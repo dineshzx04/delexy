@@ -1,11 +1,11 @@
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import AuthLayout from './layouts/AuthLayout';
-import DashboardLayout from './layouts/DashboardLayout';
-import { WorkspaceProvider } from './contexts/WorkspaceContext';
+import { WorkspaceProvider, useWorkspace } from './contexts/WorkspaceContext';
 import { BreadcrumbProvider } from './contexts/BreadcrumbContext';
 import ErrorBoundary from './components/ErrorBoundary';
 
+import AuthLayout from './layouts/AuthLayout';
+import DashboardLayout from './layouts/DashboardLayout';
 // Auth Pages
 import LandingPage from './pages/auth/LandingPage';
 import Login from './pages/auth/Login';
@@ -24,8 +24,25 @@ import SecuritySettings from './pages/dashboard/SecuritySettings';
 import ActiveSessions from './pages/dashboard/ActiveSessions';
 import Dashboard from './pages/dashboard/Dashboard';
 import PlaceholderPage from './pages/dashboard/PlaceholderPage';
+import RolesList from './pages/dashboard/rbac/RolesList';
+import RoleEditor from './pages/dashboard/rbac/RoleEditor';
+import TeamManagement from './pages/dashboard/team/TeamManagement';
 import PlatformLayout from './layouts/PlatformLayout';
-import { useWorkspace } from './contexts/WorkspaceContext';
+import PlatformDashboard from './pages/platform/PlatformDashboard';
+import PlatformTeam from './pages/platform/PlatformTeam';
+import PlatformRolesList from './pages/platform/rbac/PlatformRolesList';
+import PlatformRoleEditor from './pages/platform/rbac/PlatformRoleEditor';
+import Attributes from './pages/platform/attributes/Attributes';
+import AttributeValues from './pages/platform/attributes/AttributeValues';
+import AttributeGroups from './pages/platform/attributes/AttributeGroups';
+import AttributeMapping from './pages/platform/attributes/AttributeMapping';
+import CategoryManagement from './pages/platform/CategoryManagement';
+import PlatformProducts from './pages/platform/PlatformProducts';
+import PlatformProductReview from './pages/platform/PlatformProductReview';
+import PlatformCatalog from './pages/platform/PlatformCatalog';
+import UserProductsList from './pages/tenant/products/UserProductsList';
+import ProductBuilder from './pages/tenant/products/ProductBuilder';
+import GlobalCatalog from './pages/tenant/catalog/GlobalCatalog';
 
 const ActiveLayout: React.FC = () => {
   const { activeWorkspace } = useWorkspace();
@@ -63,6 +80,7 @@ const App: React.FC = () => {
             <Route element={<ErrorBoundary />}>
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="profile" element={<UserProfile />} />
+              <Route path="settings" element={<Navigate to="/settings/account" replace />} />
               <Route path="settings/account" element={<AccountSettings />} />
               <Route path="settings/security" element={<SecuritySettings />} />
               <Route path="settings/sessions" element={<ActiveSessions />} />
@@ -73,29 +91,48 @@ const App: React.FC = () => {
           <Route path="/" element={<DashboardLayout />}>
             <Route element={<ErrorBoundary />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
-              
+
+              {/* Tenant Specific Routes */}
+              <Route path="user-management" element={<TeamManagement />} />
+              <Route path="rbac" element={<Navigate to="/rbac/roles" replace />} />
+              <Route path="rbac/roles" element={<RolesList />} />
+              <Route path="rbac/roles/new" element={<RoleEditor />} />
+              <Route path="rbac/roles/:id" element={<RoleEditor />} />
+
               {/* Tenant & Individual Specific Routes */}
+              <Route path="catalog" element={<GlobalCatalog />} />
               <Route path="rfqs" element={<PlaceholderPage />} />
-              <Route path="products" element={<PlaceholderPage />} />
+              <Route path="products" element={<UserProductsList />} />
+              <Route path="products/new" element={<ProductBuilder />} />
+              <Route path="products/:id/edit" element={<ProductBuilder />} />
               <Route path="orders" element={<PlaceholderPage />} />
               <Route path="suppliers" element={<PlaceholderPage />} />
               <Route path="manufacturer" element={<PlaceholderPage />} />
-              
-              {/* Tenant Specific Placeholder Routes */}
-              <Route path="user-management" element={<PlaceholderPage />} />
-              <Route path="rbac" element={<PlaceholderPage />} />
             </Route>
           </Route>
 
           {/* Platform Routes */}
           <Route path="/platform" element={<PlatformLayout />}>
             <Route element={<ErrorBoundary />}>
-              <Route index element={<Dashboard />} />
-              <Route path="attribute-values" element={<PlaceholderPage />} />
-              <Route path="attributes" element={<PlaceholderPage />} />
-              <Route path="groups" element={<PlaceholderPage />} />
-              <Route path="category" element={<PlaceholderPage />} />
-              <Route path="platform-products" element={<PlaceholderPage />} />
+              <Route index element={<PlatformDashboard />} />
+              <Route path="dashboard" element={<PlatformDashboard />} />
+
+              <Route path="members" element={<PlatformTeam />} />
+              <Route path="rbac/roles" element={<PlatformRolesList />} />
+              <Route path="rbac/roles/new" element={<PlatformRoleEditor />} />
+              <Route path="rbac/roles/:id" element={<PlatformRoleEditor />} />
+              <Route path="rbac" element={<Navigate to="/platform/rbac/roles" replace />} />
+
+              <Route path="attributes" element={<Attributes />} />
+              <Route path="attributes/values" element={<AttributeValues />} />
+              <Route path="attributes/groups" element={<AttributeGroups />} />
+              <Route path="attributes/mapping" element={<AttributeMapping />} />
+
+              <Route path="category" element={<CategoryManagement />} />
+              <Route path="platform-products" element={<PlatformProducts />} />
+              <Route path="user-products" element={<PlatformProductReview />} />
+              <Route path="catalog" element={<PlatformCatalog />} />
+              
             </Route>
           </Route>
 

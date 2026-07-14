@@ -59,7 +59,7 @@ const PlatformLayout: React.FC = () => {
   const breadcrumbItems = customBreadcrumbs || [];
 
   const selectedKey = pathParts[pathParts.length - 1] || 'profile';
-  console.log(selectedKey)
+
   const workspaceMenuItems = workspaces.map((ws) => ({
     key: ws.id,
     label: (
@@ -94,12 +94,25 @@ const PlatformLayout: React.FC = () => {
       ]
     };
     return [
-      { key: 'dashboard', icon: <Lucide.Globe size={16} />, label: <Link to="/dashboard">Global Overview</Link> },
-      { key: 'attribute-values', icon: <Lucide.Tags size={16} />, label: <Link to="/platform/attribute-values">Attribute Values</Link> },
-      { key: 'attributes', icon: <Lucide.List size={16} />, label: <Link to="/platform/attributes">Attributes</Link> },
-      { key: 'groups', icon: <Lucide.Layers size={16} />, label: <Link to="/platform/groups">Groups</Link> },
-      { key: 'category', icon: <Lucide.FolderTree size={16} />, label: <Link to="/platform/category">Category</Link> },
+      { key: 'dashboard', icon: <Lucide.Globe size={16} />, label: <Link to="/platform">Global Overview</Link> },
+      { key: 'members', icon: <Lucide.Users size={16} />, label: <Link to="/platform/members">Platform Team</Link> },
+      { key: 'rbac', icon: <Lucide.Shield size={16} />, label: <Link to="/platform/rbac">Platform RBAC</Link> },
+      { type: 'divider' },
+      {
+        key: 'attributes',
+        icon: <Lucide.Layers size={16} />,
+        label: 'Attributes',
+        children: [
+          { key: 'groups', label: <Link to="/platform/attributes/groups">Attribute Groups</Link> },
+          { key: 'attributes', label: <Link to="/platform/attributes">Attributes</Link> },
+          { key: 'values', label: <Link to="/platform/attributes/values">Attribute Values</Link> },
+          { key: 'mapping', label: <Link to="/platform/attributes/mapping">Mapping Matrix</Link> }
+        ]
+      },
+      { key: 'category', icon: <Lucide.FolderTree size={16} />, label: <Link to="/platform/category">Categories</Link> },
       { key: 'platform-products', icon: <Lucide.Package size={16} />, label: <Link to="/platform/platform-products">Platform Products</Link> },
+      { key: 'user-products', icon: <Lucide.ClipboardCheck size={16} />, label: <Link to="/platform/user-products">User Product Reviews</Link> },
+      { key: 'platform-catalog', icon: <Lucide.Store size={16} />, label: <Link to="/platform/catalog">Live Catalog</Link> },
       { type: 'divider' },
       baseSettings
     ];
@@ -180,7 +193,7 @@ const PlatformLayout: React.FC = () => {
               <AntBreadcrumb
                 items={[
                   {
-                    title: <Link to="/" className="px-1">
+                    title: <Link to="/platform" className="px-1">
                       <Lucide.Home size={14} className="h-full text-gray-500 hover:text-sky-600 transition-colors" />
                     </Link>
                   },

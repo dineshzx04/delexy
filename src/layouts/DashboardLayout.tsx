@@ -95,8 +95,10 @@ const DashboardLayout: React.FC = () => {
     };
 
     const individualMenus = [
-      { key: 'dashboard', icon: <Lucide.LayoutDashboard size={16} />, label: <Link to="/dashboard">Dashboard</Link> },
-      { key: 'rfqs', icon: <Lucide.FileText size={16} />, label: <Link to="/rfqs">RFQs</Link> },
+      { key: 'dashboard', icon: <Lucide.LayoutDashboard size={16} />, label: <Link to="/dashboard">Dashboard Overview</Link> },
+      { key: 'catalog', icon: <Lucide.Store size={16} />, label: <Link to="/catalog">Global Marketplace</Link> },
+      { type: 'divider' },
+      { key: 'user-management', icon: <Lucide.Users size={16} />, label: <Link to="/user-management">My Team</Link> },
       { key: 'products', icon: <Lucide.Package size={16} />, label: <Link to="/products">Products</Link> },
       { key: 'orders', icon: <Lucide.ShoppingCart size={16} />, label: <Link to="/orders">Orders</Link> },
       { key: 'suppliers', icon: <Lucide.Users size={16} />, label: <Link to="/suppliers">Suppliers</Link> },
