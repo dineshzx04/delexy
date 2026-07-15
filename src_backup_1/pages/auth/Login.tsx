@@ -9,7 +9,7 @@ const Login: React.FC = () => {
   const onFinish = (values: any) => {
     console.log('Login values:', values);
     // Simulate login and redirect to 2FA or App
-    navigate('/auth/2fa');
+    navigate('/2fa');
   };
 
   return (
@@ -46,7 +46,7 @@ const Login: React.FC = () => {
           <AntForm.Item name="remember" valuePropName="checked" noStyle>
             <AntCheckbox className="text-slate-600">Remember me</AntCheckbox>
           </AntForm.Item>
-          <Link to="/auth/forgot-password" className="text-sky-600 hover:text-sky-700 font-medium text-sm">
+          <Link to="/forgot-password" className="text-sky-600 hover:text-sky-700 font-medium text-sm">
             Forgot password?
           </Link>
         </div>
@@ -71,7 +71,7 @@ const Login: React.FC = () => {
 
       <div className="text-center text-slate-500 mt-8">
         Don't have an account?{' '}
-        <Link to="/auth/register" className="text-sky-600 font-semibold hover:text-sky-700">
+        <Link to="/register" className="text-sky-600 font-semibold hover:text-sky-700">
           Sign up
         </Link>
       </div>

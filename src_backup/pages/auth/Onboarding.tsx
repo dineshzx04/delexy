@@ -12,7 +12,7 @@ const Onboarding = () => {
     if (selectedOption === 'individual') {
       navigate(PATHS.DASHBOARD);
     } else if (selectedOption === 'organization') {
-      navigate('/auth/create-organization');
+      navigate('/create-organization');
     }
   };
 
@@ -27,13 +27,12 @@ const Onboarding = () => {
 
       <div className="space-y-4 mb-8">
         {/* Individual Option */}
-        <div 
+        <div
           onClick={() => setSelectedOption('individual')}
-          className={`relative p-5 border-2 rounded-xl cursor-pointer transition-all duration-200 flex items-start gap-4 ${
-            selectedOption === 'individual' 
-              ? 'border-primary-500 bg-primary-50/50' 
+          className={`relative p-5 border-2 rounded-xl cursor-pointer transition-all duration-200 flex items-start gap-4 ${selectedOption === 'individual'
+              ? 'border-primary-500 bg-primary-50/50'
               : 'border-gray-200 hover:border-primary-200 hover:bg-gray-50'
-          }`}
+            }`}
         >
           <div className={`p-3 rounded-lg flex-shrink-0 ${selectedOption === 'individual' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
             <User size={24} />
@@ -54,13 +53,12 @@ const Onboarding = () => {
         </div>
 
         {/* Organization Option */}
-        <div 
+        <div
           onClick={() => setSelectedOption('organization')}
-          className={`relative p-5 border-2 rounded-xl cursor-pointer transition-all duration-200 flex items-start gap-4 ${
-            selectedOption === 'organization' 
-              ? 'border-primary-500 bg-primary-50/50' 
+          className={`relative p-5 border-2 rounded-xl cursor-pointer transition-all duration-200 flex items-start gap-4 ${selectedOption === 'organization'
+              ? 'border-primary-500 bg-primary-50/50'
               : 'border-gray-200 hover:border-primary-200 hover:bg-gray-50'
-          }`}
+            }`}
         >
           <div className={`p-3 rounded-lg flex-shrink-0 ${selectedOption === 'organization' ? 'bg-primary-500 text-white' : 'bg-gray-100 text-gray-600'}`}>
             <Building2 size={24} />
@@ -81,9 +79,9 @@ const Onboarding = () => {
         </div>
       </div>
 
-      <Button 
-        type="primary" 
-        size="large" 
+      <Button
+        type="primary"
+        size="large"
         className="w-full h-12 text-base font-medium rounded-md flex items-center justify-center gap-2"
         disabled={!selectedOption}
         onClick={handleContinue}

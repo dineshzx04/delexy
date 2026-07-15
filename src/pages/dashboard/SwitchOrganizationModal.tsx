@@ -38,7 +38,7 @@ const SwitchOrganizationModal: React.FC<SwitchOrganizationModalProps> = ({ isOpe
 
   const handleCreateOrg = () => {
     onClose();
-    navigate('/auth/create-organization');
+    navigate('/create-organization');
   };
 
   return (
@@ -54,18 +54,18 @@ const SwitchOrganizationModal: React.FC<SwitchOrganizationModalProps> = ({ isOpe
         <p className="text-gray-500 mb-4 block">
           Select which workspace you want to operate in. You can also create a new organization.
         </p>
-        
+
         <ul className="mb-4 border border-gray-200 rounded-md divide-y divide-gray-200">
           {organizations.map((item) => (
-            <li 
+            <li
               key={item.id}
               className={`cursor-pointer px-4 py-3 flex items-center hover:bg-sky-50 transition-colors ${item.isActive ? 'bg-sky-50/50' : ''}`}
               onClick={onClose} // In real app, trigger context switch here
             >
-              <AntAvatar 
+              <AntAvatar
                 className="shrink-0 mr-4"
                 style={{ backgroundColor: item.type === 'tenant' ? '#f0f9ff' : '#f8fafc', color: item.type === 'tenant' ? '#0284c7' : '#475569' }}
-                icon={item.type === 'tenant' ? <Lucide.Building2 size={16} /> : <Lucide.User size={16} />} 
+                icon={item.type === 'tenant' ? <Lucide.Building2 size={16} /> : <Lucide.User size={16} />}
               />
               <div className="flex-1 flex flex-col">
                 <div className="flex items-center justify-between w-full">

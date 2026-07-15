@@ -13,10 +13,10 @@ const LandingPage: React.FC = () => {
           <span className="text-2xl font-bold tracking-tight text-slate-900">Delexy</span>
         </div>
         <div className="flex items-center gap-4">
-          <Link to="/auth/login" className="text-slate-600 hover:text-sky-600 font-medium transition-colors">
+          <Link to="/login" className="text-slate-600 hover:text-sky-600 font-medium transition-colors">
             Sign In
           </Link>
-          <Link to="/auth/register">
+          <Link to="/register">
             <AntButton type="primary" size="large" className="font-medium">
               Create Account
             </AntButton>
@@ -35,14 +35,14 @@ const LandingPage: React.FC = () => {
         <p className="text-lg lg:text-xl text-slate-600 max-w-2xl mb-10 leading-relaxed">
           Delexy connects global engineering suppliers with enterprise buyers. Manage RFQs, track procurement, and scale your supply chain in one unified platform.
         </p>
-        
+
         <div className="flex flex-col sm:flex-row items-center gap-4">
-          <Link to="/auth/register">
+          <Link to="/register">
             <AntButton type="primary" size="large" className="h-14 px-8 text-lg font-medium flex items-center gap-2">
               Start Sourcing Now <Lucide.ArrowRight size={20} />
             </AntButton>
           </Link>
-          <Link to="/auth/login">
+          <Link to="/login">
             <AntButton size="large" className="h-14 px-8 text-lg font-medium">
               Access Supplier Portal
             </AntButton>

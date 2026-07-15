@@ -1,9 +1,9 @@
 export const PATHS = {
   // Auth
-  LOGIN: '/auth/login',
-  REGISTER: '/auth/register',
-  ONBOARDING: '/auth/onboarding',
-  CREATE_ORG: '/auth/create-organization',
+  LOGIN: '/login',
+  REGISTER: '/register',
+  ONBOARDING: '/onboarding',
+  CREATE_ORG: '/create-organization',
 
   // Public / Marketplace
   HOME: '/',
@@ -15,7 +15,7 @@ export const PATHS = {
   DASHBOARD: '/dashboard',
   SELLER_PRODUCTS: '/dashboard/seller/products',
   RFQS: '/dashboard/rfqs',
-  
+
   // User specific
   USER_ORDERS: '/dashboard/user-orders',
   USER_SETTINGS: '/dashboard/user-settings',

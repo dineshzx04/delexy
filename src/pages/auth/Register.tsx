@@ -1,13 +1,18 @@
 import React from 'react';
-import { Form as AntForm, Input as AntInput, Button as AntButton, Divider as AntDivider } from 'antd';
+import { Input as AntInput, Button as AntButton, Divider as AntDivider } from 'antd';
 import { Link, useNavigate } from 'react-router-dom';
+import { useForm, Controller } from 'react-hook-form';
+import FormItem from '../../components/common/FormItem';
 
 const Register: React.FC = () => {
   const navigate = useNavigate();
+  const { control, handleSubmit, formState: { errors } } = useForm({
+    defaultValues: { firstName: '', lastName: '', email: '', password: '' }
+  });
 
   const onFinish = (values: any) => {
     console.log('Register values:', values);
-    navigate('/auth/verify-email');
+    navigate('/verify-email');
   };
 
   return (
@@ -17,63 +22,92 @@ const Register: React.FC = () => {
         <p className="text-slate-500">Join Delexy to start streamlining your engineering procurement.</p>
       </div>
 
-      <AntForm
-        name="register"
-        layout="vertical"
-        onFinish={onFinish}
-        size="large"
-      >
+      <form onSubmit={handleSubmit(onFinish)} className="space-y-4">
         <div className="flex gap-4 w-full">
           <div className="flex-1">
-            <AntForm.Item
-              label={<span className="font-medium text-slate-700">First Name</span>}
-              name="firstName"
-              rules={[{ required: true, message: 'First name is required' }]}
+            <FormItem 
+              label="First Name" 
+              required 
+              error={errors.firstName?.message as string}
             >
-              <AntInput placeholder="John" />
-            </AntForm.Item>
+              <Controller
+                name="firstName"
+                control={control}
+                rules={{ required: 'First name is required' }}
+                render={({ field }) => (
+                  <AntInput {...field} size="large" status={errors.firstName ? 'error' : ''} placeholder="John" />
+                )}
+              />
+            </FormItem>
           </div>
           <div className="flex-1">
-            <AntForm.Item
-              label={<span className="font-medium text-slate-700">Last Name</span>}
-              name="lastName"
-              rules={[{ required: true, message: 'Last name is required' }]}
+            <FormItem 
+              label="Last Name" 
+              required 
+              error={errors.lastName?.message as string}
             >
-              <AntInput placeholder="Doe" />
-            </AntForm.Item>
+              <Controller
+                name="lastName"
+                control={control}
+                rules={{ required: 'Last name is required' }}
+                render={({ field }) => (
+                  <AntInput {...field} size="large" status={errors.lastName ? 'error' : ''} placeholder="Doe" />
+                )}
+              />
+            </FormItem>
           </div>
         </div>
 
-        <AntForm.Item
-          label={<span className="font-medium text-slate-700">Work Email Address</span>}
-          name="email"
-          rules={[{ required: true, message: 'Please input your work email!' }, { type: 'email', message: 'Invalid email address' }]}
+        <FormItem 
+          label="Work Email Address" 
+          required 
+          error={errors.email?.message as string}
         >
-          <AntInput placeholder="name@company.com" />
-        </AntForm.Item>
+          <Controller
+            name="email"
+            control={control}
+            rules={{ 
+              required: 'Please input your work email!', 
+              pattern: { value: /^\S+@\S+$/i, message: 'Invalid email address' } 
+            }}
+            render={({ field }) => (
+              <AntInput {...field} size="large" status={errors.email ? 'error' : ''} placeholder="name@company.com" />
+            )}
+          />
+        </FormItem>
 
-        <AntForm.Item
-          label={<span className="font-medium text-slate-700">Password</span>}
-          name="password"
-          rules={[{ required: true, message: 'Please create a password!' }, { min: 8, message: 'Must be at least 8 characters.' }]}
+        <FormItem 
+          label="Password" 
+          required 
+          error={errors.password?.message as string}
         >
-          <AntInput.Password placeholder="Create a strong password" />
-        </AntForm.Item>
+          <Controller
+            name="password"
+            control={control}
+            rules={{ 
+              required: 'Please create a password!',
+              minLength: { value: 8, message: 'Must be at least 8 characters.' }
+            }}
+            render={({ field }) => (
+              <AntInput.Password {...field} size="large" status={errors.password ? 'error' : ''} placeholder="Create a strong password" />
+            )}
+          />
+        </FormItem>
 
         <div className="text-sm text-slate-500 mb-6">
           By signing up, you agree to our <a href="#" className="text-sky-600 hover:underline">Terms of Service</a> and <a href="#" className="text-sky-600 hover:underline">Privacy Policy</a>.
         </div>
 
-        <AntForm.Item>
+        <div className="mt-4">
           <AntButton type="primary" htmlType="submit" className="w-full bg-sky-600 hover:bg-sky-700" size="large">
             Create Account
           </AntButton>
-        </AntForm.Item>
-      </AntForm>
+        </div>
+      </form>
 
       <div className="text-center text-slate-500 mt-6">
         Already have an account?{' '}
-        <Link to="/auth/login" className="text-sky-600 font-semibold hover:text-sky-700">
+        <Link to="/login" className="text-sky-600 font-semibold hover:text-sky-700">
           Sign in
         </Link>
       </div>

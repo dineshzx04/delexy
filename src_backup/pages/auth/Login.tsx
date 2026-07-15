@@ -46,7 +46,7 @@ const Login = () => {
           label={
             <div className="flex justify-between w-full">
               <span className="font-medium text-gray-700">Password</span>
-              <Link to="/auth/forgot-password" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+              <Link to="/forgot-password" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
                 Forgot password?
               </Link>
             </div>
@@ -78,7 +78,7 @@ const Login = () => {
 
       <div className="mt-8 text-center text-gray-600">
         Don't have an account?{' '}
-        <Link to="/auth/register" className="text-primary-600 hover:text-primary-700 font-semibold">
+        <Link to="/register" className="text-primary-600 hover:text-primary-700 font-semibold">
           Create an account
         </Link>
       </div>

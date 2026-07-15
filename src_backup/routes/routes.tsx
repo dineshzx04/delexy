@@ -8,10 +8,10 @@ import AdminLayout from '../layouts/AdminLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
 
 // Auth Pages
-import Login from '../pages/auth/Login';
-import Register from '../pages/auth/Register';
-import Onboarding from '../pages/auth/Onboarding';
-import CreateOrganization from '../pages/auth/CreateOrganization';
+import Login from '../pages/Login';
+import Register from '../pages/Register';
+import Onboarding from '../pages/Onboarding';
+import CreateOrganization from '../pages/CreateOrganization';
 
 // Admin Pages
 import AdminDashboard from '../pages/admin/AdminDashboard';
@@ -48,7 +48,7 @@ export const AppRoutes = () => {
         <Route path={PATHS.PRODUCTS.substring(1)} element={<ProductList />} />
         <Route path="product/:id" element={<ProductDetail />} />
         <Route path={PATHS.CART.substring(1)} element={<Cart />} />
-        
+
         <Route path="dashboard" element={<DashboardOverview />} />
         <Route path="dashboard/seller/products" element={<SellerProducts />} />
         <Route path="dashboard/rfqs" element={<RfqManagement />} />

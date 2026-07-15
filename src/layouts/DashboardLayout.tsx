@@ -98,7 +98,6 @@ const DashboardLayout: React.FC = () => {
       { key: 'dashboard', icon: <Lucide.LayoutDashboard size={16} />, label: <Link to="/dashboard">Dashboard Overview</Link> },
       { key: 'catalog', icon: <Lucide.Store size={16} />, label: <Link to="/catalog">Global Marketplace</Link> },
       { type: 'divider' },
-      { key: 'user-management', icon: <Lucide.Users size={16} />, label: <Link to="/user-management">My Team</Link> },
       { key: 'products', icon: <Lucide.Package size={16} />, label: <Link to="/products">Products</Link> },
       { key: 'orders', icon: <Lucide.ShoppingCart size={16} />, label: <Link to="/orders">Orders</Link> },
       { key: 'suppliers', icon: <Lucide.Users size={16} />, label: <Link to="/suppliers">Suppliers</Link> },
@@ -108,8 +107,8 @@ const DashboardLayout: React.FC = () => {
     if (activeWorkspace.type === 'tenant') {
       return [
         ...individualMenus,
-        { key: 'user-management', icon: <Lucide.UserCog size={16} />, label: <Link to="/user-management">User Management</Link> },
-        { key: 'rbac', icon: <Lucide.Shield size={16} />, label: <Link to="/rbac">RBAC Settings</Link> },
+        { key: 'user-management', icon: <Lucide.Users size={16} />, label: <Link to="/user-management">My Team</Link> },
+        { key: 'rbac', icon: <Lucide.Shield size={16} />, label: <Link to="/rbac">Roles & Permission</Link> },
         { type: 'divider' },
         baseSettings
       ];

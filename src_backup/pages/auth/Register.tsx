@@ -9,7 +9,7 @@ const Register = () => {
   const onFinish = (values: any) => {
     console.log('Success:', values);
     // After registration, redirect to onboarding flow to choose between Individual or Org
-    navigate('/auth/onboarding');
+    navigate('/onboarding');
   };
 
   return (
@@ -108,7 +108,7 @@ const Register = () => {
 
       <div className="mt-8 text-center text-gray-600">
         Already have an account?{' '}
-        <Link to="/auth/login" className="text-primary-600 hover:text-primary-700 font-semibold">
+        <Link to="/login" className="text-primary-600 hover:text-primary-700 font-semibold">
           Log in instead
         </Link>
       </div>

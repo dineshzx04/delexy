@@ -33,9 +33,9 @@ const CreateOrganization = () => {
           rules={[{ required: true, message: 'Please input the organization name!' }]}
           className="mb-5"
         >
-          <Input 
-            prefix={<Building2 size={18} className="text-gray-400 mr-2" />} 
-            placeholder="Acme Engineering Ltd." 
+          <Input
+            prefix={<Building2 size={18} className="text-gray-400 mr-2" />}
+            placeholder="Acme Engineering Ltd."
             className="rounded-md"
           />
         </Form.Item>
@@ -45,9 +45,9 @@ const CreateOrganization = () => {
           name="website"
           className="mb-5"
         >
-          <Input 
-            prefix={<Globe size={18} className="text-gray-400 mr-2" />} 
-            placeholder="acme-engineering.com" 
+          <Input
+            prefix={<Globe size={18} className="text-gray-400 mr-2" />}
+            placeholder="acme-engineering.com"
             className="rounded-md"
           />
         </Form.Item>
@@ -58,7 +58,7 @@ const CreateOrganization = () => {
           rules={[{ required: true, message: 'Please select company size!' }]}
           className="mb-8"
         >
-          <Select 
+          <Select
             placeholder="Select number of employees"
             suffixIcon={<Users size={16} className="text-gray-400" />}
             className="rounded-md h-11"
@@ -73,16 +73,16 @@ const CreateOrganization = () => {
         </Form.Item>
 
         <div className="flex gap-4">
-          <Button 
-            type="default" 
+          <Button
+            type="default"
             className="w-1/3 h-11 text-base font-medium rounded-md"
-            onClick={() => navigate('/auth/onboarding')}
+            onClick={() => navigate('/onboarding')}
           >
             Back
           </Button>
-          <Button 
-            type="primary" 
-            htmlType="submit" 
+          <Button
+            type="primary"
+            htmlType="submit"
             className="w-2/3 h-11 text-base font-medium rounded-md"
           >
             Create Organization

@@ -27,7 +27,7 @@ const ForgotPassword: React.FC = () => {
             showIcon
             className="mb-6"
           />
-          <Link to="/auth/login">
+          <Link to="/login">
             <AntButton size="large" className="w-full">Return to login</AntButton>
           </Link>
         </div>
@@ -55,7 +55,7 @@ const ForgotPassword: React.FC = () => {
       )}
 
       {!submitted && (
-        <Link to="/auth/login" className="flex items-center justify-center text-slate-500 hover:text-slate-900 font-medium mt-6">
+        <Link to="/login" className="flex items-center justify-center text-slate-500 hover:text-slate-900 font-medium mt-6">
           <Lucide.ArrowLeft size={16} className="mr-2" /> Back to log in
         </Link>
       )}

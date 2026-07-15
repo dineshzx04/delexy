@@ -7,15 +7,15 @@ import { BreadcrumbProvider } from './contexts/BreadcrumbContext';
 import ErrorBoundary from './components/ErrorBoundary';
 
 // Auth Pages
-import LandingPage from './pages/auth/LandingPage';
-import Login from './pages/auth/Login';
-import Register from './pages/auth/Register';
-import EmailVerification from './pages/auth/EmailVerification';
-import ForgotPassword from './pages/auth/ForgotPassword';
-import ResetPassword from './pages/auth/ResetPassword';
-import TwoFactorAuth from './pages/auth/TwoFactorAuth';
-import CreateOrganization from './pages/auth/CreateOrganization';
-import JoinOrganization from './pages/auth/JoinOrganization';
+import LandingPage from './pages/LandingPage';
+import Login from './pages/Login';
+import Register from './pages/Register';
+import EmailVerification from './pages/EmailVerification';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+import TwoFactorAuth from './pages/TwoFactorAuth';
+import CreateOrganization from './pages/CreateOrganization';
+import JoinOrganization from './pages/JoinOrganization';
 
 // Dashboard Pages
 import UserProfile from './pages/dashboard/UserProfile';
@@ -47,14 +47,14 @@ const App: React.FC = () => {
           {/* Auth Routes */}
           <Route element={<AuthLayout />}>
             <Route element={<ErrorBoundary />}>
-              <Route path="/auth/login" element={<Login />} />
-              <Route path="/auth/register" element={<Register />} />
-              <Route path="/auth/verify-email" element={<EmailVerification />} />
-              <Route path="/auth/forgot-password" element={<ForgotPassword />} />
-              <Route path="/auth/reset-password" element={<ResetPassword />} />
-              <Route path="/auth/2fa" element={<TwoFactorAuth />} />
-              <Route path="/auth/create-organization" element={<CreateOrganization />} />
-              <Route path="/auth/join-organization" element={<JoinOrganization />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/verify-email" element={<EmailVerification />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/2fa" element={<TwoFactorAuth />} />
+              <Route path="/create-organization" element={<CreateOrganization />} />
+              <Route path="/join-organization" element={<JoinOrganization />} />
             </Route>
           </Route>
 
@@ -73,14 +73,14 @@ const App: React.FC = () => {
           <Route path="/" element={<DashboardLayout />}>
             <Route element={<ErrorBoundary />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
-              
+
               {/* Tenant & Individual Specific Routes */}
               <Route path="rfqs" element={<PlaceholderPage />} />
               <Route path="products" element={<PlaceholderPage />} />
               <Route path="orders" element={<PlaceholderPage />} />
               <Route path="suppliers" element={<PlaceholderPage />} />
               <Route path="manufacturer" element={<PlaceholderPage />} />
-              
+
               {/* Tenant Specific Placeholder Routes */}
               <Route path="user-management" element={<PlaceholderPage />} />
               <Route path="rbac" element={<PlaceholderPage />} />

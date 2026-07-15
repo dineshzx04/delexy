@@ -69,7 +69,7 @@ const TwoFactorAuth: React.FC = () => {
         Didn't receive the code? <button className="text-sky-600 font-semibold hover:underline">Resend</button>
       </div>
 
-      <Link to="/auth/login" className="flex items-center justify-center text-slate-500 hover:text-slate-900 font-medium">
+      <Link to="/login" className="flex items-center justify-center text-slate-500 hover:text-slate-900 font-medium">
         <Lucide.ArrowLeft size={16} className="mr-2" /> Back to log in
       </Link>
     </div>

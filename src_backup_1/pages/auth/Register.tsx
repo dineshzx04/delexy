@@ -7,7 +7,7 @@ const Register: React.FC = () => {
 
   const onFinish = (values: any) => {
     console.log('Register values:', values);
-    navigate('/auth/verify-email');
+    navigate('/verify-email');
   };
 
   return (
@@ -73,7 +73,7 @@ const Register: React.FC = () => {
 
       <div className="text-center text-slate-500 mt-6">
         Already have an account?{' '}
-        <Link to="/auth/login" className="text-sky-600 font-semibold hover:text-sky-700">
+        <Link to="/login" className="text-sky-600 font-semibold hover:text-sky-700">
           Sign in
         </Link>
       </div>
