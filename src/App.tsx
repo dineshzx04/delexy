@@ -31,7 +31,6 @@ import AttributeMapping from './pages/platform/attributes/AttributeMapping';
 import CategoryManagement from './pages/platform/CategoryManagement';
 import PlatformProducts from './pages/platform/PlatformProducts';
 import PlatformProductReview from './pages/platform/PlatformProductReview';
-import PlatformCatalog from './pages/platform/PlatformCatalog';
 import UserProductsList from './pages/tenant/products/UserProductsList';
 import ProductBuilder from './pages/tenant/products/ProductBuilder';
 import GlobalCatalog from './pages/tenant/catalog/GlobalCatalog';
@@ -132,7 +131,7 @@ const App: React.FC = () => {
               <Route path="category" element={<CategoryManagement />} />
               <Route path="platform-products" element={<PlatformProducts />} />
               <Route path="user-products" element={<PlatformProductReview />} />
-              <Route path="catalog" element={<PlatformCatalog />} />
+              {/* Note: PlatformCatalog was merged into PlatformProductReview */}
 
             </Route>
           </Route>

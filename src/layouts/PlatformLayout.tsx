@@ -111,8 +111,7 @@ const PlatformLayout: React.FC = () => {
       },
       { key: 'category', icon: <Lucide.FolderTree size={16} />, label: <Link to="/platform/category">Categories</Link> },
       { key: 'platform-products', icon: <Lucide.Package size={16} />, label: <Link to="/platform/platform-products">Platform Products</Link> },
-      { key: 'user-products', icon: <Lucide.ClipboardCheck size={16} />, label: <Link to="/platform/user-products">User Product Reviews</Link> },
-      { key: 'platform-catalog', icon: <Lucide.Store size={16} />, label: <Link to="/platform/catalog">Live Catalog</Link> },
+      { key: 'user-products', icon: <Lucide.ClipboardCheck size={16} />, label: <Link to="/platform/user-products">User Products</Link> },
       { type: 'divider' },
       baseSettings
     ];
