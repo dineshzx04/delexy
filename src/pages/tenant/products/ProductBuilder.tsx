@@ -7,6 +7,7 @@ import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
 import WorkflowTimeline, { type ProductStatus } from '../../../components/common/WorkflowTimeline';
 import CategoryPicker from '../../../components/common/CategoryPicker';
 import FormItem from '../../../components/common/FormItem';
+import { getProductById, createProduct, updateProduct, type Product, type FieldReview } from '../../../data/mockProducts';
 
 // Mock Platform Products for the selector
 const PLATFORM_PRODUCTS = [
@@ -57,7 +58,7 @@ const getDynamicAttributeGroups = (categoryId: string) => {
 };
 
 // Local component to prevent full table re-render on keystrokes
-const VariantInput = ({ value, onChange, prefix }: { value: number, onChange: (val: number) => void, prefix?: string }) => {
+const VariantInput = ({ value, onChange, prefix, disabled }: { value: number, onChange: (val: number) => void, prefix?: string, disabled?: boolean }) => {
   const [localValue, setLocalValue] = useState(value);
 
   useEffect(() => {
@@ -71,8 +72,25 @@ const VariantInput = ({ value, onChange, prefix }: { value: number, onChange: (v
       onChange={(e) => setLocalValue(e.target.value as any)}
       onBlur={() => onChange(Number(localValue))}
       prefix={prefix}
+      disabled={disabled}
     />
   );
+};
+
+const FieldReviewAlert = ({ entityKey, reviewData }: { entityKey: string, reviewData: Record<string, FieldReview> }) => {
+  const review = reviewData[entityKey];
+  if (review?.status === 'rejected') {
+    return (
+      <div className="mt-1 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200 flex items-start gap-1.5">
+        <Lucide.AlertCircle size={14} className="shrink-0 mt-0.5" />
+        <div>
+          <span className="font-semibold block">Platform Rejected:</span>
+          {review.comment || 'No comment provided.'}
+        </div>
+      </div>
+    );
+  }
+  return null;
 };
 
 const ProductBuilder: React.FC = () => {
@@ -84,6 +102,9 @@ const ProductBuilder: React.FC = () => {
   const [currentStatus, setCurrentStatus] = useState<ProductStatus>('Draft');
   const [selectedPlatformProduct, setSelectedPlatformProduct] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [reviewData, setReviewData] = useState<Record<string, FieldReview>>({});
+
+  const isReadOnly = ['Submitted', 'Under Review', 'Approved', 'Published'].includes(currentStatus);
 
   // Dynamic Variant State
   const dynamicAttributesValues = watch('dynamicAttributes') || {};
@@ -177,14 +198,37 @@ const ProductBuilder: React.FC = () => {
   }, [JSON.stringify(dynamicAttributesValues), selectedPlatformProduct, dynamicAttributeGroups]);
 
   useEffect(() => {
-    // Mock loading an existing product's status
     if (id) {
-      if (id === 'tp-2') setCurrentStatus('Under Review');
-      else if (id === 'tp-3') setCurrentStatus('Changes Requested');
-      else if (id === 'tp-5') setCurrentStatus('Resubmitted');
-      else setCurrentStatus('Draft');
+      const prod = getProductById(id);
+      if (prod) {
+        setCurrentStatus(prod.status);
+        setReviewData(prod.reviewData || {});
+        
+        // Load the stored data into the form
+        if (prod.payload) {
+          const pd = prod.payload.productData || {};
+          Object.keys(pd).forEach(key => {
+            setValue(key, pd[key]);
+          });
+          
+          if (pd.categoryId) {
+            setSelectedCategory(pd.categoryId);
+          }
+          if (pd.platformProductId) {
+             const pp = PLATFORM_PRODUCTS.find(p => p.id === pd.platformProductId) || 
+               { id: pd.platformProductId, name: 'Loaded Template', categoryId: pd.categoryId, categoryName: 'Unknown' };
+             setSelectedPlatformProduct(pp);
+          }
+
+          // If variants and global specs exist, we can force them to state
+          // Note: The dynamic attribute logic above will try to overwrite them if dynamicAttributes values change.
+          // To make this fully robust, we would load `pd.dynamicAttributes` so the useEffect recreates them exactly.
+          if (prod.payload.variants) setVariants(prod.payload.variants);
+          if (prod.payload.globalSpecs) setGlobalSpecs(prod.payload.globalSpecs);
+        }
+      }
     }
-  }, [id]);
+  }, [id, setValue]);
 
   const handleCategorySelect = (value: string) => {
     setSelectedCategory(value);
@@ -234,14 +278,35 @@ const ProductBuilder: React.FC = () => {
   const confirmSave = () => {
     if (!pendingStatus) return;
     const values = getValues();
-    const mockPayload = {
+    
+    // Unify payload
+    const payload = {
       productData: values,
       globalSpecs: globalSpecs,
-      variants: variants,
-      status: pendingStatus
+      variants: variants
     };
 
-    console.log('Product Data Saved:', mockPayload);
+    if (id) {
+      updateProduct(id, {
+        status: pendingStatus,
+        payload,
+        name: values.name || 'Untitled Product',
+        partNumber: values.partNumber || 'N/A'
+      });
+    } else {
+      createProduct({
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: values.name || 'Untitled Product',
+        categoryName: selectedCategory || 'Uncategorized',
+        partNumber: values.partNumber || 'N/A',
+        status: pendingStatus,
+        updatedAt: new Date().toISOString().split('T')[0],
+        payload,
+        reviewData: {}
+      });
+    }
+
     notification.success({
       message: pendingStatus === 'Draft' ? 'Saved as Draft' : 'Submitted for Review',
       description: `Product has been successfully processed to ${pendingStatus}.`
@@ -261,6 +326,7 @@ const ProductBuilder: React.FC = () => {
           value={record.price}
           onChange={(val: number) => updateVariant(record.id, 'price', val)}
           prefix="$"
+          disabled={isReadOnly}
         />
       )
     },
@@ -271,6 +337,7 @@ const ProductBuilder: React.FC = () => {
         <VariantInput
           value={record.stock}
           onChange={(val: number) => updateVariant(record.id, 'stock', val)}
+          disabled={isReadOnly}
         />
       )
     },
@@ -281,10 +348,19 @@ const ProductBuilder: React.FC = () => {
         <VariantInput
           value={record.minOrder}
           onChange={(val: number) => updateVariant(record.id, 'minOrder', val)}
+          disabled={isReadOnly}
         />
       )
     }
   ];
+
+  if (currentStatus === 'Changes Requested' || currentStatus === 'Resubmitted') {
+    variantColumns.push({
+      title: 'Platform Review',
+      key: 'review',
+      render: (_: any, record: any) => <FieldReviewAlert entityKey={`variant-${record.id}`} reviewData={reviewData} />
+    } as any);
+  }
 
   return (
     <div className="w-full max-w-5xl pb-20">
@@ -296,6 +372,7 @@ const ProductBuilder: React.FC = () => {
       {id && <WorkflowTimeline currentStatus={currentStatus} />}
 
       <form className="space-y-6">
+        <fieldset disabled={isReadOnly} className="space-y-6">
 
         {/* STEP 1: PLATFORM PRODUCT SELECTION */}
         <AntCard className="mb-6 shadow-sm border-gray-200">
@@ -391,29 +468,38 @@ const ProductBuilder: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-              <FormItem label="Product Name" required error={errors.name?.message as string}>
-                <Controller
-                  name="name"
-                  control={control}
-                  rules={{ required: 'Required' }}
-                  render={({ field }) => <AntInput {...field} size="large" status={errors.name ? 'error' : ''} />}
-                />
-              </FormItem>
-              <FormItem label="Model number">
-                <Controller
-                  name="modelNumber"
-                  control={control}
-                  render={({ field }) => <AntInput {...field} size="large" />}
-                />
-              </FormItem>
-              <FormItem label="Part number" required error={errors.partNumber?.message as string}>
-                <Controller
-                  name="partNumber"
-                  control={control}
-                  rules={{ required: 'Required' }}
-                  render={({ field }) => <AntInput {...field} size="large" status={errors.partNumber ? 'error' : ''} />}
-                />
-              </FormItem>
+              <div>
+                <FormItem label="Product Name" required error={errors.name?.message as string}>
+                  <Controller
+                    name="name"
+                    control={control}
+                    rules={{ required: 'Required' }}
+                    render={({ field }) => <AntInput {...field} size="large" status={errors.name ? 'error' : ''} />}
+                  />
+                </FormItem>
+                <FieldReviewAlert entityKey="prod-name" reviewData={reviewData} />
+              </div>
+              <div>
+                <FormItem label="Model number">
+                  <Controller
+                    name="modelNumber"
+                    control={control}
+                    render={({ field }) => <AntInput {...field} size="large" />}
+                  />
+                </FormItem>
+                <FieldReviewAlert entityKey="prod-model" reviewData={reviewData} />
+              </div>
+              <div>
+                <FormItem label="Part number" required error={errors.partNumber?.message as string}>
+                  <Controller
+                    name="partNumber"
+                    control={control}
+                    rules={{ required: 'Required' }}
+                    render={({ field }) => <AntInput {...field} size="large" status={errors.partNumber ? 'error' : ''} />}
+                  />
+                </FormItem>
+                <FieldReviewAlert entityKey="prod-part" reviewData={reviewData} />
+              </div>
               <FormItem label="Year of Manufacture">
                 <Controller
                   name="yearOfManufacture"
@@ -563,23 +649,26 @@ const ProductBuilder: React.FC = () => {
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                     {group.attributes.map((attr) => (
-                      <FormItem key={attr.id} label={attr.name}>
-                        <Controller
-                          name={`dynamicAttributes.${attr.id}`}
-                          control={control}
-                          render={({ field }) => (
-                            <AntSelect
-                              {...field}
-                              mode='multiple'
-                              size="large"
-                              placeholder={`Select ${attr.name}`}
-                              options={attr.options.map(opt => ({ label: opt, value: opt }))}
-                              className="w-full"
-                              showSearch
-                            />
-                          )}
-                        />
-                      </FormItem>
+                      <div key={attr.id}>
+                        <FormItem label={attr.name}>
+                          <Controller
+                            name={`dynamicAttributes.${attr.id}`}
+                            control={control}
+                            render={({ field }) => (
+                              <AntSelect
+                                {...field}
+                                mode='multiple'
+                                size="large"
+                                placeholder={`Select ${attr.name}`}
+                                options={attr.options.map(opt => ({ label: opt, value: opt }))}
+                                className="w-full"
+                                showSearch
+                              />
+                            )}
+                          />
+                        </FormItem>
+                        <FieldReviewAlert entityKey={`spec-${attr.name}`} reviewData={reviewData} />
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -656,34 +745,37 @@ const ProductBuilder: React.FC = () => {
         </div>
 
 
+        </fieldset>
       </form>
 
       {/* STICKY FOOTER ACTIONS */}
-      <div className="fixed bottom-0 right-0 w-full md:w-[calc(100%-256px)] bg-white border-t border-gray-200 p-4 flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
-        <AntButton size="large" onClick={() => navigate('/products')}>
-          Cancel
-        </AntButton>
-        <div className="flex gap-3">
-          <Tooltip title="Save locally without notifying the platform admins.">
+      {!isReadOnly && (
+        <div className="fixed bottom-0 right-0 w-full md:w-[calc(100%-256px)] bg-white border-t border-gray-200 p-4 flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-10">
+          <AntButton size="large" onClick={() => navigate('/products')}>
+            Cancel
+          </AntButton>
+          <div className="flex gap-3">
+            <Tooltip title="Save locally without notifying the platform admins.">
+              <AntButton
+                size="large"
+                onClick={() => handleInitiateSave('Draft')}
+                disabled={!selectedPlatformProduct}
+              >
+                Save Draft
+              </AntButton>
+            </Tooltip>
             <AntButton
+              type="primary"
               size="large"
-              onClick={() => handleInitiateSave('Draft')}
+              className="bg-sky-600"
+              onClick={() => handleInitiateSave(currentStatus === 'Changes Requested' ? 'Resubmitted' : 'Submitted')}
               disabled={!selectedPlatformProduct}
             >
-              Save Draft
+              {currentStatus === 'Changes Requested' ? 'Resubmit for Approval' : 'Submit for Approval'}
             </AntButton>
-          </Tooltip>
-          <AntButton
-            type="primary"
-            size="large"
-            className="bg-sky-600"
-            onClick={() => handleInitiateSave(currentStatus === 'Changes Requested' ? 'Resubmitted' : 'Submitted')}
-            disabled={!selectedPlatformProduct}
-          >
-            {currentStatus === 'Changes Requested' ? 'Resubmit for Approval' : 'Submit for Approval'}
-          </AntButton>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* REVIEW MODAL */}
       <AntModal

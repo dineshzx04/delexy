@@ -1,35 +1,20 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Table as AntTable, Input as AntInput, Button as AntButton, Tag as AntTag, Modal, Tabs as AntTabs } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
 import WorkflowTimeline, { type ProductStatus } from '../../../components/common/WorkflowTimeline';
 
-// Define the User Product type
-export interface UserProduct {
-  id: string;
-  name: string;
-  partNumber: string;
-  categoryName: string;
-  status: ProductStatus;
-  updatedAt: string;
-}
-
-// Generate Mock Data
-const generateMockProducts = (): UserProduct[] => {
-  return [
-    { id: 'tp-1', name: 'Sample product A', partNumber: '2', categoryName: 'Floating Ball Valves', status: 'Published', updatedAt: '2023-10-25' },
-    { id: 'tp-2', name: 'Micro Controller Pro', partNumber: 'MCP-REV2', categoryName: 'Logic Boards', status: 'Under Review', updatedAt: '2023-10-26' },
-    { id: 'tp-3', name: 'Heavy Duty Servo', partNumber: 'HDS-99', categoryName: 'Motors', status: 'Changes Requested', updatedAt: '2023-10-27' },
-    { id: 'tp-4', name: 'Lithium Battery Pack', partNumber: 'LBP-10AH', categoryName: 'Power Systems', status: 'Draft', updatedAt: '2023-10-28' },
-    { id: 'tp-5', name: 'Resubmitted Widget', partNumber: 'RW-1', categoryName: 'Widgets', status: 'Resubmitted', updatedAt: '2023-10-29' },
-  ];
-};
-
-const INITIAL_PRODUCTS = generateMockProducts();
+import { getProducts, type Product } from '../../../data/mockProducts';
 
 const UserProductsList: React.FC = () => {
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  // Simulate fetching products for the current tenant ('tenant-1')
+  const [products, setProducts] = useState<Product[]>([]);
+  
+  useEffect(() => {
+    setProducts(getProducts().filter(p => p.tenantId === 'tenant-1'));
+  }, []);
+
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('All');
   const [isTimelineModalVisible, setIsTimelineModalVisible] = useState(false);
@@ -82,7 +67,7 @@ const UserProductsList: React.FC = () => {
     {
       title: 'Product Info',
       key: 'info',
-      render: (_: any, record: UserProduct) => (
+      render: (_: any, record: Product) => (
         <div className="flex flex-col">
           <span className="font-semibold text-gray-900">{record.name}</span>
           <span className="text-xs text-gray-500 font-mono">PN: {record.partNumber}</span>
@@ -116,7 +101,7 @@ const UserProductsList: React.FC = () => {
       title: 'Actions',
       key: 'action',
       width: 150,
-      render: (_: any, record: UserProduct) => (
+      render: (_: any, record: Product) => (
         <div className="flex gap-2">
           <AntButton
             type="text"
@@ -132,7 +117,7 @@ const UserProductsList: React.FC = () => {
             className="text-gray-600 hover:text-gray-700 hover:bg-gray-50"
             onClick={() => navigate(`/products/${record.id}/edit`)}
           >
-            {record.status === 'Published' ? 'View' : 'Edit'}
+            {['Draft', 'Changes Requested'].includes(record.status) ? 'Edit' : 'View'}
           </AntButton>
         </div>
       ),

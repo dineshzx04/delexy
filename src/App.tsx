@@ -31,6 +31,11 @@ import AttributeMapping from './pages/platform/attributes/AttributeMapping';
 import CategoryManagement from './pages/platform/CategoryManagement';
 import PlatformProducts from './pages/platform/PlatformProducts';
 import PlatformProductReview from './pages/platform/PlatformProductReview';
+import PlatformReviewDetail from './pages/platform/PlatformReviewDetail';
+import OutboundRFQList from './pages/tenant/rfq/OutboundRFQList';
+import InboundRFQList from './pages/tenant/rfq/InboundRFQList';
+import CreateRFQ from './pages/tenant/rfq/CreateRFQ';
+import RFQDetail from './pages/tenant/rfq/RFQDetail';
 import UserProductsList from './pages/tenant/products/UserProductsList';
 import ProductBuilder from './pages/tenant/products/ProductBuilder';
 import GlobalCatalog from './pages/tenant/catalog/GlobalCatalog';
@@ -100,8 +105,11 @@ const App: React.FC = () => {
               <Route path="rbac/roles/:id" element={<RoleEditor />} />
 
               {/* Tenant & Individual Specific Routes */}
-              <Route path="catalog" element={<GlobalCatalog />} />
-              <Route path="rfqs" element={<PlaceholderPage />} />
+              <Route path="marketplace/catalog" element={<GlobalCatalog />} />
+              <Route path="rfqs/outbound" element={<OutboundRFQList />} />
+              <Route path="rfqs/inbound" element={<InboundRFQList />} />
+              <Route path="rfqs/new" element={<CreateRFQ />} />
+              <Route path="rfqs/:id" element={<RFQDetail />} />
               <Route path="products" element={<UserProductsList />} />
               <Route path="products/new" element={<ProductBuilder />} />
               <Route path="products/:id/edit" element={<ProductBuilder />} />
@@ -131,7 +139,7 @@ const App: React.FC = () => {
               <Route path="category" element={<CategoryManagement />} />
               <Route path="platform-products" element={<PlatformProducts />} />
               <Route path="user-products" element={<PlatformProductReview />} />
-              {/* Note: PlatformCatalog was merged into PlatformProductReview */}
+              <Route path="review/:id" element={<PlatformReviewDetail />} />
 
             </Route>
           </Route>
