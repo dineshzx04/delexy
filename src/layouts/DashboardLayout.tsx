@@ -55,10 +55,87 @@ const DashboardLayout: React.FC = () => {
     }
   };
 
-  const pathParts = location.pathname.split('/').filter(p => p);
   const breadcrumbItems = customBreadcrumbs || [];
 
-  const selectedKey = pathParts[pathParts.length - 1] || 'profile';
+  const getMenuItems = () => {
+    const baseSettings = {
+      key: 'settings-group',
+      type: 'group',
+      label: collapsed ? null : 'Personal Settings',
+      children: [
+        { key: '/profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> },
+        { key: '/settings/account', icon: <Lucide.Settings size={16} />, label: <Link to="/settings/account">Account</Link> },
+        { key: '/settings/security', icon: <Lucide.ShieldCheck size={16} />, label: <Link to="/settings/security">Security</Link> },
+        { key: '/settings/sessions', icon: <Lucide.Monitor size={16} />, label: <Link to="/settings/sessions">Sessions</Link> },
+      ]
+    };
+
+    const individualMenus = [
+      { key: '/dashboard', icon: <Lucide.LayoutDashboard size={16} />, label: <Link to="/dashboard">Dashboard Overview</Link> },
+      { key: '/marketplace/catalog', icon: <Lucide.Store size={16} />, label: <Link to="/marketplace/catalog">Global Marketplace</Link> },
+      { type: 'divider' },
+      { key: '/rfqs/outbound', icon: <Lucide.FileText size={16} />, label: <Link to="/rfqs/outbound">My RFQs</Link> },
+      { key: '/rfqs/inbound', icon: <Lucide.Inbox size={16} />, label: <Link to="/rfqs/inbound">Received RFQs</Link> },
+      { key: '/products', icon: <Lucide.Package size={16} />, label: <Link to="/products">Products</Link> },
+      { key: '/orders', icon: <Lucide.ShoppingCart size={16} />, label: <Link to="/orders">Orders</Link> },
+      { key: '/suppliers', icon: <Lucide.Users size={16} />, label: <Link to="/suppliers">Suppliers</Link> },
+      { key: '/manufacturer', icon: <Lucide.Factory size={16} />, label: <Link to="/manufacturer">Manufacturer</Link> },
+    ];
+
+    if (activeWorkspace.type === 'tenant') {
+      return [
+        ...individualMenus,
+        { key: '/user-management', icon: <Lucide.Users size={16} />, label: <Link to="/user-management">My Team</Link> },
+        { key: '/rbac', icon: <Lucide.Shield size={16} />, label: <Link to="/rbac">Roles & Permission</Link> },
+        { type: 'divider' },
+        baseSettings
+      ];
+    }
+
+    // Platform shouldn't render this layout ideally, but as a fallback:
+    if (activeWorkspace.type === 'platform') {
+      return [
+        { key: '/platform', icon: <Lucide.Globe size={16} />, label: <Link to="/platform">Global Overview</Link> },
+        { type: 'divider' },
+        baseSettings
+      ];
+    }
+
+    // Individual
+    return [
+      ...individualMenus,
+      { type: 'divider' },
+      baseSettings
+    ];
+  };
+
+  const getSelectedKey = () => {
+    const path = location.pathname;
+    const knownRoutes: string[] = [];
+    
+    const extractKeys = (items: any[]) => {
+      items.forEach(item => {
+        if (!item) return;
+        if (item.key && typeof item.key === 'string' && item.key.startsWith('/')) {
+          knownRoutes.push(item.key);
+        }
+        if (item.children) {
+          extractKeys(item.children);
+        }
+      });
+    };
+    
+    extractKeys(getMenuItems());
+    knownRoutes.sort((a, b) => b.length - a.length);
+
+    for (const route of knownRoutes) {
+      if (path.startsWith(route)) return route;
+    }
+    
+    return '/dashboard';
+  };
+
+  const selectedKey = getSelectedKey();
 
   const workspaceMenuItems = workspaces.map((ws) => ({
     key: ws.id,
@@ -80,58 +157,6 @@ const DashboardLayout: React.FC = () => {
       </div>
     )
   }));
-
-  const getMenuItems = () => {
-    const baseSettings = {
-      key: 'settings-group',
-      type: 'group',
-      label: collapsed ? null : 'Personal Settings',
-      children: [
-        { key: 'profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> },
-        { key: 'account', icon: <Lucide.Settings size={16} />, label: <Link to="/settings/account">Account</Link> },
-        { key: 'security', icon: <Lucide.ShieldCheck size={16} />, label: <Link to="/settings/security">Security</Link> },
-        { key: 'sessions', icon: <Lucide.Monitor size={16} />, label: <Link to="/settings/sessions">Sessions</Link> },
-      ]
-    };
-
-    const individualMenus = [
-      { key: 'dashboard', icon: <Lucide.LayoutDashboard size={16} />, label: <Link to="/dashboard">Dashboard Overview</Link> },
-      { key: 'catalog', icon: <Lucide.Store size={16} />, label: <Link to="/marketplace/catalog">Global Marketplace</Link> },
-      { type: 'divider' },
-      { key: 'rfqs-outbound', icon: <Lucide.FileText size={16} />, label: <Link to="/rfqs/outbound">My RFQs</Link> },
-      { key: 'rfqs-inbound', icon: <Lucide.Inbox size={16} />, label: <Link to="/rfqs/inbound">Received RFQs</Link> },
-      { key: 'products', icon: <Lucide.Package size={16} />, label: <Link to="/products">Products</Link> },
-      { key: 'orders', icon: <Lucide.ShoppingCart size={16} />, label: <Link to="/orders">Orders</Link> },
-      { key: 'suppliers', icon: <Lucide.Users size={16} />, label: <Link to="/suppliers">Suppliers</Link> },
-      { key: 'manufacturer', icon: <Lucide.Factory size={16} />, label: <Link to="/manufacturer">Manufacturer</Link> },
-    ];
-
-    if (activeWorkspace.type === 'tenant') {
-      return [
-        ...individualMenus,
-        { key: 'user-management', icon: <Lucide.Users size={16} />, label: <Link to="/user-management">My Team</Link> },
-        { key: 'rbac', icon: <Lucide.Shield size={16} />, label: <Link to="/rbac">Roles & Permission</Link> },
-        { type: 'divider' },
-        baseSettings
-      ];
-    }
-
-    // Platform shouldn't render this layout ideally, but as a fallback:
-    if (activeWorkspace.type === 'platform') {
-      return [
-        { key: 'overview', icon: <Lucide.Globe size={16} />, label: <Link to="/platform">Global Overview</Link> },
-        { type: 'divider' },
-        baseSettings
-      ];
-    }
-
-    // Individual
-    return [
-      ...individualMenus,
-      { type: 'divider' },
-      baseSettings
-    ];
-  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

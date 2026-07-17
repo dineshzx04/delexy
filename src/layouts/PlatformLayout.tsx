@@ -55,10 +55,71 @@ const PlatformLayout: React.FC = () => {
     }
   };
 
-  const pathParts = location.pathname.split('/').filter(p => p);
   const breadcrumbItems = customBreadcrumbs || [];
 
-  const selectedKey = pathParts[pathParts.length - 1] || 'profile';
+  const getMenuItems = () => {
+    const baseSettings = {
+      key: 'settings-group',
+      type: 'group',
+      label: collapsed ? null : 'Personal Settings',
+      children: [
+        { key: '/profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> },
+        { key: '/settings/account', icon: <Lucide.Settings size={16} />, label: <Link to="/settings/account">Account</Link> },
+        { key: '/settings/security', icon: <Lucide.ShieldCheck size={16} />, label: <Link to="/settings/security">Security</Link> },
+        { key: '/settings/sessions', icon: <Lucide.Monitor size={16} />, label: <Link to="/settings/sessions">Sessions</Link> },
+      ]
+    };
+    return [
+      { key: '/platform', icon: <Lucide.Globe size={16} />, label: <Link to="/platform">Global Overview</Link> },
+      { key: '/platform/members', icon: <Lucide.Users size={16} />, label: <Link to="/platform/members">Platform Team</Link> },
+      { key: '/platform/rbac', icon: <Lucide.Shield size={16} />, label: <Link to="/platform/rbac">Platform RBAC</Link> },
+      { type: 'divider' },
+      {
+        key: 'attributes-group',
+        icon: <Lucide.Layers size={16} />,
+        label: 'Attributes',
+        children: [
+          { key: '/platform/attributes/groups', label: <Link to="/platform/attributes/groups">Attribute Groups</Link> },
+          { key: '/platform/attributes', label: <Link to="/platform/attributes">Attributes</Link> },
+          { key: '/platform/attributes/values', label: <Link to="/platform/attributes/values">Attribute Values</Link> },
+          { key: '/platform/attributes/mapping', label: <Link to="/platform/attributes/mapping">Mapping Matrix</Link> }
+        ]
+      },
+      { key: '/platform/category', icon: <Lucide.FolderTree size={16} />, label: <Link to="/platform/category">Categories</Link> },
+      { key: '/platform/platform-products', icon: <Lucide.Package size={16} />, label: <Link to="/platform/platform-products">Platform Products</Link> },
+      { key: '/platform/user-products', icon: <Lucide.ClipboardCheck size={16} />, label: <Link to="/platform/user-products">User Products</Link> },
+      { type: 'divider' },
+      baseSettings
+    ];
+  };
+
+  const getSelectedKey = () => {
+    const path = location.pathname;
+    const knownRoutes: string[] = [];
+    
+    const extractKeys = (items: any[]) => {
+      items.forEach(item => {
+        if (!item) return;
+        if (item.key && typeof item.key === 'string' && item.key.startsWith('/')) {
+          knownRoutes.push(item.key);
+        }
+        if (item.children) {
+          extractKeys(item.children);
+        }
+      });
+    };
+    
+    extractKeys(getMenuItems());
+    knownRoutes.sort((a, b) => b.length - a.length);
+
+    for (const route of knownRoutes) {
+      if (path.startsWith(route)) return route;
+    }
+    
+    return '/platform';
+  };
+
+  const selectedKey = getSelectedKey();
 
   const workspaceMenuItems = workspaces.map((ws) => ({
     key: ws.id,
@@ -81,41 +142,7 @@ const PlatformLayout: React.FC = () => {
     )
   }));
 
-  const getMenuItems = () => {
-    const baseSettings = {
-      key: 'settings-group',
-      type: 'group',
-      label: collapsed ? null : 'Personal Settings',
-      children: [
-        { key: 'profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> },
-        { key: 'account', icon: <Lucide.Settings size={16} />, label: <Link to="/settings/account">Account</Link> },
-        { key: 'security', icon: <Lucide.ShieldCheck size={16} />, label: <Link to="/settings/security">Security</Link> },
-        { key: 'sessions', icon: <Lucide.Monitor size={16} />, label: <Link to="/settings/sessions">Sessions</Link> },
-      ]
-    };
-    return [
-      { key: 'dashboard', icon: <Lucide.Globe size={16} />, label: <Link to="/platform">Global Overview</Link> },
-      { key: 'members', icon: <Lucide.Users size={16} />, label: <Link to="/platform/members">Platform Team</Link> },
-      { key: 'rbac', icon: <Lucide.Shield size={16} />, label: <Link to="/platform/rbac">Platform RBAC</Link> },
-      { type: 'divider' },
-      {
-        key: 'attributes',
-        icon: <Lucide.Layers size={16} />,
-        label: 'Attributes',
-        children: [
-          { key: 'groups', label: <Link to="/platform/attributes/groups">Attribute Groups</Link> },
-          { key: 'attributes', label: <Link to="/platform/attributes">Attributes</Link> },
-          { key: 'values', label: <Link to="/platform/attributes/values">Attribute Values</Link> },
-          { key: 'mapping', label: <Link to="/platform/attributes/mapping">Mapping Matrix</Link> }
-        ]
-      },
-      { key: 'category', icon: <Lucide.FolderTree size={16} />, label: <Link to="/platform/category">Categories</Link> },
-      { key: 'platform-products', icon: <Lucide.Package size={16} />, label: <Link to="/platform/platform-products">Platform Products</Link> },
-      { key: 'user-products', icon: <Lucide.ClipboardCheck size={16} />, label: <Link to="/platform/user-products">User Products</Link> },
-      { type: 'divider' },
-      baseSettings
-    ];
-  };
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex">

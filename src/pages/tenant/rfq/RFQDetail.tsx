@@ -139,8 +139,9 @@ const RFQDetail: React.FC = () => {
               render: (_: any, qi: any) => {
                 const item = rfq.items.find(i => i.id === qi.rfqItemId);
                 if (!item) return qi.rfqItemId;
-                if (item.type === 'direct') return `SKU: ${item.targetSku}`;
-                return `Product ID: ${item.platformProductId}`;
+                if (item.targetSku) return `SKU: ${item.targetSku}`;
+                if (item.platformProductId) return `Product ID: ${item.platformProductId}`;
+                return `Item: ${item.id}`;
               }
             },
             {
@@ -169,13 +170,13 @@ const RFQDetail: React.FC = () => {
       <div className="mb-6 flex justify-between items-start">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <h1 className="text-2xl font-bold text-gray-900 m-0">RFQ Details: {rfq.id}</h1>
+            <h1 className="text-2xl font-bold text-gray-900 m-0">{rfq.title}</h1>
             <AntTag color={rfq.status === 'Open' ? 'blue' : rfq.status === 'Closed' ? 'green' : 'orange'} className="text-sm font-semibold px-2 py-0.5">
               {rfq.status.toUpperCase()}
             </AntTag>
           </div>
           <p className="text-gray-500">
-            {isRequester ? `You requested this quote on ${new Date(rfq.createdAt).toLocaleDateString()}.` : `${rfq.requesterTenantName} is requesting a quote.`}
+            {rfq.rfqNumber} • {isRequester ? `Requested on ${new Date(rfq.createdAt).toLocaleDateString()}` : `Requested by ${rfq.requesterTenantName}`}
           </p>
         </div>
       </div>
@@ -188,14 +189,25 @@ const RFQDetail: React.FC = () => {
               {rfq.requesterTenantName}
             </AntDescriptions.Item>
           )}
-          <AntDescriptions.Item label="Target Date">
-            {new Date(rfq.requiredDate).toLocaleDateString()}
+          <AntDescriptions.Item label="Contact Email">
+            {rfq.contactEmail}
+          </AntDescriptions.Item>
+          {rfq.contactMobile && (
+            <AntDescriptions.Item label="Contact Mobile">
+              {rfq.contactMobile}
+            </AntDescriptions.Item>
+          )}
+          <AntDescriptions.Item label="Currency">
+            {rfq.currency}
+          </AntDescriptions.Item>
+          <AntDescriptions.Item label="Submission Deadline">
+            <span className="font-semibold text-red-600">{new Date(rfq.submissionDeadline).toLocaleDateString()}</span>
           </AntDescriptions.Item>
           <AntDescriptions.Item label="Destination">
             {rfq.shippingDestination}
           </AntDescriptions.Item>
-          <AntDescriptions.Item label="Notes/Instructions" span={2}>
-            {rfq.notes || <span className="text-gray-400 italic">No additional notes.</span>}
+          <AntDescriptions.Item label="Detailed Specifications" span={2}>
+            {rfq.specifications || <span className="text-gray-400 italic">No detailed specifications.</span>}
           </AntDescriptions.Item>
         </AntDescriptions>
         
@@ -209,13 +221,43 @@ const RFQDetail: React.FC = () => {
            columns={[
              { title: '#', render: (_, __, idx) => idx + 1 },
              { title: 'Quantity', dataIndex: 'quantity', key: 'qty' },
-             { title: 'Type', dataIndex: 'type', render: t => <span className="capitalize">{t}</span> },
-             { title: 'Target', render: (_, r: RFQItem) => {
-                 if (r.type === 'direct') return `SKU: ${r.targetSku}`;
-                 if (r.type === 'broadcast') return `Product ID: ${r.platformProductId}`;
-                 return `Seller: ${r.targetTenantId} | Product: ${r.platformProductId}`;
+             { title: 'Target Info', render: (_, r: RFQItem) => {
+                 if (r.targetTenantId) return `Seller: ${r.targetTenantId} | SKU: ${r.targetSku || r.platformProductId}`;
+                 if (r.platformProductId) return `Product ID: ${r.platformProductId}`;
+                 if (r.targetSku) return `Product #: ${r.targetSku}`;
+                 if (r.categoryId) return `Category ID: ${r.categoryId}`;
+                 return `Open RFQ`;
              }}
            ]}
+           expandable={{
+             expandedRowRender: (r: RFQItem) => (
+               <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                 <h5 className="font-semibold text-gray-700 mb-2">Item Specifications</h5>
+                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                   {r.brand && <div><span className="text-gray-500">Brand:</span> {r.brand}</div>}
+                   {r.manufacturer && <div><span className="text-gray-500">Mfr:</span> {r.manufacturer}</div>}
+                   {r.countryOfOrigin && <div><span className="text-gray-500">Country:</span> {r.countryOfOrigin}</div>}
+                   {r.modelNumber && <div><span className="text-gray-500">Model:</span> {r.modelNumber}</div>}
+                   {r.partNumber && <div><span className="text-gray-500">Part #:</span> {r.partNumber}</div>}
+                   {r.height && <div><span className="text-gray-500">Height:</span> {r.height}</div>}
+                   {r.width && <div><span className="text-gray-500">Width:</span> {r.width}</div>}
+                   {r.weight && <div><span className="text-gray-500">Weight:</span> {r.weight}</div>}
+                 </div>
+
+                 {r.dynamicAttributes && Object.keys(r.dynamicAttributes).length > 0 && (
+                   <div className="mt-4 pt-4 border-t border-gray-200">
+                     <h5 className="font-semibold text-gray-700 mb-2">Dynamic Specifications</h5>
+                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                       {Object.entries(r.dynamicAttributes).map(([key, value]) => (
+                         <div key={key}><span className="text-gray-500">{key}:</span> {value}</div>
+                       ))}
+                     </div>
+                   </div>
+                 )}
+               </div>
+             ),
+             rowExpandable: () => true
+           }}
         />
       </AntCard>
 
@@ -273,8 +315,9 @@ const RFQDetail: React.FC = () => {
                     render: (_: any, qi: any) => {
                       const item = rfq.items.find(i => i.id === qi.rfqItemId);
                       if (!item) return qi.rfqItemId;
-                      if (item.type === 'direct') return `SKU: ${item.targetSku}`;
-                      return `Product ID: ${item.platformProductId}`;
+                      if (item.targetSku) return `SKU: ${item.targetSku}`;
+                      if (item.platformProductId) return `Product ID: ${item.platformProductId}`;
+                      return `Item: ${item.id}`;
                     }
                   },
                   { title: 'Unit Price', dataIndex: 'price', render: (p: number) => `$${p.toFixed(2)}` },
@@ -300,7 +343,7 @@ const RFQDetail: React.FC = () => {
                    size="small"
                    className="border border-gray-200 rounded mb-4"
                    columns={[
-                     { title: 'Item', render: (_, r) => r.type === 'direct' ? `SKU: ${r.targetSku}` : `Product: ${r.platformProductId}` },
+                     { title: 'Item', render: (_, r) => r.targetSku ? `SKU: ${r.targetSku}` : r.platformProductId ? `Product: ${r.platformProductId}` : `Item: ${r.id}` },
                      { title: 'Qty', dataIndex: 'quantity' },
                      { 
                        title: 'Unit Price ($)', 

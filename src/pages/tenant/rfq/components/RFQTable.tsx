@@ -13,10 +13,14 @@ const RFQTable: React.FC<RFQTableProps> = ({ rfqs, isOutbound }) => {
 
   const columns = [
     {
-      title: 'RFQ ID',
-      dataIndex: 'id',
-      key: 'id',
-      render: (text: string) => <span className="font-mono text-sm font-semibold">{text}</span>
+      title: 'RFQ Details',
+      key: 'rfqDetails',
+      render: (_: any, record: RFQ) => (
+        <div>
+          <div className="font-semibold text-gray-900">{record.title}</div>
+          <div className="font-mono text-xs text-gray-500">{record.rfqNumber}</div>
+        </div>
+      )
     },
     {
       title: 'Status',

@@ -1,15 +1,27 @@
-export type RFQType = 'direct' | 'targeted' | 'broadcast';
 export type RFQStatus = 'Open' | 'Responded' | 'Closed' | 'Cancelled';
 export type QuoteStatus = 'Pending' | 'Submitted' | 'Accepted' | 'Rejected';
 
 export interface RFQItem {
   id: string;
-  type: RFQType;
   categoryId?: string;
   platformProductId?: string;
   targetSku?: string;
   targetTenantId?: string;
   quantity: number;
+  unit?: string;
+  
+  // New Static Fields for Target/Broadcast
+  brand?: string;
+  manufacturer?: string;
+  countryOfOrigin?: string;
+  modelNumber?: string;
+  partNumber?: string;
+  height?: string;
+  width?: string;
+  weight?: string;
+  
+  // Dynamic Attributes based on Category
+  dynamicAttributes?: Record<string, string>;
 }
 
 export interface QuoteItem {
@@ -30,16 +42,21 @@ export interface RFQQuote {
 
 export interface RFQ {
   id: string;
+  rfqNumber: string;
+  title: string;
   status: RFQStatus;
   
   // Requester (Buyer)
   requesterTenantId: string;
   requesterTenantName: string;
+  contactEmail: string;
+  contactMobile: string;
   
   // Global RFQ Details
-  requiredDate: string;
+  submissionDeadline: string;
   shippingDestination: string;
-  notes: string;
+  currency: string;
+  specifications: string;
   
   createdAt: string;
   
@@ -51,17 +68,21 @@ export interface RFQ {
 let mockRFQs: RFQ[] = [
   {
     id: 'rfq-001',
+    rfqNumber: 'RFQ-2023-1001',
+    title: 'Q4 Industrial Motor Restock',
     status: 'Responded',
     requesterTenantId: 'tenant-2',
     requesterTenantName: 'TechSource Procurement',
-    requiredDate: '2023-12-01',
+    contactEmail: 'procurement@techsource.com',
+    contactMobile: '+1-555-0192',
+    submissionDeadline: '2023-11-15',
+    currency: 'USD',
     shippingDestination: 'New York, USA',
-    notes: 'Looking for best pricing on industrial servo motors. Need them by Q4.',
+    specifications: 'Standard industrial specs apply.',
     createdAt: '2023-11-01T10:00:00Z',
     items: [
       {
         id: 'item-1',
-        type: 'broadcast',
         categoryId: 'c-2-2-1-1',
         platformProductId: 'pp-3',
         quantity: 500
@@ -94,17 +115,21 @@ let mockRFQs: RFQ[] = [
   },
   {
     id: 'rfq-002',
+    rfqNumber: 'RFQ-2023-1002',
+    title: 'Micro Controller Direct Sourcing',
     status: 'Open',
     requesterTenantId: 'tenant-1',
     requesterTenantName: 'Acme Corp (Business)',
-    requiredDate: '2023-12-15',
+    contactEmail: 'sourcing@acme.com',
+    contactMobile: '+1-555-9921',
+    submissionDeadline: '2023-11-20',
+    currency: 'USD',
     shippingDestination: 'Texas, USA',
-    notes: 'Direct RFQ for Micro Controller Pro.',
+    specifications: 'Must meet IP67 standards.',
     createdAt: '2023-11-10T08:00:00Z',
     items: [
       {
         id: 'item-1',
-        type: 'direct',
         targetSku: 'MC-R2-32-512',
         targetTenantId: 'tenant-1',
         quantity: 1000
@@ -122,7 +147,7 @@ export const getRFQsByRequester = (tenantId: string) =>
 export const getRelevantRFQItems = (rfq: RFQ, tenantId: string): RFQItem[] => {
   return rfq.items.filter(item => 
     item.targetTenantId === tenantId || 
-    (item.type === 'broadcast' && rfq.requesterTenantId !== tenantId)
+    (!item.targetTenantId && rfq.requesterTenantId !== tenantId)
   );
 };
 
@@ -135,10 +160,12 @@ export const getRFQsReceived = (tenantId: string) =>
 export const getRFQById = (id: string) => 
   mockRFQs.find(rfq => rfq.id === id);
 
-export const createRFQ = (rfq: Omit<RFQ, 'id' | 'createdAt' | 'quotes' | 'status'>) => {
+export const createRFQ = (rfq: Omit<RFQ, 'id' | 'rfqNumber' | 'createdAt' | 'quotes' | 'status'>) => {
+  const newId = `rfq-${Date.now()}`;
   const newRFQ: RFQ = {
     ...rfq,
-    id: `rfq-${Date.now()}`,
+    id: newId,
+    rfqNumber: `RFQ-${Math.floor(1000 + Math.random() * 9000)}`,
     status: 'Open',
     createdAt: new Date().toISOString(),
     quotes: []
