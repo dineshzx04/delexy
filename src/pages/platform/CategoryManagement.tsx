@@ -6,95 +6,19 @@ import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Category } from '../../data/db';
-import { useEffect } from 'react';
- 
-
-// Generate massive flat list with parent relationships
-const generateData = (): Category[] => {
-  const data: Category[] = [];
-  
-  // 50 Root Categories
-  for (let i = 1; i <= 50; i++) {
-    const rootId = `root-${i}`;
-    data.push({
-      id: rootId,
-      name: `Category ${i}`,
-      slug: `category-${i}`,
-      isActive: true,
-      mappedGroupIds: ['g1', 'g2'],
-      parentId: null,
-      childrenCount: 20
-    });
-    
-    // 20 Level 1 Subcategories per Root
-    for (let j = 1; j <= 20; j++) {
-      const l1Id = `l1-${i}-${j}`;
-      data.push({
-        id: l1Id,
-        name: `Sub-category ${i}.${j}`,
-        slug: `sub-category-${i}-${j}`,
-        isActive: true,
-        mappedGroupIds: ['g5'],
-        parentId: rootId,
-        childrenCount: 5
-      });
-      
-      // 5 Level 2 Subcategories per L1
-      for (let k = 1; k <= 5; k++) {
-        data.push({
-          id: `l2-${i}-${j}-${k}`,
-          name: `Nested Sub ${i}.${j}.${k}`,
-          slug: `nested-sub-${i}-${j}-${k}`,
-          isActive: i % 2 === 0,
-          mappedGroupIds: [],
-          parentId: l1Id,
-          childrenCount: 3
-        });
-        
-        // 3 Level 3 Subcategories per L2
-        for (let l = 1; l <= 3; l++) {
-          data.push({
-            id: `l3-${i}-${j}-${k}-${l}`,
-            name: `Leaf Category ${i}.${j}.${k}.${l}`,
-            slug: `leaf-${i}-${j}-${k}-${l}`,
-            isActive: true,
-            mappedGroupIds: [],
-            parentId: `l2-${i}-${j}-${k}`,
-            childrenCount: 0
-          });
-        }
-      }
-    }
-  }
-  return data;
-};
-
-const ALL_CATEGORIES = generateData();
-
 const CategoryManagement: React.FC = () => {
   const categories = useLiveQuery(() => db.categories.toArray());
   const GLOBAL_GROUPS = useLiveQuery(() => db.attributeGroups.toArray()) || [];
   const [searchText, setSearchText] = useState('');
-  
-  // Sync mock data to Dexie on mount if empty
-  useEffect(() => {
-    const syncData = async () => {
-      const count = await db.categories.count();
-      if (count === 0) {
-        await db.categories.bulkAdd(ALL_CATEGORIES as any);
-      }
-    };
-    syncData();
-  }, []);
 
   // Drill-down Breadcrumb State
   const [path, setPath] = useState<Category[]>([]);
-  
+
   // Modal State for Create/Edit Base
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [form] = AntForm.useForm();
-  
+
   // Drawer State for Group Mapping
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const [mappingCategory, setMappingCategory] = useState<Category | null>(null);
@@ -116,11 +40,11 @@ const CategoryManagement: React.FC = () => {
       .filter(c => c.parentId === currentParentId)
       .filter(c => c.name.toLowerCase().includes(searchText.toLowerCase()) || c.slug.toLowerCase().includes(searchText.toLowerCase()));
   }, [categories, currentParentId, searchText]);
-
+  
   // Drawer Group Filter
   const filteredGroups = useMemo(() => {
     return GLOBAL_GROUPS.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase()));
-  }, [GLOBAL_GROUPS,groupSearch]);
+  }, [GLOBAL_GROUPS, groupSearch]);
 
   // Handle Drill Down
   const navigateToLevel = (category: Category) => {
@@ -142,9 +66,9 @@ const CategoryManagement: React.FC = () => {
   const handleCreateNew = (specificParentId: string | null = null) => {
     setEditingCategory(null);
     form.resetFields();
-    form.setFieldsValue({ 
-      isActive: true, 
-      parentId: specificParentId !== null ? specificParentId : currentParentId 
+    form.setFieldsValue({
+      isActive: true,
+      parentId: specificParentId !== null ? specificParentId : currentParentId
     });
     setIsModalVisible(true);
   };
@@ -167,7 +91,7 @@ const CategoryManagement: React.FC = () => {
         childrenCount: 0
       };
       await db.categories.add(newCat);
-      
+
       // Update parent child count
       if (values.parentId) {
         const parentCat = (categories || []).find(c => c.id === values.parentId);
@@ -175,7 +99,7 @@ const CategoryManagement: React.FC = () => {
           await db.categories.update(parentCat.id, { childrenCount: (parentCat.childrenCount || 0) + 1 });
         }
       }
-      
+
       notification.success({ message: 'Category Created' });
     }
     setIsModalVisible(false);
@@ -188,7 +112,7 @@ const CategoryManagement: React.FC = () => {
       return;
     }
     await db.categories.delete(id);
-    
+
     // Update parent child count
     if (cat && cat.parentId) {
       const parentCat = (categories || []).find(c => c.id === cat.parentId);
@@ -196,7 +120,7 @@ const CategoryManagement: React.FC = () => {
         await db.categories.update(parentCat.id, { childrenCount: (parentCat.childrenCount || 1) - 1 });
       }
     }
-    
+
     notification.success({ message: 'Category Deleted' });
   };
 
@@ -211,46 +135,49 @@ const CategoryManagement: React.FC = () => {
     if (!mappingCategory) return;
     const newGroupIds = selectedRowKeys as string[];
     await db.categories.update(mappingCategory.id, { mappedGroupIds: newGroupIds });
-    
+
     // We update the mappingCategory state as well so the drawer reflects changes instantly
     setMappingCategory({ ...mappingCategory, mappedGroupIds: newGroupIds });
   };
 
   const columns = [
-    { 
-      title: 'Category Name', 
-      dataIndex: 'name', 
-      key: 'name', 
-      render: (text: string, record: Category) => (
-        <div className="flex items-center gap-2">
-          {(record.childrenCount || 0) > 0 ? (
-            <AntButton 
-              type="link" 
-              className="p-0 font-semibold text-sky-600 flex items-center gap-2"
-              onClick={() => navigateToLevel(record)}
-            >
-              <Lucide.Folder size={16} className="text-sky-500 fill-sky-100" />
-              {text}
-            </AntButton>
-          ) : (
-            <span className="font-semibold text-gray-700 flex items-center gap-2">
-              <Lucide.FileText size={16} className="text-gray-400" />
-              {text}
-            </span>
-          )}
-        </div>
-      )
+    {
+      title: 'Category Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text: string, record: Category) => {
+        const childCount = categories?.filter(c => c.parentId === record.id).length || 0;
+        return (
+          <div className="flex items-center gap-2">
+            {childCount > 0 ? (
+              <AntButton
+                type="link"
+                className="p-0 font-semibold text-sky-600 flex items-center gap-2"
+                onClick={() => navigateToLevel(record)}
+              >
+                <Lucide.Folder size={16} className="text-sky-500 fill-sky-100" />
+                {text}
+              </AntButton>
+            ) : (
+              <span className="font-semibold text-gray-700 flex items-center gap-2">
+                <Lucide.FileText size={16} className="text-gray-400" />
+                {text}
+              </span>
+            )}
+          </div>
+        );
+      }
     },
-    { 
-      title: 'Subcategories', 
-      dataIndex: 'childrenCount', 
+    {
+      title: 'Subcategories',
       key: 'childrenCount',
-      render: (count: number) => (
-        count > 0 ? <AntTag color="blue">{count} items</AntTag> : <span className="text-gray-400">-</span>
-      )
+      render: (_: any, record: Category) => {
+        const count = categories?.filter(c => c.parentId === record.id).length || 0;
+        return count > 0 ? <AntTag color="blue">{count} items</AntTag> : <span className="text-gray-400">-</span>;
+      }
     },
-    { 
-      title: 'Attribute Groups', 
+    {
+      title: 'Attribute Groups',
       key: 'mappedGroupIds',
       render: (_: any, record: Category) => (
         <div className="flex items-center gap-2">
@@ -261,9 +188,9 @@ const CategoryManagement: React.FC = () => {
         </div>
       )
     },
-    { 
-      title: 'Status', 
-      dataIndex: 'isActive', 
+    {
+      title: 'Status',
+      dataIndex: 'isActive',
       key: 'isActive',
       render: (isActive: boolean) => (
         <AntTag color={isActive ? 'success' : 'default'}>{isActive ? 'Active' : 'Draft'}</AntTag>
@@ -302,7 +229,7 @@ const CategoryManagement: React.FC = () => {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-        
+
         {/* Navigation Breadcrumb Bar */}
         <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
           <Lucide.FolderTree size={20} className="text-gray-400" />
@@ -311,8 +238,8 @@ const CategoryManagement: React.FC = () => {
               Root Level
             </AntBreadcrumb.Item>
             {path.map((crumb, index) => (
-              <AntBreadcrumb.Item 
-                key={crumb.id} 
+              <AntBreadcrumb.Item
+                key={crumb.id}
                 className={index === path.length - 1 ? "text-gray-900" : "cursor-pointer hover:text-sky-600 transition-colors"}
                 onClick={() => navigateToBreadcrumb(index)}
               >
@@ -324,9 +251,9 @@ const CategoryManagement: React.FC = () => {
 
         {/* Toolbar */}
         <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-          <AntInput 
-            placeholder={`Search ${path.length > 0 ? 'subcategories' : 'root categories'}...`} 
-            prefix={<Lucide.Search size={16} className="text-gray-400" />} 
+          <AntInput
+            placeholder={`Search ${path.length > 0 ? 'subcategories' : 'root categories'}...`}
+            prefix={<Lucide.Search size={16} className="text-gray-400" />}
             className="w-80"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
@@ -336,11 +263,11 @@ const CategoryManagement: React.FC = () => {
             {currentLevelCategories.length} items at this level
           </div>
         </div>
-        
+
         {/* Flat Paginated Table (Only shows current level) */}
-        <AntTable 
-          columns={columns} 
-          dataSource={currentLevelCategories} 
+        <AntTable
+          columns={columns}
+          dataSource={currentLevelCategories}
           rowKey="id"
           pagination={{
             pageSize: 10,
@@ -362,7 +289,7 @@ const CategoryManagement: React.FC = () => {
         <AntForm form={form} layout="vertical" onFinish={handleSave} className="mt-4">
           <AntForm.Item name="id" hidden><AntInput /></AntForm.Item>
           <AntForm.Item name="parentId" hidden><AntInput /></AntForm.Item>
-          
+
           <div className="flex items-center justify-between mb-4">
             <div className="text-sm text-gray-500">Status</div>
             <AntForm.Item name="isActive" valuePropName="checked" className="mb-0">
@@ -406,9 +333,9 @@ const CategoryManagement: React.FC = () => {
         }
       >
         <div className="mb-4">
-          <AntInput 
-            placeholder="Search thousands of groups..." 
-            prefix={<Lucide.Search size={16} className="text-gray-400" />} 
+          <AntInput
+            placeholder="Search thousands of groups..."
+            prefix={<Lucide.Search size={16} className="text-gray-400" />}
             size="large"
             value={groupSearch}
             onChange={(e) => setGroupSearch(e.target.value)}

@@ -29,7 +29,7 @@ import AttributeValues from './pages/platform/attributes/AttributeValues';
 import AttributeGroups from './pages/platform/attributes/AttributeGroups';
 import AttributeMapping from './pages/platform/attributes/AttributeMapping';
 import CategoryManagement from './pages/platform/CategoryManagement';
-import PlatformProducts from './pages/platform/PlatformProducts';
+import CategoryProducts from './pages/platform/CategoryProducts';
 import PlatformProductReview from './pages/platform/PlatformProductReview';
 import PlatformReviewDetail from './pages/platform/PlatformReviewDetail';
 import OutboundRFQList from './pages/tenant/rfq/OutboundRFQList';
@@ -140,7 +140,7 @@ const App: React.FC = () => {
               <Route path="attributes/mapping" element={<AttributeMapping />} />
 
               <Route path="category" element={<CategoryManagement />} />
-              <Route path="platform-products" element={<PlatformProducts />} />
+              <Route path="category-products" element={<CategoryProducts />} />
               <Route path="user-products" element={<PlatformProductReview />} />
               <Route path="review/:id" element={<PlatformReviewDetail />} />
 

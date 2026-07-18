@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Table as AntTable, Input as AntInput, Button as AntButton, Tag as AntTag, Modal, Tabs as AntTabs } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,7 +11,7 @@ import { db, type UserProduct } from '../../../data/db';
 
 const UserProductsList: React.FC = () => {
   const { activeWorkspace } = useWorkspace();
-  
+
   // Fetch products for the current workspace
   const products = useLiveQuery(() => db.userProducts.where('tenantId').equals(activeWorkspace.id).toArray()) || [];
 
@@ -30,7 +30,7 @@ const UserProductsList: React.FC = () => {
 
   const filteredProducts = useMemo(() => {
     let result = products;
-    
+
     if (activeTab !== 'All') {
       if (activeTab === 'Submitted/Review') {
         result = result.filter(p => p.status === 'Submitted' || p.status === 'Resubmitted' || p.status === 'Under Review');
@@ -138,9 +138,9 @@ const UserProductsList: React.FC = () => {
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gray-50">
-          <AntTabs 
-            activeKey={activeTab} 
-            onChange={setActiveTab} 
+          <AntTabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
             className="w-full sm:w-auto"
             style={{ marginBottom: -16 }} // Align tabs with the bottom border
             items={[

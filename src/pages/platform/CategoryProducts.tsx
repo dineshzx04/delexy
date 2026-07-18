@@ -3,45 +3,28 @@ import { Table as AntTable, Input as AntInput, Form as AntForm, Button as AntBut
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
-import CategoryPicker, { getCategoryPathNames } from '../../components/common/CategoryPicker';
+import CategoryPicker from '../../components/common/CategoryPicker';
 
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type PlatformProduct } from '../../data/db';
-import { useEffect } from 'react';
 
-// Generate Mock Data
-const generateMockProducts = (): PlatformProduct[] => {
-  const data: PlatformProduct[] = [];
-  for (let i = 1; i <= 50; i++) {
-    data.push({
-      id: `prod-${i}`,
-      name: `Global Master Product ${i}`,
-      categoryId: `c-1-1-1-${(i % 5) + 1}`,
-      categoryName: `Leaf Item 1.1.1.${(i % 5) + 1}`,
-      description: `This is the master template for product ${i}`,
-      isActive: i % 10 !== 0,
-      globalSpecs: {}
-    });
-  }
-  return data;
-};
+const CategoryProducts: React.FC = () => {
 
-const INITIAL_PRODUCTS = generateMockProducts();
-
-const PlatformProducts: React.FC = () => {
   const products = useLiveQuery(() => db.platformProducts.toArray());
-  const [searchText, setSearchText] = useState('');
+  const categories = useLiveQuery(() => db.categories.toArray());
 
-  // Sync mock data to Dexie on mount if empty
-  useEffect(() => {
-    const syncData = async () => {
-      const count = await db.platformProducts.count();
-      if (count === 0) {
-        await db.platformProducts.bulkAdd(INITIAL_PRODUCTS as any);
-      }
-    };
-    syncData();
-  }, []);
+  const getCategoryPathNames = (id: string): string[] => {
+    const pathNames: string[] = [];
+    if (!categories) return pathNames;
+    let curr = categories.find(c => c.id === id);
+    while (curr) {
+      pathNames.unshift(curr.name);
+      curr = categories.find(c => c.id === curr!.parentId);
+    }
+    return pathNames;
+  };
+
+  const [searchText, setSearchText] = useState('');
 
   // Modal State
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -50,7 +33,7 @@ const PlatformProducts: React.FC = () => {
 
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/platform" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/platform' },
-    { title: <span className="text-gray-900 font-semibold">Platform Products</span> }
+    { title: <span className="text-gray-900 font-semibold">Products</span> }
   ], []);
 
   useBreadcrumb(breadcrumbs);
@@ -171,7 +154,7 @@ const PlatformProducts: React.FC = () => {
     <div className="w-full max-w-7xl pb-12">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Platform Products</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Products</h1>
           <p className="text-gray-500">Master templates that map to categories. Business users will clone these to create variants.</p>
         </div>
         <AntButton type="primary" className="bg-sky-600 flex items-center gap-2" size="large" onClick={handleCreateNew}>
@@ -199,7 +182,7 @@ const PlatformProducts: React.FC = () => {
       </div>
 
       <AntModal
-        title={editingProduct ? "Edit Platform Product" : "Create Platform Product"}
+        title={editingProduct ? "Edit Product" : "Create Product"}
         open={isModalVisible}
         onCancel={() => setIsModalVisible(false)}
         onOk={() => form.submit()}
@@ -250,4 +233,4 @@ const PlatformProducts: React.FC = () => {
   );
 };
 
-export default PlatformProducts;
+export default CategoryProducts;

@@ -8,8 +8,7 @@ import WorkflowTimeline, { type ProductStatus } from '../../../components/common
 import CategoryPicker from '../../../components/common/CategoryPicker';
 import FormItem from '../../../components/common/FormItem';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type UserProduct } from '../../../data/db';
-import { type FieldReview } from '../../../data/mockProducts';
+import { db, type UserProduct, type FieldReview } from '../../../data/db';
 
 // Mock dynamic attribute groups based on category
 const getDynamicAttributeGroups = (categoryId: string) => {
@@ -202,25 +201,27 @@ const ProductBuilder: React.FC = () => {
           setReviewData(prod.reviewData || {});
           
           // Load the stored data into the form
-          const payload = (prod as any).payload;
-          if (payload) {
-            const pd = payload.productData || {};
-            Object.keys(pd).forEach(key => {
+          const pd = prod as any;
+          
+          // Exclude certain db-specific keys from being pushed straight into form
+          const excludedKeys = ['id', 'tenantId', 'tenantName', 'status', 'reviewData', 'updatedAt', 'submittedAt', 'variants', 'globalSpecs'];
+          Object.keys(pd).forEach(key => {
+            if (!excludedKeys.includes(key)) {
               setValue(key, pd[key]);
-            });
-            
-            if (pd.categoryId) {
-              setSelectedCategory(pd.categoryId);
             }
-            if (pd.platformProductId) {
-               const pp = PLATFORM_PRODUCTS.find(p => p.id === pd.platformProductId) || 
-                 { id: pd.platformProductId, name: 'Loaded Template', categoryId: pd.categoryId, categoryName: 'Unknown' };
-               setSelectedPlatformProduct(pp);
-            }
-
-            if (payload.variants) setVariants(payload.variants);
-            if (payload.globalSpecs) setGlobalSpecs(payload.globalSpecs);
+          });
+          
+          if (pd.categoryId) {
+            setSelectedCategory(pd.categoryId);
           }
+          if (pd.platformProductId) {
+             const pp = PLATFORM_PRODUCTS.find(p => p.id === pd.platformProductId) || 
+               { id: pd.platformProductId, name: 'Loaded Template', categoryId: pd.categoryId, categoryName: 'Unknown', isActive: true };
+             setSelectedPlatformProduct(pp);
+          }
+
+          if (pd.variants) setVariants(pd.variants);
+          if (pd.globalSpecs) setGlobalSpecs(pd.globalSpecs);
         }
       });
     }
@@ -275,38 +276,28 @@ const ProductBuilder: React.FC = () => {
     if (!pendingStatus) return;
     const values = getValues();
     
-    // Unify payload
-    const payload = {
-      productData: values,
-      globalSpecs: globalSpecs,
-      variants: variants
-    };
-
     if (id) {
       await db.userProducts.update(id, {
         status: pendingStatus,
-        name: values.name || 'Untitled Product',
-        partNumber: values.partNumber || 'N/A',
         updatedAt: new Date().toISOString().split('T')[0],
         ...(pendingStatus === 'Submitted' || pendingStatus === 'Resubmitted' ? { submittedAt: new Date().toISOString().split('T')[0] } : {}),
-        payload: payload as any
+        ...values,
+        variants: variants,
+        globalSpecs: globalSpecs
       });
     } else {
       await db.userProducts.add({
         id: `up-${Date.now()}`,
         tenantId: 'tenant-1',
-        platformProductId: values.platformProductId || null,
-        name: values.name || 'Untitled Product',
         categoryName: selectedCategory || 'Uncategorized',
-        partNumber: values.partNumber || 'N/A',
         status: pendingStatus,
         updatedAt: new Date().toISOString().split('T')[0],
         ...(pendingStatus === 'Submitted' || pendingStatus === 'Resubmitted' ? { submittedAt: new Date().toISOString().split('T')[0] } : { submittedAt: '' }),
-        payload: payload as any,
         reviewData: {},
+        ...values,
         variants: variants,
         globalSpecs: globalSpecs
-      });
+      } as any);
     }
 
     notification.success({
@@ -376,11 +367,11 @@ const ProductBuilder: React.FC = () => {
       <form className="space-y-6">
         <fieldset disabled={isReadOnly} className="space-y-6">
 
-        {/* STEP 1: PLATFORM PRODUCT SELECTION */}
+        {/* STEP 1: MASTER PRODUCT SELECTION */}
         <AntCard className="mb-6 shadow-sm border-gray-200">
           <div className="flex items-center gap-2 mb-4 text-sky-600">
             <Lucide.Link size={20} />
-            <h2 className="text-lg font-semibold m-0">1. Select Platform Master</h2>
+            <h2 className="text-lg font-semibold m-0">1. Select Master Product</h2>
           </div>
           <p className="text-gray-500 text-sm mb-4">
             Select a category to load the corresponding platform master products.
@@ -403,16 +394,16 @@ const ProductBuilder: React.FC = () => {
           </FormItem>
 
           {selectedCategory && (
-            <FormItem label="Platform Master Product" required error={errors.platformProductId?.message as string}>
+            <FormItem label="Master Product" required error={errors.platformProductId?.message as string}>
               <Controller
                 name="platformProductId"
                 control={control}
-                rules={{ required: 'Please select a platform product' }}
+                rules={{ required: 'Please select a product' }}
                 render={({ field }) => (
                   <AntSelect
                     {...field}
                     size="large"
-                    placeholder="Select a platform product..."
+                    placeholder="Select a product..."
                     onChange={(val) => {
                       field.onChange(val);
                       handlePlatformProductSelect(val);
@@ -702,7 +693,7 @@ const ProductBuilder: React.FC = () => {
               <div className="mt-4">
                 <h3 className="text-sm font-semibold text-gray-700 mb-1 uppercase tracking-wider">Sellable Product Variants</h3>
                 <p className="text-sm text-gray-500 mb-4">
-                  Platform Product Numbers (SKUs) are auto-generated based on combinations. Set your minimum prices and stock levels below.
+                  Product Numbers (SKUs) are auto-generated based on combinations. Set your minimum prices and stock levels below.
                 </p>
 
                 <div className="bg-gray-50 p-4 rounded-md border border-gray-200 mb-4 flex flex-col md:flex-row items-end gap-4">

@@ -11,6 +11,12 @@ export interface Category {
   childrenCount?: number;
 }
 
+export type FieldReviewStatus = 'pending' | 'approved' | 'rejected';
+export interface FieldReview {
+  status: FieldReviewStatus;
+  comment?: string;
+}
+
 export interface AttributeGroup {
   id: string;
   name: string;
@@ -35,12 +41,22 @@ export interface PlatformProduct {
   categoryName?: string;
   name: string;
   description?: string;
-  isActive?: boolean;
-  brand?: string;
-  manufacturer?: string;
-  modelNumber?: string;
-  partNumber?: string;
-  globalSpecs: Record<string, any>;
+  isActive: boolean;
+}
+
+export interface UserProductVariant {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  stock: number;
+  minOrder: number;
+  [key: string]: any;
+}
+
+export interface UserProductGlobalSpec {
+  name: string;
+  value: string;
 }
 
 export interface UserProduct {
@@ -48,16 +64,47 @@ export interface UserProduct {
   tenantId: string;
   tenantName?: string;
   platformProductId: string | null;
-  status: string;
-  name: string;
+  categoryId?: string;
   categoryName: string;
+  status: string;
+  
+  // Production Details
+  name: string;
+  modelNumber?: string;
   partNumber: string;
+  yearOfManufacture?: number;
+  countryOfOrigin?: string;
+  manufacturer?: string;
+  brand?: string;
+
+  // Dimensions & Weight
+  height?: string;
+  width?: string;
+  emptyWeight?: string;
+
+  // Seller Details
+  seller?: string;
+
+  // Others (Instructions & Documentation)
+  deviations?: string;
+  exclusions?: string;
+  assumptions?: string;
+  operationInstructions?: string;
+  safetyInstructions?: string;
+  handlingInstructions?: string;
+  maintenanceInstructions?: string;
+  additionalRequirements?: string;
+  additionalInformation?: string;
+
+  // Dynamic Attributes
+  dynamicAttributes?: Record<string, string[]>;
+  globalSpecs: UserProductGlobalSpec[];
+  variants: UserProductVariant[];
+
+  // Review & Timestamps
   reviewData: Record<string, any>;
-  variants: any[];
-  globalSpecs: any[];
   updatedAt: string;
   submittedAt: string;
-  payload?: any;
 }
 
 export interface RFQItem {
@@ -123,7 +170,7 @@ export class DelexyDatabase extends Dexie {
   rfqs!: Table<RFQ, string>;
 
   constructor() {
-    super('DelexyDB_v3');
+    super('DelexyDB');
     this.version(1).stores({
       workspaces: 'id, type',
       categories: 'id, parentId, slug',

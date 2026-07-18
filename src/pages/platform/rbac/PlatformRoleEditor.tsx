@@ -24,7 +24,7 @@ const PlatformRoleEditor: React.FC = () => {
     if (isEditing) {
       form.setFieldsValue({
         name: id === '2' ? 'Catalog Manager' : 'Custom Platform Role',
-        description: 'Can manage global categories, attributes, and platform products.',
+        description: 'Can manage global categories, attributes, and products.',
         permissions: {
           master_catalog: ['read', 'create', 'update', 'delete'],
           taxonomies: ['read', 'create', 'update', 'delete'],

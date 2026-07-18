@@ -5,8 +5,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import WorkflowTimeline from '../../components/common/WorkflowTimeline';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type UserProduct } from '../../data/db';
-import { type FieldReview, type FieldReviewStatus } from '../../data/mockProducts';
+import { db, type UserProduct, type FieldReview, type FieldReviewStatus } from '../../data/db';
 
 const PlatformReviewDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -39,10 +38,10 @@ const PlatformReviewDetail: React.FC = () => {
 
   const modalMode = ['Draft', 'Published'].includes(reviewingProduct.status) ? 'view' : 'review';
 
-  const payload = (reviewingProduct as any).payload || {};
+  const prod = reviewingProduct as any;
   const staticFieldsCount = 18; // Height, width, weight, name, model, part, year, country, mfg, brand, seller, + 7 others
-  const specFieldsCount = payload.globalSpecs?.length || 0;
-  const variantFieldsCount = payload.variants?.length || 0;
+  const specFieldsCount = prod.globalSpecs?.length || 0;
+  const variantFieldsCount = prod.variants?.length || 0;
   const totalFields = staticFieldsCount + specFieldsCount + variantFieldsCount;
 
   const approvedFieldsCount = Object.values(fieldReviews).filter(r => r.status === 'approved').length;
@@ -87,9 +86,9 @@ const PlatformReviewDetail: React.FC = () => {
 
   const handleBulkApproveSpecs = () => {
     if (!reviewingProduct) return;
-    const payload = (reviewingProduct as any).payload || {};
+    const prod = reviewingProduct as any;
     const updates: Record<string, FieldReview> = {};
-    (payload.globalSpecs || []).forEach((spec: any) => {
+    (prod.globalSpecs || []).forEach((spec: any) => {
       const key = `spec-${spec.name}`;
       if (!fieldReviews[key] || fieldReviews[key].status === 'pending') {
         updates[key] = { status: 'approved' };
@@ -100,9 +99,9 @@ const PlatformReviewDetail: React.FC = () => {
 
   const handleBulkApproveVariants = () => {
     if (!reviewingProduct) return;
-    const payload = (reviewingProduct as any).payload || {};
+    const prod = reviewingProduct as any;
     const updates: Record<string, FieldReview> = {};
-    (payload.variants || []).forEach((v: any) => {
+    (prod.variants || []).forEach((v: any) => {
       const key = `variant-${v.id}`;
       if (!fieldReviews[key] || fieldReviews[key].status === 'pending') {
         updates[key] = { status: 'approved' };
@@ -287,35 +286,35 @@ const PlatformReviewDetail: React.FC = () => {
         )}
 
         <Divider orientation="horizontal" plain>1. Dimensions & Weight</Divider>
-        <ReviewableRow label="Height" value={payload.productData?.height} entityKey="dim-height" />
-        <ReviewableRow label="Width" value={payload.productData?.width} entityKey="dim-width" />
-        <ReviewableRow label="Empty Weight" value={payload.productData?.emptyWeight} entityKey="dim-weight" />
+        <ReviewableRow label="Height" value={prod.height} entityKey="dim-height" />
+        <ReviewableRow label="Width" value={prod.width} entityKey="dim-width" />
+        <ReviewableRow label="Empty Weight" value={prod.emptyWeight} entityKey="dim-weight" />
 
         <Divider orientation="horizontal" plain>2. Production Details</Divider>
-        <ReviewableRow label="Product Name" value={payload.productData?.name} entityKey="prod-name" />
-        <ReviewableRow label="Model Number" value={payload.productData?.modelNumber} entityKey="prod-model" />
-        <ReviewableRow label="Part Number" value={payload.productData?.partNumber} entityKey="prod-part" />
-        <ReviewableRow label="Year of Manufacture" value={payload.productData?.yearOfManufacture} entityKey="prod-year" />
-        <ReviewableRow label="Country of Origin" value={payload.productData?.countryOfOrigin} entityKey="prod-country" />
-        <ReviewableRow label="Manufacturer" value={payload.productData?.manufacturer} entityKey="prod-mfg" />
-        <ReviewableRow label="Brand" value={payload.productData?.brand} entityKey="prod-brand" />
+        <ReviewableRow label="Product Name" value={prod.name} entityKey="prod-name" />
+        <ReviewableRow label="Model Number" value={prod.modelNumber} entityKey="prod-model" />
+        <ReviewableRow label="Part Number" value={prod.partNumber} entityKey="prod-part" />
+        <ReviewableRow label="Year of Manufacture" value={prod.yearOfManufacture} entityKey="prod-year" />
+        <ReviewableRow label="Country of Origin" value={prod.countryOfOrigin} entityKey="prod-country" />
+        <ReviewableRow label="Manufacturer" value={prod.manufacturer} entityKey="prod-mfg" />
+        <ReviewableRow label="Brand" value={prod.brand} entityKey="prod-brand" />
 
         <Divider orientation="horizontal" plain>3. Seller Details</Divider>
-        <ReviewableRow label="Seller" value={payload.productData?.seller} entityKey="seller-name" />
+        <ReviewableRow label="Seller" value={prod.seller} entityKey="seller-name" />
 
         <Divider orientation="horizontal" plain>4. Others</Divider>
-        <ReviewableRow label="Deviations" value={payload.productData?.deviations} entityKey="other-dev" />
-        <ReviewableRow label="Exclusions" value={payload.productData?.exclusions} entityKey="other-exc" />
-        <ReviewableRow label="Assumptions" value={payload.productData?.assumptions} entityKey="other-ass" />
-        <ReviewableRow label="Operation Instructions" value={payload.productData?.operationInstructions} entityKey="other-op" />
-        <ReviewableRow label="Safety Instructions" value={payload.productData?.safetyInstructions} entityKey="other-saf" />
-        <ReviewableRow label="Handling Instructions" value={payload.productData?.handlingInstructions} entityKey="other-hand" />
-        <ReviewableRow label="Maintenance Instructions" value={payload.productData?.maintenanceInstructions} entityKey="other-maint" />
-        <ReviewableRow label="Additional Requirements" value={payload.productData?.additionalRequirements} entityKey="other-req" />
-        <ReviewableRow label="Additional Information" value={payload.productData?.additionalInformation} entityKey="other-info" />
+        <ReviewableRow label="Deviations" value={prod.deviations} entityKey="other-dev" />
+        <ReviewableRow label="Exclusions" value={prod.exclusions} entityKey="other-exc" />
+        <ReviewableRow label="Assumptions" value={prod.assumptions} entityKey="other-ass" />
+        <ReviewableRow label="Operation Instructions" value={prod.operationInstructions} entityKey="other-op" />
+        <ReviewableRow label="Safety Instructions" value={prod.safetyInstructions} entityKey="other-saf" />
+        <ReviewableRow label="Handling Instructions" value={prod.handlingInstructions} entityKey="other-hand" />
+        <ReviewableRow label="Maintenance Instructions" value={prod.maintenanceInstructions} entityKey="other-maint" />
+        <ReviewableRow label="Additional Requirements" value={prod.additionalRequirements} entityKey="other-req" />
+        <ReviewableRow label="Additional Information" value={prod.additionalInformation} entityKey="other-info" />
 
         <Divider orientation="horizontal" plain>5. Global Specifications</Divider>
-        {payload.globalSpecs && payload.globalSpecs.length > 0 ? (
+        {prod.globalSpecs && prod.globalSpecs.length > 0 ? (
           <div className="border border-gray-200 rounded-lg overflow-hidden mb-6">
             {modalMode === 'review' && (
               <div className="bg-gray-50 p-3 border-b border-gray-200 flex justify-between items-center">
@@ -341,7 +340,7 @@ const PlatformReviewDetail: React.FC = () => {
                 onChange: setSelectedSpecKeys,
               } : undefined}
               columns={specColumns}
-              dataSource={payload.globalSpecs}
+              dataSource={prod.globalSpecs}
               rowKey="name"
               pagination={{ pageSize: 10 }}
               size="small"
@@ -352,7 +351,7 @@ const PlatformReviewDetail: React.FC = () => {
         )}
 
         <Divider orientation="horizontal" plain>6. Variants Matrix</Divider>
-        {payload.variants && payload.variants.length > 0 ? (
+        {prod.variants && prod.variants.length > 0 ? (
           <div className="border border-gray-200 rounded-lg overflow-hidden mb-2">
             {modalMode === 'review' && (
               <div className="bg-gray-50 p-3 border-b border-gray-200 flex justify-between items-center">
@@ -378,7 +377,7 @@ const PlatformReviewDetail: React.FC = () => {
                 onChange: setSelectedVariantKeys,
               } : undefined}
               columns={variantColumns}
-              dataSource={payload.variants}
+              dataSource={prod.variants}
               rowKey="id"
               pagination={{ pageSize: 10 }}
               size="small"

@@ -99,7 +99,7 @@ const PlatformLayout: React.FC = () => {
       { key: 'attributes', icon: <Lucide.List size={16} />, label: <Link to="/platform/attributes">Attributes</Link> },
       { key: 'groups', icon: <Lucide.Layers size={16} />, label: <Link to="/platform/groups">Groups</Link> },
       { key: 'category', icon: <Lucide.FolderTree size={16} />, label: <Link to="/platform/category">Category</Link> },
-      { key: 'platform-products', icon: <Lucide.Package size={16} />, label: <Link to="/platform/platform-products">Platform Products</Link> },
+      { key: 'category-products', icon: <Lucide.Package size={16} />, label: <Link to="/platform/category-products">Platform Products</Link> },
       { type: 'divider' },
       baseSettings
     ];

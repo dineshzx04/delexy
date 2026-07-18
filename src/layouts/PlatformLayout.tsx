@@ -86,7 +86,7 @@ const PlatformLayout: React.FC = () => {
         ]
       },
       { key: '/platform/category', icon: <Lucide.FolderTree size={16} />, label: <Link to="/platform/category">Categories</Link> },
-      { key: '/platform/platform-products', icon: <Lucide.Package size={16} />, label: <Link to="/platform/platform-products">Platform Products</Link> },
+      { key: '/platform/category-products', icon: <Lucide.Package size={16} />, label: <Link to="/platform/category-products">Products</Link> },
       { key: '/platform/user-products', icon: <Lucide.ClipboardCheck size={16} />, label: <Link to="/platform/user-products">User Products</Link> },
       { type: 'divider' },
       baseSettings
@@ -96,7 +96,7 @@ const PlatformLayout: React.FC = () => {
   const getSelectedKey = () => {
     const path = location.pathname;
     const knownRoutes: string[] = [];
-    
+
     const extractKeys = (items: any[]) => {
       items.forEach(item => {
         if (!item) return;
@@ -108,14 +108,14 @@ const PlatformLayout: React.FC = () => {
         }
       });
     };
-    
+
     extractKeys(getMenuItems());
     knownRoutes.sort((a, b) => b.length - a.length);
 
     for (const route of knownRoutes) {
       if (path.startsWith(route)) return route;
     }
-    
+
     return '/platform';
   };
 

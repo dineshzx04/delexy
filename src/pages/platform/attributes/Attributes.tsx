@@ -16,7 +16,6 @@ const Attributes: React.FC = () => {
 
   const attributes = useLiveQuery(() => db.attributes.toArray()) || [];
   const GLOBAL_VALUES = useLiveQuery(() => db.attributeValues.toArray()) || [];
-  console.log(GLOBAL_VALUES)
 
   // Search states
   const [attrSearchText, setAttrSearchText] = useState('');

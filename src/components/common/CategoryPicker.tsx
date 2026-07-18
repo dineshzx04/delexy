@@ -2,46 +2,8 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Modal, Button, Input } from 'antd';
 import * as Lucide from 'lucide-react';
 import { cn } from '../../lib/utils';
-
-export interface CategoryNode {
-  id: string;
-  name: string;
-  parentId: string | null;
-  hasChildren: boolean;
-}
-
-// Generate Mock Data for Picker
-const generateData = (): CategoryNode[] => {
-  const data: CategoryNode[] = [];
-  for (let i = 1; i <= 20; i++) {
-    const rootId = `c-${i}`;
-    data.push({ id: rootId, name: `Electronics & Gadgets ${i}`, parentId: null, hasChildren: true });
-    for (let j = 1; j <= 15; j++) {
-      const l1Id = `c-${i}-${j}`;
-      data.push({ id: l1Id, name: `Subcategory ${i}.${j}`, parentId: rootId, hasChildren: true });
-      for (let k = 1; k <= 10; k++) {
-        const l2Id = `c-${i}-${j}-${k}`;
-        data.push({ id: l2Id, name: `Deep Sub ${i}.${j}.${k}`, parentId: l1Id, hasChildren: true });
-        for (let l = 1; l <= 5; l++) {
-          data.push({ id: `c-${i}-${j}-${k}-${l}`, name: `Leaf Item ${i}.${j}.${k}.${l}`, parentId: l2Id, hasChildren: false });
-        }
-      }
-    }
-  }
-  return data;
-};
-
-export const ALL_CATEGORIES = generateData();
-
-export const getCategoryPathNames = (id: string): string[] => {
-  const pathNames: string[] = [];
-  let curr = ALL_CATEGORIES.find(c => c.id === id);
-  while (curr) {
-    pathNames.unshift(curr.name);
-    curr = ALL_CATEGORIES.find(c => c.id === curr!.parentId);
-  }
-  return pathNames;
-};
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../data/db';
 
 interface CategoryPickerProps {
   value?: string; // Category ID
@@ -52,6 +14,9 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // Fetch categories from Dexie
+  const dbCategories = useLiveQuery(() => db.categories.toArray()) || [];
+
   // State to hold the selected path of category IDs
   const [selectedPath, setSelectedPath] = useState<string[]>([]);
 
@@ -60,25 +25,25 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   // Compute columns based on selected path
   const columns = useMemo(() => {
     // First column is always roots (where parentId is null)
-    const cols = [ALL_CATEGORIES.filter(c => c.parentId === null)];
+    const cols = [dbCategories.filter(c => c.parentId === null)];
 
     // For each selected item in the path, if it has children, add the next column
     for (let i = 0; i < selectedPath.length; i++) {
       const currentId = selectedPath[i];
-      const children = ALL_CATEGORIES.filter(c => c.parentId === currentId);
+      const children = dbCategories.filter(c => c.parentId === currentId);
       if (children.length > 0) {
         cols.push(children);
       }
     }
     return cols;
-  }, [selectedPath]);
+  }, [selectedPath, dbCategories]);
 
   // Handle Search Filtering
   // If search query exists, we flatten the UI to just show search results instead of columns
   const searchResults = useMemo(() => {
     if (!searchQuery) return [];
-    return ALL_CATEGORIES.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 50); // limit for performance
-  }, [searchQuery]);
+    return dbCategories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.slug.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 50); // limit for performance
+  }, [searchQuery, dbCategories]);
 
   const handleSelectCategory = (categoryId: string, columnIndex: number) => {
     // Truncate path to current column, then append new selection
@@ -90,7 +55,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   const handleConfirm = () => {
     if (selectedPath.length > 0) {
       const finalId = selectedPath[selectedPath.length - 1];
-      const finalCat = ALL_CATEGORIES.find(c => c.id === finalId);
+      const finalCat = dbCategories.find(c => c.id === finalId);
       if (finalCat && onChange) {
         onChange(finalCat.id, finalCat.name);
       }
@@ -115,9 +80,15 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
 
   // Find currently selected category path for the trigger button
   const currentCategoryPathNames = useMemo(() => {
-    if (!value) return null;
-    return getCategoryPathNames(value);
-  }, [value]);
+    if (!value || dbCategories.length === 0) return null;
+    const pathNames: string[] = [];
+    let curr = dbCategories.find(c => c.id === value);
+    while (curr) {
+      pathNames.unshift(curr.name);
+      curr = dbCategories.find(c => c.id === curr!.parentId);
+    }
+    return pathNames.length > 0 ? pathNames : null;
+  }, [value, dbCategories]);
 
   return (
     <>
@@ -125,12 +96,12 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
         <Button
           onClick={() => {
             // Re-hydrate path if editing existing value
-            if (value) {
+            if (value && dbCategories.length > 0) {
               const path: string[] = [];
-              let curr = ALL_CATEGORIES.find(c => c.id === value);
+              let curr = dbCategories.find(c => c.id === value);
               while (curr) {
                 path.unshift(curr.id);
-                curr = ALL_CATEGORIES.find(c => c.id === curr!.parentId);
+                curr = dbCategories.find(c => c.id === curr!.parentId);
               }
               setSelectedPath(path);
             } else {
@@ -216,10 +187,10 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
                         onClick={() => {
                           // Build path for this category so when we clear search, we are deep in the tree
                           const path: string[] = [];
-                          let curr: CategoryNode | undefined = cat;
+                          let curr: any = cat;
                           while (curr) {
                             path.unshift(curr.id);
-                            curr = ALL_CATEGORIES.find(c => c.id === curr!.parentId);
+                            curr = dbCategories.find(c => c.id === curr!.parentId);
                           }
                           setSelectedPath(path);
                           setSearchQuery('');
@@ -249,6 +220,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
                     <div className="flex-1 overflow-y-auto p-1">
                       {colItems.map(item => {
                         const isSelected = selectedPath[colIndex] === item.id;
+                        const hasChildren = dbCategories.some(c => c.parentId === item.id);
                         return (
                           <div
                             key={item.id}
@@ -259,7 +231,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
                             onClick={() => handleSelectCategory(item.id, colIndex)}
                           >
                             <span className="truncate pr-2">{item.name}</span>
-                            {item.hasChildren && (
+                            {hasChildren && (
                               <Lucide.ChevronRight size={14} className={isSelected ? "text-sky-200" : "text-gray-400"} />
                             )}
                           </div>
@@ -279,7 +251,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
               <span className="italic text-gray-400">No category selected</span>
             ) : (
               selectedPath.map((id, idx) => {
-                const cat = ALL_CATEGORIES.find(c => c.id === id);
+                const cat = dbCategories.find(c => c.id === id);
                 return (
                   <React.Fragment key={id}>
                     {idx > 0 && <Lucide.ChevronRight size={12} className="text-gray-300 shrink-0" />}

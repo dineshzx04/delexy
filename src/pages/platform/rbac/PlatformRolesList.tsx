@@ -26,7 +26,7 @@ const PlatformRolesList: React.FC = () => {
     {
       id: '2',
       name: 'Catalog Manager',
-      description: 'Can manage global categories, attributes, and platform products.',
+      description: 'Can manage global categories, attributes, and products.',
       usersCount: 2,
       lastModified: 'Nov 05, 2023',
       isDefault: false,

@@ -95,7 +95,7 @@ const App: React.FC = () => {
               <Route path="attributes" element={<PlaceholderPage />} />
               <Route path="groups" element={<PlaceholderPage />} />
               <Route path="category" element={<PlaceholderPage />} />
-              <Route path="platform-products" element={<PlaceholderPage />} />
+              <Route path="category-products" element={<PlaceholderPage />} />
             </Route>
           </Route>
 

@@ -59,7 +59,7 @@ const CreateRFQ: React.FC = () => {
   const [previewProduct, setPreviewProduct] = useState<{ variant: any, product: UserProduct, itemIndex: number } | null>(null);
   const [activeDrawerItemIndex, setActiveDrawerItemIndex] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   const PLATFORM_PRODUCTS = useLiveQuery(() => db.platformProducts.toArray()) || [];
   const allTenantProducts = useLiveQuery(() => db.userProducts.toArray()) || [];
 
@@ -255,7 +255,7 @@ const CreateRFQ: React.FC = () => {
                   }
                 },
                 {
-                  title: 'Platform Product',
+                  title: 'Product',
                   render: (_, field, index) => {
                     const currentCategory = watchItems[index]?.categoryId;
                     const currentPlatformProduct = watchItems[index]?.platformProductId;
@@ -563,7 +563,7 @@ const CreateRFQ: React.FC = () => {
                             }}
                             options={platformProducts.map(p => ({ label: p.name, value: p.id }))}
                             className="w-full"
-                            placeholder="Select Platform Product (Optional)"
+                            placeholder="Select Product (Optional)"
                             allowClear
                           />
                         )}
@@ -577,13 +577,14 @@ const CreateRFQ: React.FC = () => {
                       <Lucide.FileText size={16} className="mr-2" /> Specifications
                     </h4>
                     <div className="flex flex-col gap-3 text-sm">
-                      <FormItem label="Brand" className="mb-0"><Controller name={`items.${index}.brand`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'Brand A', value: 'Brand A' }, { label: 'Brand B', value: 'Brand B' }]} placeholder="Brand" allowClear />} /></FormItem>
                       <FormItem label="Manufacturer" className="mb-0"><Controller name={`items.${index}.manufacturer`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'Acme Corp', value: 'Acme Corp' }, { label: 'Globex', value: 'Globex' }]} placeholder="Manufacturer" allowClear />} /></FormItem>
+                      <FormItem label="Brand" className="mb-0"><Controller name={`items.${index}.brand`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'Brand A', value: 'Brand A' }, { label: 'Brand B', value: 'Brand B' }]} placeholder="Brand" allowClear />} /></FormItem>
+                      <FormItem label="Seller" className="mb-0"><Controller name={`items.${index}.manufacturer`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'Supplier A', value: 'Supplier A' }, { label: 'Supplier B', value: 'Supplier B' }]} placeholder="Brand" allowClear />} /></FormItem>
                       <FormItem label="Country" className="mb-0"><Controller name={`items.${index}.countryOfOrigin`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'USA', value: 'USA' }, { label: 'Germany', value: 'Germany' }, { label: 'China', value: 'China' }]} placeholder="Country" allowClear />} /></FormItem>
 
                       <div className="grid grid-cols-2 gap-3 mt-2">
                         <FormItem label="Model" className="mb-0"><Controller name={`items.${index}.modelNumber`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Model" />} /></FormItem>
-                        <FormItem label="Part #" className="mb-0"><Controller name={`items.${index}.partNumber`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Part #" />} /></FormItem>
+                        <FormItem label="Part" className="mb-0"><Controller name={`items.${index}.partNumber`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Part #" />} /></FormItem>
                       </div>
 
                       <FormItem label="Dimensions (H x W x Wt)" className="mb-0 mt-2">
