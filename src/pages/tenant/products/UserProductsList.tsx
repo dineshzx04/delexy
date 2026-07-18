@@ -3,17 +3,17 @@ import { Table as AntTable, Input as AntInput, Button as AntButton, Tag as AntTa
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
+import { useWorkspace } from '../../../contexts/WorkspaceContext';
 import WorkflowTimeline, { type ProductStatus } from '../../../components/common/WorkflowTimeline';
 
-import { getProducts, type Product } from '../../../data/mockProducts';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type UserProduct } from '../../../data/db';
 
 const UserProductsList: React.FC = () => {
-  // Simulate fetching products for the current tenant ('tenant-1')
-  const [products, setProducts] = useState<Product[]>([]);
+  const { activeWorkspace } = useWorkspace();
   
-  useEffect(() => {
-    setProducts(getProducts().filter(p => p.tenantId === 'tenant-1'));
-  }, []);
+  // Fetch products for the current workspace
+  const products = useLiveQuery(() => db.userProducts.where('tenantId').equals(activeWorkspace.id).toArray()) || [];
 
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -67,7 +67,7 @@ const UserProductsList: React.FC = () => {
     {
       title: 'Product Info',
       key: 'info',
-      render: (_: any, record: Product) => (
+      render: (_: any, record: UserProduct) => (
         <div className="flex flex-col">
           <span className="font-semibold text-gray-900">{record.name}</span>
           <span className="text-xs text-gray-500 font-mono">PN: {record.partNumber}</span>
@@ -95,19 +95,19 @@ const UserProductsList: React.FC = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: ProductStatus) => getStatusTag(status)
+      render: (status: string) => getStatusTag(status as ProductStatus)
     },
     {
       title: 'Actions',
       key: 'action',
       width: 150,
-      render: (_: any, record: Product) => (
+      render: (_: any, record: UserProduct) => (
         <div className="flex gap-2">
           <AntButton
             type="text"
             size="small"
             className="text-sky-600 hover:text-sky-700 hover:bg-sky-50"
-            onClick={() => handleViewStatus(record.status)}
+            onClick={() => handleViewStatus(record.status as ProductStatus)}
           >
             Status
           </AntButton>

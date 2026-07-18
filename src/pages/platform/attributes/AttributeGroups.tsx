@@ -4,30 +4,8 @@ import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
 
-// Mock large attributes global pool
-const generateMockAttributes = () => {
-  const data = [];
-  for (let i = 1; i <= 300; i++) {
-    data.push({ id: String(i), name: `Global Attribute ${i}` });
-  }
-  return data;
-};
-const GLOBAL_ATTRIBUTES = generateMockAttributes();
-
-// Mock large groups
-const generateMockGroups = () => {
-  const data = [];
-  for (let i = 1; i <= 50; i++) {
-    data.push({
-      id: String(i),
-      name: `Category Group ${i}`,
-      description: `Description for group ${i}`,
-      mappedAttributes: [String(i), String(i+1)]
-    });
-  }
-  return data;
-};
-const INITIAL_GROUPS = generateMockGroups();
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type AttributeGroup } from '../../../data/db';
 
 const AttributeGroups: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -35,7 +13,9 @@ const AttributeGroups: React.FC = () => {
   const [currentMappingGroup, setCurrentMappingGroup] = useState<any>(null);
   
   const [form] = AntForm.useForm();
-  const [groups, setGroups] = useState(INITIAL_GROUPS);
+  
+  const groups = useLiveQuery(() => db.attributeGroups.toArray()) || [];
+  const GLOBAL_ATTRIBUTES = useLiveQuery(() => db.attributes.toArray()) || [];
   
   // Search states
   const [groupSearchText, setGroupSearchText] = useState('');
@@ -55,17 +35,17 @@ const AttributeGroups: React.FC = () => {
 
   const filteredAttributes = useMemo(() => {
     return GLOBAL_ATTRIBUTES.filter(a => a.name.toLowerCase().includes(attrSearchText.toLowerCase()));
-  }, [attrSearchText]);
+  }, [GLOBAL_ATTRIBUTES, attrSearchText]);
 
   const columns = [
     { title: 'Group Name', dataIndex: 'name', key: 'name', render: (text: string) => <span className="font-semibold text-gray-900">{text}</span> },
     { title: 'Description', dataIndex: 'description', key: 'description' },
     { 
       title: 'Mapped Attributes', 
-      key: 'mappedAttributes', 
-      render: (_: any, record: any) => (
+      key: 'attributeIds', 
+      render: (_: any, record: AttributeGroup) => (
         <div className="flex items-center gap-2">
-          <AntTag color="purple">{record.mappedAttributes.length} Attributes</AntTag>
+          <AntTag color="purple">{record.attributeIds?.length || 0} Attributes</AntTag>
           <AntButton type="link" size="small" className="p-0 text-sky-600" onClick={() => openMappingDrawer(record)}>
             Manage
           </AntButton>
@@ -76,7 +56,7 @@ const AttributeGroups: React.FC = () => {
       title: 'Actions',
       key: 'action',
       width: 120,
-      render: (_: any, record: any) => (
+      render: (_: any, record: AttributeGroup) => (
         <div className="flex items-center gap-2">
           <AntButton type="text" size="small" className="text-gray-600 hover:text-sky-600" onClick={() => {
             form.setFieldsValue(record);
@@ -84,30 +64,39 @@ const AttributeGroups: React.FC = () => {
           }}>
             Edit Base
           </AntButton>
+          <AntButton type="text" danger size="small" onClick={async () => {
+            await db.attributeGroups.delete(record.id);
+          }}>Delete</AntButton>
         </div>
       ),
     },
   ];
 
-  const handleSave = (formValues: any) => {
+  const handleSave = async (formValues: any) => {
     if (formValues.id) {
-      setGroups(groups.map(g => g.id === formValues.id ? { ...g, ...formValues } : g));
+      await db.attributeGroups.update(formValues.id, formValues);
     } else {
-      setGroups([{ ...formValues, id: Math.random().toString(), mappedAttributes: [] }, ...groups]);
+      const newGroup: AttributeGroup = {
+        ...formValues,
+        id: `g-${Date.now()}`,
+        attributeIds: []
+      };
+      await db.attributeGroups.add(newGroup);
     }
     setIsModalVisible(false);
     form.resetFields();
   };
 
-  const openMappingDrawer = (group: any) => {
+  const openMappingDrawer = (group: AttributeGroup) => {
     setCurrentMappingGroup(group);
     setAttrSearchText('');
     setIsDrawerVisible(true);
   };
 
-  const handleSaveMapping = (selectedRowKeys: React.Key[]) => {
-    setGroups(groups.map(g => g.id === currentMappingGroup.id ? { ...g, mappedAttributes: selectedRowKeys as string[] } : g));
-    setIsDrawerVisible(false);
+  const handleSaveMapping = async (selectedRowKeys: React.Key[]) => {
+    const newAttrIds = selectedRowKeys as string[];
+    await db.attributeGroups.update(currentMappingGroup.id, { attributeIds: newAttrIds });
+    setCurrentMappingGroup({ ...currentMappingGroup, attributeIds: newAttrIds });
   };
 
   return (
@@ -197,7 +186,7 @@ const AttributeGroups: React.FC = () => {
         <AntTable
           rowSelection={{
             type: 'checkbox',
-            selectedRowKeys: currentMappingGroup?.mappedAttributes || [],
+            selectedRowKeys: currentMappingGroup?.attributeIds || [],
             onChange: handleSaveMapping,
             preserveSelectedRowKeys: true,
           }}

@@ -5,15 +5,9 @@ import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import CategoryPicker, { getCategoryPathNames } from '../../components/common/CategoryPicker';
 
-// Define the Platform Product type
-interface PlatformProduct {
-  id: string;
-  name: string;
-  categoryId: string;
-  categoryName: string;
-  description: string;
-  isActive: boolean;
-}
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type PlatformProduct } from '../../data/db';
+import { useEffect } from 'react';
 
 // Generate Mock Data
 const generateMockProducts = (): PlatformProduct[] => {
@@ -26,6 +20,7 @@ const generateMockProducts = (): PlatformProduct[] => {
       categoryName: `Leaf Item 1.1.1.${(i % 5) + 1}`,
       description: `This is the master template for product ${i}`,
       isActive: i % 10 !== 0,
+      globalSpecs: {}
     });
   }
   return data;
@@ -34,8 +29,19 @@ const generateMockProducts = (): PlatformProduct[] => {
 const INITIAL_PRODUCTS = generateMockProducts();
 
 const PlatformProducts: React.FC = () => {
-  const [products, setProducts] = useState(INITIAL_PRODUCTS);
+  const products = useLiveQuery(() => db.platformProducts.toArray());
   const [searchText, setSearchText] = useState('');
+
+  // Sync mock data to Dexie on mount if empty
+  useEffect(() => {
+    const syncData = async () => {
+      const count = await db.platformProducts.count();
+      if (count === 0) {
+        await db.platformProducts.bulkAdd(INITIAL_PRODUCTS as any);
+      }
+    };
+    syncData();
+  }, []);
 
   // Modal State
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -50,7 +56,7 @@ const PlatformProducts: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const filteredProducts = useMemo(() => {
-    return products.filter(p => p.name.toLowerCase().includes(searchText.toLowerCase()));
+    return (products || []).filter(p => p.name.toLowerCase().includes(searchText.toLowerCase()));
   }, [products, searchText]);
 
   const handleCreateNew = () => {
@@ -66,24 +72,29 @@ const PlatformProducts: React.FC = () => {
     setIsModalVisible(true);
   };
 
-  const handleSave = (values: any) => {
+  const handleSave = async (values: any) => {
     if (!values.categoryId) {
       notification.error({ message: 'Category is required.' });
       return;
     }
 
     if (editingProduct) {
-      setProducts(products.map(p => p.id === editingProduct.id ? { ...p, ...values } : p));
+      await db.platformProducts.update(editingProduct.id, values);
       notification.success({ message: 'Product Updated' });
     } else {
-      setProducts([{ ...values, id: `new-prod-${Math.random()}` }, ...products]);
+      const newProduct: PlatformProduct = {
+        ...values,
+        id: `new-prod-${Date.now()}`,
+        globalSpecs: {}
+      };
+      await db.platformProducts.add(newProduct);
       notification.success({ message: 'Product Created' });
     }
     setIsModalVisible(false);
   };
 
-  const handleDelete = (id: string) => {
-    setProducts(products.filter(p => p.id !== id));
+  const handleDelete = async (id: string) => {
+    await db.platformProducts.delete(id);
     notification.success({ message: 'Product Deleted' });
   };
 

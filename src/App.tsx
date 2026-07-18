@@ -34,8 +34,9 @@ import PlatformProductReview from './pages/platform/PlatformProductReview';
 import PlatformReviewDetail from './pages/platform/PlatformReviewDetail';
 import OutboundRFQList from './pages/tenant/rfq/OutboundRFQList';
 import InboundRFQList from './pages/tenant/rfq/InboundRFQList';
+import InboundRFQDetail from './pages/tenant/rfq/InboundRFQDetail';
+import OutboundRFQDetail from './pages/tenant/rfq/OutboundRFQDetail';
 import CreateRFQ from './pages/tenant/rfq/CreateRFQ';
-import RFQDetail from './pages/tenant/rfq/RFQDetail';
 import UserProductsList from './pages/tenant/products/UserProductsList';
 import ProductBuilder from './pages/tenant/products/ProductBuilder';
 import GlobalCatalog from './pages/tenant/catalog/GlobalCatalog';
@@ -70,13 +71,11 @@ const App: React.FC = () => {
           <Route element={<AuthLayout />}>
             <Route element={<ErrorBoundary />}>
               <Route path="/login" element={<Login />} />
+              <Route path="/2fa" element={<TwoFactorAuth />} />
               <Route path="/register" element={<Register />} />
               <Route path="/verify-email" element={<EmailVerification />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
-              <Route path="/2fa" element={<TwoFactorAuth />} />
-              <Route path="/create-organization" element={<CreateOrganization />} />
-              <Route path="/join-organization" element={<JoinOrganization />} />
             </Route>
           </Route>
 
@@ -97,6 +96,9 @@ const App: React.FC = () => {
             <Route element={<ErrorBoundary />}>
               <Route index element={<Navigate to="/dashboard" replace />} />
 
+              <Route path="create-organization" element={<CreateOrganization />} />
+              <Route path="join-organization" element={<JoinOrganization />} />
+
               {/* Tenant Specific Routes */}
               <Route path="user-management" element={<TeamManagement />} />
               <Route path="rbac" element={<Navigate to="/rbac/roles" replace />} />
@@ -109,7 +111,8 @@ const App: React.FC = () => {
               <Route path="rfqs/outbound" element={<OutboundRFQList />} />
               <Route path="rfqs/inbound" element={<InboundRFQList />} />
               <Route path="rfqs/new" element={<CreateRFQ />} />
-              <Route path="rfqs/:id" element={<RFQDetail />} />
+              <Route path="rfqs/inbound/:id" element={<InboundRFQDetail />} />
+              <Route path="rfqs/outbound/:id" element={<OutboundRFQDetail />} />
               <Route path="products" element={<UserProductsList />} />
               <Route path="products/new" element={<ProductBuilder />} />
               <Route path="products/:id/edit" element={<ProductBuilder />} />

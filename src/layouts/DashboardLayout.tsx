@@ -69,17 +69,22 @@ const DashboardLayout: React.FC = () => {
         { key: '/settings/sessions', icon: <Lucide.Monitor size={16} />, label: <Link to="/settings/sessions">Sessions</Link> },
       ]
     };
-
+    
     const individualMenus = [
       { key: '/dashboard', icon: <Lucide.LayoutDashboard size={16} />, label: <Link to="/dashboard">Dashboard Overview</Link> },
+      { key: '/manufacturer', icon: <Lucide.Factory size={16} />, label: <Link to="/manufacturer">Manufacturer</Link> },
+      { key: '/suppliers', icon: <Lucide.Users size={16} />, label: <Link to="/suppliers">Suppliers</Link> },
+      { key: '/orders', icon: <Lucide.ShoppingCart size={16} />, label: <Link to="/orders">Orders</Link> },
+      { type: 'divider' },
+      { key: '/products', icon: <Lucide.Package size={16} />, label: <Link to="/products">Products</Link> },
       { key: '/marketplace/catalog', icon: <Lucide.Store size={16} />, label: <Link to="/marketplace/catalog">Global Marketplace</Link> },
+      { type: 'divider' },
+      { key: '/create-organization', icon: <Lucide.Building2 size={16} />, label: <Link to="/create-organization">Create Organization</Link> },
+      { key: '/join-organization', icon: <Lucide.Users size={16} />, label: <Link to="/join-organization">Join Organization</Link> },
       { type: 'divider' },
       { key: '/rfqs/outbound', icon: <Lucide.FileText size={16} />, label: <Link to="/rfqs/outbound">My RFQs</Link> },
       { key: '/rfqs/inbound', icon: <Lucide.Inbox size={16} />, label: <Link to="/rfqs/inbound">Received RFQs</Link> },
-      { key: '/products', icon: <Lucide.Package size={16} />, label: <Link to="/products">Products</Link> },
-      { key: '/orders', icon: <Lucide.ShoppingCart size={16} />, label: <Link to="/orders">Orders</Link> },
-      { key: '/suppliers', icon: <Lucide.Users size={16} />, label: <Link to="/suppliers">Suppliers</Link> },
-      { key: '/manufacturer', icon: <Lucide.Factory size={16} />, label: <Link to="/manufacturer">Manufacturer</Link> },
+      { type: 'divider' },
     ];
 
     if (activeWorkspace.type === 'tenant') {

@@ -4,12 +4,11 @@ import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
 
-const { TabPane } = AntTabs;
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../../../data/db';
+import { useEffect } from 'react';
 
-// Generators for massive data testing
-const GROUPS = Array.from({ length: 50 }, (_, i) => ({ id: `g${i+1}`, name: `Group ${i+1}` }));
-const ATTRIBUTES = Array.from({ length: 300 }, (_, i) => ({ id: `a${i+1}`, name: `Attribute ${i+1}` }));
-const VALUES = Array.from({ length: 500 }, (_, i) => ({ id: `v${i+1}`, value: `Value ${i+1}` }));
+const { TabPane } = AntTabs;
 
 const AttributeMapping: React.FC = () => {
   const breadcrumbs = useMemo(() => [
@@ -20,34 +19,59 @@ const AttributeMapping: React.FC = () => {
 
   useBreadcrumb(breadcrumbs);
 
+  const GROUPS = useLiveQuery(() => db.attributeGroups.toArray()) || [];
+  const ATTRIBUTES = useLiveQuery(() => db.attributes.toArray()) || [];
+  const VALUES = useLiveQuery(() => db.attributeValues.toArray()) || [];
   // Mappings state
-  const [groupToAttr, setGroupToAttr] = useState<Record<string, string[]>>({
-    g1: ['a1', 'a2', 'a50', 'a100']
-  });
+  const [groupToAttr, setGroupToAttr] = useState<Record<string, string[]>>({});
+  const [attrToValue, setAttrToValue] = useState<Record<string, string[]>>({});
 
-  const [attrToValue, setAttrToValue] = useState<Record<string, string[]>>({
-    a1: ['v1', 'v2', 'v200']
-  });
+  useEffect(() => {
+    if (GROUPS.length > 0 && Object.keys(groupToAttr).length === 0) {
+      const gMap: Record<string, string[]> = {};
+      GROUPS.forEach(g => gMap[g.id] = g.attributeIds || []);
+      setGroupToAttr(gMap);
+      if (!selectedGroupId) setSelectedGroupId(GROUPS[0].id);
+    }
+    if (ATTRIBUTES.length > 0 && Object.keys(attrToValue).length === 0) {
+      const aMap: Record<string, string[]> = {};
+      ATTRIBUTES.forEach(a => aMap[a.id] = a.valueIds || []);
+      setAttrToValue(aMap);
+      if (!selectedAttrId) setSelectedAttrId(ATTRIBUTES[0].id);
+    }
+  }, [GROUPS, ATTRIBUTES]);
 
   // Tab 1 state
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(GROUPS[0].id);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [groupSearch, setGroupSearch] = useState('');
   const [attrSearchTab1, setAttrSearchTab1] = useState('');
 
   // Tab 2 state
-  const [selectedAttrId, setSelectedAttrId] = useState<string | null>(ATTRIBUTES[0].id);
+  const [selectedAttrId, setSelectedAttrId] = useState<string | null>(null);
   const [attrSearchTab2, setAttrSearchTab2] = useState('');
   const [valSearch, setValSearch] = useState('');
 
-  const saveMappings = () => {
-    message.success('Large-scale taxonomy mappings saved successfully');
+  const saveMappings = async () => {
+    try {
+      // Save groupToAttr
+      const groupUpdates = Object.entries(groupToAttr).map(([id, attrIds]) => db.attributeGroups.update(id, { attributeIds: attrIds }));
+      await Promise.all(groupUpdates);
+
+      // Save attrToValue
+      const attrUpdates = Object.entries(attrToValue).map(([id, valIds]) => db.attributes.update(id, { valueIds: valIds }));
+      await Promise.all(attrUpdates);
+
+      message.success('Large-scale taxonomy mappings saved successfully to Database');
+    } catch (e) {
+      message.error('Failed to save mappings');
+    }
   };
 
   // ----------------------------------------------------
   // TAB 1: Groups (Master) <-> Attributes (Detail)
   // ----------------------------------------------------
-  const filteredGroups = useMemo(() => GROUPS.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase())), [groupSearch]);
-  const filteredAttrsTab1 = useMemo(() => ATTRIBUTES.filter(a => a.name.toLowerCase().includes(attrSearchTab1.toLowerCase())), [attrSearchTab1]);
+  const filteredGroups = useMemo(() => GROUPS.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase())), [GROUPS, groupSearch]);
+  const filteredAttrsTab1 = useMemo(() => ATTRIBUTES.filter(a => a.name.toLowerCase().includes(attrSearchTab1.toLowerCase())), [ATTRIBUTES, attrSearchTab1]);
 
   const handleGroupAttrChange = (selectedRowKeys: React.Key[]) => {
     if (!selectedGroupId) return;
@@ -57,8 +81,8 @@ const AttributeMapping: React.FC = () => {
   // ----------------------------------------------------
   // TAB 2: Attributes (Master) <-> Values (Detail)
   // ----------------------------------------------------
-  const filteredAttrsTab2 = useMemo(() => ATTRIBUTES.filter(a => a.name.toLowerCase().includes(attrSearchTab2.toLowerCase())), [attrSearchTab2]);
-  const filteredValues = useMemo(() => VALUES.filter(v => v.value.toLowerCase().includes(valSearch.toLowerCase())), [valSearch]);
+  const filteredAttrsTab2 = useMemo(() => ATTRIBUTES.filter(a => a.name.toLowerCase().includes(attrSearchTab2.toLowerCase())), [ATTRIBUTES, attrSearchTab2]);
+  const filteredValues = useMemo(() => VALUES.filter(v => v.value.toLowerCase().includes(valSearch.toLowerCase())), [VALUES, valSearch]);
 
   const handleAttrValChange = (selectedRowKeys: React.Key[]) => {
     if (!selectedAttrId) return;

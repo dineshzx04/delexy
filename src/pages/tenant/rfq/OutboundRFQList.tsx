@@ -3,18 +3,17 @@ import { Button as AntButton } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
-import { getRFQsByRequester, type RFQ } from '../../../data/mockRFQs';
 import { useWorkspace } from '../../../contexts/WorkspaceContext';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type RFQ } from '../../../data/db';
 import RFQTable from './components/RFQTable';
 
 const OutboundRFQList: React.FC = () => {
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
-  const [rfqs, setRfqs] = useState<RFQ[]>([]);
-
-  useEffect(() => {
-    setRfqs(getRFQsByRequester(activeWorkspace.id));
-  }, [activeWorkspace.id]);
+  const rfqs = useLiveQuery(() => 
+    db.rfqs.where('requesterTenantId').equals(activeWorkspace.id).toArray()
+  ) || [];
 
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/" className="text-gray-500 hover:text-sky-600 transition-colors">Dashboard</Link>, url: '/' },

@@ -1,20 +1,15 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Table as AntTable, Button as AntButton, Tag as AntTag, Input, Tabs as AntTabs } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
-import { getProducts, updateProduct, type Product } from '../../data/mockProducts';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type UserProduct } from '../../data/db';
 
 const PlatformProductReview: React.FC = () => {
-  const [submissions, setSubmissions] = useState<Product[]>([]);
   const [searchText, setSearchText] = useState('');
-  const [activeTab, setActiveTab] = useState('All');
+  const [activeTab, setActiveTab] = useState('Submitted');
   const navigate = useNavigate();
-
-  useEffect(() => {
-    // Load from our unified module store, filtering out Drafts
-    setSubmissions(getProducts().filter(p => p.status !== 'Draft'));
-  }, []);
 
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/platform" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/platform' },
@@ -23,18 +18,18 @@ const PlatformProductReview: React.FC = () => {
 
   useBreadcrumb(breadcrumbs);
 
-  const filteredSubmissions = useMemo(() => {
-    let result = submissions;
+  const products = useLiveQuery(() => {
+    if (activeTab === 'All') return db.userProducts.toArray();
+    return db.userProducts.where('status').equals(activeTab).toArray();
+  }, [activeTab]) || [];
 
-    if (activeTab !== 'All') {
-      result = result.filter(p => p.status === activeTab);
-    }
-
-    return result.filter(p =>
+  const filteredProducts = useMemo(() => {
+    return products.filter(p =>
       p.name.toLowerCase().includes(searchText.toLowerCase()) ||
-      p.tenantName.toLowerCase().includes(searchText.toLowerCase())
+      p.tenantId.toLowerCase().includes(searchText.toLowerCase()) ||
+      p.partNumber.toLowerCase().includes(searchText.toLowerCase())
     );
-  }, [submissions, activeTab, searchText]);
+  }, [products, searchText]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -51,21 +46,23 @@ const PlatformProductReview: React.FC = () => {
 
   const columns = [
     {
-      title: 'Tenant / Submitter',
-      dataIndex: 'tenantName',
-      key: 'tenantName',
-      render: (text: string) => <span className="font-medium text-gray-900">{text}</span>,
+      title: 'Tenant',
+      key: 'tenant',
+      render: (_: any, record: UserProduct) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-gray-800">{record.tenantId}</span>
+        </div>
+      )
     },
     {
       title: 'Product Name',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: 'Category',
-      dataIndex: 'categoryName',
-      key: 'categoryName',
-      render: (text: string) => <AntTag>{text}</AntTag>,
+      key: 'product',
+      render: (_: any, record: UserProduct) => (
+        <div className="flex flex-col">
+          <span className="font-semibold text-sky-700">{record.name}</span>
+          <span className="text-xs text-gray-500">Part: {record.partNumber}</span>
+        </div>
+      )
     },
     {
       title: 'Status',
@@ -78,51 +75,19 @@ const PlatformProductReview: React.FC = () => {
       ),
     },
     {
-      title: 'Submitted At',
-      dataIndex: 'submittedAt',
-      key: 'submittedAt',
-      render: (text: string) => <span className="text-gray-500">{text}</span>,
-    },
-    {
-      title: 'Action',
+      title: 'Actions',
       key: 'action',
-      render: (_: any, record: Product) => {
-        if (record.status === 'Submitted' || record.status === 'Resubmitted' || record.status === 'Under Review') {
-          return (
-            <AntButton
-              type="primary"
-              className={record.status === 'Under Review' ? "bg-orange-500 hover:bg-orange-600" : "bg-sky-600 hover:bg-sky-700"}
-              onClick={() => {
-                if (record.status === 'Submitted' || record.status === 'Resubmitted') {
-                  updateProduct(record.id, { status: 'Under Review' });
-                }
-                navigate(`/platform/review/${record.id}`);
-              }}
-            >
-              {record.status === 'Under Review' ? 'Continue Review' : 'Start Review'}
-            </AntButton>
-          );
-        } else if (record.status === 'Approved') {
-          return (
-            <AntButton
-              type="primary"
-              className="bg-green-600 hover:bg-green-700"
-              onClick={() => {
-                 updateProduct(record.id, { status: 'Published' });
-                 setSubmissions(getProducts().filter(p => p.status !== 'Draft'));
-              }}
-            >
-              Publish to Catalog
-            </AntButton>
-          );
-        }
-        return (
-          <AntButton onClick={() => navigate(`/platform/review/${record.id}`)}>
-            View Product
-          </AntButton>
-        );
-      },
-    },
+      render: (_: any, record: UserProduct) => (
+        <AntButton 
+          type="primary"
+          className="bg-sky-600"
+          size="small"
+          onClick={() => navigate(`/platform/review/${record.id}`)}
+        >
+          Review
+        </AntButton>
+      )
+    }
   ];
 
   return (
@@ -162,7 +127,7 @@ const PlatformProductReview: React.FC = () => {
         </div>
         <AntTable
           columns={columns}
-          dataSource={filteredSubmissions}
+          dataSource={filteredProducts}
           rowKey="id"
           pagination={{ pageSize: 10 }}
         />

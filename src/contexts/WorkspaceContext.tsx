@@ -15,45 +15,22 @@ interface WorkspaceContextProps {
   switchWorkspace: (id: string) => void;
 }
 
-const defaultWorkspaces: Workspace[] = [
-  {
-    id: 'ind-1',
-    name: 'John Personal',
-    type: 'individual',
-    role: 'Individual User',
-  },
-  {
-    id: 'org-1',
-    name: 'ABC Engineering Pvt Ltd',
-    type: 'tenant',
-    role: 'Organization Owner',
-  },
-  {
-    id: 'org-2',
-    name: 'XYZ Manufacturing Ltd',
-    type: 'tenant',
-    role: 'Procurement Manager',
-  },
-  {
-    id: 'plat-1',
-    name: 'Platform Workspace',
-    type: 'platform',
-    role: 'System Administrator',
-  },
-];
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../data/db';
 
 const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(undefined);
 
 export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [workspaces] = useState<Workspace[]>(defaultWorkspaces);
-  const [activeWorkspace, setActiveWorkspace] = useState<Workspace>(defaultWorkspaces[1]); // Default to ABC Engineering
+  const workspaces = useLiveQuery(() => db.workspaces.toArray()) || [];
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('org-1'); // Default to ABC Engineering
+
+  const activeWorkspace = workspaces.find((ws) => ws.id === activeWorkspaceId) || workspaces[0];
 
   const switchWorkspace = (id: string) => {
-    const workspace = workspaces.find((ws) => ws.id === id);
-    if (workspace) {
-      setActiveWorkspace(workspace);
-    }
+    setActiveWorkspaceId(id);
   };
+
+  if (!workspaces.length || !activeWorkspace) return null; // Wait for seed
 
   return (
     <WorkspaceContext.Provider value={{ workspaces, activeWorkspace, switchWorkspace }}>

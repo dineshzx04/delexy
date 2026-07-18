@@ -1,7 +1,7 @@
 import React from 'react';
 import { Table as AntTable, Button as AntButton, Tag as AntTag, Card as AntCard } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import type { RFQ } from '../../../../data/mockRFQs';
+import type { RFQ } from '../../../../data/db';
 
 interface RFQTableProps {
   rfqs: RFQ[];
@@ -61,7 +61,7 @@ const RFQTable: React.FC<RFQTableProps> = ({ rfqs, isOutbound }) => {
       title: 'Action',
       key: 'action',
       render: (_: any, record: RFQ) => (
-        <AntButton type="primary" size="small" onClick={() => navigate(`/rfqs/${record.id}`)}>
+        <AntButton type="primary" size="small" onClick={() => navigate(`/rfqs/${isOutbound ? 'outbound' : 'inbound'}/${record.id}`)}>
           View
         </AntButton>
       )

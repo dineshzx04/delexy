@@ -4,42 +4,15 @@ import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
 
-// Generate large dataset for prototype
-const generateMockValues = () => {
-  const data = [];
-  const colors = ['Red', 'Blue', 'Green', 'Yellow', 'Black', 'White', 'Purple', 'Orange'];
-  const materials = ['Cotton', 'Polyester', 'Wool', 'Silk', 'Leather', 'Denim', 'Nylon'];
-  const sizes = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
-  const weights = ['100g', '250g', '500g', '1kg', '5kg'];
-  
-  let idCounter = 1;
-  [...colors, ...materials, ...sizes, ...weights].forEach((val, idx) => {
-    data.push({
-      id: String(idCounter++),
-      value: val,
-      label: `${val} (Auto-generated)`,
-      code: `VAL_${val.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`
-    });
-  });
-
-  // Add bulk generic values to hit 200+
-  for (let i = 1; i <= 200; i++) {
-    data.push({
-      id: String(idCounter++),
-      value: `Generic Option ${i}`,
-      label: `Generic Option ${i} (Bulk)`,
-      code: `VAL_GENERIC_${i}`
-    });
-  }
-  return data;
-};
-
-const INITIAL_DATA = generateMockValues();
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type AttributeValue } from '../../../data/db';
 
 const AttributeValues: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = AntForm.useForm();
-  const [values, setValues] = useState(INITIAL_DATA);
+  
+  // Use DB data
+  const values = useLiveQuery(() => db.attributeValues.toArray()) || [];
   const [searchText, setSearchText] = useState('');
 
   const breadcrumbs = useMemo(() => [
@@ -52,16 +25,12 @@ const AttributeValues: React.FC = () => {
 
   const filteredValues = useMemo(() => {
     return values.filter(v => 
-      v.value.toLowerCase().includes(searchText.toLowerCase()) || 
-      v.label.toLowerCase().includes(searchText.toLowerCase()) ||
-      v.code.toLowerCase().includes(searchText.toLowerCase())
+      v.value.toLowerCase().includes(searchText.toLowerCase())
     );
   }, [values, searchText]);
 
   const columns = [
     { title: 'Value', dataIndex: 'value', key: 'value', render: (text: string) => <span className="font-semibold text-gray-900">{text}</span> },
-    { title: 'Display Label', dataIndex: 'label', key: 'label' },
-    { title: 'System Code', dataIndex: 'code', key: 'code', render: (text: string) => <span className="font-mono text-xs text-gray-500">{text}</span> },
     {
       title: 'Actions',
       key: 'action',
@@ -74,17 +43,23 @@ const AttributeValues: React.FC = () => {
           }}>
             Edit
           </AntButton>
-          <AntButton type="text" danger size="small">Delete</AntButton>
+          <AntButton type="text" danger size="small" onClick={async () => {
+            await db.attributeValues.delete(record.id);
+          }}>Delete</AntButton>
         </div>
       ),
     },
   ];
 
-  const handleSave = (formValues: any) => {
+  const handleSave = async (formValues: any) => {
     if (formValues.id) {
-      setValues(values.map(v => v.id === formValues.id ? { ...v, ...formValues } : v));
+      await db.attributeValues.update(formValues.id, formValues);
     } else {
-      setValues([{ ...formValues, id: Math.random().toString(), code: `VAL_${formValues.value.toUpperCase().replace(/[^A-Z0-9]/g, '_')}` }, ...values]);
+      const newValue: AttributeValue = {
+        ...formValues,
+        id: `val-${Date.now()}`
+      };
+      await db.attributeValues.add(newValue);
     }
     setIsModalVisible(false);
     form.resetFields();
@@ -138,9 +113,6 @@ const AttributeValues: React.FC = () => {
           <AntForm.Item name="id" hidden><AntInput /></AntForm.Item>
           <AntForm.Item name="value" label="Value" rules={[{ required: true }]}>
             <AntInput placeholder="e.g. Red, 8GB, Cotton" />
-          </AntForm.Item>
-          <AntForm.Item name="label" label="Display Label" rules={[{ required: true }]}>
-            <AntInput placeholder="e.g. Red (Color)" />
           </AntForm.Item>
         </AntForm>
       </AntModal>

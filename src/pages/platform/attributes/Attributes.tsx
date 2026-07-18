@@ -4,40 +4,20 @@ import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
 
-// Mock large global values
-const generateMockValues = () => {
-  const data = [];
-  for (let i = 1; i <= 500; i++) {
-    data.push({ id: String(i), value: `Value ${i}` });
-  }
-  return data;
-};
-const GLOBAL_VALUES = generateMockValues();
-
-// Mock large attributes
-const generateMockAttributes = () => {
-  const data = [];
-  const types = ['Dropdown', 'Radio', 'Checkbox', 'Text'];
-  for (let i = 1; i <= 150; i++) {
-    data.push({
-      id: String(i),
-      name: `Attribute ${i}`,
-      type: types[i % 4],
-      mappedValues: [String(i), String(i+1), String(i+2)] // Mock mapping
-    });
-  }
-  return data;
-};
-const INITIAL_ATTRIBUTES = generateMockAttributes();
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type Attribute } from '../../../data/db';
 
 const Attributes: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isDrawerVisible, setIsDrawerVisible] = useState(false);
   const [currentMappingAttr, setCurrentMappingAttr] = useState<any>(null);
-  
+
   const [form] = AntForm.useForm();
-  const [attributes, setAttributes] = useState(INITIAL_ATTRIBUTES);
-  
+
+  const attributes = useLiveQuery(() => db.attributes.toArray()) || [];
+  const GLOBAL_VALUES = useLiveQuery(() => db.attributeValues.toArray()) || [];
+  console.log(GLOBAL_VALUES)
+
   // Search states
   const [attrSearchText, setAttrSearchText] = useState('');
   const [valSearchText, setValSearchText] = useState('');
@@ -57,17 +37,17 @@ const Attributes: React.FC = () => {
 
   const filteredValues = useMemo(() => {
     return GLOBAL_VALUES.filter(v => v.value.toLowerCase().includes(valSearchText.toLowerCase()));
-  }, [valSearchText]);
+  }, [GLOBAL_VALUES, valSearchText]);
 
   const columns = [
     { title: 'Attribute Name', dataIndex: 'name', key: 'name', render: (text: string) => <span className="font-semibold text-gray-900">{text}</span> },
     { title: 'Input Type', dataIndex: 'type', key: 'type' },
-    { 
-      title: 'Mapped Values', 
-      key: 'mappedValues', 
-      render: (_: any, record: any) => (
+    {
+      title: 'Mapped Values',
+      key: 'valueIds',
+      render: (_: any, record: Attribute) => (
         <div className="flex items-center gap-2">
-          <AntTag color="blue">{record.mappedValues.length} Values</AntTag>
+          <AntTag color="blue">{record.valueIds?.length || 0} Values</AntTag>
           <AntButton type="link" size="small" className="p-0 text-sky-600" onClick={() => openMappingDrawer(record)}>
             Manage
           </AntButton>
@@ -78,7 +58,7 @@ const Attributes: React.FC = () => {
       title: 'Actions',
       key: 'action',
       width: 120,
-      render: (_: any, record: any) => (
+      render: (_: any, record: Attribute) => (
         <div className="flex items-center gap-2">
           <AntButton type="text" size="small" className="text-gray-600 hover:text-sky-600" onClick={() => {
             form.setFieldsValue(record);
@@ -86,30 +66,39 @@ const Attributes: React.FC = () => {
           }}>
             Edit Base
           </AntButton>
+          <AntButton type="text" danger size="small" onClick={async () => {
+            await db.attributes.delete(record.id);
+          }}>Delete</AntButton>
         </div>
       ),
     },
   ];
 
-  const handleSave = (formValues: any) => {
+  const handleSave = async (formValues: any) => {
     if (formValues.id) {
-      setAttributes(attributes.map(a => a.id === formValues.id ? { ...a, ...formValues } : a));
+      await db.attributes.update(formValues.id, formValues);
     } else {
-      setAttributes([{ ...formValues, id: Math.random().toString(), mappedValues: [] }, ...attributes]);
+      const newAttr: Attribute = {
+        ...formValues,
+        id: `attr-${Date.now()}`,
+        valueIds: []
+      };
+      await db.attributes.add(newAttr);
     }
     setIsModalVisible(false);
     form.resetFields();
   };
 
-  const openMappingDrawer = (attr: any) => {
+  const openMappingDrawer = (attr: Attribute) => {
     setCurrentMappingAttr(attr);
     setValSearchText('');
     setIsDrawerVisible(true);
   };
 
-  const handleSaveMapping = (selectedRowKeys: React.Key[]) => {
-    setAttributes(attributes.map(a => a.id === currentMappingAttr.id ? { ...a, mappedValues: selectedRowKeys as string[] } : a));
-    setIsDrawerVisible(false);
+  const handleSaveMapping = async (selectedRowKeys: React.Key[]) => {
+    const newValIds = selectedRowKeys as string[];
+    await db.attributes.update(currentMappingAttr.id, { valueIds: newValIds });
+    setCurrentMappingAttr({ ...currentMappingAttr, valueIds: newValIds });
   };
 
   return (
@@ -126,19 +115,19 @@ const Attributes: React.FC = () => {
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-          <AntInput 
-            placeholder="Search attributes..." 
-            prefix={<Lucide.Search size={16} className="text-gray-400" />} 
+          <AntInput
+            placeholder="Search attributes..."
+            prefix={<Lucide.Search size={16} className="text-gray-400" />}
             className="w-80"
             value={attrSearchText}
             onChange={(e) => setAttrSearchText(e.target.value)}
             allowClear
           />
         </div>
-        <AntTable 
-          columns={columns} 
-          dataSource={filteredAttributes} 
-          rowKey="id" 
+        <AntTable
+          columns={columns}
+          dataSource={filteredAttributes}
+          rowKey="id"
           pagination={{ pageSize: 10, showSizeChanger: true }}
         />
       </div>
@@ -159,10 +148,10 @@ const Attributes: React.FC = () => {
           </AntForm.Item>
           <AntForm.Item name="type" label="Input Type" rules={[{ required: true }]}>
             <AntSelect>
-              <AntSelect.Option value="Dropdown">Dropdown</AntSelect.Option>
-              <AntSelect.Option value="Radio">Radio</AntSelect.Option>
-              <AntSelect.Option value="Checkbox">Checkbox</AntSelect.Option>
-              <AntSelect.Option value="Text">Text Input</AntSelect.Option>
+              <AntSelect.Option value="select">Dropdown (Select)</AntSelect.Option>
+              <AntSelect.Option value="boolean">Checkbox (Boolean)</AntSelect.Option>
+              <AntSelect.Option value="string">Text Input (String)</AntSelect.Option>
+              <AntSelect.Option value="number">Number Input</AntSelect.Option>
             </AntSelect>
           </AntForm.Item>
           <div className="text-sm text-gray-500 mt-4 bg-gray-50 p-3 rounded border border-gray-200">
@@ -191,9 +180,9 @@ const Attributes: React.FC = () => {
         }
       >
         <div className="mb-4">
-          <AntInput 
-            placeholder="Search thousands of values..." 
-            prefix={<Lucide.Search size={16} className="text-gray-400" />} 
+          <AntInput
+            placeholder="Search thousands of values..."
+            prefix={<Lucide.Search size={16} className="text-gray-400" />}
             size="large"
             value={valSearchText}
             onChange={(e) => setValSearchText(e.target.value)}
@@ -203,7 +192,7 @@ const Attributes: React.FC = () => {
         <AntTable
           rowSelection={{
             type: 'checkbox',
-            selectedRowKeys: currentMappingAttr?.mappedValues || [],
+            selectedRowKeys: currentMappingAttr?.valueIds || [],
             onChange: handleSaveMapping,
             preserveSelectedRowKeys: true, // Crucial for paginated row selection!
           }}

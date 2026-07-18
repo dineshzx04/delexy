@@ -4,6 +4,9 @@ import { ConfigProvider } from 'antd';
 import App from './App';
 import { StyleProvider, legacyLogicalPropertiesTransformer } from '@ant-design/cssinjs';
 import './index.css';
+import { seedDatabase } from './data/seed';
+
+seedDatabase();
 
 const root = document.getElementById('root');
 if (root) {

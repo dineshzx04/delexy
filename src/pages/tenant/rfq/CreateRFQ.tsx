@@ -4,18 +4,12 @@ import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
-import { createRFQ, type RFQItem } from '../../../data/mockRFQs';
+import { type RFQItem } from '../../../data/db';
 import { useWorkspace } from '../../../contexts/WorkspaceContext';
 import CategoryPicker from '../../../components/common/CategoryPicker';
 import FormItem from '../../../components/common/FormItem';
-import { getProducts, type Product } from '../../../data/mockProducts';
-
-// Mock Platform Products (same as ProductBuilder)
-const PLATFORM_PRODUCTS = [
-  { id: 'pp-1', name: 'Master iPhone 14', categoryId: 'c-1-1-1-1' },
-  { id: 'pp-2', name: 'Master MacBook Pro', categoryId: 'c-1-1-1-2' },
-  { id: 'pp-3', name: 'Industrial Servo Motor Type-A', categoryId: 'c-2-2-1-1' },
-];
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type UserProduct } from '../../../data/db';
 
 // Mock dynamic attribute groups based on category (copied from ProductBuilder)
 const getDynamicAttributeGroups = (categoryId: string) => {
@@ -62,9 +56,12 @@ const CreateRFQ: React.FC = () => {
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
   const [currentStep, setCurrentStep] = useState(0);
-  const [previewProduct, setPreviewProduct] = useState<{ variant: any, product: Product, itemIndex: number } | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<{ variant: any, product: UserProduct, itemIndex: number } | null>(null);
   const [activeDrawerItemIndex, setActiveDrawerItemIndex] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  
+  const PLATFORM_PRODUCTS = useLiveQuery(() => db.platformProducts.toArray()) || [];
+  const allTenantProducts = useLiveQuery(() => db.userProducts.toArray()) || [];
 
   const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     defaultValues: {
@@ -97,14 +94,14 @@ const CreateRFQ: React.FC = () => {
 
   useBreadcrumb(breadcrumbs);
 
-  const allTenantProducts = useMemo(() => getProducts(), []);
   const allVariants = useMemo(() => {
-    return allTenantProducts.flatMap(p =>
-      (p.payload?.variants || []).map(v => ({
+    return allTenantProducts.flatMap(p => {
+      const payload = (p as any).payload || {};
+      return (payload.variants || []).map((v: any) => ({
         variant: v,
         product: p
-      }))
-    );
+      }));
+    });
   }, [allTenantProducts]);
 
   const handleNext = (e: React.MouseEvent) => {
@@ -136,7 +133,7 @@ const CreateRFQ: React.FC = () => {
     setCurrentStep(prev => prev - 1);
   };
 
-  const onSubmit = (data: any) => {
+  const onSubmit = async (data: any) => {
     if (!data.termsAgreed || !data.shareContact) {
       notification.error({ message: 'You must agree to the terms and consent to share contact details.' });
       return;
@@ -144,11 +141,15 @@ const CreateRFQ: React.FC = () => {
 
     const finalItems = data.items.map((item: any, index: number) => ({
       ...item,
-      id: `item-${index + 1}`
+      id: `item-${Date.now()}-${index}`
     }));
 
-    createRFQ({
+    await db.rfqs.add({
+      id: `rfq-${Date.now()}`,
+      rfqNumber: `RFQ-${Math.floor(Math.random() * 100000)}`,
       title: data.title,
+      status: 'Open',
+      createdAt: new Date().toISOString(),
       requesterTenantId: activeWorkspace.id,
       requesterTenantName: activeWorkspace.name,
       contactEmail: data.contactEmail,
@@ -157,7 +158,8 @@ const CreateRFQ: React.FC = () => {
       currency: data.currency,
       shippingDestination: data.shippingDestination,
       specifications: data.specifications,
-      items: finalItems
+      items: finalItems,
+      quotes: []
     });
 
     notification.success({ message: 'RFQ created successfully!' });
@@ -279,7 +281,7 @@ const CreateRFQ: React.FC = () => {
                             <Lucide.CheckCircle size={14} className="mr-1" /> Mapped
                           </span>
                           <span className="text-gray-600 truncate text-xs">Seller: <span className="font-medium">{item.targetTenantId}</span></span>
-                          <span className="text-gray-600 truncate text-xs">SKU: <span className="font-medium">{item.targetSku || item.platformProductId}</span></span>
+                          <span className="text-gray-600 truncate text-xs">Platform ID: <span className="font-medium">{item.platformProductId}</span></span>
                         </div>
                       );
                     }
@@ -364,9 +366,8 @@ const CreateRFQ: React.FC = () => {
                 { title: 'Quantity', width: 100, dataIndex: 'quantity' },
                 {
                   title: 'Target Info', render: (_, r) => {
-                    if (r.targetTenantId) return <span>Seller: <strong>{r.targetTenantId}</strong> (SKU: {r.targetSku || r.platformProductId})</span>;
+                    if (r.targetTenantId) return <span>Seller: <strong>{r.targetTenantId}</strong> (Platform ID: {r.platformProductId})</span>;
                     if (r.platformProductId) return <span>Platform ID: <strong>{r.platformProductId}</strong></span>;
-                    if (r.targetSku) return <span>Search: <strong>{r.targetSku}</strong></span>;
                     return <span className="text-gray-400 italic">Open RFQ</span>;
                   }
                 }
@@ -441,7 +442,6 @@ const CreateRFQ: React.FC = () => {
         {activeDrawerItemIndex !== null && (() => {
           const index = activeDrawerItemIndex;
           const currentCategory = watchItems[index]?.categoryId;
-          const currentSku = watchItems[index]?.targetSku || '';
           const currentPlatformProduct = watchItems[index]?.platformProductId;
           const dynamicAttrGroups = currentCategory ? getDynamicAttributeGroups(currentCategory) : [];
 
@@ -450,15 +450,7 @@ const CreateRFQ: React.FC = () => {
           // Progressive filtering for matching products
           let matches = allVariants;
 
-          if (currentSku) {
-            const query = currentSku.toLowerCase();
-            matches = matches.filter(v =>
-              v.variant.sku.toLowerCase().includes(query) ||
-              v.variant.name.toLowerCase().includes(query) ||
-              v.product.name.toLowerCase().includes(query) ||
-              (v.product.payload?.productData?.platformProductId || '').toLowerCase().includes(query)
-            );
-          }
+          const currentSearch = watchItems[index]?.platformProductId;
           if (currentPlatformProduct) {
             matches = matches.filter(v => v.product.payload?.productData?.platformProductId === currentPlatformProduct || v.product.id === currentPlatformProduct);
           }
@@ -467,6 +459,41 @@ const CreateRFQ: React.FC = () => {
               const pId = v.product.payload?.productData?.platformProductId;
               const pp = PLATFORM_PRODUCTS.find(p => p.id === pId);
               return pp?.categoryId === currentCategory;
+            });
+          }
+
+          const currentItem = watchItems[index] || ({} as any);
+          if (currentItem.brand) matches = matches.filter(v => {
+            const pd = (v.product as any).payload?.productData;
+            return pd?.brand === currentItem.brand;
+          });
+          if (currentItem.manufacturer) matches = matches.filter(v => {
+            const pd = (v.product as any).payload?.productData;
+            return pd?.manufacturer === currentItem.manufacturer;
+          });
+          if (currentItem.countryOfOrigin) matches = matches.filter(v => {
+            const pd = (v.product as any).payload?.productData;
+            return pd?.countryOfOrigin === currentItem.countryOfOrigin;
+          });
+          if (currentItem.modelNumber) matches = matches.filter(v => {
+            const pd = (v.product as any).payload?.productData;
+            return pd?.modelNumber === currentItem.modelNumber;
+          });
+          if (currentItem.partNumber) matches = matches.filter(v => {
+            const pd = (v.product as any).payload?.productData;
+            return pd?.partNumber === currentItem.partNumber;
+          });
+
+          if (currentItem.dynamicAttributes) {
+            Object.entries(currentItem.dynamicAttributes).forEach(([key, values]) => {
+              if (Array.isArray(values) && values.length > 0) {
+                matches = matches.filter(v => {
+                  const val = (v.product as any).payload?.productData?.[key];
+                  if (!val) return false;
+                  const valArray = Array.isArray(val) ? val : [val];
+                  return valArray.some((x: string) => (values as string[]).includes(x));
+                });
+              }
             });
           }
 
@@ -507,19 +534,7 @@ const CreateRFQ: React.FC = () => {
                       </FormItem>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 mb-4">
-                      <Controller
-                        name={`items.${index}.targetSku`}
-                        control={control}
-                        render={({ field }) => (
-                          <AntInput
-                            {...field}
-                            placeholder="Search by Platform Product Number, Name or SKU"
-                            prefix={<Lucide.Search size={14} className="text-gray-400" />}
-                          />
-                        )}
-                      />
-                    </div>
+
 
                     <div className="grid grid-cols-1 gap-4">
                       <Controller
@@ -622,10 +637,10 @@ const CreateRFQ: React.FC = () => {
                           <Lucide.CheckCircle size={24} className="mr-2" /> Product Selected
                         </div>
                         <div className="text-sm text-green-700 mb-1">Seller: <span className="font-bold">{watchItems[index].targetTenantId}</span></div>
-                        <div className="text-sm text-green-700 mb-6">SKU: <span className="font-bold">{watchItems[index].targetSku || watchItems[index].platformProductId}</span></div>
+                        <div className="text-sm text-green-700 mb-6">Platform ID: <span className="font-bold">{watchItems[index].platformProductId}</span></div>
                         <AntButton htmlType="button" danger block onClick={() => {
                           setValue(`items.${index}.targetTenantId`, '');
-                          setValue(`items.${index}.platformProductId`, '');
+                          // We intentionally do NOT clear platformProductId here because it serves as the base template for the left side configuration
                         }}>Change Selected Product</AntButton>
                       </div>
                     ) : (
@@ -648,7 +663,7 @@ const CreateRFQ: React.FC = () => {
                                   <div className="font-bold text-green-700 text-sm">${v.variant.price}</div>
                                 </div>
                                 <div className="flex justify-between items-center mt-auto border-t border-gray-50 pt-2">
-                                  <div className="text-xs text-gray-500">Seller: {v.product.tenantName}</div>
+                                  <div className="text-xs text-gray-500">Seller: {(v.product as any).tenantName}</div>
                                   <span className="text-sky-600 text-xs font-medium flex items-center bg-sky-50 px-2 py-1 rounded hover:bg-sky-100">
                                     <Lucide.Eye size={12} className="mr-1" /> View Details
                                   </span>
@@ -724,7 +739,7 @@ const CreateRFQ: React.FC = () => {
 
             <h4 className="font-semibold text-gray-700 mb-2">Global Specs</h4>
             <div className="grid grid-cols-2 gap-2 mb-6 text-sm">
-              {previewProduct.product.payload.globalSpecs?.map((spec, i) => (
+              {(previewProduct.product as any).payload?.globalSpecs?.map((spec: any, i: number) => (
                 <div key={i} className="bg-gray-50 p-2 rounded border border-gray-100">
                   <span className="text-gray-500">{spec.name}:</span> {spec.value}
                 </div>
@@ -734,12 +749,11 @@ const CreateRFQ: React.FC = () => {
             <div className="flex justify-end pt-4 border-t border-gray-200">
               <AntButton htmlType="button" onClick={() => setPreviewProduct(null)} className="mr-3">Cancel</AntButton>
               <AntButton htmlType="button" type="primary" className="bg-sky-600" onClick={() => {
-                const prod = previewProduct.product;
+                const prod = previewProduct.product as any;
                 const variant = previewProduct.variant;
                 const idx = previewProduct.itemIndex;
                 setValue(`items.${idx}.targetTenantId`, prod.tenantId);
-                setValue(`items.${idx}.platformProductId`, prod.payload.productData.platformProductId || prod.id);
-                setValue(`items.${idx}.targetSku`, variant.sku);
+                setValue(`items.${idx}.platformProductId`, prod.payload?.productData?.platformProductId || prod.id);
                 setPreviewProduct(null);
 
                 // If it was selected via the Drawer, we don't necessarily close the Drawer, but we show a success message

@@ -4,26 +4,10 @@ import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
-// Define the Category type
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  isActive: boolean;
-  mappedGroups: string[];
-  parentId: string | null;
-  childrenCount: number;
-}
-
-// Generate Mock Groups for the drawer mapping
-const generateMockGroups = () => {
-  const data = [];
-  for (let i = 1; i <= 200; i++) {
-    data.push({ id: `g${i}`, name: `Attribute Group ${i}` });
-  }
-  return data;
-};
-const GLOBAL_GROUPS = generateMockGroups();
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type Category } from '../../data/db';
+import { useEffect } from 'react';
+ 
 
 // Generate massive flat list with parent relationships
 const generateData = (): Category[] => {
@@ -37,7 +21,7 @@ const generateData = (): Category[] => {
       name: `Category ${i}`,
       slug: `category-${i}`,
       isActive: true,
-      mappedGroups: ['g1', 'g2'],
+      mappedGroupIds: ['g1', 'g2'],
       parentId: null,
       childrenCount: 20
     });
@@ -50,7 +34,7 @@ const generateData = (): Category[] => {
         name: `Sub-category ${i}.${j}`,
         slug: `sub-category-${i}-${j}`,
         isActive: true,
-        mappedGroups: ['g5'],
+        mappedGroupIds: ['g5'],
         parentId: rootId,
         childrenCount: 5
       });
@@ -62,10 +46,23 @@ const generateData = (): Category[] => {
           name: `Nested Sub ${i}.${j}.${k}`,
           slug: `nested-sub-${i}-${j}-${k}`,
           isActive: i % 2 === 0,
-          mappedGroups: [],
+          mappedGroupIds: [],
           parentId: l1Id,
-          childrenCount: 0
+          childrenCount: 3
         });
+        
+        // 3 Level 3 Subcategories per L2
+        for (let l = 1; l <= 3; l++) {
+          data.push({
+            id: `l3-${i}-${j}-${k}-${l}`,
+            name: `Leaf Category ${i}.${j}.${k}.${l}`,
+            slug: `leaf-${i}-${j}-${k}-${l}`,
+            isActive: true,
+            mappedGroupIds: [],
+            parentId: `l2-${i}-${j}-${k}`,
+            childrenCount: 0
+          });
+        }
       }
     }
   }
@@ -75,9 +72,21 @@ const generateData = (): Category[] => {
 const ALL_CATEGORIES = generateData();
 
 const CategoryManagement: React.FC = () => {
-  const [categories, setCategories] = useState(ALL_CATEGORIES);
+  const categories = useLiveQuery(() => db.categories.toArray());
+  const GLOBAL_GROUPS = useLiveQuery(() => db.attributeGroups.toArray()) || [];
   const [searchText, setSearchText] = useState('');
   
+  // Sync mock data to Dexie on mount if empty
+  useEffect(() => {
+    const syncData = async () => {
+      const count = await db.categories.count();
+      if (count === 0) {
+        await db.categories.bulkAdd(ALL_CATEGORIES as any);
+      }
+    };
+    syncData();
+  }, []);
+
   // Drill-down Breadcrumb State
   const [path, setPath] = useState<Category[]>([]);
   
@@ -103,7 +112,7 @@ const CategoryManagement: React.FC = () => {
 
   // Filter categories for the CURRENT level only
   const currentLevelCategories = useMemo(() => {
-    return categories
+    return (categories || [])
       .filter(c => c.parentId === currentParentId)
       .filter(c => c.name.toLowerCase().includes(searchText.toLowerCase()) || c.slug.toLowerCase().includes(searchText.toLowerCase()));
   }, [categories, currentParentId, searchText]);
@@ -111,7 +120,7 @@ const CategoryManagement: React.FC = () => {
   // Drawer Group Filter
   const filteredGroups = useMemo(() => {
     return GLOBAL_GROUPS.filter(g => g.name.toLowerCase().includes(groupSearch.toLowerCase()));
-  }, [groupSearch]);
+  }, [GLOBAL_GROUPS,groupSearch]);
 
   // Handle Drill Down
   const navigateToLevel = (category: Category) => {
@@ -146,33 +155,48 @@ const CategoryManagement: React.FC = () => {
     setIsModalVisible(true);
   };
 
-  const handleSave = (values: any) => {
+  const handleSave = async (values: any) => {
     if (editingCategory) {
-      setCategories(categories.map(c => c.id === editingCategory.id ? { ...c, ...values } : c));
+      await db.categories.update(editingCategory.id, values);
       notification.success({ message: 'Category Updated' });
     } else {
       const newCat: Category = {
         ...values,
-        id: `new-${Math.random()}`,
-        mappedGroups: [], // New categories start with no mapped groups
+        id: `new-${Date.now()}`,
+        mappedGroupIds: [],
         childrenCount: 0
       };
-      const updatedCategories = categories.map(c => 
-        c.id === values.parentId ? { ...c, childrenCount: c.childrenCount + 1 } : c
-      );
-      setCategories([newCat, ...updatedCategories]);
+      await db.categories.add(newCat);
+      
+      // Update parent child count
+      if (values.parentId) {
+        const parentCat = (categories || []).find(c => c.id === values.parentId);
+        if (parentCat) {
+          await db.categories.update(parentCat.id, { childrenCount: (parentCat.childrenCount || 0) + 1 });
+        }
+      }
+      
       notification.success({ message: 'Category Created' });
     }
     setIsModalVisible(false);
   };
 
-  const handleDelete = (id: string) => {
-    const cat = categories.find(c => c.id === id);
-    if (cat && cat.childrenCount > 0) {
+  const handleDelete = async (id: string) => {
+    const cat = (categories || []).find(c => c.id === id);
+    if (cat && (cat.childrenCount || 0) > 0) {
       notification.error({ message: 'Cannot delete category with subcategories.' });
       return;
     }
-    setCategories(categories.filter(c => c.id !== id));
+    await db.categories.delete(id);
+    
+    // Update parent child count
+    if (cat && cat.parentId) {
+      const parentCat = (categories || []).find(c => c.id === cat.parentId);
+      if (parentCat && (parentCat.childrenCount || 0) > 0) {
+        await db.categories.update(parentCat.id, { childrenCount: (parentCat.childrenCount || 1) - 1 });
+      }
+    }
+    
     notification.success({ message: 'Category Deleted' });
   };
 
@@ -183,13 +207,13 @@ const CategoryManagement: React.FC = () => {
     setIsDrawerVisible(true);
   };
 
-  const handleSaveMapping = (selectedRowKeys: React.Key[]) => {
+  const handleSaveMapping = async (selectedRowKeys: React.Key[]) => {
     if (!mappingCategory) return;
-    setCategories(categories.map(c => 
-      c.id === mappingCategory.id ? { ...c, mappedGroups: selectedRowKeys as string[] } : c
-    ));
+    const newGroupIds = selectedRowKeys as string[];
+    await db.categories.update(mappingCategory.id, { mappedGroupIds: newGroupIds });
+    
     // We update the mappingCategory state as well so the drawer reflects changes instantly
-    setMappingCategory({ ...mappingCategory, mappedGroups: selectedRowKeys as string[] });
+    setMappingCategory({ ...mappingCategory, mappedGroupIds: newGroupIds });
   };
 
   const columns = [
@@ -199,7 +223,7 @@ const CategoryManagement: React.FC = () => {
       key: 'name', 
       render: (text: string, record: Category) => (
         <div className="flex items-center gap-2">
-          {record.childrenCount > 0 ? (
+          {(record.childrenCount || 0) > 0 ? (
             <AntButton 
               type="link" 
               className="p-0 font-semibold text-sky-600 flex items-center gap-2"
@@ -227,10 +251,10 @@ const CategoryManagement: React.FC = () => {
     },
     { 
       title: 'Attribute Groups', 
-      key: 'mappedGroups',
+      key: 'mappedGroupIds',
       render: (_: any, record: Category) => (
         <div className="flex items-center gap-2">
-          <AntTag color="purple">{record.mappedGroups.length} Groups</AntTag>
+          <AntTag color="purple">{record.mappedGroupIds?.length || 0} Groups</AntTag>
           <AntButton type="link" size="small" className="p-0 text-sky-600" onClick={() => openMappingDrawer(record)}>
             Manage
           </AntButton>
@@ -394,7 +418,7 @@ const CategoryManagement: React.FC = () => {
         <AntTable
           rowSelection={{
             type: 'checkbox',
-            selectedRowKeys: mappingCategory?.mappedGroups || [],
+            selectedRowKeys: mappingCategory?.mappedGroupIds || [],
             onChange: handleSaveMapping,
             preserveSelectedRowKeys: true,
           }}

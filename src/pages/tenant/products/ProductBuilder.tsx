@@ -7,14 +7,9 @@ import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
 import WorkflowTimeline, { type ProductStatus } from '../../../components/common/WorkflowTimeline';
 import CategoryPicker from '../../../components/common/CategoryPicker';
 import FormItem from '../../../components/common/FormItem';
-import { getProductById, createProduct, updateProduct, type Product, type FieldReview } from '../../../data/mockProducts';
-
-// Mock Platform Products for the selector
-const PLATFORM_PRODUCTS = [
-  { id: 'pp-1', name: 'Master iPhone 14', categoryId: 'c-1-1-1-1', categoryName: 'Smartphones' },
-  { id: 'pp-2', name: 'Master MacBook Pro', categoryId: 'c-1-1-1-2', categoryName: 'Laptops' },
-  { id: 'pp-3', name: 'Industrial Servo Motor Type-A', categoryId: 'c-2-2-1-1', categoryName: 'Motors' },
-];
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type UserProduct } from '../../../data/db';
+import { type FieldReview } from '../../../data/mockProducts';
 
 // Mock dynamic attribute groups based on category
 const getDynamicAttributeGroups = (categoryId: string) => {
@@ -103,6 +98,8 @@ const ProductBuilder: React.FC = () => {
   const [selectedPlatformProduct, setSelectedPlatformProduct] = useState<any>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [reviewData, setReviewData] = useState<Record<string, FieldReview>>({});
+  
+  const PLATFORM_PRODUCTS = useLiveQuery(() => db.platformProducts.toArray()) || [];
 
   const isReadOnly = ['Submitted', 'Under Review', 'Approved', 'Published'].includes(currentStatus);
 
@@ -199,36 +196,35 @@ const ProductBuilder: React.FC = () => {
 
   useEffect(() => {
     if (id) {
-      const prod = getProductById(id);
-      if (prod) {
-        setCurrentStatus(prod.status);
-        setReviewData(prod.reviewData || {});
-        
-        // Load the stored data into the form
-        if (prod.payload) {
-          const pd = prod.payload.productData || {};
-          Object.keys(pd).forEach(key => {
-            setValue(key, pd[key]);
-          });
+      db.userProducts.get(id).then(prod => {
+        if (prod) {
+          setCurrentStatus(prod.status as ProductStatus);
+          setReviewData(prod.reviewData || {});
           
-          if (pd.categoryId) {
-            setSelectedCategory(pd.categoryId);
-          }
-          if (pd.platformProductId) {
-             const pp = PLATFORM_PRODUCTS.find(p => p.id === pd.platformProductId) || 
-               { id: pd.platformProductId, name: 'Loaded Template', categoryId: pd.categoryId, categoryName: 'Unknown' };
-             setSelectedPlatformProduct(pp);
-          }
+          // Load the stored data into the form
+          const payload = (prod as any).payload;
+          if (payload) {
+            const pd = payload.productData || {};
+            Object.keys(pd).forEach(key => {
+              setValue(key, pd[key]);
+            });
+            
+            if (pd.categoryId) {
+              setSelectedCategory(pd.categoryId);
+            }
+            if (pd.platformProductId) {
+               const pp = PLATFORM_PRODUCTS.find(p => p.id === pd.platformProductId) || 
+                 { id: pd.platformProductId, name: 'Loaded Template', categoryId: pd.categoryId, categoryName: 'Unknown' };
+               setSelectedPlatformProduct(pp);
+            }
 
-          // If variants and global specs exist, we can force them to state
-          // Note: The dynamic attribute logic above will try to overwrite them if dynamicAttributes values change.
-          // To make this fully robust, we would load `pd.dynamicAttributes` so the useEffect recreates them exactly.
-          if (prod.payload.variants) setVariants(prod.payload.variants);
-          if (prod.payload.globalSpecs) setGlobalSpecs(prod.payload.globalSpecs);
+            if (payload.variants) setVariants(payload.variants);
+            if (payload.globalSpecs) setGlobalSpecs(payload.globalSpecs);
+          }
         }
-      }
+      });
     }
-  }, [id, setValue]);
+  }, [id, setValue, PLATFORM_PRODUCTS]);
 
   const handleCategorySelect = (value: string) => {
     setSelectedCategory(value);
@@ -275,7 +271,7 @@ const ProductBuilder: React.FC = () => {
     }
   };
 
-  const confirmSave = () => {
+  const confirmSave = async () => {
     if (!pendingStatus) return;
     const values = getValues();
     
@@ -287,23 +283,29 @@ const ProductBuilder: React.FC = () => {
     };
 
     if (id) {
-      updateProduct(id, {
+      await db.userProducts.update(id, {
         status: pendingStatus,
-        payload,
         name: values.name || 'Untitled Product',
-        partNumber: values.partNumber || 'N/A'
+        partNumber: values.partNumber || 'N/A',
+        updatedAt: new Date().toISOString().split('T')[0],
+        ...(pendingStatus === 'Submitted' || pendingStatus === 'Resubmitted' ? { submittedAt: new Date().toISOString().split('T')[0] } : {}),
+        payload: payload as any
       });
     } else {
-      createProduct({
+      await db.userProducts.add({
+        id: `up-${Date.now()}`,
         tenantId: 'tenant-1',
-        tenantName: 'Acme Corp (Business)',
+        platformProductId: values.platformProductId || null,
         name: values.name || 'Untitled Product',
         categoryName: selectedCategory || 'Uncategorized',
         partNumber: values.partNumber || 'N/A',
         status: pendingStatus,
         updatedAt: new Date().toISOString().split('T')[0],
-        payload,
-        reviewData: {}
+        ...(pendingStatus === 'Submitted' || pendingStatus === 'Resubmitted' ? { submittedAt: new Date().toISOString().split('T')[0] } : { submittedAt: '' }),
+        payload: payload as any,
+        reviewData: {},
+        variants: variants,
+        globalSpecs: globalSpecs
       });
     }
 

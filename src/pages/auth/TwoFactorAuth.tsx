@@ -48,7 +48,7 @@ const TwoFactorAuth: React.FC = () => {
               rules={[{ required: true, message: '' }]}
             >
               <AntInput
-                ref={(el) => (inputRefs.current[index] = el)}
+                ref={(el) => { inputRefs.current[index] = el; }}
                 className="w-12 h-14 text-center text-2xl font-semibold bg-slate-50"
                 maxLength={1}
                 onChange={(e) => handleInput(e as any, index)}
