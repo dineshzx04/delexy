@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Card as AntCard, Button as AntButton, Input as AntInput, Select as AntSelect, DatePicker as AntDatePicker, Steps as AntSteps, notification, Table as AntTable, Popconfirm, Checkbox as AntCheckbox, Modal as AntModal, Descriptions as AntDescriptions, Tag as AntTag, Pagination as AntPagination, Drawer as AntDrawer } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -11,47 +11,6 @@ import FormItem from '../../../components/common/FormItem';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type UserProduct } from '../../../data/db';
 
-// Mock dynamic attribute groups based on category (copied from ProductBuilder)
-const getDynamicAttributeGroups = (categoryId: string) => {
-  if (!categoryId) return [];
-  return [
-    {
-      groupId: 'g-1',
-      groupName: 'Technical Specifications',
-      attributes: [
-        { id: 'attr-1', name: 'Material Grade', options: ['Standard', 'Premium', 'Industrial', 'Aerospace', 'Military Spec'] },
-        { id: 'attr-2', name: 'Power Source', options: ['AC 110V', 'AC 220V', 'DC 12V', 'DC 24V', 'DC 48V', 'Solar'] },
-        { id: 'attr-3', name: 'Mounting Type', options: ['Surface Mount', 'Panel Mount', 'DIN Rail', 'Rack Mount'] },
-      ]
-    },
-    {
-      groupId: 'g-2',
-      groupName: 'Environmental Conditions',
-      attributes: [
-        { id: 'attr-4', name: 'Operating Temperature', options: ['0°C to 40°C', '-20°C to 60°C', '-40°C to 85°C', '-55°C to 125°C'] },
-        { id: 'attr-5', name: 'IP Rating', options: ['IP54', 'IP65', 'IP67', 'IP68', 'IP69K'] },
-        { id: 'attr-6', name: 'Humidity Tolerance', options: ['0-80% Non-condensing', '0-95% Non-condensing', '100% Condensing'] },
-      ]
-    },
-    {
-      groupId: 'g-3',
-      groupName: 'Performance Metrics',
-      attributes: [
-        { id: 'attr-7', name: 'Energy Efficiency', options: ['80 PLUS', '80 PLUS Gold', '80 PLUS Titanium', 'IE3 Premium', 'IE4 Super Premium'] },
-        { id: 'attr-8', name: 'Max RPM', options: ['1000 RPM', '1500 RPM', '3000 RPM', '10000 RPM'] },
-      ]
-    },
-    {
-      groupId: 'g-4',
-      groupName: 'Compliance & Standards',
-      attributes: [
-        { id: 'attr-9', name: 'Certifications', options: ['ISO 9001', 'CE', 'UL Listed', 'FCC', 'CSA'] },
-        { id: 'attr-10', name: 'RoHS Compliant', options: ['Yes', 'No', 'Pending'] },
-      ]
-    }
-  ];
-};
-
 const CreateRFQ: React.FC = () => {
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
@@ -62,8 +21,41 @@ const CreateRFQ: React.FC = () => {
 
   const PLATFORM_PRODUCTS = useLiveQuery(() => db.platformProducts.toArray()) || [];
   const allTenantProducts = useLiveQuery(() => db.userProducts.toArray()) || [];
+  
+  const dbCategories = useLiveQuery(() => db.categories.toArray()) || [];
+  const dbAttributeGroups = useLiveQuery(() => db.attributeGroups.toArray()) || [];
+  const dbAttributes = useLiveQuery(() => db.attributes.toArray()) || [];
+  const dbAttributeValues = useLiveQuery(() => db.attributeValues.toArray()) || [];
 
-  const { control, handleSubmit, watch, setValue, formState: { errors } } = useForm({
+  const getDynamicAttributeGroups = useCallback((categoryId: string) => {
+    if (!categoryId) return [];
+    const category = dbCategories.find(c => c.id === categoryId);
+    if (!category || !category.mappedGroupIds) return [];
+
+    return category.mappedGroupIds.map(groupId => {
+      const group = dbAttributeGroups.find(g => g.id === groupId);
+      if (!group) return null;
+      return {
+        groupId: group.id,
+        groupName: group.name,
+        attributes: group.attributeIds.map(attrId => {
+          const attr = dbAttributes.find(a => a.id === attrId);
+          if (!attr) return null;
+          const options = (attr.valueIds || []).map(valId => {
+            const val = dbAttributeValues.find(v => v.id === valId);
+            return val ? val.value : '';
+          }).filter(Boolean);
+          return {
+            id: attr.id,
+            name: attr.name,
+            options
+          };
+        }).filter(Boolean)
+      };
+    }).filter(Boolean) as any[];
+  }, [dbCategories, dbAttributeGroups, dbAttributes, dbAttributeValues]);
+
+  const { control, handleSubmit, watch, setValue } = useForm({
     defaultValues: {
       title: '',
       submissionDeadline: null as any,
@@ -96,12 +88,30 @@ const CreateRFQ: React.FC = () => {
 
   const allVariants = useMemo(() => {
     return allTenantProducts.flatMap(p => {
-      const payload = (p as any).payload || {};
-      return (payload.variants || []).map((v: any) => ({
+      const variants = p.variants || [];
+      return variants.map((v: any) => ({
         variant: v,
         product: p
       }));
     });
+  }, [allTenantProducts]);
+
+  const availableManufacturers = useMemo(() => {
+    const m = new Set<string>();
+    allTenantProducts.forEach(p => { if (p.manufacturer?.name) m.add(p.manufacturer.name); });
+    return Array.from(m).map(val => ({ label: val, value: val }));
+  }, [allTenantProducts]);
+
+  const availableBrands = useMemo(() => {
+    const b = new Set<string>();
+    allTenantProducts.forEach(p => { if (p.brand?.name) b.add(p.brand.name); });
+    return Array.from(b).map(val => ({ label: val, value: val }));
+  }, [allTenantProducts]);
+
+  const availableSellers = useMemo(() => {
+    const s = new Set<string>();
+    allTenantProducts.forEach(p => { if (p.tenantName) s.add(p.tenantName); });
+    return Array.from(s).map(val => ({ label: val, value: val }));
   }, [allTenantProducts]);
 
   const handleNext = (e: React.MouseEvent) => {
@@ -248,7 +258,7 @@ const CreateRFQ: React.FC = () => {
                 {
                   title: 'Quantity',
                   width: 120,
-                  render: (_, field, index) => {
+                  render: (_, __, index) => {
                     const qty = watchItems[index]?.quantity || 0;
                     const unit = watchItems[index]?.unit || 'Units';
                     return <span className="font-medium text-gray-800">{qty} {unit}</span>;
@@ -256,7 +266,7 @@ const CreateRFQ: React.FC = () => {
                 },
                 {
                   title: 'Product',
-                  render: (_, field, index) => {
+                  render: (_, __, index) => {
                     const currentCategory = watchItems[index]?.categoryId;
                     const currentPlatformProduct = watchItems[index]?.platformProductId;
 
@@ -271,7 +281,7 @@ const CreateRFQ: React.FC = () => {
                 },
                 {
                   title: 'Selected Product',
-                  render: (_, field, index) => {
+                  render: (_, __, index) => {
                     const item = watchItems[index];
 
                     if (item.targetTenantId) {
@@ -324,35 +334,121 @@ const CreateRFQ: React.FC = () => {
               size="small"
               bordered
               expandable={{
-                expandedRowRender: (record, index) => {
-                  const currentCategory = watchItems[index]?.categoryId;
+                expandedRowRender: (_, index) => {
+                  const item = watchItems[index];
+                  const currentCategory = item?.categoryId;
                   const dynamicAttrGroups = currentCategory ? getDynamicAttributeGroups(currentCategory) : [];
+                  
+                  // Check if a specific product was selected
+                  const targetProduct = item?.platformProductId ? allTenantProducts.find(p => p.id === item.platformProductId) : null;
 
+                  if (targetProduct) {
+                    return (
+                      <div className="p-4 bg-sky-50/50 border border-sky-200 rounded-lg shadow-sm">
+                        <div className="flex justify-between items-center mb-4">
+                          <h4 className="text-sm font-bold text-sky-800 flex items-center m-0">
+                            <Lucide.CheckCircle className="w-4 h-4 mr-2" /> Selected Target Product
+                          </h4>
+                          <AntTag color="blue" className="m-0 border-sky-300">{targetProduct.name}</AntTag>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4 bg-white p-3 rounded border border-sky-100 shadow-sm">
+                          <div><span className="text-gray-500">Manufacturer:</span> <span className="font-medium text-gray-900">{targetProduct.manufacturer?.name || 'N/A'}</span></div>
+                          <div><span className="text-gray-500">Country:</span> <span className="font-medium text-gray-900">{targetProduct.countryOfOrigin?.name || 'N/A'}</span></div>
+                          <div><span className="text-gray-500">Brand:</span> <span className="font-medium text-gray-900">{targetProduct.brand?.name || 'N/A'}</span></div>
+                          <div><span className="text-gray-500">Seller:</span> <span className="font-medium text-gray-900">{targetProduct.tenantName || 'N/A'}</span></div>
+                          <div><span className="text-gray-500">Model:</span> <span className="font-medium text-gray-900">{targetProduct.modelNumber || 'N/A'}</span></div>
+                          <div><span className="text-gray-500">Part #:</span> <span className="font-medium text-gray-900">{targetProduct.partNumber || 'N/A'}</span></div>
+                          <div><span className="text-gray-500">Dimensions:</span> <span className="font-medium text-gray-900">{targetProduct.height || '?'} x {targetProduct.width || '?'} x {targetProduct.emptyWeight || '?'}</span></div>
+                        </div>
+
+                        {targetProduct.globalSpecs && targetProduct.globalSpecs.length > 0 && (
+                          <div className="border-t border-sky-100 pt-3 mt-3">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2">Global Specifications</h4>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                              {targetProduct.globalSpecs.map((spec: any, i: number) => (
+                                <div key={i} className="bg-white p-2 rounded border border-gray-100 shadow-sm">
+                                  <span className="text-gray-500">{spec.attributeName || spec.name}:</span> <span className="font-medium text-gray-900">{spec.values ? spec.values.map((v:any) => v.label).join(', ') : spec.value}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {dynamicAttrGroups.length > 0 && (
+                          <div className="border-t border-sky-100 pt-3 mt-3">
+                            <h4 className="text-sm font-semibold text-gray-700 mb-2">Variant Specific Attributes</h4>
+                            <div className="flex flex-col gap-3">
+                              {dynamicAttrGroups.map(group => {
+                                const hasValues = group.attributes.some((attr: any) => {
+                                  const val = targetProduct.dynamicAttributes?.[attr.id];
+                                  return val && (!Array.isArray(val) || val.length > 0);
+                                });
+                                if (!hasValues) return null;
+                                return (
+                                  <div key={group.groupId} className="bg-white p-3 rounded border border-gray-100 shadow-sm">
+                                    <h5 className="font-semibold text-sky-700 mb-2 text-xs uppercase tracking-wider">{group.groupName}</h5>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                              {group.attributes.map((attr: any) => {
+                                const attrData = targetProduct.dynamicAttributes?.find(da => da.attributeId === attr.id);
+                                const val = attrData ? attrData.values.map(v => v.label) : null;
+                                if (!val || val.length === 0) return null;
+                                return (
+                                  <div key={attr.id}><span className="text-gray-500">{attr.name}:</span> <span className="font-medium text-gray-900">{val.join(', ')}</span></div>
+                                );
+                              })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Fallback for Open RFQ (No specific product selected)
                   return (
                     <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Item Specifications Review</h4>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                        <Lucide.Search className="w-4 h-4 mr-2 text-gray-500" /> Requested Specifications (Open RFQ)
+                      </h4>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
-                        <div><span className="text-gray-500">Brand:</span> {watchItems[index]?.brand || 'N/A'}</div>
-                        <div><span className="text-gray-500">Manufacturer:</span> {watchItems[index]?.manufacturer || 'N/A'}</div>
-                        <div><span className="text-gray-500">Country:</span> {watchItems[index]?.countryOfOrigin || 'N/A'}</div>
-                        <div><span className="text-gray-500">Model:</span> {watchItems[index]?.modelNumber || 'N/A'}</div>
-                        <div><span className="text-gray-500">Part #:</span> {watchItems[index]?.partNumber || 'N/A'}</div>
-                        <div><span className="text-gray-500">Dimensions:</span> {watchItems[index]?.height} x {watchItems[index]?.width} x {watchItems[index]?.weight}</div>
+                        <div><span className="text-gray-500">Manufacturer:</span> {item?.manufacturer?.length ? item.manufacturer.join(', ') : 'Any'}</div>
+                        <div><span className="text-gray-500">Country:</span> {item?.countryOfOrigin || 'Any'}</div>
+                        <div><span className="text-gray-500">Brand:</span> {item?.brand?.length ? item.brand.join(', ') : 'Any'}</div>
+                        <div><span className="text-gray-500">Seller:</span> {item?.seller?.length ? item.seller.join(', ') : 'Any'}</div>
+                        <div><span className="text-gray-500">Model:</span> {item?.modelNumber || 'Any'}</div>
+                        <div><span className="text-gray-500">Part #:</span> {item?.partNumber || 'Any'}</div>
+                        <div><span className="text-gray-500">Dimensions:</span> {item?.height || '*'} x {item?.width || '*'} x {item?.weight || '*'}</div>
                       </div>
 
                       {dynamicAttrGroups.length > 0 && (
                         <div className="border-t border-gray-200 pt-3 mt-3">
-                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Dynamic Specs</h4>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                            {dynamicAttrGroups.flatMap(group =>
-                              group.attributes.map(attr => {
-                                const val = watchItems[index]?.dynamicAttributes?.[attr.id];
-                                if (!val || (Array.isArray(val) && val.length === 0)) return null;
-                                return (
-                                  <div key={attr.id}><span className="text-gray-500">{attr.name}:</span> {Array.isArray(val) ? val.join(', ') : val}</div>
-                                );
-                              })
-                            )}
+                          <h4 className="text-sm font-semibold text-gray-700 mb-2">Requested Dynamic Specs</h4>
+                          <div className="flex flex-col gap-3">
+                            {dynamicAttrGroups.map(group => {
+                              const hasValues = group.attributes.some((attr: any) => {
+                                const val = item?.dynamicAttributes?.[attr.id];
+                                return val && (!Array.isArray(val) || val.length > 0);
+                              });
+                              if (!hasValues) return null;
+                              return (
+                                <div key={group.groupId} className="bg-white p-3 rounded border border-gray-100 shadow-sm">
+                                  <h5 className="font-semibold text-gray-700 mb-2 text-xs uppercase tracking-wider">{group.groupName}</h5>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                                    {group.attributes.map((attr: any) => {
+                                      const val = item?.dynamicAttributes?.[attr.id];
+                                      if (!val || (Array.isArray(val) && val.length === 0)) return null;
+                                      return (
+                                        <div key={attr.id}><span className="text-gray-500">{attr.name}:</span> <span className="font-medium text-gray-900">{Array.isArray(val) ? val.join(', ') : val}</span></div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -450,53 +546,108 @@ const CreateRFQ: React.FC = () => {
           // Progressive filtering for matching products
           let matches = allVariants;
 
-          const currentSearch = watchItems[index]?.platformProductId;
           if (currentPlatformProduct) {
-            matches = matches.filter(v => v.product.payload?.productData?.platformProductId === currentPlatformProduct || v.product.id === currentPlatformProduct);
+            matches = matches.filter(v => v.product.platformProductId === currentPlatformProduct || v.product.id === currentPlatformProduct);
           }
           if (currentCategory) {
             matches = matches.filter(v => {
-              const pId = v.product.payload?.productData?.platformProductId;
+              const pId = v.product.platformProductId;
               const pp = PLATFORM_PRODUCTS.find(p => p.id === pId);
-              return pp?.categoryId === currentCategory;
+              return pp?.categoryId === currentCategory || v.product.categoryId === currentCategory;
             });
           }
 
+          // Compute dynamic dropdown options with counts based on current category matches, grouped by availability
+          const baseMatches = matches;
+          
+          const allMfrs = Array.from(new Set(allTenantProducts.map(p => p.manufacturer?.name).filter(Boolean))) as string[];
+          const mfrCounts = baseMatches.reduce((acc, v) => {
+             const mName = v.product.manufacturer?.name;
+             if (mName) acc[mName] = (acc[mName] || 0) + 1;
+             return acc;
+          }, {} as Record<string, number>);
+          
+          const dynamicManufacturers = [
+            {
+              label: 'Available',
+              options: Object.entries(mfrCounts).map(([val, count]) => ({ label: `${val} (${count})`, value: val }))
+            },
+            {
+              label: 'Unavailable',
+              options: allMfrs.filter(m => !mfrCounts[m]).map(val => ({ label: `${val} (0)`, value: val, disabled: true }))
+            }
+          ].filter(g => g.options.length > 0);
+
+          const allBrands = Array.from(new Set(allTenantProducts.map(p => p.brand?.name).filter(Boolean))) as string[];
+          const brandCounts = baseMatches.reduce((acc, v) => {
+             const bName = v.product.brand?.name;
+             if (bName) acc[bName] = (acc[bName] || 0) + 1;
+             return acc;
+          }, {} as Record<string, number>);
+
+          const dynamicBrands = [
+            {
+              label: 'Available',
+              options: Object.entries(brandCounts).map(([val, count]) => ({ label: `${val} (${count})`, value: val }))
+            },
+            {
+              label: 'Unavailable',
+              options: allBrands.filter(b => !brandCounts[b]).map(val => ({ label: `${val} (0)`, value: val, disabled: true }))
+            }
+          ].filter(g => g.options.length > 0);
+
+          const allSellers = Array.from(new Set(allTenantProducts.map(p => p.tenantName).filter(Boolean))) as string[];
+          const sellerCounts = baseMatches.reduce((acc, v) => {
+             if (v.product.tenantName) acc[v.product.tenantName] = (acc[v.product.tenantName] || 0) + 1;
+             return acc;
+          }, {} as Record<string, number>);
+
+          const dynamicSellers = [
+            {
+              label: 'Available',
+              options: Object.entries(sellerCounts).map(([val, count]) => ({ label: `${val} (${count})`, value: val }))
+            },
+            {
+              label: 'Unavailable',
+              options: allSellers.filter(s => !sellerCounts[s]).map(val => ({ label: `${val} (0)`, value: val, disabled: true }))
+            }
+          ].filter(g => g.options.length > 0);
+
           const currentItem = watchItems[index] || ({} as any);
-          if (currentItem.brand) matches = matches.filter(v => {
-            const pd = (v.product as any).payload?.productData;
-            return pd?.brand === currentItem.brand;
+          if (currentItem.brand && currentItem.brand.length > 0) matches = matches.filter(v => {
+            return v.product.brand?.name && currentItem.brand?.includes(v.product.brand.name);
           });
-          if (currentItem.manufacturer) matches = matches.filter(v => {
-            const pd = (v.product as any).payload?.productData;
-            return pd?.manufacturer === currentItem.manufacturer;
+          if (currentItem.manufacturer && currentItem.manufacturer.length > 0) matches = matches.filter(v => {
+            return v.product.manufacturer?.name && currentItem.manufacturer?.includes(v.product.manufacturer.name);
+          });
+          if (currentItem.seller && currentItem.seller.length > 0) matches = matches.filter(v => {
+            return v.product.tenantName && currentItem.seller?.includes(v.product.tenantName);
           });
           if (currentItem.countryOfOrigin) matches = matches.filter(v => {
-            const pd = (v.product as any).payload?.productData;
-            return pd?.countryOfOrigin === currentItem.countryOfOrigin;
+            return v.product.countryOfOrigin?.code === currentItem.countryOfOrigin || v.product.countryOfOrigin?.name === currentItem.countryOfOrigin;
           });
           if (currentItem.modelNumber) matches = matches.filter(v => {
-            const pd = (v.product as any).payload?.productData;
-            return pd?.modelNumber === currentItem.modelNumber;
+            return v.product.modelNumber === currentItem.modelNumber;
           });
           if (currentItem.partNumber) matches = matches.filter(v => {
-            const pd = (v.product as any).payload?.productData;
-            return pd?.partNumber === currentItem.partNumber;
+            return v.product.partNumber === currentItem.partNumber;
           });
 
           if (currentItem.dynamicAttributes) {
             Object.entries(currentItem.dynamicAttributes).forEach(([key, values]) => {
               if (Array.isArray(values) && values.length > 0) {
                 matches = matches.filter(v => {
-                  const val = (v.product as any).payload?.productData?.[key];
+                  const variantVal = v.variant.values?.find((val: any) => val.attributeId === key)?.label;
+                  const productAttr = v.product.dynamicAttributes?.find((da: any) => da.attributeId === key);
+                  const val = variantVal ? [variantVal] : (productAttr ? productAttr.values.map(x => x.label || x.id) : null);
                   if (!val) return false;
-                  const valArray = Array.isArray(val) ? val : [val];
+                  const valArray = val;
                   return valArray.some((x: string) => (values as string[]).includes(x));
                 });
               }
             });
           }
-
+          console.log(matches)
           return (
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -572,50 +723,61 @@ const CreateRFQ: React.FC = () => {
                   </div>
 
                   {/* Extended Specifications */}
-                  <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm">
-                    <h4 className="text-sm font-semibold text-sky-700 mb-4 border-b border-gray-100 pb-2 flex items-center">
-                      <Lucide.FileText size={16} className="mr-2" /> Specifications
-                    </h4>
-                    <div className="flex flex-col gap-3 text-sm">
-                      <FormItem label="Manufacturer" className="mb-0"><Controller name={`items.${index}.manufacturer`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'Acme Corp', value: 'Acme Corp' }, { label: 'Globex', value: 'Globex' }]} placeholder="Manufacturer" allowClear />} /></FormItem>
-                      <FormItem label="Brand" className="mb-0"><Controller name={`items.${index}.brand`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'Brand A', value: 'Brand A' }, { label: 'Brand B', value: 'Brand B' }]} placeholder="Brand" allowClear />} /></FormItem>
-                      <FormItem label="Seller" className="mb-0"><Controller name={`items.${index}.manufacturer`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'Supplier A', value: 'Supplier A' }, { label: 'Supplier B', value: 'Supplier B' }]} placeholder="Brand" allowClear />} /></FormItem>
-                      <FormItem label="Country" className="mb-0"><Controller name={`items.${index}.countryOfOrigin`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'USA', value: 'USA' }, { label: 'Germany', value: 'Germany' }, { label: 'China', value: 'China' }]} placeholder="Country" allowClear />} /></FormItem>
+                  {currentCategory && (
+                    <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm">
+                      <h4 className="text-sm font-semibold text-sky-700 mb-4 border-b border-gray-100 pb-2 flex items-center">
+                        <Lucide.FileText size={16} className="mr-2" /> Specifications
+                      </h4>
+                      <div className="flex flex-col gap-3 text-sm">
+                        <FormItem label="Country" className="mb-0"><Controller name={`items.${index}.countryOfOrigin`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} options={[{ label: 'USA', value: 'USA' }, { label: 'Germany', value: 'Germany' }, { label: 'China', value: 'China' }]} placeholder="Country" allowClear />} /></FormItem>
+                        <FormItem label="Manufacturer" className="mb-0"><Controller name={`items.${index}.manufacturer`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} mode='multiple' options={dynamicManufacturers} placeholder="Manufacturer" allowClear />} /></FormItem>
+                        <FormItem label="Brand" className="mb-0"><Controller name={`items.${index}.brand`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} mode='multiple' options={dynamicBrands} placeholder="Brand" allowClear />} /></FormItem>
+                        <FormItem label="Seller" className="mb-0"><Controller name={`items.${index}.seller`} control={control} render={({ field }) => <AntSelect className='w-full' {...field} mode='multiple' options={dynamicSellers} placeholder="Seller" allowClear />} /></FormItem>
 
-                      <div className="grid grid-cols-2 gap-3 mt-2">
-                        <FormItem label="Model" className="mb-0"><Controller name={`items.${index}.modelNumber`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Model" />} /></FormItem>
-                        <FormItem label="Part" className="mb-0"><Controller name={`items.${index}.partNumber`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Part #" />} /></FormItem>
-                      </div>
-
-                      <FormItem label="Dimensions (H x W x Wt)" className="mb-0 mt-2">
-                        <div className="flex gap-2">
-                          <Controller name={`items.${index}.height`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="H" />} />
-                          <Controller name={`items.${index}.width`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="W" />} />
-                          <Controller name={`items.${index}.weight`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Wt" />} />
+                        <div className="grid grid-cols-2 gap-3 mt-2">
+                          <FormItem label="Model" className="mb-0"><Controller name={`items.${index}.modelNumber`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Model" />} /></FormItem>
+                          <FormItem label="Part" className="mb-0"><Controller name={`items.${index}.partNumber`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Part #" />} /></FormItem>
                         </div>
-                      </FormItem>
+
+                        <FormItem label="Dimensions (H x W x Wt)" className="mb-0 mt-2">
+                          <div className="flex gap-2">
+                            <Controller name={`items.${index}.height`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="H" />} />
+                            <Controller name={`items.${index}.width`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="W" />} />
+                            <Controller name={`items.${index}.weight`} control={control} render={({ field }) => <AntInput className='w-full' {...field} placeholder="Wt" />} />
+                          </div>
+                        </FormItem>
+                      </div>
                     </div>
-                    {dynamicAttrGroups.length > 0 && (
-                      <div className="mt-6 pt-4 border-t border-gray-200">
-                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Dynamic Attributes</h4>
-                        <div className="flex flex-col gap-3 text-sm">
-                          {dynamicAttrGroups.flatMap(group =>
-                            group.attributes.map(attr => (
-                              <FormItem key={attr.id} label={attr.name} className="mb-0">
-                                <Controller
-                                  name={`items.${index}.dynamicAttributes.${attr.id}`}
-                                  control={control}
-                                  render={({ field }) => (
-                                    <AntSelect {...field} mode='multiple' options={attr.options.map(o => ({ label: o, value: o }))} className="w-full" placeholder={`Select`} allowClear />
-                                  )}
-                                />
-                              </FormItem>
-                            ))
-                          )}
-                        </div>
+                  )}
+
+                  {/* Dynamic Attributes */}
+                  {dynamicAttrGroups.length > 0 && (
+                    <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm">
+                      <h4 className="text-sm font-semibold text-sky-700 mb-4 border-b border-gray-100 pb-2 flex items-center">
+                        <Lucide.Sliders size={16} className="mr-2" /> Dynamic Attributes
+                      </h4>
+                      <div className="flex flex-col gap-4 text-sm">
+                        {dynamicAttrGroups.map(group => (
+                          <div key={group.groupId} className="border border-gray-100 p-3 rounded bg-gray-50/50">
+                            <h5 className="font-semibold text-gray-700 mb-2">{group.groupName}</h5>
+                            <div className="flex flex-col gap-3">
+                              {group.attributes.map((attr: any) => (
+                                <FormItem key={attr.id} label={attr.name} className="mb-0">
+                                  <Controller
+                                    name={`items.${index}.dynamicAttributes.${attr.id}`}
+                                    control={control}
+                                    render={({ field }) => (
+                                      <AntSelect {...field} mode='multiple' options={attr.options.map((o: any) => ({ label: o, value: o }))} className="w-full" placeholder={`Select`} allowClear />
+                                    )}
+                                  />
+                                </FormItem>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* RIGHT: Matching Products */}
@@ -661,7 +823,7 @@ const CreateRFQ: React.FC = () => {
                                     <div className="font-semibold text-gray-800 text-sm truncate">{v.product.name}</div>
                                     <div className="font-medium text-sky-700 text-xs truncate">{v.variant.name}</div>
                                   </div>
-                                  <div className="font-bold text-green-700 text-sm">${v.variant.price}</div>
+                                  <div className="font-bold text-green-700 text-sm">${v.variant.price?.amount ?? 0}</div>
                                 </div>
                                 <div className="flex justify-between items-center mt-auto border-t border-gray-50 pt-2">
                                   <div className="text-xs text-gray-500">Seller: {(v.product as any).tenantName}</div>
@@ -706,55 +868,89 @@ const CreateRFQ: React.FC = () => {
         title="Product Details & Selection"
         open={!!previewProduct}
         onCancel={() => setPreviewProduct(null)}
-        width={700}
+        width={750}
         footer={null}
         zIndex={1050}
       >
         {previewProduct?.product && previewProduct?.variant && (
-          <div>
-            <div className="flex justify-between items-start mb-4">
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex justify-between items-start border-b border-gray-200 pb-4">
               <div>
                 <h3 className="text-xl font-bold text-gray-800 m-0">{previewProduct.product.name}</h3>
-                <div className="text-gray-500 mt-1">Seller: {previewProduct.product.tenantName}</div>
+                <div className="text-gray-500 mt-1">Seller: <span className="font-medium text-gray-700">{previewProduct.product.tenantName}</span></div>
               </div>
-              <AntTag color="blue">{previewProduct.product.categoryName}</AntTag>
+              <AntTag color="blue" className="text-sm px-3 py-1">{previewProduct.product.categoryName}</AntTag>
             </div>
 
-            <h4 className="font-semibold text-gray-700 mb-2">Static Details</h4>
-            <AntDescriptions bordered size="small" column={2} className="mb-6">
-              <AntDescriptions.Item label="Part Number">{previewProduct.product.partNumber || 'N/A'}</AntDescriptions.Item>
-              <AntDescriptions.Item label="Status">{previewProduct.product.status}</AntDescriptions.Item>
-              <AntDescriptions.Item label="Brand">{previewProduct.product.payload.productData.brand || 'N/A'}</AntDescriptions.Item>
-              <AntDescriptions.Item label="Manufacturer">{previewProduct.product.payload.productData.manufacturer || 'N/A'}</AntDescriptions.Item>
-              <AntDescriptions.Item label="Country">{previewProduct.product.payload.productData.countryOfOrigin || 'N/A'}</AntDescriptions.Item>
-            </AntDescriptions>
+            {/* Global Product Details */}
+            <div>
+              <h4 className="font-semibold text-gray-700 mb-3 flex items-center"><Lucide.Layers className="w-4 h-4 mr-2 text-sky-600"/> Global Product Details</h4>
+              <AntDescriptions bordered size="small" column={2} className="bg-white shadow-sm">
+                <AntDescriptions.Item label="Platform ID"><span className="font-mono text-xs">{previewProduct.product.platformProductId || 'N/A'}</span></AntDescriptions.Item>
+                <AntDescriptions.Item label="Part Number">{previewProduct.product.partNumber || 'N/A'}</AntDescriptions.Item>
+                <AntDescriptions.Item label="Manufacturer">{previewProduct.product.manufacturer?.name || 'N/A'}</AntDescriptions.Item>
+                <AntDescriptions.Item label="Brand">{previewProduct.product.brand?.name || 'N/A'}</AntDescriptions.Item>
+                <AntDescriptions.Item label="Model Number">{previewProduct.product.modelNumber || 'N/A'}</AntDescriptions.Item>
+                <AntDescriptions.Item label="Country of Origin">{previewProduct.product.countryOfOrigin?.name || 'N/A'}</AntDescriptions.Item>
+                <AntDescriptions.Item label="Year">{previewProduct.product.yearOfManufacture || 'N/A'}</AntDescriptions.Item>
+                <AntDescriptions.Item label="Status">{previewProduct.product.status}</AntDescriptions.Item>
+              </AntDescriptions>
+            </div>
 
-            <h4 className="font-semibold text-gray-700 mb-2">Variant Details</h4>
-            <AntDescriptions bordered size="small" column={2} className="mb-6">
-              <AntDescriptions.Item label="Variant Name" span={2}><span className="font-medium text-sky-700">{previewProduct.variant.name}</span></AntDescriptions.Item>
-              <AntDescriptions.Item label="SKU">{previewProduct.variant.sku}</AntDescriptions.Item>
-              <AntDescriptions.Item label="Price"><span className="font-bold text-green-700">${previewProduct.variant.price}</span></AntDescriptions.Item>
-              <AntDescriptions.Item label="Stock">{previewProduct.variant.stock}</AntDescriptions.Item>
-              <AntDescriptions.Item label="Min Order">{previewProduct.variant.minOrder || 1}</AntDescriptions.Item>
-            </AntDescriptions>
-
-            <h4 className="font-semibold text-gray-700 mb-2">Global Specs</h4>
-            <div className="grid grid-cols-2 gap-2 mb-6 text-sm">
-              {(previewProduct.product as any).payload?.globalSpecs?.map((spec: any, i: number) => (
-                <div key={i} className="bg-gray-50 p-2 rounded border border-gray-100">
-                  <span className="text-gray-500">{spec.name}:</span> {spec.value}
+            {/* Global Specifications */}
+            {previewProduct.product.globalSpecs && previewProduct.product.globalSpecs.length > 0 && (
+              <div>
+                <h4 className="font-semibold text-gray-700 mb-3 flex items-center"><Lucide.Settings className="w-4 h-4 mr-2 text-sky-600"/> Global Specifications</h4>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {previewProduct.product.globalSpecs.map((spec: any, i: number) => (
+                    <div key={i} className="bg-gray-50 p-2.5 rounded border border-gray-200 flex justify-between items-center shadow-sm">
+                      <span className="text-gray-600 font-medium">{spec.attributeName || spec.name}</span>
+                      <span className="text-gray-900">{spec.values ? spec.values.map((v:any) => v.label).join(', ') : spec.value}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Selected Variant Details */}
+            <div>
+              <h4 className="font-semibold text-gray-700 mb-3 flex items-center"><Lucide.Box className="w-4 h-4 mr-2 text-sky-600"/> Selected Variant</h4>
+              <AntDescriptions bordered size="small" column={2} className="bg-white mb-4 shadow-sm">
+                <AntDescriptions.Item label="Variant Name" span={2}><span className="font-semibold text-sky-700 text-base">{previewProduct.variant.name}</span></AntDescriptions.Item>
+                <AntDescriptions.Item label="SKU"><span className="font-mono text-xs">{previewProduct.variant.sku}</span></AntDescriptions.Item>
+                <AntDescriptions.Item label="Price"><span className="font-bold text-green-700">${previewProduct.variant.price?.amount ?? 0}</span></AntDescriptions.Item>
+                <AntDescriptions.Item label="Stock">{previewProduct.variant.stock}</AntDescriptions.Item>
+                <AntDescriptions.Item label="Min Order">{previewProduct.variant.minOrder || 1}</AntDescriptions.Item>
+              </AntDescriptions>
+              
+              {/* Variant Attributes */}
+              {previewProduct.variant.values && previewProduct.variant.values.length > 0 && (
+                <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+                  <div className="text-sm font-semibold text-blue-800 mb-2">Variant Specific Attributes</div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {previewProduct.variant.values.map((val: any) => {
+                      return (
+                        <div key={val.attributeId} className="flex justify-between items-center bg-white p-2 rounded border border-blue-100 shadow-sm">
+                          <span className="text-gray-500">{val.attributeName}</span>
+                          <span className="font-medium text-gray-900">{val.label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <div className="flex justify-end pt-4 border-t border-gray-200">
+            <div className="flex justify-end pt-4 border-t border-gray-200 mt-6">
               <AntButton htmlType="button" onClick={() => setPreviewProduct(null)} className="mr-3">Cancel</AntButton>
-              <AntButton htmlType="button" type="primary" className="bg-sky-600" onClick={() => {
-                const prod = previewProduct.product as any;
+              <AntButton htmlType="button" type="primary" className="bg-sky-600 hover:bg-sky-700 shadow-md" size="large" onClick={() => {
+                const prod = previewProduct.product;
                 const variant = previewProduct.variant;
                 const idx = previewProduct.itemIndex;
+                setValue(`items.${idx}.categoryId`, prod.categoryId);
                 setValue(`items.${idx}.targetTenantId`, prod.tenantId);
-                setValue(`items.${idx}.platformProductId`, prod.payload?.productData?.platformProductId || prod.id);
+                setValue(`items.${idx}.platformProductId`, prod.platformProductId || prod.id);
                 setPreviewProduct(null);
 
                 // If it was selected via the Drawer, we don't necessarily close the Drawer, but we show a success message

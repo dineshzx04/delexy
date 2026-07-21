@@ -13,7 +13,9 @@ const UserProductsList: React.FC = () => {
   const { activeWorkspace } = useWorkspace();
 
   // Fetch products for the current workspace
-  const products = useLiveQuery(() => db.userProducts.where('tenantId').equals(activeWorkspace.id).toArray()) || [];
+  const publishedProducts = useLiveQuery(() => db.userProducts.toArray()) || [];
+  const reviewProducts = useLiveQuery(() => db.userProductReviews.toArray()) || [];
+  const products = useMemo(() => [...publishedProducts, ...reviewProducts], [publishedProducts, reviewProducts]);
 
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('All');
@@ -115,7 +117,7 @@ const UserProductsList: React.FC = () => {
             type="text"
             size="small"
             className="text-gray-600 hover:text-gray-700 hover:bg-gray-50"
-            onClick={() => navigate(`/products/${record.id}/edit`)}
+            onClick={() => navigate(['Draft', 'Changes Requested'].includes(record.status) ? `/products/${record.id}/edit` : `/products/${record.id}`)}
           >
             {['Draft', 'Changes Requested'].includes(record.status) ? 'Edit' : 'View'}
           </AntButton>

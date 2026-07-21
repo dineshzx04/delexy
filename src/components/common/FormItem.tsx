@@ -4,7 +4,7 @@ import { Tooltip } from 'antd';
 import { cn } from '../../lib/utils';
 
 interface FormItemProps {
-  label?: string;
+  label?: React.ReactNode;
   required?: boolean;
   error?: string;
   tooltip?: string;

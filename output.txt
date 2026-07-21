@@ -1,0 +1,330 @@
+      {
+        id: 'prod-7',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Excavators 7',
+        partNumber: 'EXC-7',
+        categoryName: 'Excavators',
+        categoryId: 'c-3-1-1-1',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '7',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-17': ['Value 49', 'Value 50'],
+          'attr-18': ['Value 52', 'Value 53']
+        },
+        globalSpecs: [
+          { name: 'Attribute 19', value: 'Value 55' },
+          { name: 'Attribute 20', value: 'Value 58' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 7', sku: 'EXC-7-STD-1', price: 100 + 7, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-17': 'Value 49', 'attr-18': 'Value 52' } },
+          { id: 'v2', name: 'Premium 7', sku: 'EXC-7-PRM-2', price: 150 + 7, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-17': 'Value 50', 'attr-18': 'Value 53' } }
+        ]
+      },
+      {
+        id: 'prod-8',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Bulldozers 8',
+        partNumber: 'BUL-8',
+        categoryName: 'Bulldozers',
+        categoryId: 'c-3-1-1-2',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '8',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-21': ['Value 61', 'Value 62'],
+          'attr-22': ['Value 64', 'Value 65']
+        },
+        globalSpecs: [
+          { name: 'Attribute 23', value: 'Value 67' },
+          { name: 'Attribute 24', value: 'Value 70' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 8', sku: 'BUL-8-STD-1', price: 100 + 8, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-21': 'Value 61', 'attr-22': 'Value 64' } },
+          { id: 'v2', name: 'Premium 8', sku: 'BUL-8-PRM-2', price: 150 + 8, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-21': 'Value 62', 'attr-22': 'Value 65' } }
+        ]
+      },
+      {
+        id: 'prod-9',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Loaders 9',
+        partNumber: 'LOA-9',
+        categoryName: 'Loaders',
+        categoryId: 'c-3-1-1-3',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '9',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-25': ['Value 73', 'Value 74'],
+          'attr-26': ['Value 76', 'Value 77']
+        },
+        globalSpecs: [
+          { name: 'Attribute 27', value: 'Value 79' },
+          { name: 'Attribute 28', value: 'Value 82' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 9', sku: 'LOA-9-STD-1', price: 100 + 9, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-25': 'Value 73', 'attr-26': 'Value 76' } },
+          { id: 'v2', name: 'Premium 9', sku: 'LOA-9-PRM-2', price: 150 + 9, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-25': 'Value 74', 'attr-26': 'Value 77' } }
+        ]
+      },
+      {
+        id: 'prod-10',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Cranes 10',
+        partNumber: 'CRA-10',
+        categoryName: 'Cranes',
+        categoryId: 'c-3-1-2-1',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '10',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-29': ['Value 85', 'Value 86'],
+          'attr-30': ['Value 88', 'Value 89']
+        },
+        globalSpecs: [
+          { name: 'Attribute 31', value: 'Value 91' },
+          { name: 'Attribute 32', value: 'Value 94' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 10', sku: 'CRA-10-STD-1', price: 100 + 10, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-29': 'Value 85', 'attr-30': 'Value 88' } },
+          { id: 'v2', name: 'Premium 10', sku: 'CRA-10-PRM-2', price: 150 + 10, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-29': 'Value 86', 'attr-30': 'Value 89' } }
+        ]
+      },
+      {
+        id: 'prod-11',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Hoists 11',
+        partNumber: 'HOI-11',
+        categoryName: 'Hoists',
+        categoryId: 'c-3-1-2-2',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '11',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-33': ['Value 97', 'Value 98'],
+          'attr-34': ['Value 100', 'Value 101']
+        },
+        globalSpecs: [
+          { name: 'Attribute 35', value: 'Value 103' },
+          { name: 'Attribute 36', value: 'Value 106' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 11', sku: 'HOI-11-STD-1', price: 100 + 11, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-33': 'Value 97', 'attr-34': 'Value 100' } },
+          { id: 'v2', name: 'Premium 11', sku: 'HOI-11-PRM-2', price: 150 + 11, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-33': 'Value 98', 'attr-34': 'Value 101' } }
+        ]
+      },
+      {
+        id: 'prod-12',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Forklifts 12',
+        partNumber: 'FOR-12',
+        categoryName: 'Forklifts',
+        categoryId: 'c-3-1-2-3',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '12',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-37': ['Value 109', 'Value 110'],
+          'attr-38': ['Value 112', 'Value 113']
+        },
+        globalSpecs: [
+          { name: 'Attribute 39', value: 'Value 115' },
+          { name: 'Attribute 40', value: 'Value 118' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 12', sku: 'FOR-12-STD-1', price: 100 + 12, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-37': 'Value 109', 'attr-38': 'Value 112' } },
+          { id: 'v2', name: 'Premium 12', sku: 'FOR-12-PRM-2', price: 150 + 12, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-37': 'Value 110', 'attr-38': 'Value 113' } }
+        ]
+      },
+      {
+        id: 'prod-13',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Drills 13',
+        partNumber: 'DRI-13',
+        categoryName: 'Drills',
+        categoryId: 'c-3-2-1-1',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '13',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-13': ['Value 37', 'Value 38'],
+          'attr-14': ['Value 40', 'Value 41']
+        },
+        globalSpecs: [
+          { name: 'Attribute 15', value: 'Value 43' },
+          { name: 'Attribute 16', value: 'Value 46' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 13', sku: 'DRI-13-STD-1', price: 100 + 13, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-13': 'Value 37', 'attr-14': 'Value 40' } },
+          { id: 'v2', name: 'Premium 13', sku: 'DRI-13-PRM-2', price: 150 + 13, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-13': 'Value 38', 'attr-14': 'Value 41' } }
+        ]
+      },
+      {
+        id: 'prod-14',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Saws 14',
+        partNumber: 'SAW-14',
+        categoryName: 'Saws',
+        categoryId: 'c-3-2-1-2',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '14',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-17': ['Value 49', 'Value 50'],
+          'attr-18': ['Value 52', 'Value 53']
+        },
+        globalSpecs: [
+          { name: 'Attribute 19', value: 'Value 55' },
+          { name: 'Attribute 20', value: 'Value 58' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 14', sku: 'SAW-14-STD-1', price: 100 + 14, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-17': 'Value 49', 'attr-18': 'Value 52' } },
+          { id: 'v2', name: 'Premium 14', sku: 'SAW-14-PRM-2', price: 150 + 14, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-17': 'Value 50', 'attr-18': 'Value 53' } }
+        ]
+      },
+      {
+        id: 'prod-15',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Grinders 15',
+        partNumber: 'GRI-15',
+        categoryName: 'Grinders',
+        categoryId: 'c-3-2-1-3',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '15',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-21': ['Value 61', 'Value 62'],
+          'attr-22': ['Value 64', 'Value 65']
+        },
+        globalSpecs: [
+          { name: 'Attribute 23', value: 'Value 67' },
+          { name: 'Attribute 24', value: 'Value 70' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 15', sku: 'GRI-15-STD-1', price: 100 + 15, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-21': 'Value 61', 'attr-22': 'Value 64' } },
+          { id: 'v2', name: 'Premium 15', sku: 'GRI-15-PRM-2', price: 150 + 15, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-21': 'Value 62', 'attr-22': 'Value 65' } }
+        ]
+      },
+      {
+        id: 'prod-16',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Helmets 16',
+        partNumber: 'HEL-16',
+        categoryName: 'Helmets',
+        categoryId: 'c-3-3-1-1',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '16',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-9': ['Value 25', 'Value 26'],
+          'attr-10': ['Value 28', 'Value 29']
+        },
+        globalSpecs: [
+          { name: 'Attribute 11', value: 'Value 31' },
+          { name: 'Attribute 12', value: 'Value 34' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 16', sku: 'HEL-16-STD-1', price: 100 + 16, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-9': 'Value 25', 'attr-10': 'Value 28' } },
+          { id: 'v2', name: 'Premium 16', sku: 'HEL-16-PRM-2', price: 150 + 16, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-9': 'Value 26', 'attr-10': 'Value 29' } }
+        ]
+      },
+      {
+        id: 'prod-17',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Gloves 17',
+        partNumber: 'GLO-17',
+        categoryName: 'Gloves',
+        categoryId: 'c-3-3-1-2',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '17',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-13': ['Value 37', 'Value 38'],
+          'attr-14': ['Value 40', 'Value 41']
+        },
+        globalSpecs: [
+          { name: 'Attribute 15', value: 'Value 43' },
+          { name: 'Attribute 16', value: 'Value 46' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 17', sku: 'GLO-17-STD-1', price: 100 + 17, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-13': 'Value 37', 'attr-14': 'Value 40' } },
+          { id: 'v2', name: 'Premium 17', sku: 'GLO-17-PRM-2', price: 150 + 17, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-13': 'Value 38', 'attr-14': 'Value 41' } }
+        ]
+      }

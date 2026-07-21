@@ -14,7 +14,12 @@ const InboundRFQDetail: React.FC = () => {
   const rfq = useLiveQuery(() => id ? db.rfqs.get(id) : undefined, [id]);
 
   // Quote State for multiple items: rfqItemId -> Quote details
-  const [itemQuotes, setItemQuotes] = useState<Record<string, { price: string, leadTimeDays: string }>>({});
+  const [itemQuotes, setItemQuotes] = useState<Record<string, { 
+    price: string, 
+    leadTimeDays: string,
+    brand: string,
+    dynamicAttributes: Record<string, string>
+  }>>({});
   const [quoteNotes, setQuoteNotes] = useState('');
 
   const myQuote = rfq?.quotes && rfq.quotes.find(q => q.responderTenantId === activeWorkspace.id);
@@ -34,7 +39,7 @@ const InboundRFQDetail: React.FC = () => {
 
   if (!rfq) return <div className="p-8">RFQ Not Found</div>;
 
-  const handleItemQuoteChange = (itemId: string, field: 'price' | 'leadTimeDays', value: string) => {
+  const handleItemQuoteChange = (itemId: string, field: 'price' | 'leadTimeDays' | 'brand', value: string) => {
     setItemQuotes(prev => ({
       ...prev,
       [itemId]: {
@@ -42,6 +47,22 @@ const InboundRFQDetail: React.FC = () => {
         [field]: value
       }
     }));
+  };
+
+  const handleDynamicAttrChange = (itemId: string, attrKey: string, value: string) => {
+    setItemQuotes(prev => {
+      const current = prev[itemId] || { price: '', leadTimeDays: '', brand: '', dynamicAttributes: {} };
+      return {
+        ...prev,
+        [itemId]: {
+          ...current,
+          dynamicAttributes: {
+            ...(current.dynamicAttributes || {}),
+            [attrKey]: value
+          }
+        }
+      };
+    });
   };
 
   const handleSubmitQuote = async () => {
@@ -58,7 +79,12 @@ const InboundRFQDetail: React.FC = () => {
       quoteItems.push({
         rfqItemId: item.id,
         price: Number(q.price),
-        leadTimeDays: Number(q.leadTimeDays)
+        leadTimeDays: Number(q.leadTimeDays),
+        responseType: 'OPEN_RFQ' as const, // Automated processing parses this
+        quotedSpecifications: {
+          brand: q.brand ? [q.brand] : undefined,
+          dynamicAttributes: q.dynamicAttributes || {}
+        }
       });
     }
 
@@ -146,8 +172,9 @@ const InboundRFQDetail: React.FC = () => {
               <div className="bg-gray-50 p-4 rounded border border-gray-200">
                 <h5 className="font-semibold text-gray-700 mb-2">Item Specifications</h5>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  {r.brand && <div><span className="text-gray-500">Brand:</span> {r.brand}</div>}
-                  {r.manufacturer && <div><span className="text-gray-500">Mfr:</span> {r.manufacturer}</div>}
+                  {r.brand && r.brand.length > 0 && <div><span className="text-gray-500">Brand:</span> {Array.isArray(r.brand) ? r.brand.join(', ') : r.brand}</div>}
+                  {r.manufacturer && r.manufacturer.length > 0 && <div><span className="text-gray-500">Mfr:</span> {Array.isArray(r.manufacturer) ? r.manufacturer.join(', ') : r.manufacturer}</div>}
+                  {r.seller && r.seller.length > 0 && <div><span className="text-gray-500">Seller:</span> {Array.isArray(r.seller) ? r.seller.join(', ') : r.seller}</div>}
                   {r.countryOfOrigin && <div><span className="text-gray-500">Country:</span> {r.countryOfOrigin}</div>}
                   {r.modelNumber && <div><span className="text-gray-500">Model:</span> {r.modelNumber}</div>}
                   {r.partNumber && <div><span className="text-gray-500">Part #:</span> {r.partNumber}</div>}
@@ -217,44 +244,103 @@ const InboundRFQDetail: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            <div>
-              <p className="text-sm text-gray-600 mb-4">Please provide a unit price and estimated lead time for each item below.</p>
-              <AntTable
-                dataSource={visibleItems}
-                rowKey="id"
-                pagination={false}
-                size="small"
-                className="border border-gray-200 rounded mb-4"
-                columns={[
-                  { title: 'Item', render: (_, r) => r.platformProductId ? `Product: ${r.platformProductId}` : `Item: ${r.id}` },
-                  { title: 'Qty', dataIndex: 'quantity' },
-                  {
-                    title: 'Unit Price ($)',
-                    render: (_, r) => (
-                      <AntInput
-                        type="number"
-                        size="small"
-                        placeholder="0.00"
-                        value={itemQuotes[r.id]?.price || ''}
-                        onChange={e => handleItemQuoteChange(r.id, 'price', e.target.value)}
-                      />
-                    )
-                  },
-                  {
-                    title: 'Lead Time (Days)',
-                    render: (_, r) => (
-                      <AntInput
-                        type="number"
-                        size="small"
-                        placeholder="Days"
-                        value={itemQuotes[r.id]?.leadTimeDays || ''}
-                        onChange={e => handleItemQuoteChange(r.id, 'leadTimeDays', e.target.value)}
-                      />
-                    )
-                  }
-                ]}
-              />
-            </div>
+            <p className="text-sm text-gray-600 mb-4">Please configure your response for each requested item. You may quote identical specifications or provide your own alternatives.</p>
+            
+            {visibleItems.map((item, idx) => {
+              const quote = itemQuotes[item.id] || { price: '', leadTimeDays: '', brand: '', dynamicAttributes: {} };
+              
+              return (
+                <div key={item.id} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-gray-50 px-4 py-2 border-b border-gray-200 font-semibold text-gray-700">
+                    Item {idx + 1}: {item.platformProductId ? `Product ${item.platformProductId}` : item.categoryId ? `Category ${item.categoryId}` : item.id}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2">
+                    {/* Left Side: Requested Specs */}
+                    <div className="p-4 border-r border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4 border-b pb-1">Requested Specifications</h4>
+                      <div className="space-y-3 text-sm">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div className="text-gray-500 font-medium">Quantity</div>
+                          <div className="col-span-2">{item.quantity} {item.unit || 'Pieces'}</div>
+                        </div>
+                        {item.brand && (
+                          <div className="grid grid-cols-3 gap-2">
+                            <div className="text-gray-500 font-medium">Brand</div>
+                            <div className="col-span-2">{Array.isArray(item.brand) ? item.brand.join(', ') : item.brand}</div>
+                          </div>
+                        )}
+                        {item.dynamicAttributes && Object.entries(item.dynamicAttributes).map(([key, val]) => (
+                          <div key={key} className="grid grid-cols-3 gap-2">
+                            <div className="text-gray-500 font-medium">{key}</div>
+                            <div className="col-span-2">{val}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Right Side: Quoted Specs */}
+                    <div className="p-4 bg-white shadow-inner">
+                      <h4 className="text-sm font-semibold text-sky-600 uppercase tracking-wider mb-4 border-b pb-1">Your Configuration</h4>
+                      
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Unit Price ($)</label>
+                            <AntInput 
+                              type="number" 
+                              value={quote.price} 
+                              onChange={(e) => handleItemQuoteChange(item.id, 'price', e.target.value)} 
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-gray-500 mb-1">Lead Time (Days)</label>
+                            <AntInput 
+                              type="number" 
+                              value={quote.leadTimeDays} 
+                              onChange={(e) => handleItemQuoteChange(item.id, 'leadTimeDays', e.target.value)} 
+                              placeholder="Days"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-xs text-gray-500 mb-1">Brand Provided</label>
+                          <AntInput 
+                            value={quote.brand} 
+                            onChange={(e) => handleItemQuoteChange(item.id, 'brand', e.target.value)} 
+                            placeholder="Enter proposed brand..."
+                          />
+                        </div>
+
+                        {item.dynamicAttributes && Object.keys(item.dynamicAttributes).length > 0 && (
+                          <div className="mt-4 border-t pt-3">
+                            <label className="block text-xs text-gray-500 font-semibold mb-2">Dynamic Attributes (Modify if deviating)</label>
+                            <div className="space-y-3">
+                              {Object.entries(item.dynamicAttributes).map(([key, reqVal]) => {
+                                // Default to empty if not touched, though it conceptually defaults to the requested.
+                                // We'll let them explicitly type it out or prepopulate it.
+                                const val = quote.dynamicAttributes[key] !== undefined ? quote.dynamicAttributes[key] : reqVal;
+                                return (
+                                  <div key={key}>
+                                    <label className="block text-xs text-gray-500 mb-1">{key}</label>
+                                    <AntInput 
+                                      value={val} 
+                                      onChange={(e) => handleDynamicAttrChange(item.id, key, e.target.value)} 
+                                    />
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Terms & Conditions / Notes</label>

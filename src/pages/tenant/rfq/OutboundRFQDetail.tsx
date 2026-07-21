@@ -87,40 +87,94 @@ const OutboundRFQDetail: React.FC = () => {
   const expandedRowRender = (record: RFQQuote) => {
     return (
       <div className="bg-gray-50 p-4 rounded border border-gray-200 m-2">
-        <h4 className="font-semibold mb-2">Line Item Breakdown</h4>
-        <AntTable 
-          dataSource={record.items}
-          rowKey="rfqItemId"
-          pagination={false}
-          size="small"
-          columns={[
-            {
-              title: 'Item',
-              key: 'item',
-              render: (_: any, qi: any) => {
-                const item: any = rfq.items.find(i => i.id === qi.rfqItemId);
-                if (!item) return qi.rfqItemId;
-                if (item.platformProductId) return `Product ID: ${item.platformProductId}`;
-                return `Item: ${item.id}`;
+        <h4 className="font-semibold mb-2">Line Item Breakdown & Deviations</h4>
+        
+        <div className="space-y-6">
+          {record.items.map((qi: any) => {
+            const rfqItem = rfq.items.find((i: any) => i.id === qi.rfqItemId);
+            if (!rfqItem) return null;
+            
+            const reqSpecs = rfqItem.dynamicAttributes || {};
+            const quotedSpecs = qi.quotedSpecifications?.dynamicAttributes || {};
+            
+            // Find deviations
+            const deviations: any[] = [];
+            Object.entries(reqSpecs).forEach(([key, reqVal]) => {
+              const qVal = quotedSpecs[key];
+              if (qVal && qVal !== reqVal) {
+                deviations.push({ key, reqVal, qVal });
               }
-            },
-            {
-              title: 'Quantity',
-              key: 'qty',
-              render: (_: any, qi: any) => rfq.items.find(i => i.id === qi.rfqItemId)?.quantity || 0
-            },
-            { title: 'Unit Price', dataIndex: 'price', render: (p: number) => `$${p.toFixed(2)}` },
-            { 
-              title: 'Line Total', 
-              key: 'lineTotal', 
-              render: (_: any, qi: any) => {
-                const qty = rfq.items.find(i => i.id === qi.rfqItemId)?.quantity || 0;
-                return `$${(qi.price * qty).toFixed(2)}`;
-              }
-            },
-            { title: 'Lead Time (Days)', dataIndex: 'leadTimeDays' }
-          ]}
-        />
+            });
+
+            // Find chats for this item
+            const itemChats = record.chatLog ? record.chatLog.filter(c => c.itemId === qi.rfqItemId) : [];
+
+            return (
+              <div key={qi.rfqItemId} className="border border-gray-200 bg-white rounded-lg overflow-hidden">
+                <div className="bg-gray-100 px-4 py-2 flex justify-between items-center border-b border-gray-200">
+                  <div className="font-semibold text-gray-700">
+                    Item: {rfqItem.platformProductId || rfqItem.id} ({rfqItem.quantity} {rfqItem.unit})
+                  </div>
+                  <div className="text-sm font-semibold">
+                    ${qi.price.toFixed(2)} / unit • Total: ${(qi.price * rfqItem.quantity).toFixed(2)} • {qi.leadTimeDays} Days Lead
+                  </div>
+                </div>
+
+                <div className="p-4 flex flex-col md:flex-row gap-6">
+                  {/* Deviations Panel */}
+                  <div className="flex-1">
+                    <h5 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Configuration Review</h5>
+                    {deviations.length === 0 ? (
+                      <div className="text-sm text-green-600 flex items-center gap-2 bg-green-50 p-2 rounded">
+                        <Lucide.CheckCircle size={16} /> Exact Specification Match
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {deviations.map(dev => (
+                          <div key={dev.key} className="text-sm bg-orange-50 border border-orange-200 p-2 rounded">
+                            <div className="font-semibold text-orange-800 flex items-center gap-1 mb-1">
+                              <Lucide.AlertTriangle size={14} /> Deviation on: {dev.key}
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 mt-1">
+                              <div><span className="text-gray-500 text-xs">Requested:</span><br/>{dev.reqVal}</div>
+                              <div><span className="text-sky-600 text-xs font-semibold">Quoted:</span><br/>{dev.qVal}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Chat / Negotiation Panel */}
+                  <div className="flex-1 border-l border-gray-200 pl-6">
+                    <h5 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3 flex justify-between items-center">
+                      Negotiation History
+                      <AntButton size="small" type="link" icon={<Lucide.MessageSquare size={14}/>}>Reply</AntButton>
+                    </h5>
+                    {itemChats.length === 0 ? (
+                      <div className="text-sm text-gray-400 italic">No negotiation history.</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {itemChats.map(chat => (
+                          <div key={chat.id} className={`p-2 rounded text-sm ${chat.senderTenantId === rfq.requesterTenantId ? 'bg-sky-50 ml-4' : 'bg-gray-100 mr-4'}`}>
+                            <div className="flex justify-between items-center mb-1 text-xs text-gray-500">
+                              <span className="font-semibold">{chat.senderTenantId === rfq.requesterTenantId ? 'You' : record.responderTenantName}</span>
+                              <span>{new Date(chat.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            </div>
+                            {chat.fieldContext && (
+                              <div className="text-xs text-orange-600 bg-white inline-block px-1 rounded mb-1">Re: {chat.fieldContext.replace('dynamicAttributes.', '')}</div>
+                            )}
+                            <div>{chat.message}</div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     );
   };
@@ -188,8 +242,9 @@ const OutboundRFQDetail: React.FC = () => {
                <div className="bg-gray-50 p-4 rounded border border-gray-200">
                  <h5 className="font-semibold text-gray-700 mb-2">Item Specifications</h5>
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                   {r.brand && <div><span className="text-gray-500">Brand:</span> {r.brand}</div>}
-                   {r.manufacturer && <div><span className="text-gray-500">Mfr:</span> {r.manufacturer}</div>}
+                   {r.brand && r.brand.length > 0 && <div><span className="text-gray-500">Brand:</span> {Array.isArray(r.brand) ? r.brand.join(', ') : r.brand}</div>}
+                   {r.manufacturer && r.manufacturer.length > 0 && <div><span className="text-gray-500">Mfr:</span> {Array.isArray(r.manufacturer) ? r.manufacturer.join(', ') : r.manufacturer}</div>}
+                   {r.seller && r.seller.length > 0 && <div><span className="text-gray-500">Seller:</span> {Array.isArray(r.seller) ? r.seller.join(', ') : r.seller}</div>}
                    {r.countryOfOrigin && <div><span className="text-gray-500">Country:</span> {r.countryOfOrigin}</div>}
                    {r.modelNumber && <div><span className="text-gray-500">Model:</span> {r.modelNumber}</div>}
                    {r.partNumber && <div><span className="text-gray-500">Part #:</span> {r.partNumber}</div>}

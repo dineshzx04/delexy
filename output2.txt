@@ -1,0 +1,120 @@
+      {
+        id: 'prod-3',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Hammers 3',
+        partNumber: 'HAM-3',
+        categoryName: 'Hammers',
+        categoryId: 'c-3-2-2-1',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '3',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-25': ['Value 73', 'Value 74'],
+          'attr-26': ['Value 76', 'Value 77']
+        },
+        globalSpecs: [
+          { name: 'Attribute 27', value: 'Value 79' },
+          { name: 'Attribute 28', value: 'Value 82' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 3', sku: 'HAM-3-STD-1', price: 100 + 3, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-25': 'Value 73', 'attr-26': 'Value 76' } },
+          { id: 'v2', name: 'Premium 3', sku: 'HAM-3-PRM-2', price: 150 + 3, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-25': 'Value 74', 'attr-26': 'Value 77' } }
+        ]
+      },
+      {
+        id: 'prod-4',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial CNC Milling 4',
+        partNumber: 'CNC-4',
+        categoryName: 'CNC Milling',
+        categoryId: 'c-2-1-1-1',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '4',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-29': ['Value 85', 'Value 86'],
+          'attr-30': ['Value 88', 'Value 89']
+        },
+        globalSpecs: [
+          { name: 'Attribute 31', value: 'Value 91' },
+          { name: 'Attribute 32', value: 'Value 94' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 4', sku: 'CNC-4-STD-1', price: 100 + 4, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-29': 'Value 85', 'attr-30': 'Value 88' } },
+          { id: 'v2', name: 'Premium 4', sku: 'CNC-4-PRM-2', price: 150 + 4, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-29': 'Value 86', 'attr-30': 'Value 89' } }
+        ]
+      },
+      {
+        id: 'prod-5',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial Manual Milling 5',
+        partNumber: 'MAN-5',
+        categoryName: 'Manual Milling',
+        categoryId: 'c-2-1-1-2',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '5',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-33': ['Value 97', 'Value 98'],
+          'attr-34': ['Value 100', 'Value 101']
+        },
+        globalSpecs: [
+          { name: 'Attribute 35', value: 'Value 103' },
+          { name: 'Attribute 36', value: 'Value 106' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 5', sku: 'MAN-5-STD-1', price: 100 + 5, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-33': 'Value 97', 'attr-34': 'Value 100' } },
+          { id: 'v2', name: 'Premium 5', sku: 'MAN-5-PRM-2', price: 150 + 5, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-33': 'Value 98', 'attr-34': 'Value 101' } }
+        ]
+      },
+      {
+        id: 'prod-6',
+        tenantId: 'tenant-1',
+        tenantName: 'Acme Corp (Business)',
+        name: 'Industrial CNC Lathes 6',
+        partNumber: 'CNC-6',
+        categoryName: 'CNC Lathes',
+        categoryId: 'c-2-1-2-1',
+        status: 'Published',
+        updatedAt: '2023-11-06 10:00',
+        submittedAt: '2023-11-06 10:00',
+        reviewData: {},
+        platformProductId: 'pp-3',
+        height: '10', width: '20', emptyWeight: '50kg',
+        modelNumber: '6',
+        yearOfManufacture: 2023, countryOfOrigin: 'US', manufacturer: 'acme', brand: 'brand-x',
+        seller: 'vendor-a', deviations: 'None', exclusions: 'None', assumptions: 'None',
+        dynamicAttributes: {
+          'attr-1': ['Value 1', 'Value 2'],
+          'attr-2': ['Value 4', 'Value 5']
+        },
+        globalSpecs: [
+          { name: 'Attribute 3', value: 'Value 7' },
+          { name: 'Attribute 4', value: 'Value 10' }
+        ],
+        variants: [
+          { id: 'v1', name: 'Standard 6', sku: 'CNC-6-STD-1', price: 100 + 6, stock: 50, minOrder: 1, dynamicAttributes: { 'attr-1': 'Value 1', 'attr-2': 'Value 4' } },
+          { id: 'v2', name: 'Premium 6', sku: 'CNC-6-PRM-2', price: 150 + 6, stock: 25, minOrder: 1, dynamicAttributes: { 'attr-1': 'Value 2', 'attr-2': 'Value 5' } }
+        ]
+      }

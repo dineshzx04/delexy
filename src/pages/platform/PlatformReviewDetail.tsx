@@ -5,12 +5,12 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import WorkflowTimeline from '../../components/common/WorkflowTimeline';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type UserProduct, type FieldReview, type FieldReviewStatus } from '../../data/db';
+import { db, type UserProductReview, type FieldReview, type FieldReviewStatus } from '../../data/db';
 
 const PlatformReviewDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const reviewingProduct = useLiveQuery(() => id ? db.userProducts.get(id) : undefined, [id]);
+  const reviewingProduct = useLiveQuery(() => id ? db.userProductReviews.get(id) : undefined, [id]);
 
   // Field Reviews State map
   const [fieldReviews, setFieldReviews] = useState<Record<string, FieldReview>>({});
@@ -111,18 +111,25 @@ const PlatformReviewDetail: React.FC = () => {
   };
 
   const handleSaveProgress = async () => {
-    await db.userProducts.update(reviewingProduct.id, { reviewData: fieldReviews, status: 'Under Review' });
+    await db.userProductReviews.update(reviewingProduct.id, { reviewData: fieldReviews, status: 'Under Review' });
     notification.success({ message: 'Progress Saved', description: 'Review progress has been saved.' });
   };
 
   const handleApproveProduct = async () => {
-    await db.userProducts.update(reviewingProduct.id, { reviewData: fieldReviews, status: 'Approved' });
-    notification.success({ message: 'Product Approved', description: 'The product has been approved.' });
+    const { reviewData, ...cleanProduct } = reviewingProduct as any;
+    cleanProduct.status = 'Published';
+    
+    await db.transaction('rw', db.userProductReviews, db.userProducts, async () => {
+      await db.userProducts.put(cleanProduct);
+      await db.userProductReviews.delete(reviewingProduct.id);
+    });
+    
+    notification.success({ message: 'Product Approved', description: 'The product has been approved and published to the catalog.' });
     navigate('/platform');
   };
 
   const handleReturnToUser = async () => {
-    await db.userProducts.update(reviewingProduct.id, { reviewData: fieldReviews, status: 'Changes Requested' });
+    await db.userProductReviews.update(reviewingProduct.id, { reviewData: fieldReviews, status: 'Changes Requested' });
     notification.warning({ message: 'Returned to User', description: 'Sent back to user for changes.' });
     navigate('/platform');
   };

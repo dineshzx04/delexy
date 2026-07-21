@@ -4,7 +4,7 @@ import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type UserProduct } from '../../data/db';
+import { db, type UserProductReview } from '../../data/db';
 
 const PlatformProductReview: React.FC = () => {
   const [searchText, setSearchText] = useState('');
@@ -19,8 +19,8 @@ const PlatformProductReview: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const products = useLiveQuery(() => {
-    if (activeTab === 'All') return db.userProducts.toArray();
-    return db.userProducts.where('status').equals(activeTab).toArray();
+    if (activeTab === 'All') return db.userProductReviews.toArray();
+    return db.userProductReviews.where('status').equals(activeTab).toArray();
   }, [activeTab]) || [];
 
   const filteredProducts = useMemo(() => {
@@ -48,7 +48,7 @@ const PlatformProductReview: React.FC = () => {
     {
       title: 'Tenant',
       key: 'tenant',
-      render: (_: any, record: UserProduct) => (
+      render: (_: any, record: UserProductReview) => (
         <div className="flex flex-col">
           <span className="font-semibold text-gray-800">{record.tenantId}</span>
         </div>
@@ -57,7 +57,7 @@ const PlatformProductReview: React.FC = () => {
     {
       title: 'Product Name',
       key: 'product',
-      render: (_: any, record: UserProduct) => (
+      render: (_: any, record: UserProductReview) => (
         <div className="flex flex-col">
           <span className="font-semibold text-sky-700">{record.name}</span>
           <span className="text-xs text-gray-500">Part: {record.partNumber}</span>
@@ -77,7 +77,7 @@ const PlatformProductReview: React.FC = () => {
     {
       title: 'Actions',
       key: 'action',
-      render: (_: any, record: UserProduct) => (
+      render: (_: any, record: UserProductReview) => (
         <AntButton 
           type="primary"
           className="bg-sky-600"
