@@ -1,0 +1,22 @@
+export const groups = [
+  { id: 'g1', name: 'Group 1', attributeIds: ['attr-1', 'attr-2'] },
+  { id: 'g2', name: 'Group 2', attributeIds: ['attr-3', 'attr-4'] },
+  { id: 'g3', name: 'Group 3', attributeIds: ['attr-5', 'attr-6'] },
+  { id: 'g4', name: 'Group 4', attributeIds: ['attr-7', 'attr-8'] },
+  { id: 'g5', name: 'Group 5', attributeIds: ['attr-9', 'attr-10'] },
+  { id: 'g6', name: 'Group 6', attributeIds: ['attr-11', 'attr-12'] },
+  { id: 'g7', name: 'Group 7', attributeIds: ['attr-13', 'attr-14'] },
+  { id: 'g8', name: 'Group 8', attributeIds: ['attr-15', 'attr-16'] },
+  { id: 'g9', name: 'Group 9', attributeIds: ['attr-17', 'attr-18'] },
+  { id: 'g10', name: 'Group 10', attributeIds: ['attr-19', 'attr-20'] },
+  { id: 'g11', name: 'Group 11', attributeIds: ['attr-21', 'attr-22'] },
+  { id: 'g12', name: 'Group 12', attributeIds: ['attr-23', 'attr-24'] },
+  { id: 'g13', name: 'Group 13', attributeIds: ['attr-25', 'attr-26'] },
+  { id: 'g14', name: 'Group 14', attributeIds: ['attr-27', 'attr-28'] },
+  { id: 'g15', name: 'Group 15', attributeIds: ['attr-29', 'attr-30'] },
+  { id: 'g16', name: 'Group 16', attributeIds: ['attr-31', 'attr-32'] },
+  { id: 'g17', name: 'Group 17', attributeIds: ['attr-33', 'attr-34'] },
+  { id: 'g18', name: 'Group 18', attributeIds: ['attr-35', 'attr-36'] },
+  { id: 'g19', name: 'Group 19', attributeIds: ['attr-37', 'attr-38'] },
+  { id: 'g20', name: 'Group 20', attributeIds: ['attr-39', 'attr-40'] }
+];

@@ -72,7 +72,8 @@ const App: React.FC = () => {
           <Route element={<AuthLayout />}>
             <Route element={<ErrorBoundary />}>
               <Route path="/login" element={<Login />} />
-               <Route path="/register" element={<Register />} />
+              <Route path="/2fa" element={<TwoFactorAuth />} />
+              <Route path="/register" element={<Register />} />
               <Route path="/verify-email" element={<EmailVerification />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
@@ -129,6 +130,12 @@ const App: React.FC = () => {
               <Route index element={<PlatformDashboard />} />
               <Route path="dashboard" element={<PlatformDashboard />} />
 
+              <Route path="members" element={<PlatformTeam />} />
+              <Route path="rbac/roles" element={<PlatformRolesList />} />
+              <Route path="rbac/roles/new" element={<PlatformRoleEditor />} />
+              <Route path="rbac/roles/:id" element={<PlatformRoleEditor />} />
+              <Route path="rbac" element={<Navigate to="/platform/rbac/roles" replace />} />
+
               <Route path="attributes" element={<Attributes />} />
               <Route path="attributes/values" element={<AttributeValues />} />
               <Route path="attributes/groups" element={<AttributeGroups />} />
@@ -136,6 +143,8 @@ const App: React.FC = () => {
 
               <Route path="category" element={<CategoryManagement />} />
               <Route path="category-products" element={<CategoryProducts />} />
+              <Route path="user-products" element={<PlatformProductReview />} />
+              <Route path="review/:id" element={<PlatformReviewDetail />} />
 
             </Route>
           </Route>
