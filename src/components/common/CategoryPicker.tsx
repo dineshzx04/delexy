@@ -42,7 +42,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   // If search query exists, we flatten the UI to just show search results instead of columns
   const searchResults = useMemo(() => {
     if (!searchQuery) return [];
-    return dbCategories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.slug.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 50); // limit for performance
+    return dbCategories.filter(c => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || (c.slug && c.slug.toLowerCase().includes(searchQuery.toLowerCase()))).slice(0, 50); // limit for performance
   }, [searchQuery, dbCategories]);
 
   const handleSelectCategory = (categoryId: string, columnIndex: number) => {

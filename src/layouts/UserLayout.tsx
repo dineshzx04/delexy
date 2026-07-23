@@ -7,7 +7,7 @@ import { useWorkspace } from '../contexts/WorkspaceContext';
 import { useBreadcrumbContext } from '../contexts/BreadcrumbContext';
 import { cn } from '../lib/utils';
 
-const PlatformLayout: React.FC = () => {
+const UserLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -76,48 +76,82 @@ const PlatformLayout: React.FC = () => {
   ];
 
   const getMenuItems = () => {
+    const baseSettings = {
+      key: 'settings-group',
+      type: 'group',
+      label: collapsed ? null : 'Personal Settings',
+      children: [
+        {
+          key: '/profile',
+          icon: <Lucide.User size={18} />,
+          label: <Link to="/profile">User Profile</Link>,
+        },
+      ],
+    };
+
+    if (activeWorkspace?.type === 'tenant') {
+      return [
+        {
+          key: 'tenant-group',
+          type: 'group',
+          label: collapsed ? null : 'Organization Workspace',
+          children: [
+            {
+              key: '/dashboard',
+              icon: <Lucide.LayoutDashboard size={18} />,
+              label: <Link to="/dashboard">Tenant Dashboard</Link>,
+            },
+            {
+              key: '/rfqs',
+              icon: <Lucide.FileText size={18} />,
+              label: <Link to="/rfqs">RFQs & Procurement</Link>,
+            },
+            {
+              key: '/products',
+              icon: <Lucide.Package size={18} />,
+              label: <Link to="/products">Products Catalog</Link>,
+            },
+            {
+              key: '/orders',
+              icon: <Lucide.ShoppingCart size={18} />,
+              label: <Link to="/orders">Purchase Orders</Link>,
+            },
+            {
+              key: '/user-management',
+              icon: <Lucide.Users size={18} />,
+              label: <Link to="/user-management">Team Members</Link>,
+            },
+          ],
+        },
+        baseSettings,
+      ];
+    }
+
+    // Default / Individual Workspace
     return [
-      { key: '/platform', icon: <Lucide.Globe size={16} />, label: <Link to="/platform">Global Overview</Link> },
       {
-        key: 'taxonomies',
-        icon: <Lucide.Layers size={16} />,
-        label: 'Taxonomies',
-        children: [
-          { key: '/platform/attributes', label: <Link to="/platform/attributes">Attributes</Link> },
-          { key: '/platform/attribute-values', label: <Link to="/platform/attribute-values">Values</Link> },
-          { key: '/platform/attribute-groups', label: <Link to="/platform/attribute-groups">Groups</Link> },
-          { key: '/platform/attribute-mapping', label: <Link to="/platform/attribute-mapping">Mapping</Link> },
-        ]
-      },
-      {
-        key: 'global-entities',
-        icon: <Lucide.Database size={16} />,
-        label: 'Global Data',
-        children: [
-          { key: '/platform/businesses', label: <Link to="/platform/businesses">Businesses</Link> },
-          { key: '/platform/users', label: <Link to="/platform/users">Users</Link> },
-          { key: '/platform/categories', label: <Link to="/platform/categories">Categories</Link> },
-          { key: '/platform/products', label: <Link to="/platform/products">Global Products</Link> },
-        ]
-      },
-      {
-        key: 'governance',
-        icon: <Lucide.ShieldCheck size={16} />,
-        label: 'Governance & RBAC',
-        children: [
-          { key: '/platform/platform-roles', label: <Link to="/platform/platform-roles">Platform Roles</Link> },
-          { key: '/platform/business-roles', label: <Link to="/platform/business-roles">Default Tenant Roles</Link> },
-          { key: '/platform/audit-logs', label: <Link to="/platform/audit-logs">Audit Logs</Link> },
-        ]
-      },
-      {
-        key: 'settings-group',
+        key: 'individual-group',
         type: 'group',
-        label: collapsed ? null : 'Personal Settings',
+        label: collapsed ? null : 'Personal Workspace',
         children: [
-          { key: '/profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> }, 
-        ]
-      }
+          {
+            key: '/dashboard',
+            icon: <Lucide.LayoutDashboard size={18} />,
+            label: <Link to="/dashboard">Dashboard</Link>,
+          },
+          {
+            key: '/create-organization',
+            icon: <Lucide.PlusCircle size={18} />,
+            label: <Link to="/create-organization">Create Business</Link>,
+          },
+          {
+            key: '/join-organization',
+            icon: <Lucide.UserPlus size={18} />,
+            label: <Link to="/join-organization">Join Business</Link>,
+          },
+        ],
+      },
+      baseSettings,
     ];
   };
 
@@ -146,22 +180,17 @@ const PlatformLayout: React.FC = () => {
       {/* Sidebar */}
       <aside
         className={cn(
-          "bg-slate-900 text-slate-300 flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300",
+          "bg-white border-r border-gray-200 flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300",
           collapsed ? "w-16" : "w-64"
         )}
       >
         {/* Brand */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
-          <Link to="/platform" className="flex items-center gap-2 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
-              P
+        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-100">
+          <Link to="/" className="flex items-center gap-2 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
+              D
             </div>
-            {!collapsed && (
-              <div className="flex flex-col">
-                <span className="font-bold text-lg text-white tracking-tight leading-none">Delexy</span>
-                <span className="text-[10px] text-sky-400 font-semibold uppercase tracking-wider">Platform Admin</span>
-              </div>
-            )}
+            {!collapsed && <span className="font-bold text-xl text-slate-900 tracking-tight">Delexy</span>}
           </Link>
         </div>
 
@@ -169,10 +198,9 @@ const PlatformLayout: React.FC = () => {
         <div className="flex-1 overflow-y-auto py-4 px-2 custom-scrollbar">
           <AntMenu
             mode="inline"
-            theme="dark"
             selectedKeys={[location.pathname]}
             items={getMenuItems() as MenuProps['items']}
-            className="bg-slate-900 border-none"
+            className="border-none"
             inlineCollapsed={collapsed}
           />
         </div>
@@ -185,7 +213,7 @@ const PlatformLayout: React.FC = () => {
           <div className="flex items-center gap-4">
             <AntButton
               type="text"
-              icon={collapsed ? <Lucide.PanelLeftOpen size={16} /> : <Lucide.PanelLeftClose size={16} />}
+              icon={collapsed ? <Lucide.Menu size={20} /> : <Lucide.ChevronLeft size={20} />}
               onClick={() => setCollapsed(!collapsed)}
               className="text-lg w-10 h-10 flex items-center justify-center"
             />
@@ -216,14 +244,14 @@ const PlatformLayout: React.FC = () => {
           </div>
         </header>
 
-        {/* Scrollable Content */}
+        {/* Scrollable Content - Native body scrolling */}
         <main className="flex-1 p-6 md:p-8 mt-12">
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb
                 items={[
                   {
-                    title: <Link to="/platform" className="px-1">
+                    title: <Link to="/" className="px-1">
                       <Lucide.Home size={14} className="h-full text-gray-500 hover:text-sky-600 transition-colors" />
                     </Link>
                   },
@@ -253,4 +281,4 @@ const PlatformLayout: React.FC = () => {
   );
 };
 
-export default PlatformLayout;
+export default UserLayout;

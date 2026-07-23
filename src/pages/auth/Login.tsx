@@ -1,28 +1,97 @@
-import React from 'react';
-import { Input as AntInput, Button as AntButton, Checkbox as AntCheckbox, Divider as AntDivider } from 'antd';
+import React, { useState } from 'react';
+import { Input as AntInput, Button as AntButton, Checkbox as AntCheckbox, Divider as AntDivider, Alert as AntAlert, Tag as AntTag } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
 import FormItem from '../../components/common/FormItem';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { control, handleSubmit, formState: { errors } } = useForm({
-    defaultValues: { email: '', password: '', remember: true }
+  const { login, switchUser, allUsers } = useWorkspace();
+  
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const { control, handleSubmit, setValue, formState: { errors } } = useForm({
+    defaultValues: { email: 'john.doe@delexy.com', password: 'password123', remember: true }
   });
 
-  const onFinish = (values: any) => {
-    console.log('Login values:', values);
-    // Simulate login and redirect to 2FA or App
-    navigate('/2fa');
+  const onFinish = async (values: any) => {
+    setAuthError(null);
+    setLoading(true);
+    const res = await login(values.email, values.password);
+    setLoading(false);
+
+    if (res.success) {
+      navigate('/dashboard');
+    } else {
+      setAuthError(res.message || 'Login failed.');
+    }
+  };
+
+  const handleQuickPersona = (userId: string, email: string) => {
+    setValue('email', email);
+    switchUser(userId);
+    navigate('/dashboard');
   };
 
   return (
     <div className="w-full">
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h2>
-        <p className="text-slate-500">Please enter your details to sign in to your account.</p>
+        <p className="text-slate-500">Sign in to access your Delexy account and workspaces.</p>
       </div>
+
+      {/* Quick Demo Persona Switcher Card */}
+      <div className="mb-6 p-4 rounded-xl border border-sky-100 bg-sky-50/60">
+        <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 flex items-center gap-1.5">
+          <Lucide.UserCheck size={14} /> Quick Demo Login Personas
+        </div>
+        <div className="flex flex-col gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => handleQuickPersona('usr-1', 'john.doe@delexy.com')}
+            className="flex items-center justify-between p-2 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
+          >
+            <div>
+              <span className="font-semibold text-slate-800">User 1 - John Doe</span>
+              <span className="text-slate-500 block text-[11px]">john.doe@delexy.com</span>
+            </div>
+            {/* <AntTag color="blue">Platform Admin</AntTag> */}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleQuickPersona('usr-2', 'jane.smith@gmail.com')}
+            className="flex items-center justify-between p-2 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
+          >
+            <div>
+              <span className="font-semibold text-slate-800">User 2 - Jane Smith</span>
+              <span className="text-slate-500 block text-[11px]">jane.smith@gmail.com</span>
+            </div>
+            {/* <AntTag color="green">Business Owner</AntTag> */}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleQuickPersona('usr-3', 'robert.t@acmecorp.com')}
+            className="flex items-center justify-between p-2 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
+          >
+            <div>
+              <span className="font-semibold text-slate-800">User 3 - Robert Taylor</span>
+              <span className="text-slate-500 block text-[11px]">robert.t@acmecorp.com</span>
+            </div>
+            {/* <AntTag color="orange">Guest / Pending KYC</AntTag> */}
+          </button>
+        </div>
+      </div>
+
+      {authError && (
+        <div className="mb-4">
+          <AntAlert type="error" message={authError} showIcon />
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onFinish)} className="space-y-2">
         <FormItem 
@@ -86,7 +155,7 @@ const Login: React.FC = () => {
         </div>
 
         <div className="mt-4">
-          <AntButton type="primary" htmlType="submit" className="w-full bg-sky-600 hover:bg-sky-700" size="large">
+          <AntButton loading={loading} type="primary" htmlType="submit" className="w-full bg-sky-600 hover:bg-sky-700" size="large">
             Sign In
           </AntButton>
         </div>
