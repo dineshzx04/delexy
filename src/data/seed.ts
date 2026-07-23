@@ -1,51 +1,58 @@
 import { db } from './db';
-import { workspaces } from './mockData/workspaces';
-import { values } from './mockData/attributeValues';
-import { attributes } from './mockData/attributes';
-import { groups } from './mockData/attributeGroups';
-import { categories } from './mockData/categories';
-import { categoryProducts } from './mockData/categoryProducts';
-import { userProducts } from './mockData/userProducts';
-import { userProductReviews } from './mockData/userProductReviews';
-import { rfqs } from './mockData/rfqs';
+import {
+  mockUsers,
+  mockUserCredentials,
+  mockAddresses,
+  mockBusinesses,
+  mockBusinessPermissions,
+  mockBusinessRoles,
+  mockBusinessRolePermissions,
+  mockBusinessMemberships,
+  mockPlatformPermissions,
+  mockPlatformRoles,
+  mockPlatformRolePermissions,
+  mockUserPlatformRoles,
+  mockAttributeValues,
+  mockAttributes,
+  mockAttributeGroups,
+  mockCategories,
+} from './mockData';
 
 export const seedDatabase = async () => {
   try {
-    // Check if already seeded by looking for workspaces
-    const count = await db.workspaces.count();
-    if (count > 0) {
+    const userCount = await db.users.count();
+    if (userCount > 0) {
       console.log('Database already seeded.');
       return;
     }
 
-    console.log('Seeding Mock Database...');
+    console.log('Seeding Mock Database with Prefix IDs & Mapped Data (>10 entries per table)...');
 
-    // 1. Seed Workspaces
-    await db.workspaces.bulkAdd(workspaces);
+    // 1. Core Users & Credentials & Addresses
+    await db.users.bulkAdd(mockUsers);
+    await db.userCredentials.bulkAdd(mockUserCredentials);
+    await db.addresses.bulkAdd(mockAddresses);
 
-    // 2. Seed Attribute Values
-    await db.attributeValues.bulkAdd(values);
+    // 2. Platform RBAC
+    await db.platformPermissions.bulkAdd(mockPlatformPermissions);
+    await db.platformRoles.bulkAdd(mockPlatformRoles);
+    await db.platformRolePermissions.bulkAdd(mockPlatformRolePermissions);
+    await db.userPlatformRoles.bulkAdd(mockUserPlatformRoles);
 
-    // 3. Seed Attributes
-    await db.attributes.bulkAdd(attributes as any);
+    // 3. Businesses & Business RBAC & Memberships
+    await db.businesses.bulkAdd(mockBusinesses);
+    await db.businessPermissions.bulkAdd(mockBusinessPermissions);
+    await db.businessRoles.bulkAdd(mockBusinessRoles);
+    await db.businessRolePermissions.bulkAdd(mockBusinessRolePermissions);
+    await db.businessMemberships.bulkAdd(mockBusinessMemberships);
 
-    // 4. Seed Attribute Groups
-    await db.attributeGroups.bulkAdd(groups as any);
+    // 4. Attributes, Values, Groups & Categories
+    await db.attributeValues.bulkAdd(mockAttributeValues);
+    await db.attributes.bulkAdd(mockAttributes);
+    await db.attributeGroups.bulkAdd(mockAttributeGroups);
+    await db.categories.bulkAdd(mockCategories);
 
-    // 5. Seed Categories
-    await db.categories.bulkAdd(categories as any);
-
-    // 6. Seed Platform Products
-    await db.categoryProducts.bulkAdd(categoryProducts as any);
-
-    // 7. Seed User Products & Reviews
-    await db.userProducts.bulkAdd(userProducts as any);
-    await db.userProductReviews.bulkAdd(userProductReviews as any);
-
-    // 8. Seed RFQs
-    await db.rfqs.bulkAdd(rfqs as any);
-
-    console.log('Mock database seeded successfully.');
+    console.log('Mock database seeded successfully with >10 entries per table.');
   } catch (error) {
     console.error('Error seeding database:', error);
   }

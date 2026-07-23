@@ -63,10 +63,7 @@ const PlatformLayout: React.FC = () => {
       type: 'group',
       label: collapsed ? null : 'Personal Settings',
       children: [
-        { key: '/profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> },
-        { key: '/settings/account', icon: <Lucide.Settings size={16} />, label: <Link to="/settings/account">Account</Link> },
-        { key: '/settings/security', icon: <Lucide.ShieldCheck size={16} />, label: <Link to="/settings/security">Security</Link> },
-        { key: '/settings/sessions', icon: <Lucide.Monitor size={16} />, label: <Link to="/settings/sessions">Sessions</Link> },
+        { key: '/profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> }, 
       ]
     };
     return [

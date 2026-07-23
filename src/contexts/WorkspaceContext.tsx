@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, type ReactNode } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../data/db';
 
 export type WorkspaceType = 'individual' | 'tenant' | 'platform';
 
-export interface Workspace {
+export interface DynamicWorkspace {
   id: string;
   name: string;
   type: WorkspaceType;
@@ -10,19 +12,38 @@ export interface Workspace {
 }
 
 interface WorkspaceContextProps {
-  workspaces: Workspace[];
-  activeWorkspace: Workspace;
+  workspaces: DynamicWorkspace[];
+  activeWorkspace: DynamicWorkspace;
   switchWorkspace: (id: string) => void;
 }
-
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../data/db';
 
 const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(undefined);
 
 export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const workspaces = useLiveQuery(() => db.workspaces.toArray()) || [];
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('org-1'); // Default to ABC Engineering
+  const currentUser = useLiveQuery(() => db.users.get('user-1'));
+  const memberships = useLiveQuery(() => db.businessMemberships.where('user_id').equals('user-1').toArray()) || [];
+  const businesses = useLiveQuery(() => db.businesses.toArray()) || [];
+
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string>('personal');
+
+  // Build workspaces array dynamically
+  const workspaces: DynamicWorkspace[] = [
+    {
+      id: 'personal',
+      name: currentUser?.full_name ? `${currentUser.full_name} (Personal)` : 'Personal Account',
+      type: 'individual',
+      role: 'Owner',
+    },
+    ...memberships.map((m) => {
+      const biz = businesses.find((b) => b.id === m.business_id);
+      return {
+        id: m.business_id,
+        name: biz ? biz.name : `Business (${m.business_id})`,
+        type: 'tenant' as WorkspaceType,
+        role: m.status === 'FROZEN_BY_PLATFORM' ? 'Frozen' : 'Member',
+      };
+    }),
+  ];
 
   const activeWorkspace = workspaces.find((ws) => ws.id === activeWorkspaceId) || workspaces[0];
 
@@ -30,7 +51,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     setActiveWorkspaceId(id);
   };
 
-  if (!workspaces.length || !activeWorkspace) return null; // Wait for seed
+  if (!workspaces.length || !activeWorkspace) return null;
 
   return (
     <WorkspaceContext.Provider value={{ workspaces, activeWorkspace, switchWorkspace }}>
@@ -46,3 +67,4 @@ export const useWorkspace = () => {
   }
   return context;
 };
+

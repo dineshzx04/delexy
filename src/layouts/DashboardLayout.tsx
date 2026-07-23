@@ -14,21 +14,6 @@ const userMenuItems: MenuProps['items'] = [
     label: <Link to="/profile">Profile</Link>,
   },
   {
-    key: 'account',
-    icon: <Lucide.Settings size={16} />,
-    label: <Link to="/settings/account">Account Settings</Link>,
-  },
-  {
-    key: 'security',
-    icon: <Lucide.ShieldCheck size={16} />,
-    label: <Link to="/settings/security">Security</Link>,
-  },
-  {
-    key: 'sessions',
-    icon: <Lucide.Monitor size={16} />,
-    label: <Link to="/settings/sessions">Active Sessions</Link>,
-  },
-  {
     type: 'divider',
   },
   {
@@ -64,23 +49,14 @@ const DashboardLayout: React.FC = () => {
       label: collapsed ? null : 'Personal Settings',
       children: [
         { key: '/profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> },
-        { key: '/settings/account', icon: <Lucide.Settings size={16} />, label: <Link to="/settings/account">Account</Link> },
-        { key: '/settings/security', icon: <Lucide.ShieldCheck size={16} />, label: <Link to="/settings/security">Security</Link> },
-        { key: '/settings/sessions', icon: <Lucide.Monitor size={16} />, label: <Link to="/settings/sessions">Sessions</Link> },
       ]
     };
-    
+
     const individualMenus = [
       { key: '/dashboard', icon: <Lucide.LayoutDashboard size={16} />, label: <Link to="/dashboard">Dashboard Overview</Link> },
-      { key: '/manufacturer', icon: <Lucide.Factory size={16} />, label: <Link to="/manufacturer">Manufacturer</Link> },
-      { key: '/suppliers', icon: <Lucide.Users size={16} />, label: <Link to="/suppliers">Suppliers</Link> },
-      { key: '/orders', icon: <Lucide.ShoppingCart size={16} />, label: <Link to="/orders">Orders</Link> },
-      { type: 'divider' },
-      { key: '/products', icon: <Lucide.Package size={16} />, label: <Link to="/products">Products</Link> },
       { key: '/marketplace/catalog', icon: <Lucide.Store size={16} />, label: <Link to="/marketplace/catalog">Global Marketplace</Link> },
-      { type: 'divider' },
-      { key: '/create-organization', icon: <Lucide.Building2 size={16} />, label: <Link to="/create-organization">Create Organization</Link> },
-      { key: '/join-organization', icon: <Lucide.Users size={16} />, label: <Link to="/join-organization">Join Organization</Link> },
+      { key: '/products', icon: <Lucide.Package size={16} />, label: <Link to="/products">Products</Link> },
+      { key: '/orders', icon: <Lucide.ShoppingCart size={16} />, label: <Link to="/orders">Orders</Link> },
       { type: 'divider' },
       { key: '/rfqs/outbound', icon: <Lucide.FileText size={16} />, label: <Link to="/rfqs/outbound">My RFQs</Link> },
       { key: '/rfqs/inbound', icon: <Lucide.Inbox size={16} />, label: <Link to="/rfqs/inbound">Received RFQs</Link> },
@@ -117,7 +93,7 @@ const DashboardLayout: React.FC = () => {
   const getSelectedKey = () => {
     const path = location.pathname;
     const knownRoutes: string[] = [];
-    
+
     const extractKeys = (items: any[]) => {
       items.forEach(item => {
         if (!item) return;
@@ -129,14 +105,14 @@ const DashboardLayout: React.FC = () => {
         }
       });
     };
-    
+
     extractKeys(getMenuItems());
     knownRoutes.sort((a, b) => b.length - a.length);
 
     for (const route of knownRoutes) {
       if (path.startsWith(route)) return route;
     }
-    
+
     return '/dashboard';
   };
 
