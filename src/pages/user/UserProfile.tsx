@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  Form as AntForm,
   Input as AntInput,
   Button as AntButton,
   Avatar as AntAvatar,
@@ -8,12 +7,12 @@ import {
   Select as AntSelect,
   Tag as AntTag,
   Modal as AntModal,
-  Radio as AntRadio,
-  Popconfirm as AntPopconfirm,
   message as antMessage
 } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useForm, Controller } from 'react-hook-form';
+import FormItem from '../../components/common/FormItem';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -36,12 +35,24 @@ export interface CompactEmailDisplay {
   isVerified: boolean;
 }
 
+interface PersonalInfoFormValues {
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
+  department: string;
+  phone: string;
+  timezone: string;
+}
+
+interface AddEmailFormValues {
+  email: string;
+}
+
 const UserProfile: React.FC = () => {
   const { currentUserId } = useWorkspace();
   const targetUserId = currentUserId || 'usr-1';
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [addForm] = AntForm.useForm();
 
   const breadcrumbs = React.useMemo(() => [
     { title: <Link to="/profile" className="text-gray-900 font-semibold cursor-default pointer-events-none">User Profile</Link> }
@@ -144,42 +155,65 @@ const UserProfile: React.FC = () => {
   const businessEmails = (liveBusinessEmails && liveBusinessEmails.length > 0) ? liveBusinessEmails : fallbackBusinessEmails;
   const totalEmailsCount = individualEmails.length + businessEmails.length;
 
-  // 4. Query Business Memberships & Business IDs from Dexie DB
-  const liveMemberships = useLiveQuery(
-    async () => {
-      const memberships = await db.businessMemberships.where('user_id').equals(targetUserId).toArray();
-      const allBusinesses = await db.businesses.toArray();
-      return memberships.map((m) => {
-        const bizObj = allBusinesses.find((b) => b.id === m.business_id);
-        return {
-          id: m.id,
-          businessId: m.business_id,
-          businessName: bizObj?.name || 'Business',
-          role: m.membership_type,
-          status: m.status,
-        };
+  // React Hook Form for Personal Information
+  const {
+    control: profileControl,
+    handleSubmit: handleProfileSubmit,
+    reset: resetProfileForm,
+    formState: { errors: profileErrors }
+  } = useForm<PersonalInfoFormValues>({
+    defaultValues: {
+      firstName: userRecord?.first_name || 'John',
+      lastName: userRecord?.last_name || 'Doe',
+      jobTitle: 'Procurement Director',
+      department: 'Operations',
+      phone: '+1 (555) 000-0000',
+      timezone: 'utc',
+    }
+  });
+
+  useEffect(() => {
+    if (userRecord) {
+      resetProfileForm({
+        firstName: userRecord.first_name || 'John',
+        lastName: userRecord.last_name || 'Doe',
+        jobTitle: 'Procurement Director',
+        department: 'Operations',
+        phone: '+1 (555) 000-0000',
+        timezone: 'utc',
       });
-    },
-    [targetUserId]
-  );
+    }
+  }, [userRecord, resetProfileForm]);
 
-  const fallbackMemberships = React.useMemo(() => {
-    const memberships = mockBusinessMemberships.filter((bm) => bm.user_id === targetUserId);
-    return memberships.map((m) => {
-      const bizObj = mockBusinesses.find((b) => b.id === m.business_id);
-      return {
-        id: m.id,
-        businessId: m.business_id,
-        businessName: bizObj?.name || 'Business',
-        role: m.membership_type,
-        status: m.status,
-      };
-    });
-  }, [targetUserId]);
+  // React Hook Form for Add Secondary Email Modal
+  const {
+    control: emailControl,
+    handleSubmit: handleEmailSubmit,
+    reset: resetEmailForm,
+    formState: { errors: emailErrors }
+  } = useForm<AddEmailFormValues>({
+    defaultValues: { email: '' }
+  });
 
-  const membershipsList = (liveMemberships && liveMemberships.length > 0) ? liveMemberships : fallbackMemberships;
+  // ACTION 1: Save Profile Changes
+  const onSaveProfile = async (data: PersonalInfoFormValues) => {
+    try {
+      if (userRecord?.id) {
+        await db.users.update(userRecord.id, {
+          first_name: data.firstName,
+          last_name: data.lastName,
+          full_name: `${data.firstName} ${data.lastName}`,
+          updated_at: new Date().toISOString(),
+        });
+        antMessage.success('Profile information saved successfully!');
+      }
+    } catch (err) {
+      console.error(err);
+      antMessage.error('Failed to save profile changes.');
+    }
+  };
 
-  // ACTION 1: Make Email Primary
+  // ACTION 2: Make Email Primary
   const handleMakePrimary = async (item: CompactEmailDisplay) => {
     try {
       const now = new Date().toISOString();
@@ -225,11 +259,13 @@ const UserProfile: React.FC = () => {
       console.error(err);
       antMessage.error('Failed to change primary email.');
     }
-  };  // ACTION 2: Add New Individual Secondary Email
-  const handleAddEmailSubmit = async (values: { email: string }) => {
+  };
+
+  // ACTION 3: Add New Individual Secondary Email
+  const onAddEmailSubmit = async (data: AddEmailFormValues) => {
     try {
       const now = new Date().toISOString();
-      const inputEmail = values.email.trim().toLowerCase();
+      const inputEmail = data.email.trim().toLowerCase();
       const allDbEmails = await db.emails.toArray();
       let emailObj = allDbEmails.find((e) => e.email.toLowerCase() === inputEmail);
 
@@ -261,43 +297,10 @@ const UserProfile: React.FC = () => {
 
       antMessage.success(`Added secondary individual email: ${inputEmail}`);
       setIsAddModalOpen(false);
-      addForm.resetFields();
+      resetEmailForm();
     } catch (err) {
       console.error(err);
       antMessage.error('Failed to add email address.');
-    }
-  };
-
-  // ACTION 3: Remove Email
-  const handleRemoveEmail = async (item: CompactEmailDisplay) => {
-    try {
-      if (item.type === 'PRIMARY') {
-        antMessage.warning('Cannot remove primary email. Set another email as primary first.');
-        return;
-      }
-
-      const allDbEmails = await db.emails.toArray();
-      const emailObj = allDbEmails.find((e) => e.email.toLowerCase() === item.email.toLowerCase());
-      if (!emailObj) return;
-
-      if (item.type === 'SECONDARY') {
-        const uEmails = await db.userEmails.where('user_id').equals(targetUserId).toArray();
-        const match = uEmails.find((ue) => ue.email_id === emailObj.id);
-        if (match) {
-          await db.userEmails.delete(match.id);
-        }
-      } else if (item.type === 'BUSINESS') {
-        const bEmails = await db.businessEmails.toArray();
-        const match = bEmails.find((be) => be.email_id === emailObj.id);
-        if (match) {
-          await db.businessEmails.delete(match.id);
-        }
-      }
-
-      antMessage.success(`Removed ${item.email}`);
-    } catch (err) {
-      console.error(err);
-      antMessage.error('Failed to remove email address.');
     }
   };
 
@@ -308,7 +311,13 @@ const UserProfile: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900 mb-1">My Profile</h1>
           <p className="text-gray-500">Manage your personal information and preferences.</p>
         </div>
-        <AntButton type="primary" className="bg-sky-600 hover:bg-sky-700">Save Changes</AntButton>
+        <AntButton
+          type="primary"
+          onClick={handleProfileSubmit(onSaveProfile)}
+          className="bg-sky-600 hover:bg-sky-700 font-medium"
+        >
+          Save Changes
+        </AntButton>
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">
@@ -338,51 +347,73 @@ const UserProfile: React.FC = () => {
               <Lucide.User size={18} className="text-gray-400" />
             </div>
             <div className="p-6">
-              <AntForm
-                layout="vertical"
-                key={userRecord?.id}
-                initialValues={{
-                  firstName: userRecord?.first_name || 'John',
-                  lastName: userRecord?.last_name || 'Doe',
-                  email: primaryEmailItem?.email || 'john.personal@gmail.com',
-                  jobTitle: 'Procurement Director',
-                  department: 'Operations'
-                }}
-              >
+              <form onSubmit={handleProfileSubmit(onSaveProfile)} className="space-y-2">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                  <AntForm.Item label="First Name" name="firstName" rules={[{ required: true }]}>
-                    <AntInput />
-                  </AntForm.Item>
-                  <AntForm.Item label="Last Name" name="lastName" rules={[{ required: true }]}>
-                    <AntInput />
-                  </AntForm.Item>
+                  <FormItem label="First Name" required error={profileErrors.firstName?.message}>
+                    <Controller
+                      name="firstName"
+                      control={profileControl}
+                      rules={{ required: 'First name is required' }}
+                      render={({ field }) => (
+                        <AntInput {...field} status={profileErrors.firstName ? 'error' : ''} />
+                      )}
+                    />
+                  </FormItem>
+
+                  <FormItem label="Last Name" required error={profileErrors.lastName?.message}>
+                    <Controller
+                      name="lastName"
+                      control={profileControl}
+                      rules={{ required: 'Last name is required' }}
+                      render={({ field }) => (
+                        <AntInput {...field} status={profileErrors.lastName ? 'error' : ''} />
+                      )}
+                    />
+                  </FormItem>
                 </div>
 
-                <AntForm.Item label="Primary Email Address" name="email" rules={[{ required: true, type: 'email' }]}>
-                  <AntInput disabled />
-                </AntForm.Item>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
-                  <AntForm.Item label="Job Title" name="jobTitle">
-                    <AntInput />
-                  </AntForm.Item>
-                  <AntForm.Item label="Department" name="department">
-                    <AntInput />
-                  </AntForm.Item>
+                  <FormItem label="Job Title" error={profileErrors.jobTitle?.message}>
+                    <Controller
+                      name="jobTitle"
+                      control={profileControl}
+                      render={({ field }) => <AntInput {...field} />}
+                    />
+                  </FormItem>
+
+                  <FormItem label="Department" error={profileErrors.department?.message}>
+                    <Controller
+                      name="department"
+                      control={profileControl}
+                      render={({ field }) => <AntInput {...field} />}
+                    />
+                  </FormItem>
                 </div>
 
-                <AntForm.Item label="Phone Number" name="phone">
-                  <AntInput placeholder="+1 (555) 000-0000" />
-                </AntForm.Item>
+                <FormItem label="Phone Number" error={profileErrors.phone?.message}>
+                  <Controller
+                    name="phone"
+                    control={profileControl}
+                    render={({ field }) => (
+                      <AntInput {...field} placeholder="+1 (555) 000-0000" />
+                    )}
+                  />
+                </FormItem>
 
-                <AntForm.Item label="Timezone" name="timezone" initialValue="utc">
-                  <AntSelect>
-                    <Option value="utc">UTC (Universal Coordinated Time)</Option>
-                    <Option value="est">EST (Eastern Standard Time)</Option>
-                    <Option value="pst">PST (Pacific Standard Time)</Option>
-                  </AntSelect>
-                </AntForm.Item>
-              </AntForm>
+                <FormItem label="Timezone">
+                  <Controller
+                    name="timezone"
+                    control={profileControl}
+                    render={({ field }) => (
+                      <AntSelect {...field} className="w-full">
+                        <Option value="utc">UTC (Universal Coordinated Time)</Option>
+                        <Option value="est">EST (Eastern Standard Time)</Option>
+                        <Option value="pst">PST (Pacific Standard Time)</Option>
+                      </AntSelect>
+                    )}
+                  />
+                </FormItem>
+              </form>
             </div>
           </div>
 
@@ -512,27 +543,29 @@ const UserProfile: React.FC = () => {
         open={isAddModalOpen}
         onCancel={() => {
           setIsAddModalOpen(false);
-          addForm.resetFields();
+          resetEmailForm();
         }}
         footer={null}
         destroyOnClose
       >
-        <AntForm
-          form={addForm}
-          layout="vertical"
-          onFinish={handleAddEmailSubmit}
-          className="mt-4 space-y-4"
-        >
-          <AntForm.Item
-            label="Email Address"
-            name="email"
-            rules={[
-              { required: true, message: 'Please enter an email address' },
-              { type: 'email', message: 'Please enter a valid email address' },
-            ]}
-          >
-            <AntInput placeholder="e.g. john.secondary@gmail.com" />
-          </AntForm.Item>
+        <form onSubmit={handleEmailSubmit(onAddEmailSubmit)} className="mt-4 space-y-4">
+          <FormItem label="Email Address" required error={emailErrors.email?.message}>
+            <Controller
+              name="email"
+              control={emailControl}
+              rules={{
+                required: 'Please enter an email address',
+                pattern: { value: /^\S+@\S+$/i, message: 'Please enter a valid email address' }
+              }}
+              render={({ field }) => (
+                <AntInput
+                  {...field}
+                  placeholder="e.g. john.secondary@gmail.com"
+                  status={emailErrors.email ? 'error' : ''}
+                />
+              )}
+            />
+          </FormItem>
 
           <p className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-md border border-slate-200">
             This email address will be linked to your individual user profile as a secondary recovery email.
@@ -544,7 +577,7 @@ const UserProfile: React.FC = () => {
               Add Secondary Email
             </AntButton>
           </div>
-        </AntForm>
+        </form>
       </AntModal>
     </div>
   );
