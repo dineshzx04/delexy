@@ -167,7 +167,7 @@ const UserLayout: React.FC = () => {
             mode="inline"
             selectedKeys={[location.pathname]}
             items={getMenuItems() as MenuProps['items']}
-            className="border-none text-slate-700"
+            className="border-none text-slate-700 w-auto"
             inlineCollapsed={collapsed}
           />
         </div>

@@ -169,7 +169,7 @@ const BusinessLayout: React.FC = () => {
             theme="dark"
             selectedKeys={[location.pathname]}
             items={getMenuItems() as MenuProps['items']}
-            className="border-none bg-transparent"
+            className="border-none bg-transparent w-auto"
             inlineCollapsed={collapsed}
           />
         </div>

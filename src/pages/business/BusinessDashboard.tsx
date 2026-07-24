@@ -54,7 +54,7 @@ const BusinessDashboard: React.FC = () => {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            <Link to={`/business/${currentBizId}/members`}>
+            <Link to={`/b/members`}>
               <Button size="large" type="primary" icon={<Lucide.UserPlus size={18} />} className="bg-indigo-600 hover:bg-indigo-500 border-none font-semibold shadow-sm">
                 Manage Team
               </Button>
