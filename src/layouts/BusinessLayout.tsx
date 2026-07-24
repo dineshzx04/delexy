@@ -113,13 +113,19 @@ const BusinessLayout: React.FC = () => {
     label: (
       <div
         onClick={() => handleWorkspaceSwitch(w.id)}
-        className="flex items-center justify-between gap-4 py-1.5 min-w-[220px] cursor-pointer"
+        className="flex items-center justify-between gap-4 py-2 min-w-[240px] cursor-pointer"
       >
         <div className="flex flex-col">
           <span className="font-semibold text-slate-800 text-sm">{w.name}</span>
-          <span className="text-xs text-slate-500 capitalize">{w.type} • Role: {w.role}</span>
+          {w.email && (
+            <span className="text-xs text-indigo-700 font-mono flex items-center gap-1 mt-0.5">
+              <Lucide.Mail size={12} className="text-indigo-600 shrink-0" />
+              {w.email}
+            </span>
+          )}
+          <span className="text-[11px] text-slate-500 capitalize mt-0.5">{w.type} • Role: {w.role}</span>
         </div>
-        {w.id === activeWorkspace.id && <Lucide.Check size={16} className="text-indigo-600" />}
+        {w.id === activeWorkspace.id && <Lucide.Check size={16} className="text-indigo-600 shrink-0" />}
       </div>
     ),
   }));
@@ -190,12 +196,22 @@ const BusinessLayout: React.FC = () => {
           <div className="flex items-center gap-4">
             {/* Workspace Switcher Dropdown */}
             <AntDropdown menu={{ items: workspaceMenuItems }} trigger={['click']} placement="bottomRight">
-              <div className="flex items-center gap-2 cursor-pointer hover:bg-indigo-50/60 py-1.5 px-3 rounded-lg transition-colors border border-indigo-200 bg-white">
-                <Lucide.Building2 size={16} className="text-indigo-600" />
-                <span className="font-semibold text-sm text-slate-800 hidden md:block">{activeWorkspace.name}</span>
-                <span className="text-[11px] text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded font-medium hidden md:block uppercase">
-                  {activeWorkspace.role}
-                </span>
+              <div className="flex items-center gap-2.5 cursor-pointer hover:bg-indigo-50/60 py-1.5 px-3 rounded-lg transition-colors border border-indigo-200 bg-white">
+                <Lucide.Building2 size={16} className="text-indigo-600 flex-shrink-0" />
+                <div className="hidden md:flex flex-col leading-tight text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-sm text-slate-800">{activeWorkspace.name}</span>
+                    <span className="text-[10px] text-indigo-700 bg-indigo-100 px-1.5 py-0.2 rounded font-medium uppercase">
+                      {activeWorkspace.role}
+                    </span>
+                  </div>
+                  {activeWorkspace.email && (
+                    <span className="text-[11px] text-slate-500 font-normal flex items-center gap-1">
+                      <Lucide.Mail size={11} className="text-indigo-600" />
+                      {activeWorkspace.email}
+                    </span>
+                  )}
+                </div>
                 <Lucide.ChevronDown size={14} className="text-slate-400" />
               </div>
             </AntDropdown>
@@ -205,9 +221,12 @@ const BusinessLayout: React.FC = () => {
             <AntDropdown menu={{ items: userMenuItems }} trigger={['click']} placement="bottomRight">
               <div className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 pr-3 rounded-full transition-colors border border-slate-200">
                 <AntAvatar style={{ backgroundColor: '#4f46e5' }}>{userInitials}</AntAvatar>
-                <div className="hidden md:flex flex-col leading-tight">
+                <div className="hidden md:flex flex-col leading-tight text-left">
                   <span className="text-sm font-semibold text-slate-800">{currentUser?.full_name || 'User'}</span>
-                  <span className="text-xs text-slate-500">{activeWorkspace.role}</span>
+                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                    <Lucide.Mail size={11} className="text-slate-400" />
+                    {activeWorkspace.email}
+                  </span>
                 </div>
               </div>
             </AntDropdown>

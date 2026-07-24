@@ -2,7 +2,7 @@ export const mockAuthCredentials = [
   {
     id: 'uc-1',
     credential_type: 'INDIVIDUAL',
-    email_id: 'em-101',
+    email_id: null,
     user_id: 'usr-1',
     business_membership_id: null,
     password: '123456',
@@ -13,7 +13,7 @@ export const mockAuthCredentials = [
   {
     id: 'uc-2',
     credential_type: 'INDIVIDUAL',
-    email_id: 'em-103',
+    email_id: null,
     user_id: 'usr-2',
     business_membership_id: null,
     password: '123456',

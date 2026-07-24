@@ -39,6 +39,7 @@ const Login: React.FC = () => {
   const handleQuickPersona = async (email: string) => {
     setValue('email', email);
     setValue('password', '123456');
+    setAuthError(null);
     setLoading(true);
     const res = await login(email, '123456');
     setLoading(false);
@@ -48,6 +49,8 @@ const Login: React.FC = () => {
       } else {
         navigate('/user/dashboard');
       }
+    } else {
+      setAuthError(res.message || 'Login failed.');
     }
   };
 
@@ -60,8 +63,18 @@ const Login: React.FC = () => {
 
       {/* Quick Demo Persona Switcher Card */}
       <div className="mb-6 p-4 rounded-xl border border-sky-100 bg-sky-50/60">
-        <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 flex items-center gap-1.5">
-          <Lucide.UserCheck size={14} /> Quick Demo Login Credentials
+        <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Lucide.UserCheck size={14} /> Quick Demo Login Credentials
+          </div>
+          <Link
+            to="/db"
+            target="_blank"
+            className="flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900 bg-sky-100 hover:bg-sky-200 px-2 py-0.5 rounded transition-colors"
+          >
+            <Lucide.Database size={12} />
+            <span>DB Manager</span>
+          </Link>
         </div>
         <div className="flex flex-col gap-2 text-xs">
           <button

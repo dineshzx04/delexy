@@ -10,24 +10,35 @@ import { mockBusinessEmails } from './businessEmails';
 import { mockUserAddresses } from './userAddresses';
 import { mockUserIdentifications } from './userIdentifications';
 
+let seedPromise: Promise<void> | null = null;
+
 export const seedDatabase = async () => {
-  try {
-    const userCount = await db.users.count();
-    if (userCount === 0) {
-      console.log('Seeding mock users database...');
-      await db.users.bulkAdd(mockUsers as any);
-      await db.emails.bulkAdd(mockEmails as any);
-      await db.userEmails.bulkAdd(mockUserEmails as any);
-      await db.authCredentials.bulkAdd(mockAuthCredentials as any);
-      await db.businesses.bulkAdd(mockBusinesses as any);
-      await db.businessMemberships.bulkAdd(mockBusinessMemberships as any);
-      await db.userBusinessRoles.bulkAdd(mockUserBusinessRoles as any);
-      await db.businessEmails.bulkAdd(mockBusinessEmails as any);
-      await db.userAddresses.bulkAdd(mockUserAddresses as any);
-      await db.userIdentifications.bulkAdd(mockUserIdentifications as any);
-      console.log('Mock users database seeded successfully.');
-    }
-  } catch (error) {
-    console.error('Error seeding database:', error);
+  if (seedPromise) {
+    return seedPromise;
   }
+
+  seedPromise = (async () => {
+    try {
+      const userCount = await db.users.count();
+      if (userCount === 0) {
+        console.log('Seeding mock users database...');
+        await db.users.bulkPut(mockUsers as any);
+        await db.emails.bulkPut(mockEmails as any);
+        await db.userEmails.bulkPut(mockUserEmails as any);
+        await db.authCredentials.bulkPut(mockAuthCredentials as any);
+        await db.businesses.bulkPut(mockBusinesses as any);
+        await db.businessMemberships.bulkPut(mockBusinessMemberships as any);
+        await db.userBusinessRoles.bulkPut(mockUserBusinessRoles as any);
+        await db.businessEmails.bulkPut(mockBusinessEmails as any);
+        await db.userAddresses.bulkPut(mockUserAddresses as any);
+        await db.userIdentifications.bulkPut(mockUserIdentifications as any);
+        console.log('Mock users database seeded successfully.');
+      }
+    } catch (error) {
+      console.error('Error seeding database:', error);
+    }
+  })();
+
+  return seedPromise;
 };
+

@@ -36,7 +36,7 @@ export interface UserEmail {
 export interface AuthCredential {
   id: string;
   credential_type: 'INDIVIDUAL' | 'BUSINESS';
-  email_id: string;
+  email_id?: string | null;
   user_id: string;
   business_membership_id?: string | null;
   password?: string;
@@ -136,7 +136,7 @@ export class DelexyDatabase extends Dexie {
   categories!: Table<Category, string>;
 
   constructor() {
-    super('DelexyDB');
+    super('DelexyDBd');
     this.version(4).stores({
       users: 'id, app_user_id',
       emails: 'id, email',

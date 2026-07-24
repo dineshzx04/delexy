@@ -27,6 +27,7 @@ import BusinessEmailsPage from './pages/business/BusinessEmailsPage';
 import BusinessSettings from './pages/business/BusinessSettings';
 import BusinessRFQs from './pages/business/BusinessRFQs';
 import BusinessProducts from './pages/business/BusinessProducts';
+import IndexedDbManager from './pages/dev/IndexedDbManager';
 
 const RootRedirect: React.FC = () => {
   const { activeWorkspace, currentCredential } = useWorkspace();
@@ -60,6 +61,7 @@ const App: React.FC = () => {
         <Routes>
           {/* Public & Landing Routes */}
           <Route path="/landing" element={<LandingPage />} />
+          <Route path="/db" element={<IndexedDbManager />} />
 
           {/* Public Auth Routes */}
           <Route element={<PublicAuthGuard />}>

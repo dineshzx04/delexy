@@ -126,35 +126,41 @@ const PlatformLayout: React.FC = () => {
     label: (
       <div
         onClick={() => handleWorkspaceSwitch(w.id)}
-        className="flex items-center justify-between gap-4 py-1 min-w-[200px]"
+        className="flex items-center justify-between gap-4 py-2 min-w-[240px]"
       >
         <div className="flex flex-col">
-          <span className="font-semibold text-slate-800">{w.name}</span>
-          <span className="text-xs text-slate-500">Role: {w.role}</span>
+          <span className="font-semibold text-slate-800 text-sm">{w.name}</span>
+          {w.email && (
+            <span className="text-xs text-sky-700 font-mono flex items-center gap-1 mt-0.5">
+              <Lucide.Mail size={12} className="text-sky-600 shrink-0" />
+              {w.email}
+            </span>
+          )}
+          <span className="text-[11px] text-slate-500 capitalize mt-0.5">{w.type} • Role: {w.role}</span>
         </div>
-        {w.id === activeWorkspace.id && <Lucide.Check size={16} className="text-sky-600" />}
+        {w.id === activeWorkspace.id && <Lucide.Check size={16} className="text-sky-600 shrink-0" />}
       </div>
     ),
   }));
 
   const userInitials = currentUser?.first_name && currentUser?.last_name
     ? `${currentUser.first_name[0]}${currentUser.last_name[0]}`
-    : 'US';
+    : (currentUser?.full_name ? currentUser.full_name.substring(0, 2).toUpperCase() : 'US');
 
   return (
-    <div className="min-h-screen flex bg-gray-50 text-slate-900 antialiased">
+    <div className="min-h-screen flex bg-gray-50 text-gray-900 antialiased">
       {/* Sidebar */}
       <aside
         className={cn(
-          "bg-slate-900 text-slate-300 flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300",
+          "bg-slate-900 text-slate-100 border-r border-slate-800 flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300",
           collapsed ? "w-16" : "w-64"
         )}
       >
         {/* Brand */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800">
-          <Link to="/platform" className="flex items-center gap-2 overflow-hidden">
-            <div className="w-8 h-8 rounded-lg bg-sky-500 text-white flex items-center justify-center font-bold text-lg flex-shrink-0">
-              P
+        <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 bg-slate-950">
+          <Link to="/platform" className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-md">
+              <Lucide.ShieldCheck size={20} />
             </div>
             {!collapsed && (
               <div className="flex flex-col">
@@ -194,11 +200,21 @@ const PlatformLayout: React.FC = () => {
           <div className="flex items-center gap-4">
             {/* Workspace Switcher */}
             <AntDropdown menu={{ items: workspaceMenuItems }} trigger={['click']} placement="bottomRight">
-              <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 py-1.5 px-3 rounded-md transition-colors border border-gray-200 bg-white">
-                <span className="font-semibold text-sm text-gray-800 hidden md:block">{activeWorkspace.name}</span>
-                <span className="text-xs text-sky-600 bg-sky-50 px-2 py-0.5 rounded font-medium border border-sky-100 hidden md:block">
-                  {activeWorkspace.type.toUpperCase()}
-                </span>
+              <div className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-50 py-1.5 px-3 rounded-md transition-colors border border-gray-200 bg-white">
+                <div className="hidden md:flex flex-col leading-tight text-left">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-semibold text-sm text-gray-800">{activeWorkspace.name}</span>
+                    <span className="text-[10px] text-sky-600 bg-sky-50 px-1.5 py-0.2 rounded font-medium border border-sky-100 uppercase">
+                      {activeWorkspace.type}
+                    </span>
+                  </div>
+                  {activeWorkspace.email && (
+                    <span className="text-[11px] text-gray-500 font-normal flex items-center gap-1">
+                      <Lucide.Mail size={11} className="text-sky-600" />
+                      {activeWorkspace.email}
+                    </span>
+                  )}
+                </div>
                 <Lucide.ChevronDown size={14} className="text-gray-400" />
               </div>
             </AntDropdown>
@@ -207,9 +223,12 @@ const PlatformLayout: React.FC = () => {
             <AntDropdown menu={{ items: userMenuItems }} trigger={['click']} placement="bottomRight">
               <div className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 p-1 pr-3 rounded-full transition-colors border border-transparent hover:border-gray-200">
                 <AntAvatar style={{ backgroundColor: '#0284c7' }}>{userInitials}</AntAvatar>
-                <div className="hidden md:flex flex-col leading-tight">
+                <div className="hidden md:flex flex-col leading-tight text-left">
                   <span className="text-sm font-semibold text-gray-800">{currentUser?.full_name || 'User'}</span>
-                  <span className="text-xs text-gray-500">{activeWorkspace.role}</span>
+                  <span className="text-xs text-gray-500 flex items-center gap-1">
+                    <Lucide.Mail size={11} className="text-gray-400" />
+                    {activeWorkspace.email}
+                  </span>
                 </div>
               </div>
             </AntDropdown>
