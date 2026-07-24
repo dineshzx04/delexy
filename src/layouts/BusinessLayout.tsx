@@ -27,6 +27,11 @@ const BusinessLayout: React.FC = () => {
   const breadcrumbItems = customBreadcrumbs || [];
 
   const userMenuItems: MenuProps['items'] = [
+    {
+      key: 'business-profile',
+      icon: <Lucide.Building2 size={16} />,
+      label: <Link to="/b/profile">Business Profile</Link>,
+    },
     ...(currentCredential?.credential_type !== 'BUSINESS'
       ? [
           {
@@ -34,11 +39,11 @@ const BusinessLayout: React.FC = () => {
             icon: <Lucide.User size={16} />,
             label: <Link to="/user/profile">Personal Profile</Link>,
           },
-          {
-            type: 'divider' as const,
-          },
         ]
       : []),
+    {
+      type: 'divider' as const,
+    },
     {
       key: 'logout',
       icon: <Lucide.LogOut size={16} className="text-red-500" />,
@@ -68,6 +73,11 @@ const BusinessLayout: React.FC = () => {
           label: <Link to="/b/dashboard">Business Dashboard</Link>,
         },
         {
+          key: '/b/profile',
+          icon: <Lucide.Building2 size={18} />,
+          label: <Link to="/b/profile">Business Profile</Link>,
+        },
+        {
           key: '/b/members',
           icon: <Lucide.Users size={18} />,
           label: <Link to="/b/members">Team Members</Link>,
@@ -84,8 +94,8 @@ const BusinessLayout: React.FC = () => {
         },
         {
           key: '/b/settings',
-          icon: <Lucide.Building size={18} />,
-          label: <Link to="/b/settings">Business Profile</Link>,
+          icon: <Lucide.Settings size={18} />,
+          label: <Link to="/b/settings">Business Settings</Link>,
         },
       ],
     },

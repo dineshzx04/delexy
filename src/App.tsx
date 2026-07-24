@@ -27,6 +27,7 @@ import BusinessEmailsPage from './pages/business/BusinessEmailsPage';
 import BusinessSettings from './pages/business/BusinessSettings';
 import BusinessRFQs from './pages/business/BusinessRFQs';
 import BusinessProducts from './pages/business/BusinessProducts';
+import BusinessProfile from './pages/business/BusinessProfile';
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 
 const RootRedirect: React.FC = () => {
@@ -90,6 +91,7 @@ const App: React.FC = () => {
               <Route element={<ErrorBoundary />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<BusinessDashboard />} />
+                <Route path="profile" element={<BusinessProfile />} />
                 <Route path="members" element={<BusinessMembers />} />
                 <Route path="roles" element={<BusinessRoles />} />
                 <Route path="emails" element={<BusinessEmailsPage />} />
