@@ -1,0 +1,35 @@
+export const mockAuthCredentials = [
+  {
+    id: 'uc-1',
+    credential_type: 'INDIVIDUAL',
+    email_id: 'em-101',
+    user_id: 'usr-1',
+    business_membership_id: null,
+    password: '123456',
+    auth_type: 'PASSWORD',
+    created_at: '2026-01-15T08:00:00.000Z',
+    updated_at: '2026-01-15T08:00:00.000Z',
+  },
+  {
+    id: 'uc-2',
+    credential_type: 'INDIVIDUAL',
+    email_id: 'em-103',
+    user_id: 'usr-2',
+    business_membership_id: null,
+    password: '123456',
+    auth_type: 'PASSWORD',
+    created_at: '2026-01-15T08:00:00.000Z',
+    updated_at: '2026-01-15T08:00:00.000Z',
+  },
+  {
+    id: 'uc-3',
+    credential_type: 'BUSINESS',
+    email_id: 'em-105',
+    user_id: 'usr-1',
+    business_membership_id: "bm-4",
+    password: '123456',
+    auth_type: 'PASSWORD',
+    created_at: '2026-01-15T08:00:00.000Z',
+    updated_at: '2026-01-15T08:00:00.000Z',
+  }
+];

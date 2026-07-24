@@ -37,7 +37,7 @@ CREATE TABLE emails (
 
 
 -- =================================================================
--- 2. CORE USERS & PLATFORM ROLES
+-- 2. CORE USERS
 -- =================================================================
 CREATE TABLE users (
     id CHAR(36) NOT NULL,
@@ -61,47 +61,6 @@ CREATE TABLE users (
     PRIMARY KEY (id),
     UNIQUE KEY uq_users_app_user_id (app_user_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE platform_permissions (
-    id CHAR(36) NOT NULL,
-    code VARCHAR(100) NOT NULL, -- e.g., 'platform.businesses.view'
-    description TEXT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    PRIMARY KEY (id),
-    UNIQUE KEY uq_platform_perm_code (code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE platform_roles (
-    id CHAR(36) NOT NULL,
-    name VARCHAR(100) NOT NULL, -- e.g., 'Platform Super Admin'
-    description TEXT NULL,
-    is_system_default BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    PRIMARY KEY (id),
-    UNIQUE KEY uq_platform_role_name (name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE platform_role_permissions (
-    role_id CHAR(36) NOT NULL,
-    permission_id CHAR(36) NOT NULL,
-    
-    PRIMARY KEY (role_id, permission_id),
-    CONSTRAINT fk_prp_role FOREIGN KEY (role_id) REFERENCES platform_roles (id) ON DELETE CASCADE,
-    CONSTRAINT fk_prp_perm FOREIGN KEY (permission_id) REFERENCES platform_permissions (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-CREATE TABLE user_platform_roles (
-    user_id CHAR(36) NOT NULL,
-    role_id CHAR(36) NOT NULL,
-    granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    
-    PRIMARY KEY (user_id, role_id),
-    CONSTRAINT fk_upr_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-    CONSTRAINT fk_upr_role FOREIGN KEY (role_id) REFERENCES platform_roles (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
 
 -- =================================================================
 -- 3. MULTI-ID / KYC IDENTIFICATIONS
@@ -221,6 +180,46 @@ CREATE TABLE business_role_permissions (
     PRIMARY KEY (role_id, permission_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+CREATE TABLE platform_permissions (
+    id CHAR(36) NOT NULL,
+    code VARCHAR(100) NOT NULL, -- e.g., 'platform.businesses.view'
+    description TEXT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_platform_perm_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE platform_roles (
+    id CHAR(36) NOT NULL,
+    name VARCHAR(100) NOT NULL, -- e.g., 'Platform Super Admin'
+    description TEXT NULL,
+    is_system_default BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_platform_role_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE platform_role_permissions (
+    role_id CHAR(36) NOT NULL,
+    permission_id CHAR(36) NOT NULL,
+    
+    PRIMARY KEY (role_id, permission_id),
+    CONSTRAINT fk_prp_role FOREIGN KEY (role_id) REFERENCES platform_roles (id) ON DELETE CASCADE,
+    CONSTRAINT fk_prp_perm FOREIGN KEY (permission_id) REFERENCES platform_permissions (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_platform_roles (
+    user_id CHAR(36) NOT NULL,
+    role_id CHAR(36) NOT NULL,
+    granted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    
+    PRIMARY KEY (user_id, role_id),
+    CONSTRAINT fk_upr_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_upr_role FOREIGN KEY (role_id) REFERENCES platform_roles (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- =================================================================
 -- 6. BUSINESS MEMBERSHIPS (The Core Bridge)
