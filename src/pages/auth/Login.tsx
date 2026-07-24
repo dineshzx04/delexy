@@ -8,13 +8,13 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { login, switchUser, allUsers } = useWorkspace();
+  const { login } = useWorkspace();
   
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const { control, handleSubmit, setValue, formState: { errors } } = useForm({
-    defaultValues: { email: 'john.doe@delexy.com', password: 'password123', remember: true }
+    defaultValues: { email: 'john.personal@gmail.com', password: '123456', remember: true }
   });
 
   const onFinish = async (values: any) => {
@@ -23,17 +23,32 @@ const Login: React.FC = () => {
     const res = await login(values.email, values.password);
     setLoading(false);
 
-    if (res.success) {
-      navigate('/dashboard');
+    if (res.success && res.targetWorkspace) {
+      if (res.targetWorkspace.type === 'tenant') {
+        navigate('/b/dashboard');
+      } else {
+        navigate('/user/dashboard');
+      }
+    } else if (res.success) {
+      navigate('/user/dashboard');
     } else {
       setAuthError(res.message || 'Login failed.');
     }
   };
 
-  const handleQuickPersona = (userId: string, email: string) => {
+  const handleQuickPersona = async (email: string) => {
     setValue('email', email);
-    switchUser(userId);
-    navigate('/dashboard');
+    setValue('password', '123456');
+    setLoading(true);
+    const res = await login(email, '123456');
+    setLoading(false);
+    if (res.success && res.targetWorkspace) {
+      if (res.targetWorkspace.type === 'tenant') {
+        navigate('/b/dashboard');
+      } else {
+        navigate('/user/dashboard');
+      }
+    }
   };
 
   return (
@@ -46,43 +61,43 @@ const Login: React.FC = () => {
       {/* Quick Demo Persona Switcher Card */}
       <div className="mb-6 p-4 rounded-xl border border-sky-100 bg-sky-50/60">
         <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 flex items-center gap-1.5">
-          <Lucide.UserCheck size={14} /> Quick Demo Login Personas
+          <Lucide.UserCheck size={14} /> Quick Demo Login Credentials
         </div>
         <div className="flex flex-col gap-2 text-xs">
           <button
             type="button"
-            onClick={() => handleQuickPersona('usr-1', 'john.doe@delexy.com')}
-            className="flex items-center justify-between p-2 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
+            onClick={() => handleQuickPersona('john.personal@gmail.com')}
+            className="flex items-center justify-between p-2.5 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
           >
             <div>
-              <span className="font-semibold text-slate-800">User 1 - John Doe</span>
-              <span className="text-slate-500 block text-[11px]">john.doe@delexy.com</span>
+              <span className="font-semibold text-slate-800">John Doe (INDIVIDUAL Credential - uc-1)</span>
+              <span className="text-slate-500 block text-[11px]">john.personal@gmail.com</span>
             </div>
-            {/* <AntTag color="blue">Platform Admin</AntTag> */}
+            <AntTag color="blue">Personal + All Businesses</AntTag>
           </button>
 
           <button
             type="button"
-            onClick={() => handleQuickPersona('usr-2', 'jane.smith@gmail.com')}
-            className="flex items-center justify-between p-2 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
+            onClick={() => handleQuickPersona('john.c@gmail.com')}
+            className="flex items-center justify-between p-2.5 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
           >
             <div>
-              <span className="font-semibold text-slate-800">User 2 - Jane Smith</span>
-              <span className="text-slate-500 block text-[11px]">jane.smith@gmail.com</span>
+              <span className="font-semibold text-slate-800">John Doe (BUSINESS Credential - uc-3)</span>
+              <span className="text-slate-500 block text-[11px]">john.c@gmail.com</span>
             </div>
-            {/* <AntTag color="green">Business Owner</AntTag> */}
+            <AntTag color="purple">Business C ONLY</AntTag>
           </button>
 
           <button
             type="button"
-            onClick={() => handleQuickPersona('usr-3', 'robert.t@acmecorp.com')}
-            className="flex items-center justify-between p-2 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
+            onClick={() => handleQuickPersona('alice.personal@gmail.com')}
+            className="flex items-center justify-between p-2.5 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
           >
             <div>
-              <span className="font-semibold text-slate-800">User 3 - Robert Taylor</span>
-              <span className="text-slate-500 block text-[11px]">robert.t@acmecorp.com</span>
+              <span className="font-semibold text-slate-800">Alice Smith (INDIVIDUAL Credential - uc-2)</span>
+              <span className="text-slate-500 block text-[11px]">alice.personal@gmail.com</span>
             </div>
-            {/* <AntTag color="orange">Guest / Pending KYC</AntTag> */}
+            <AntTag color="green">Personal + Business C Owner</AntTag>
           </button>
         </div>
       </div>
@@ -155,7 +170,7 @@ const Login: React.FC = () => {
         </div>
 
         <div className="mt-4">
-          <AntButton loading={loading} type="primary" htmlType="submit" className="w-full bg-sky-600 hover:bg-sky-700" size="large">
+          <AntButton loading={loading} type="primary" htmlType="submit" className="w-full bg-sky-600 hover:bg-sky-700 font-medium" size="large">
             Sign In
           </AntButton>
         </div>
