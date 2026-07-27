@@ -10,12 +10,23 @@ const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useWorkspace();
   
+  const [activeTab, setActiveTab] = useState<'global' | 'business'>('global');
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const { control, handleSubmit, setValue, formState: { errors } } = useForm({
     defaultValues: { email: 'john.personal@gmail.com', password: '123456', remember: true }
   });
+
+  const handleTabChange = (tab: 'global' | 'business') => {
+    setActiveTab(tab);
+    setAuthError(null);
+    if (tab === 'global') {
+      setValue('email', 'john.personal@gmail.com');
+    } else {
+      setValue('email', 'john.c@gmail.com');
+    }
+  };
 
   const onFinish = async (values: any) => {
     setAuthError(null);
@@ -56,62 +67,135 @@ const Login: React.FC = () => {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
-        <h2 className="text-3xl font-bold text-slate-900 mb-2">Welcome Back</h2>
-        <p className="text-slate-500">Sign in to access your Delexy account and workspaces.</p>
+      {/* Mode Switcher Tabs */}
+      <div className="flex bg-slate-100 p-1 rounded-xl mb-6 border border-slate-200">
+        <button
+          type="button"
+          onClick={() => handleTabChange('global')}
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'global'
+              ? 'bg-white text-sky-700 shadow-sm border border-slate-200/80'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Lucide.Globe size={16} className={activeTab === 'global' ? 'text-sky-600' : 'text-slate-400'} />
+          <span>Global Account Login</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => handleTabChange('business')}
+          className={`flex-1 py-2.5 px-3 rounded-lg text-xs md:text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+            activeTab === 'business'
+              ? 'bg-white text-purple-700 shadow-sm border border-slate-200/80'
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Lucide.Building2 size={16} className={activeTab === 'business' ? 'text-purple-600' : 'text-slate-400'} />
+          <span>Business Member Login</span>
+        </button>
       </div>
 
+      {/* Header Context */}
+      <div className="mb-6">
+        {activeTab === 'global' ? (
+          <>
+            <h2 className="text-3xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+              Global Sign In
+            </h2>
+            <p className="text-slate-500 text-sm">
+              Sign in with your primary individual account to access personal features and switch across all your linked businesses.
+            </p>
+          </>
+        ) : (
+          <>
+            <h2 className="text-3xl font-bold text-slate-900 mb-2 flex items-center gap-2">
+              Business Member Sign In
+            </h2>
+            <p className="text-slate-500 text-sm">
+              Direct sign-in for enterprise employees and organization staff tied strictly to a single business workspace.
+            </p>
+          </>
+        )}
+      </div>
+
+      {/* Context Scope Info Banner */}
+      {activeTab === 'global' ? (
+        <div className="mb-6 p-3.5 rounded-xl bg-sky-50/80 border border-sky-200 text-sky-900 text-xs flex items-start gap-2.5 shadow-sm">
+          <Lucide.Info size={18} className="text-sky-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold text-sky-950 block mb-0.5">Multi-Workspace Access Scope</span>
+            Authenticating with an <span className="font-semibold underline decoration-sky-400">INDIVIDUAL Credential</span> grants full access to your personal account dashboard and allows seamless workspace switching between all your associated companies.
+          </div>
+        </div>
+      ) : (
+        <div className="mb-6 p-3.5 rounded-xl bg-purple-50/80 border border-purple-200 text-purple-900 text-xs flex items-start gap-2.5 shadow-sm">
+          <Lucide.ShieldCheck size={18} className="text-purple-600 shrink-0 mt-0.5" />
+          <div>
+            <span className="font-bold text-purple-950 block mb-0.5">Single Business Context Scope</span>
+            Authenticating with a <span className="font-semibold underline decoration-purple-400">BUSINESS Credential</span> locks your active session directly to that specific tenant workspace without personal profile switching.
+          </div>
+        </div>
+      )}
+
       {/* Quick Demo Persona Switcher Card */}
-      <div className="mb-6 p-4 rounded-xl border border-sky-100 bg-sky-50/60">
-        <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 flex items-center justify-between">
+      <div className={`mb-6 p-4 rounded-xl border ${activeTab === 'global' ? 'border-sky-100 bg-sky-50/40' : 'border-purple-100 bg-purple-50/40'}`}>
+        <div className={`text-xs font-semibold uppercase tracking-wider mb-2.5 flex items-center justify-between ${activeTab === 'global' ? 'text-sky-800' : 'text-purple-800'}`}>
           <div className="flex items-center gap-1.5">
-            <Lucide.UserCheck size={14} /> Quick Demo Login Credentials
+            <Lucide.UserCheck size={14} /> Quick Demo {activeTab === 'global' ? 'Global' : 'Business'} Credentials
           </div>
           <Link
             to="/db"
             target="_blank"
-            className="flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900 bg-sky-100 hover:bg-sky-200 px-2 py-0.5 rounded transition-colors"
+            className={`flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded transition-colors ${
+              activeTab === 'global' 
+                ? 'text-sky-700 hover:text-sky-900 bg-sky-100 hover:bg-sky-200' 
+                : 'text-purple-700 hover:text-purple-900 bg-purple-100 hover:bg-purple-200'
+            }`}
           >
             <Lucide.Database size={12} />
             <span>DB Manager</span>
           </Link>
         </div>
         <div className="flex flex-col gap-2 text-xs">
-          <button
-            type="button"
-            onClick={() => handleQuickPersona('john.personal@gmail.com')}
-            className="flex items-center justify-between p-2.5 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
-          >
-            <div>
-              <span className="font-semibold text-slate-800">John Doe (INDIVIDUAL Credential - uc-1)</span>
-              <span className="text-slate-500 block text-[11px]">john.personal@gmail.com</span>
-            </div>
-            <AntTag color="blue">Personal + All Businesses</AntTag>
-          </button>
+          {activeTab === 'global' ? (
+            <>
+              <button
+                type="button"
+                onClick={() => handleQuickPersona('john.personal@gmail.com')}
+                className="flex items-center justify-between p-2.5 rounded-lg bg-white hover:bg-sky-100/70 border border-sky-200 transition-colors text-left shadow-2xs"
+              >
+                <div>
+                  <span className="font-semibold text-slate-800 block">John Doe (INDIVIDUAL Credential - uc-1)</span>
+                  <span className="text-slate-500 block text-[11px]">john.personal@gmail.com</span>
+                </div>
+                <AntTag color="blue" className="m-0 font-medium">Personal + All Businesses</AntTag>
+              </button>
 
-          <button
-            type="button"
-            onClick={() => handleQuickPersona('john.c@gmail.com')}
-            className="flex items-center justify-between p-2.5 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
-          >
-            <div>
-              <span className="font-semibold text-slate-800">John Doe (BUSINESS Credential - uc-3)</span>
-              <span className="text-slate-500 block text-[11px]">john.c@gmail.com</span>
-            </div>
-            <AntTag color="purple">Business C ONLY</AntTag>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleQuickPersona('alice.personal@gmail.com')}
-            className="flex items-center justify-between p-2.5 rounded bg-white hover:bg-sky-100 border border-sky-200 transition-colors text-left"
-          >
-            <div>
-              <span className="font-semibold text-slate-800">Alice Smith (INDIVIDUAL Credential - uc-2)</span>
-              <span className="text-slate-500 block text-[11px]">alice.personal@gmail.com</span>
-            </div>
-            <AntTag color="green">Personal + Business C Owner</AntTag>
-          </button>
+              <button
+                type="button"
+                onClick={() => handleQuickPersona('alice.personal@gmail.com')}
+                className="flex items-center justify-between p-2.5 rounded-lg bg-white hover:bg-sky-100/70 border border-sky-200 transition-colors text-left shadow-2xs"
+              >
+                <div>
+                  <span className="font-semibold text-slate-800 block">Alice Smith (INDIVIDUAL Credential - uc-2)</span>
+                  <span className="text-slate-500 block text-[11px]">alice.personal@gmail.com</span>
+                </div>
+                <AntTag color="green" className="m-0 font-medium">Personal + Business C Owner</AntTag>
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleQuickPersona('john.c@gmail.com')}
+              className="flex items-center justify-between p-2.5 rounded-lg bg-white hover:bg-purple-100/70 border border-purple-200 transition-colors text-left shadow-2xs"
+            >
+              <div>
+                <span className="font-semibold text-slate-800 block">John Doe (BUSINESS Credential - uc-3)</span>
+                <span className="text-slate-500 block text-[11px]">john.c@gmail.com</span>
+              </div>
+              <AntTag color="purple" className="m-0 font-medium">Business C ONLY (Single Context)</AntTag>
+            </button>
+          )}
         </div>
       </div>
 
@@ -123,7 +207,7 @@ const Login: React.FC = () => {
 
       <form onSubmit={handleSubmit(onFinish)} className="space-y-2">
         <FormItem 
-          label="Email Address" 
+          label={activeTab === 'global' ? 'Global Email Address' : 'Business Email Address'} 
           required 
           error={errors.email?.message as string}
         >
@@ -139,8 +223,8 @@ const Login: React.FC = () => {
                 {...field} 
                 size="large" 
                 status={errors.email ? 'error' : ''} 
-                prefix={<Lucide.User size={16} className="text-slate-400" />} 
-                placeholder="name@company.com" 
+                prefix={activeTab === 'global' ? <Lucide.User size={16} className="text-slate-400" /> : <Lucide.Mail size={16} className="text-slate-400" />} 
+                placeholder={activeTab === 'global' ? 'john.personal@gmail.com' : 'john.c@gmail.com'} 
               />
             )}
           />
@@ -177,14 +261,24 @@ const Login: React.FC = () => {
               </AntCheckbox>
             )}
           />
-          <Link to="/forgot-password" className="text-sky-600 hover:text-sky-700 font-medium text-sm">
+          <Link to="/forgot-password" className={`${activeTab === 'global' ? 'text-sky-600 hover:text-sky-700' : 'text-purple-600 hover:text-purple-700'} font-medium text-sm`}>
             Forgot password?
           </Link>
         </div>
 
         <div className="mt-4">
-          <AntButton loading={loading} type="primary" htmlType="submit" className="w-full bg-sky-600 hover:bg-sky-700 font-medium" size="large">
-            Sign In
+          <AntButton 
+            loading={loading} 
+            type="primary" 
+            htmlType="submit" 
+            className={`w-full font-medium ${
+              activeTab === 'global' 
+                ? 'bg-sky-600 hover:bg-sky-700' 
+                : 'bg-purple-600 hover:bg-purple-700 border-purple-600'
+            }`} 
+            size="large"
+          >
+            {activeTab === 'global' ? 'Sign In (Global Account)' : 'Sign In (Business Workspace)'}
           </AntButton>
         </div>
       </form>
@@ -202,7 +296,7 @@ const Login: React.FC = () => {
 
       <div className="text-center text-slate-500 mt-8">
         Don't have an account?{' '}
-        <Link to="/register" className="text-sky-600 font-semibold hover:text-sky-700">
+        <Link to="/register" className={`${activeTab === 'global' ? 'text-sky-600 hover:text-sky-700' : 'text-purple-600 hover:text-purple-700'} font-semibold`}>
           Sign up
         </Link>
       </div>
@@ -211,3 +305,4 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+
