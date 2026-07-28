@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, Table, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
@@ -16,7 +16,7 @@ const UserAddresses: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const addresses = useLiveQuery(
-    async () => await db.userAddresses.where('user_id').equals(currentUserId).toArray(),
+    async () => await userDb.userAddresses.where('user_id').equals(currentUserId).toArray(),
     [currentUserId]
   ) || [];
 

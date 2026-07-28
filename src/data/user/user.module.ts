@@ -1,4 +1,3 @@
-import Dexie, { type Table } from 'dexie';
 
 export interface User {
   id: string;
@@ -114,47 +113,4 @@ export interface UserIdentification {
   expiry_date?: string;
   created_at: string;
   updated_at: string;
-}
-
-export interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  isActive: boolean;
-  parentId: string | null;
-  mappedGroupIds: string[];
-  childrenCount?: number;
-}
-
-export class DelexyDatabase extends Dexie {
-  users!: Table<User, string>;
-  emails!: Table<EmailRecord, string>;
-  userEmails!: Table<UserEmail, string>;
-  authCredentials!: Table<AuthCredential, string>;
-  businesses!: Table<Business, string>;
-  businessMemberships!: Table<BusinessMembership, string>;
-  userBusinessRoles!: Table<UserBusinessRole, string>;
-  businessEmails!: Table<BusinessEmail, string>;
-  userAddresses!: Table<UserAddress, string>;
-  userIdentifications!: Table<UserIdentification, string>;
-  categories!: Table<Category, string>;
-
-  constructor() {
-    super('DelexyDBd');
-    this.version(4).stores({
-      users: 'id, app_user_id',
-      emails: 'id, email',
-      userEmails: 'id, user_id, email_id',
-      authCredentials: 'id, email_id, user_id, business_membership_id',
-      businesses: 'id, slug',
-      businessMemberships: 'id, business_id, user_id',
-      userBusinessRoles: 'id, business_id',
-      businessEmails: 'id, business_id, email_id',
-      userAddresses: 'id, user_id',
-      userIdentifications: 'id, user_id',
-      categories: 'id, parentId'
-    });
-  }
-}
-
-export const db = new DelexyDatabase();
+} 

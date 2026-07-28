@@ -10,13 +10,13 @@ import { Link, useParams } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
 
-import { mockBusinesses } from '../../data/businesses';
-import { mockBusinessEmails } from '../../data/businessEmails';
-import { mockEmails } from '../../data/emails';
-import { mockBusinessMemberships } from '../../data/businessMemberships';
-import { mockUsers } from '../../data/users';
+import { mockBusinesses } from '../../data/user/businesses';
+import { mockBusinessEmails } from '../../data/user/businessEmails';
+import { mockEmails } from '../../data/user/emails';
+import { mockBusinessMemberships } from '../../data/user/businessMemberships';
+import { mockUsers } from '../../data/user/users';
 
 const BusinessProfile: React.FC = () => {
   const { businessId: paramBizId } = useParams<{ businessId: string }>();
@@ -31,15 +31,15 @@ const BusinessProfile: React.FC = () => {
 
   // 1. Fetch Business Record from Dexie DB / fallback mock
   const bizRecord = useLiveQuery(
-    async () => await db.businesses.get(currentBizId),
+    async () => await userDb.businesses.get(currentBizId),
     [currentBizId]
   ) || mockBusinesses.find((b) => b.id === currentBizId) || mockBusinesses[0];
 
   // 2. Fetch Business Emails from Dexie DB / fallback mock
   const liveBizEmails = useLiveQuery(
     async () => {
-      const bEmails = await db.businessEmails.where('business_id').equals(currentBizId).toArray();
-      const allEmails = await db.emails.toArray();
+      const bEmails = await userDb.businessEmails.where('business_id').equals(currentBizId).toArray();
+      const allEmails = await userDb.emails.toArray();
 
       return bEmails.map((be) => {
         const emailObj = allEmails.find((e) => e.id === be.email_id);
@@ -74,8 +74,8 @@ const BusinessProfile: React.FC = () => {
   // 3. Fetch Team Members from Dexie DB / fallback mock
   const liveMemberships = useLiveQuery(
     async () => {
-      const memberships = await db.businessMemberships.where('business_id').equals(currentBizId).toArray();
-      const allUsers = await db.users.toArray();
+      const memberships = await userDb.businessMemberships.where('business_id').equals(currentBizId).toArray();
+      const allUsers = await userDb.users.toArray();
 
       return memberships.map((m) => {
         const uObj = allUsers.find((u) => u.id === m.user_id);

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Card, Form, Input, Button, Tag } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
@@ -19,7 +19,7 @@ const BusinessSettings: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const business = useLiveQuery(
-    async () => await db.businesses.get(currentBizId),
+    async () => await userDb.businesses.get(currentBizId),
     [currentBizId]
   );
 

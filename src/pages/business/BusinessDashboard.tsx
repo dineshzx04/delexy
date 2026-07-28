@@ -4,7 +4,7 @@ import { Card, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 const BusinessDashboard: React.FC = () => {
@@ -14,17 +14,17 @@ const BusinessDashboard: React.FC = () => {
   const currentBizId = businessId || activeWorkspace.businessId || activeWorkspace.id;
 
   const business = useLiveQuery(
-    async () => await db.businesses.get(currentBizId),
+    async () => await userDb.businesses.get(currentBizId),
     [currentBizId]
   );
 
   const memberships = useLiveQuery(
-    async () => await db.businessMemberships.where('business_id').equals(currentBizId).toArray(),
+    async () => await userDb.businessMemberships.where('business_id').equals(currentBizId).toArray(),
     [currentBizId]
   ) || [];
 
   const businessEmails = useLiveQuery(
-    async () => await db.businessEmails.where('business_id').equals(currentBizId).toArray(),
+    async () => await userDb.businessEmails.where('business_id').equals(currentBizId).toArray(),
     [currentBizId]
   ) || [];
 

@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Card, Table, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
@@ -19,7 +19,7 @@ const BusinessRoles: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const roles = useLiveQuery(
-    async () => await db.userBusinessRoles.where('business_id').equals(currentBizId).toArray(),
+    async () => await userDb.userBusinessRoles.where('business_id').equals(currentBizId).toArray(),
     [currentBizId]
   ) || [];
 

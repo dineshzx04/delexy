@@ -3,7 +3,7 @@ import { Modal, Button, Input } from 'antd';
 import * as Lucide from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { catalogDb } from '../../data/catelog/catalogDb';
 
 interface CategoryPickerProps {
   value?: string; // Category ID
@@ -14,8 +14,8 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Fetch categories from Dexie
-  const dbCategories = useLiveQuery(() => db.categories.toArray()) || [];
+  // Fetch categories from Catalog Dexie Database
+  const dbCategories = useLiveQuery(() => catalogDb.categories.toArray()) || [];
 
   // State to hold the selected path of category IDs
   const [selectedPath, setSelectedPath] = useState<string[]>([]);

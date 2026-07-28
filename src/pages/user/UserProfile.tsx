@@ -16,14 +16,14 @@ import FormItem from '../../components/common/FormItem';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
 
-import { mockUsers } from '../../data/users';
-import { mockEmails } from '../../data/emails';
-import { mockUserEmails } from '../../data/userEmails';
-import { mockBusinessEmails } from '../../data/businessEmails';
-import { mockBusinesses } from '../../data/businesses';
-import { mockBusinessMemberships } from '../../data/businessMemberships';
+import { mockUsers } from '../../data/user/users';
+import { mockEmails } from '../../data/user/emails';
+import { mockUserEmails } from '../../data/user/userEmails';
+import { mockBusinessEmails } from '../../data/user/businessEmails';
+import { mockBusinesses } from '../../data/user/businesses';
+import { mockBusinessMemberships } from '../../data/user/businessMemberships';
 
 const { Option } = AntSelect;
 
@@ -62,15 +62,15 @@ const UserProfile: React.FC = () => {
 
   // 1. Fetch User Record from Dexie DB or fallback to mockUsers from src/data/users.ts
   const userRecord = useLiveQuery(
-    async () => await db.users.get(targetUserId),
+    async () => await userDb.users.get(targetUserId),
     [targetUserId]
   ) || mockUsers.find((u) => u.id === targetUserId) || mockUsers[0];
 
   // 2. Query User Emails (Primary & Secondary) directly from Dexie DB / mockUserEmails
   const liveUserEmails = useLiveQuery(
     async () => {
-      const uEmails = await db.userEmails.where('user_id').equals(targetUserId).toArray();
-      const allEmails = await db.emails.toArray();
+      const uEmails = await userDb.userEmails.where('user_id').equals(targetUserId).toArray();
+      const allEmails = await userDb.emails.toArray();
 
       return uEmails.map((ue) => {
         const emailObj = allEmails.find((e) => e.id === ue.email_id);
@@ -107,13 +107,13 @@ const UserProfile: React.FC = () => {
   // 3. Query Business Emails & Roles directly from Dexie DB / mockBusinessEmails
   const liveBusinessEmails = useLiveQuery(
     async () => {
-      const memberships = await db.businessMemberships.where('user_id').equals(targetUserId).toArray();
+      const memberships = await userDb.businessMemberships.where('user_id').equals(targetUserId).toArray();
       const bizIds = memberships.map((m) => m.business_id);
 
-      const allBizEmails = await db.businessEmails.toArray();
+      const allBizEmails = await userDb.businessEmails.toArray();
       const userBizEmails = allBizEmails.filter((be) => bizIds.includes(be.business_id));
-      const allEmails = await db.emails.toArray();
-      const allBusinesses = await db.businesses.toArray();
+      const allEmails = await userDb.emails.toArray();
+      const allBusinesses = await userDb.businesses.toArray();
 
       return userBizEmails.map((be) => {
         const emailObj = allEmails.find((e) => e.id === be.email_id);
@@ -199,7 +199,7 @@ const UserProfile: React.FC = () => {
   const onSaveProfile = async (data: PersonalInfoFormValues) => {
     try {
       if (userRecord?.id) {
-        await db.users.update(userRecord.id, {
+        await userDb.users.update(userRecord.id, {
           first_name: data.firstName,
           last_name: data.lastName,
           full_name: `${data.firstName} ${data.lastName}`,
@@ -217,32 +217,32 @@ const UserProfile: React.FC = () => {
   const handleMakePrimary = async (item: CompactEmailDisplay) => {
     try {
       const now = new Date().toISOString();
-      const allDbEmails = await db.emails.toArray();
+      const allDbEmails = await userDb.emails.toArray();
       let targetEmailObj = allDbEmails.find((e) => e.email.toLowerCase() === item.email.toLowerCase());
 
       if (!targetEmailObj) {
         const newEmailId = `em-${Date.now()}`;
         const newRecord = { id: newEmailId, email: item.email.toLowerCase(), created_at: now, updated_at: now };
-        await db.emails.add(newRecord);
+        await userDb.emails.add(newRecord);
         targetEmailObj = newRecord;
       }
 
       if (!targetEmailObj) return;
 
-      const existingUserEmails = await db.userEmails.where('user_id').equals(targetUserId).toArray();
+      const existingUserEmails = await userDb.userEmails.where('user_id').equals(targetUserId).toArray();
       let foundTarget = false;
 
       for (const ue of existingUserEmails) {
         if (ue.email_id === targetEmailObj.id) {
-          await db.userEmails.update(ue.id, { is_primary: true });
+          await userDb.userEmails.update(ue.id, { is_primary: true });
           foundTarget = true;
         } else {
-          await db.userEmails.update(ue.id, { is_primary: false });
+          await userDb.userEmails.update(ue.id, { is_primary: false });
         }
       }
 
       if (!foundTarget) {
-        await db.userEmails.add({
+        await userDb.userEmails.add({
           id: `ue-${Date.now()}`,
           user_id: targetUserId,
           email_id: targetEmailObj.id,
@@ -266,25 +266,25 @@ const UserProfile: React.FC = () => {
     try {
       const now = new Date().toISOString();
       const inputEmail = data.email.trim().toLowerCase();
-      const allDbEmails = await db.emails.toArray();
+      const allDbEmails = await userDb.emails.toArray();
       let emailObj = allDbEmails.find((e) => e.email.toLowerCase() === inputEmail);
 
       if (!emailObj) {
         const newId = `em-${Date.now()}`;
         const newRecord = { id: newId, email: inputEmail, created_at: now, updated_at: now };
-        await db.emails.add(newRecord);
+        await userDb.emails.add(newRecord);
         emailObj = newRecord;
       }
 
       if (!emailObj) return;
 
-      const userEmails = await db.userEmails.where('user_id').equals(targetUserId).toArray();
+      const userEmails = await userDb.userEmails.where('user_id').equals(targetUserId).toArray();
       if (userEmails.some((ue) => ue.email_id === emailObj.id)) {
         antMessage.warning('This email address is already connected to your personal account.');
         return;
       }
 
-      await db.userEmails.add({
+      await userDb.userEmails.add({
         id: `ue-${Date.now()}`,
         user_id: targetUserId,
         email_id: emailObj.id,

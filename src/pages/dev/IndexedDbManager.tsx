@@ -8,7 +8,8 @@ import {
   Spin
 } from 'antd';
 import * as Lucide from 'lucide-react';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
+import { catalogDb } from '../../data/catelog/catalogDb';
 import { seedDatabase } from '../../data/seed';
 
 export interface IDBInfo {
@@ -45,7 +46,7 @@ const IndexedDbManager: React.FC = () => {
           }));
         setDatabases(formatted);
       } else {
-        setDatabases([{ name: db.name, version: db.verno }]);
+        setDatabases([{ name: userDb.name, version: userDb.verno }]);
       }
 
       // 2. Read LocalStorage items
@@ -112,9 +113,9 @@ const IndexedDbManager: React.FC = () => {
     try {
       setLoading(true);
 
-      if (db.name === dbName && db.isOpen()) {
+      if (userDb.name === dbName && userDb.isOpen()) {
         try {
-          db.close();
+          userDb.close();
         } catch (e) {
           console.warn('Closing Dexie database:', e);
         }
@@ -202,14 +203,20 @@ const IndexedDbManager: React.FC = () => {
   const handleReSeed = async () => {
     try {
       setLoading(true);
-      if (!db.isOpen()) {
-        await db.open();
+      if (!userDb.isOpen()) {
+        await userDb.open();
       }
-      for (const t of db.tables) {
+      for (const t of userDb.tables) {
+        await t.clear();
+      }
+      if (!catalogDb.isOpen()) {
+        await catalogDb.open();
+      }
+      for (const t of catalogDb.tables) {
         await t.clear();
       }
       await seedDatabase();
-      antMessage.success('Active database seeded with initial mock data!');
+      antMessage.success('Active databases seeded with initial mock data!');
       await fetchAllStorageData();
     } catch (err: any) {
       console.error('Re-seed error:', err);
@@ -275,7 +282,7 @@ const IndexedDbManager: React.FC = () => {
           ) : (
             <div className="space-y-3">
               {databases.map((item) => {
-                const isActive = item.name === db.name;
+                const isActive = item.name === userDb.name;
                 return (
                   <div
                     key={item.name}

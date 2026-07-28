@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Card, Table, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
@@ -19,11 +19,11 @@ const BusinessEmailsPage: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const businessEmails = useLiveQuery(
-    async () => await db.businessEmails.where('business_id').equals(currentBizId).toArray(),
+    async () => await userDb.businessEmails.where('business_id').equals(currentBizId).toArray(),
     [currentBizId]
   ) || [];
 
-  const emails = useLiveQuery(() => db.emails.toArray()) || [];
+  const emails = useLiveQuery(() => userDb.emails.toArray()) || [];
 
   const data = businessEmails.map((be) => {
     const em = emails.find((e) => e.id === be.email_id);

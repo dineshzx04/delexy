@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Card, Table, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../data/db';
+import { userDb } from '../../data/user/userDb';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
@@ -19,12 +19,12 @@ const BusinessMembers: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const memberships = useLiveQuery(
-    async () => await db.businessMemberships.where('business_id').equals(currentBizId).toArray(),
+    async () => await userDb.businessMemberships.where('business_id').equals(currentBizId).toArray(),
     [currentBizId]
   ) || [];
 
-  const users = useLiveQuery(() => db.users.toArray()) || [];
-  const roles = useLiveQuery(() => db.userBusinessRoles.toArray()) || [];
+  const users = useLiveQuery(() => userDb.users.toArray()) || [];
+  const roles = useLiveQuery(() => userDb.userBusinessRoles.toArray()) || [];
 
   const data = memberships.map((m) => {
     const usr = users.find((u) => u.id === m.user_id);

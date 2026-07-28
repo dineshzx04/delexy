@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, type User, type Business, type AuthCredential } from '../data/db';
+import { userDb, type User, type Business, type AuthCredential } from '../data/user/userDb';
 import { seedDatabase } from '../data/seed';
 
 export type WorkspaceType = 'individual' | 'tenant' | 'platform';
@@ -90,13 +90,13 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   // Live Query 1: Get active auth credential by ID
   const currentCredential = useLiveQuery(
-    async () => (currentCredentialId && dbReady ? await db.authCredentials.get(currentCredentialId) : undefined),
+    async () => (currentCredentialId && dbReady ? await userDb.authCredentials.get(currentCredentialId) : undefined),
     [currentCredentialId, dbReady]
   );
 
   // Live Query 2: Get active user from credential.user_id
   const currentUser = useLiveQuery(
-    async () => (currentCredential?.user_id && dbReady ? await db.users.get(currentCredential.user_id) : undefined),
+    async () => (currentCredential?.user_id && dbReady ? await userDb.users.get(currentCredential.user_id) : undefined),
     [currentCredential?.user_id, dbReady]
   );
 
@@ -104,23 +104,23 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   const isAuthenticated = Boolean(currentCredentialId && currentCredential && currentUser);
   const currentUserId = currentUser?.id || '';
 
-  const allUsers = useLiveQuery(() => (dbReady ? db.users.toArray() : []), [dbReady]) || [];
+  const allUsers = useLiveQuery(() => (dbReady ? userDb.users.toArray() : []), [dbReady]) || [];
 
   // Live Query 3: Business memberships for current user
   const memberships = useLiveQuery(
-    async () => (currentUser && dbReady ? await db.businessMemberships.where('user_id').equals(currentUser.id).toArray() : []),
+    async () => (currentUser && dbReady ? await userDb.businessMemberships.where('user_id').equals(currentUser.id).toArray() : []),
     [currentUser?.id, dbReady]
   ) || [];
 
-  const businesses = useLiveQuery(() => (dbReady ? db.businesses.toArray() : []), [dbReady]) || [];
-  const allEmails = useLiveQuery(() => (dbReady ? db.emails.toArray() : []), [dbReady]) || [];
-  const allUserEmails = useLiveQuery(() => (dbReady ? db.userEmails.toArray() : []), [dbReady]) || [];
-  const allBusinessEmails = useLiveQuery(() => (dbReady ? db.businessEmails.toArray() : []), [dbReady]) || [];
+  const businesses = useLiveQuery(() => (dbReady ? userDb.businesses.toArray() : []), [dbReady]) || [];
+  const allEmails = useLiveQuery(() => (dbReady ? userDb.emails.toArray() : []), [dbReady]) || [];
+  const allUserEmails = useLiveQuery(() => (dbReady ? userDb.userEmails.toArray() : []), [dbReady]) || [];
+  const allBusinessEmails = useLiveQuery(() => (dbReady ? userDb.businessEmails.toArray() : []), [dbReady]) || [];
 
   // Live Query 4: Business membership for business-type credential
   const credentialBusinessMembership = useLiveQuery(
     async () => (currentCredential?.credential_type === 'BUSINESS' && currentCredential?.business_membership_id && dbReady
-      ? await db.businessMemberships.get(currentCredential.business_membership_id)
+      ? await userDb.businessMemberships.get(currentCredential.business_membership_id)
       : undefined),
     [currentCredential?.business_membership_id, dbReady]
   );
@@ -259,7 +259,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     const m = memberships.find((bm) => bm.business_id === workspaceId);
     if (!m || !m.require_switch_password) return true;
 
-    const cred = await db.authCredentials
+    const cred = await userDb.authCredentials
       .where('business_membership_id').equals(m.id)
       .first();
 
@@ -272,12 +272,12 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       const cleanInput = input.trim();
       const cleanEmail = cleanInput.toLowerCase();
 
-      // 1. Search by email address in db.emails
-      const emailRecord = await db.emails.where('email').equalsIgnoreCase(cleanEmail).first();
+      // 1. Search by email address in userDb.emails
+      const emailRecord = await userDb.emails.where('email').equalsIgnoreCase(cleanEmail).first();
 
       if (emailRecord) {
         // 1a. Check if this is a MEMBER email or has BUSINESS credentials
-        const allBizCreds = await db.authCredentials
+        const allBizCreds = await userDb.authCredentials
           .filter((c) => c.credential_type === 'BUSINESS')
           .toArray();
 
@@ -287,7 +287,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
           if (cred.email_id === emailRecord.id) {
             matchingBizCreds.push(cred);
           } else if (cred.business_membership_id) {
-            const bm = await db.businessMemberships.get(cred.business_membership_id);
+            const bm = await userDb.businessMemberships.get(cred.business_membership_id);
             if (bm && bm.email_id === emailRecord.id) {
               matchingBizCreds.push(cred);
             }
@@ -306,13 +306,13 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
 
           const targetCred = matchingBizCreds[0];
           const bm = targetCred.business_membership_id
-            ? await db.businessMemberships.get(targetCred.business_membership_id)
+            ? await userDb.businessMemberships.get(targetCred.business_membership_id)
             : undefined;
 
-          const targetBiz = bm ? await db.businesses.get(bm.business_id) : undefined;
+          const targetBiz = bm ? await userDb.businesses.get(bm.business_id) : undefined;
           const bizName = targetBiz?.name || 'Business Workspace';
 
-          const targetUser = await db.users.get(targetCred.user_id);
+          const targetUser = await userDb.users.get(targetCred.user_id);
           if (!targetUser || !targetUser.is_active) {
             return { success: false, message: 'User account is inactive or disabled.' };
           }
@@ -336,8 +336,8 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
           return { success: true, targetWorkspace };
         }
 
-        // 1b. Check if this email belongs to a user in db.userEmails (Branch A)
-        const userEmailRecord = await db.userEmails.where('email_id').equals(emailRecord.id).first();
+        // 1b. Check if this email belongs to a user in userDb.userEmails (Branch A)
+        const userEmailRecord = await userDb.userEmails.where('email_id').equals(emailRecord.id).first();
         if (userEmailRecord) {
           // STRICT RULE: Only Primary Email can be used for individual login!
           if (!userEmailRecord.is_primary) {
@@ -348,7 +348,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
           }
 
           // Find INDIVIDUAL credential for this user
-          const indCred = await db.authCredentials
+          const indCred = await userDb.authCredentials
             .where('user_id').equals(userEmailRecord.user_id)
             .filter((c) => c.credential_type === 'INDIVIDUAL')
             .first();
@@ -358,7 +358,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
               return { success: false, message: 'Invalid password provided.' };
             }
 
-            const targetUser = await db.users.get(indCred.user_id);
+            const targetUser = await userDb.users.get(indCred.user_id);
             if (!targetUser || !targetUser.is_active) {
               return { success: false, message: 'User account is inactive or disabled.' };
             }
@@ -382,11 +382,11 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
 
       // 2. Search by User ID or App User ID (e.g. USR-984201 or usr-1)
       const userByIdentifier =
-        (await db.users.where('app_user_id').equalsIgnoreCase(cleanInput).first()) ||
-        (await db.users.get(cleanInput));
+        (await userDb.users.where('app_user_id').equalsIgnoreCase(cleanInput).first()) ||
+        (await userDb.users.get(cleanInput));
 
       if (userByIdentifier) {
-        const indCred = await db.authCredentials
+        const indCred = await userDb.authCredentials
           .where('user_id').equals(userByIdentifier.id)
           .filter((c) => c.credential_type === 'INDIVIDUAL')
           .first();
@@ -403,12 +403,12 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
           setCurrentCredentialId(indCred.id);
           setSelectedWorkspaceId('personal');
 
-          const primaryUserEmailRecord = await db.userEmails
+          const primaryUserEmailRecord = await userDb.userEmails
             .where('user_id').equals(userByIdentifier.id)
             .filter((ue) => ue.is_primary)
             .first();
           const primaryEmailObj = primaryUserEmailRecord
-            ? await db.emails.get(primaryUserEmailRecord.email_id)
+            ? await userDb.emails.get(primaryUserEmailRecord.email_id)
             : undefined;
 
           const targetWorkspace: DynamicWorkspace = {
@@ -445,7 +445,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   };
 
   const switchUser = (userId: string) => {
-    db.authCredentials.where('user_id').equals(userId).first().then((cred) => {
+    userDb.authCredentials.where('user_id').equals(userId).first().then((cred) => {
       if (cred) {
         setCurrentCredentialId(cred.id);
       } else {
