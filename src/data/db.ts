@@ -39,6 +39,7 @@ export interface AuthCredential {
   email_id?: string | null;
   user_id: string;
   business_membership_id?: string | null;
+  switch_password?: string | null;
   password?: string;
   auth_type: string;
   created_at: string;
@@ -64,8 +65,11 @@ export interface BusinessMembership {
   business_id: string;
   user_id: string;
   membership_type: 'OWNER' | 'MEMBER';
+  email_id?: string | null;
   role_id?: string | null;
   status: string;
+  require_switch_password?: boolean;
+  deletedAt?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -141,7 +145,7 @@ export class DelexyDatabase extends Dexie {
       users: 'id, app_user_id',
       emails: 'id, email',
       userEmails: 'id, user_id, email_id',
-      authCredentials: 'id, email_id, user_id',
+      authCredentials: 'id, email_id, user_id, business_membership_id',
       businesses: 'id, slug',
       businessMemberships: 'id, business_id, user_id',
       userBusinessRoles: 'id, business_id',

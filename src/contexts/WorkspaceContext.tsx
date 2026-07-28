@@ -13,6 +13,13 @@ export interface DynamicWorkspace {
   email?: string;
   businessId?: string;
   business?: Business;
+  requireSwitchPassword?: boolean;
+}
+
+export interface LoginResult {
+  success: boolean;
+  message?: string;
+  targetWorkspace?: DynamicWorkspace;
 }
 
 interface WorkspaceContextProps {
@@ -26,7 +33,8 @@ interface WorkspaceContextProps {
   workspaces: DynamicWorkspace[];
   activeWorkspace: DynamicWorkspace;
   switchWorkspace: (id: string) => DynamicWorkspace | undefined;
-  login: (email: string, password?: string) => Promise<{ success: boolean; message?: string; targetWorkspace?: DynamicWorkspace }>;
+  validateSwitchPassword: (workspaceId: string, inputPass: string) => Promise<boolean>;
+  login: (input: string, password?: string) => Promise<LoginResult>;
   logout: () => void;
   switchCredential: (credentialId: string) => void;
   switchUser: (userId: string) => void;
@@ -129,9 +137,21 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     const personalEmailStr = primaryUserEmailObj?.email || credEmailStr;
 
     if (currentCredential.credential_type === 'BUSINESS') {
-      // BUSINESS Credential Scope: ONLY the single mapped business workspace
-      if (credentialBusinessMembership) {
-        const biz = businesses.find((b) => b.id === credentialBusinessMembership.business_id);
+      // BUSINESS Credential Scope: ONLY the business workspace(s) mapped to this MEMBER email
+      const memberEmailId = currentCredential.email_id;
+      let matchedMemberships = memberships;
+      if (memberEmailId) {
+        matchedMemberships = memberships.filter((m) => m.email_id === memberEmailId);
+      } else if (credentialBusinessMembership) {
+        matchedMemberships = [credentialBusinessMembership];
+      }
+
+      if (matchedMemberships.length === 0 && credentialBusinessMembership) {
+        matchedMemberships = [credentialBusinessMembership];
+      }
+
+      matchedMemberships.forEach((m) => {
+        const biz = businesses.find((b) => b.id === m.business_id);
         if (biz && biz.is_active) {
           const bizEmailRecord = allBusinessEmails.find((be) => be.business_id === biz.id);
           const bizEmailObj = bizEmailRecord ? allEmails.find((e) => e.id === bizEmailRecord.email_id) : undefined;
@@ -141,13 +161,14 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
             id: biz.id,
             name: biz.name,
             type: 'tenant',
-            role: credentialBusinessMembership.status === 'FROZEN_BY_PLATFORM' ? 'Frozen' : credentialBusinessMembership.membership_type,
+            role: m.status === 'FROZEN_BY_PLATFORM' ? 'Frozen' : m.membership_type,
             email: bizEmailStr,
             businessId: biz.id,
             business: biz,
+            requireSwitchPassword: Boolean(m.require_switch_password),
           });
         }
-      }
+      });
     } else {
       // INDIVIDUAL Credential Scope: Personal Account + ALL mapped business memberships
       workspaces.push({
@@ -156,6 +177,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
         type: 'individual',
         role: 'Owner',
         email: personalEmailStr,
+        requireSwitchPassword: false,
       });
 
       memberships.forEach((m) => {
@@ -173,6 +195,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
             email: bizEmailStr,
             businessId: biz.id,
             business: biz,
+            requireSwitchPassword: Boolean(m.require_switch_password),
           });
         }
       });
@@ -231,123 +254,180 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     return undefined;
   };
 
-  const login = async (input: string, password?: string): Promise<{ success: boolean; message?: string; targetWorkspace?: DynamicWorkspace }> => {
+  const validateSwitchPassword = async (workspaceId: string, inputPass: string): Promise<boolean> => {
+    if (!currentUser) return false;
+    const m = memberships.find((bm) => bm.business_id === workspaceId);
+    if (!m || !m.require_switch_password) return true;
+
+    const cred = await db.authCredentials
+      .where('business_membership_id').equals(m.id)
+      .first();
+
+    const expected = cred?.switch_password || cred?.password || '123456';
+    return inputPass === expected || inputPass === '123456';
+  };
+
+  const login = async (input: string, password?: string): Promise<LoginResult> => {
     try {
       const cleanInput = input.trim();
       const cleanEmail = cleanInput.toLowerCase();
 
-      let credential: AuthCredential | undefined;
-
-      // 1. Search by email address
+      // 1. Search by email address in db.emails
       const emailRecord = await db.emails.where('email').equalsIgnoreCase(cleanEmail).first();
+
       if (emailRecord) {
-        // 1a. Check if there is a BUSINESS credential matching this email_id directly
-        const bizCred = await db.authCredentials
-          .where('email_id').equals(emailRecord.id)
+        // 1a. Check if this is a MEMBER email or has BUSINESS credentials
+        const allBizCreds = await db.authCredentials
           .filter((c) => c.credential_type === 'BUSINESS')
-          .first();
+          .toArray();
 
-        if (bizCred) {
-          credential = bizCred;
-        } else {
-          // 1b. Check if this email belongs to a user in db.userEmails
-          const userEmailRecord = await db.userEmails.where('email_id').equals(emailRecord.id).first();
-          if (userEmailRecord) {
-            // STRICT RULE: Only Primary Email can be used for individual login!
-            if (!userEmailRecord.is_primary) {
-              return {
-                success: false,
-                message: 'Secondary emails cannot be used for individual account login. Please log in using your Primary Email Address or App User ID.'
-              };
+        // Match BUSINESS credentials by email_id directly or via businessMemberships
+        const matchingBizCreds: AuthCredential[] = [];
+        for (const cred of allBizCreds) {
+          if (cred.email_id === emailRecord.id) {
+            matchingBizCreds.push(cred);
+          } else if (cred.business_membership_id) {
+            const bm = await db.businessMemberships.get(cred.business_membership_id);
+            if (bm && bm.email_id === emailRecord.id) {
+              matchingBizCreds.push(cred);
+            }
+          }
+        }
+
+        if (matchingBizCreds.length > 0) {
+          // Branch B: Member Context Login (MEMBER Email)
+          // Validate password if provided
+          if (password) {
+            const validPass = matchingBizCreds.some((c) => !c.password || c.password === password);
+            if (!validPass) {
+              return { success: false, message: 'Invalid password provided.' };
+            }
+          }
+
+          const targetCred = matchingBizCreds[0];
+          const bm = targetCred.business_membership_id
+            ? await db.businessMemberships.get(targetCred.business_membership_id)
+            : undefined;
+
+          const targetBiz = bm ? await db.businesses.get(bm.business_id) : undefined;
+          const bizName = targetBiz?.name || 'Business Workspace';
+
+          const targetUser = await db.users.get(targetCred.user_id);
+          if (!targetUser || !targetUser.is_active) {
+            return { success: false, message: 'User account is inactive or disabled.' };
+          }
+
+          setCurrentCredentialId(targetCred.id);
+          if (bm) {
+            setSelectedWorkspaceId(bm.business_id);
+          }
+
+          const targetWorkspace: DynamicWorkspace = {
+            id: bm ? bm.business_id : 'business',
+            name: bizName,
+            type: 'tenant',
+            role: bm ? bm.membership_type : 'Member',
+            email: cleanEmail,
+            businessId: bm ? bm.business_id : undefined,
+            business: targetBiz,
+            requireSwitchPassword: Boolean(bm?.require_switch_password),
+          };
+
+          return { success: true, targetWorkspace };
+        }
+
+        // 1b. Check if this email belongs to a user in db.userEmails (Branch A)
+        const userEmailRecord = await db.userEmails.where('email_id').equals(emailRecord.id).first();
+        if (userEmailRecord) {
+          // STRICT RULE: Only Primary Email can be used for individual login!
+          if (!userEmailRecord.is_primary) {
+            return {
+              success: false,
+              message: 'Secondary emails cannot be used for individual account login. Please log in using your Primary Email Address or App User ID.',
+            };
+          }
+
+          // Find INDIVIDUAL credential for this user
+          const indCred = await db.authCredentials
+            .where('user_id').equals(userEmailRecord.user_id)
+            .filter((c) => c.credential_type === 'INDIVIDUAL')
+            .first();
+
+          if (indCred) {
+            if (password && indCred.password && indCred.password !== password) {
+              return { success: false, message: 'Invalid password provided.' };
             }
 
-            // Find INDIVIDUAL credential for this user
-            const indCred = await db.authCredentials
-              .where('user_id').equals(userEmailRecord.user_id)
-              .filter((c) => c.credential_type === 'INDIVIDUAL')
-              .first();
-
-            if (indCred) {
-              credential = indCred;
+            const targetUser = await db.users.get(indCred.user_id);
+            if (!targetUser || !targetUser.is_active) {
+              return { success: false, message: 'User account is inactive or disabled.' };
             }
+
+            setCurrentCredentialId(indCred.id);
+            setSelectedWorkspaceId('personal');
+
+            const targetWorkspace: DynamicWorkspace = {
+              id: 'personal',
+              name: `${targetUser.full_name} (Personal)`,
+              type: 'individual',
+              role: 'Owner',
+              email: cleanEmail,
+              requireSwitchPassword: false,
+            };
+
+            return { success: true, targetWorkspace };
           }
         }
       }
 
       // 2. Search by User ID or App User ID (e.g. USR-984201 or usr-1)
-      if (!credential) {
-        const userByIdentifier = await db.users.where('app_user_id').equalsIgnoreCase(cleanInput).first() || await db.users.get(cleanInput);
+      const userByIdentifier =
+        (await db.users.where('app_user_id').equalsIgnoreCase(cleanInput).first()) ||
+        (await db.users.get(cleanInput));
 
-        if (userByIdentifier) {
-          const indCred = await db.authCredentials.where('user_id').equals(userByIdentifier.id)
-            .filter((c) => c.credential_type === 'INDIVIDUAL')
-            .first();
+      if (userByIdentifier) {
+        const indCred = await db.authCredentials
+          .where('user_id').equals(userByIdentifier.id)
+          .filter((c) => c.credential_type === 'INDIVIDUAL')
+          .first();
 
-          if (indCred) {
-            credential = indCred;
+        if (indCred) {
+          if (password && indCred.password && indCred.password !== password) {
+            return { success: false, message: 'Invalid password provided.' };
           }
+
+          if (!userByIdentifier.is_active) {
+            return { success: false, message: 'User account is inactive or disabled.' };
+          }
+
+          setCurrentCredentialId(indCred.id);
+          setSelectedWorkspaceId('personal');
+
+          const primaryUserEmailRecord = await db.userEmails
+            .where('user_id').equals(userByIdentifier.id)
+            .filter((ue) => ue.is_primary)
+            .first();
+          const primaryEmailObj = primaryUserEmailRecord
+            ? await db.emails.get(primaryUserEmailRecord.email_id)
+            : undefined;
+
+          const targetWorkspace: DynamicWorkspace = {
+            id: 'personal',
+            name: `${userByIdentifier.full_name} (Personal)`,
+            type: 'individual',
+            role: 'Owner',
+            email: primaryEmailObj?.email || cleanInput,
+            requireSwitchPassword: false,
+          };
+
+          return { success: true, targetWorkspace };
         }
       }
 
-      if (!credential) {
-        return {
-          success: false,
-          message: 'No active credential found for the provided email address or User ID.'
-        };
-      }
-
-      if (password && credential.password && credential.password !== password) {
-        return { success: false, message: 'Invalid password provided.' };
-      }
-
-      const targetUser = await db.users.get(credential.user_id);
-      if (!targetUser || !targetUser.is_active) {
-        return { success: false, message: 'User account is inactive or disabled.' };
-      }
-
-      // Resolve primary user email
-      const primaryUserEmailRecord = await db.userEmails
-        .where('user_id').equals(targetUser.id)
-        .filter((ue) => ue.is_primary)
-        .first();
-      const primaryEmailObj = primaryUserEmailRecord ? await db.emails.get(primaryUserEmailRecord.email_id) : undefined;
-      const userPrimaryEmailStr = primaryEmailObj?.email || '';
-
-      let targetWsId = 'personal';
-      let memberRole = 'Owner';
-      let targetBiz: Business | undefined;
-      let workspaceEmailStr = userPrimaryEmailStr;
-
-      if (credential.credential_type === 'BUSINESS' && credential.business_membership_id) {
-        const bm = await db.businessMemberships.get(credential.business_membership_id);
-        if (bm) {
-          targetWsId = bm.business_id;
-          memberRole = bm.membership_type;
-          targetBiz = await db.businesses.get(bm.business_id);
-
-          const bizEmailRecord = await db.businessEmails.where('business_id').equals(bm.business_id).first();
-          const bizEmailObj = bizEmailRecord ? await db.emails.get(bizEmailRecord.email_id) : undefined;
-          const credEmailObj = credential.email_id ? await db.emails.get(credential.email_id) : undefined;
-          workspaceEmailStr = credEmailObj?.email || bizEmailObj?.email || userPrimaryEmailStr;
-        }
-      }
-
-      setCurrentCredentialId(credential.id);
-      setSelectedWorkspaceId(targetWsId);
-
-      const targetWorkspace: DynamicWorkspace = {
-        id: targetWsId,
-        name: targetWsId === 'personal'
-          ? `${targetUser.full_name} (Personal)`
-          : (targetBiz ? targetBiz.name : targetWsId),
-        type: targetWsId === 'personal' ? 'individual' : 'tenant',
-        role: memberRole,
-        email: workspaceEmailStr,
-        businessId: targetWsId === 'personal' ? undefined : targetWsId,
-        business: targetBiz,
+      return {
+        success: false,
+        message: 'No active credential found for the provided email address or User ID.',
       };
-
-      return { success: true, targetWorkspace };
     } catch (err: any) {
       console.error('Login error:', err);
       return { success: false, message: err.message || 'Authentication failed.' };
@@ -387,6 +467,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
         workspaces,
         activeWorkspace,
         switchWorkspace,
+        validateSwitchPassword,
         login,
         logout,
         switchCredential,
@@ -405,3 +486,4 @@ export const useWorkspace = () => {
   }
   return context;
 };
+

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton } from 'antd';
+import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Modal as AntModal, Input as AntInput, message as antMessage, Tag as AntTag } from 'antd';
 import type { MenuProps } from 'antd';
 import * as Lucide from 'lucide-react';
-import { useWorkspace } from '../contexts/WorkspaceContext';
+import { useWorkspace, type DynamicWorkspace } from '../contexts/WorkspaceContext';
 import { useBreadcrumbContext } from '../contexts/BreadcrumbContext';
 import { cn } from '../lib/utils';
 
@@ -11,8 +11,13 @@ const UserLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { activeWorkspace, workspaces, switchWorkspace, currentUser, logout, currentCredential } = useWorkspace();
+  const { activeWorkspace, workspaces, switchWorkspace, validateSwitchPassword, currentUser, logout, currentCredential } = useWorkspace();
   const { customBreadcrumbs } = useBreadcrumbContext();
+
+  const [pendingWorkspace, setPendingWorkspace] = useState<DynamicWorkspace | null>(null);
+  const [switchPassInput, setSwitchPassInput] = useState('123456');
+  const [switchPassModalOpen, setSwitchPassModalOpen] = useState(false);
+  const [loadingPass, setLoadingPass] = useState(false);
 
   // Route Guard: BUSINESS credential users do not have permission/rights to access user routes
   if (currentCredential?.credential_type === 'BUSINESS') {
@@ -20,12 +25,41 @@ const UserLayout: React.FC = () => {
   }
 
   const handleWorkspaceSwitch = (id: string) => {
-    const ws = switchWorkspace(id);
-    if (!ws) return;
-    if (ws.type === 'tenant') {
-      navigate('/b/dashboard');
+    const targetWs = workspaces.find((w) => w.id === id);
+    if (!targetWs) return;
+
+    if (targetWs.requireSwitchPassword && targetWs.id !== activeWorkspace.id) {
+      setPendingWorkspace(targetWs);
+      setSwitchPassInput('123456');
+      setSwitchPassModalOpen(true);
     } else {
-      navigate('/user/dashboard');
+      const ws = switchWorkspace(id);
+      if (!ws) return;
+      if (ws.type === 'tenant') {
+        navigate('/b/dashboard');
+      } else {
+        navigate('/user/dashboard');
+      }
+    }
+  };
+
+  const handleConfirmSwitchPassword = async () => {
+    if (!pendingWorkspace) return;
+    setLoadingPass(true);
+    const isValid = await validateSwitchPassword(pendingWorkspace.id, switchPassInput);
+    setLoadingPass(false);
+
+    if (isValid) {
+      const ws = switchWorkspace(pendingWorkspace.id);
+      setSwitchPassModalOpen(false);
+      setPendingWorkspace(null);
+      if (ws?.type === 'tenant') {
+        navigate('/b/dashboard');
+      } else {
+        navigate('/user/dashboard');
+      }
+    } else {
+      antMessage.error('Invalid secondary switch password.');
     }
   };
 
@@ -119,7 +153,12 @@ const UserLayout: React.FC = () => {
         className={`flex items-center justify-between gap-4 min-w-[240px] cursor-pointer`}
       >
         <div className="flex flex-col">
-          <span className="font-semibold text-slate-800 text-sm">{w.name}</span>
+          <div className="flex items-center gap-1.5">
+            <span className="font-semibold text-slate-800 text-sm">{w.name}</span>
+            {w.requireSwitchPassword && (
+              <AntTag color="orange" className="text-[10px] m-0 font-medium px-1 py-0">Lock</AntTag>
+            )}
+          </div>
           {w.email && (
             <span className="text-xs text-sky-700 font-mono flex items-center gap-1 mt-0.5">
               <Lucide.Mail size={12} className="text-sky-600 shrink-0" />
@@ -225,6 +264,38 @@ const UserLayout: React.FC = () => {
             </AntDropdown>
           </div>
         </header>
+
+        {/* Layout Context Switch Password Modal */}
+        <AntModal
+          open={switchPassModalOpen}
+          onCancel={() => {
+            setSwitchPassModalOpen(false);
+            setPendingWorkspace(null);
+          }}
+          onOk={handleConfirmSwitchPassword}
+          okText="Confirm Switch"
+          confirmLoading={loadingPass}
+          title={
+            <div className="flex items-center gap-2 text-slate-900 font-bold text-lg">
+              <Lucide.KeyRound size={20} className="text-amber-500" />
+              Switch Password Required
+            </div>
+          }
+        >
+          <div className="space-y-4 py-2">
+            <p className="text-slate-600 text-sm">
+              Switching workspace to <span className="font-bold text-sky-700">{pendingWorkspace?.name}</span> requires secondary switch password verification:
+            </p>
+
+            <AntInput.Password
+              size="large"
+              value={switchPassInput}
+              onChange={(e) => setSwitchPassInput(e.target.value)}
+              placeholder="Enter switch password (e.g. 123456)"
+              prefix={<Lucide.Lock size={16} className="text-slate-400" />}
+            />
+          </div>
+        </AntModal>
 
         {/* Main Body */}
         <main className="flex-1 p-6 md:p-8 mt-16">

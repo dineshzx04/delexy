@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { Input as AntInput, Button as AntButton, Checkbox as AntCheckbox, Divider as AntDivider, Alert as AntAlert, Tag as AntTag } from 'antd';
+import {
+  Input as AntInput,
+  Button as AntButton,
+  Checkbox as AntCheckbox,
+  Divider as AntDivider,
+  Alert as AntAlert,
+  Tag as AntTag,
+} from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
@@ -9,7 +16,7 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useWorkspace();
-  
+
   const [activeTab, setActiveTab] = useState<'global' | 'business'>('global');
   const [authError, setAuthError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -24,7 +31,7 @@ const Login: React.FC = () => {
     if (tab === 'global') {
       setValue('email', 'john.personal@gmail.com');
     } else {
-      setValue('email', 'john.c@gmail.com');
+      setValue('email', 'alice.business@gmail.com');
     }
   };
 
@@ -40,8 +47,6 @@ const Login: React.FC = () => {
       } else {
         navigate('/user/dashboard');
       }
-    } else if (res.success) {
-      navigate('/user/dashboard');
     } else {
       setAuthError(res.message || 'Login failed.');
     }
@@ -180,21 +185,35 @@ const Login: React.FC = () => {
                   <span className="font-semibold text-slate-800 block">Alice Smith (INDIVIDUAL Credential - uc-2)</span>
                   <span className="text-slate-500 block text-[11px]">alice.personal@gmail.com</span>
                 </div>
-                <AntTag color="green" className="m-0 font-medium">Personal + Business C Owner</AntTag>
+                <AntTag color="green" className="m-0 font-medium">Personal + Member Businesses</AntTag>
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              onClick={() => handleQuickPersona('john.c@gmail.com')}
-              className="flex items-center justify-between p-2.5 rounded-lg bg-white hover:bg-purple-100/70 border border-purple-200 transition-colors text-left shadow-2xs"
-            >
-              <div>
-                <span className="font-semibold text-slate-800 block">John Doe (BUSINESS Credential - uc-3)</span>
-                <span className="text-slate-500 block text-[11px]">john.c@gmail.com</span>
-              </div>
-              <AntTag color="purple" className="m-0 font-medium">Business C ONLY (Single Context)</AntTag>
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => handleQuickPersona('alice.business@gmail.com')}
+                className="flex items-center justify-between p-2.5 rounded-lg bg-white hover:bg-purple-100/70 border border-purple-200 transition-colors text-left shadow-2xs"
+              >
+                <div>
+                  <span className="font-semibold text-slate-800 block">Alice Smith (BUSINESS Credential - uc-3 / uc-4)</span>
+                  <span className="text-slate-500 block text-[11px]">alice.business@gmail.com</span>
+                </div>
+                <AntTag color="purple" className="m-0 font-medium">Multi-Context (Biz A & B)</AntTag>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleQuickPersona('john.member@gmail.com')}
+                className="flex items-center justify-between p-2.5 rounded-lg bg-white hover:bg-purple-100/70 border border-purple-200 transition-colors text-left shadow-2xs"
+              >
+                <div>
+                  <span className="font-semibold text-slate-800 block">John Doe (BUSINESS Credential - uc-5)</span>
+                  <span className="text-slate-500 block text-[11px]">john.member@gmail.com</span>
+                </div>
+                <AntTag color="geekblue" className="m-0 font-medium">Business C ONLY</AntTag>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -224,7 +243,7 @@ const Login: React.FC = () => {
                 size="large" 
                 status={errors.email ? 'error' : ''} 
                 prefix={activeTab === 'global' ? <Lucide.User size={16} className="text-slate-400" /> : <Lucide.Mail size={16} className="text-slate-400" />} 
-                placeholder={activeTab === 'global' ? 'john.personal@gmail.com' : 'john.c@gmail.com'} 
+                placeholder={activeTab === 'global' ? 'john.personal@gmail.com' : 'alice.business@gmail.com'} 
               />
             )}
           />
@@ -305,4 +324,5 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+
 
