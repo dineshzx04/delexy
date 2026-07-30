@@ -67,18 +67,17 @@ const PlatformLayout: React.FC = () => {
   ];
 
   const getMenuItems = () => [
-    // Dashboard
     {
       key: "/p/dashboard",
       icon: <Lucide.LayoutDashboard size={16} />,
       label: <Link to="/p/dashboard">Dashboard</Link>,
     },
 
-    // Organizations
+    // Organization Management
     {
-      key: "organizations",
-      icon: <Lucide.Building2 size={16} />,
-      label: "Organizations",
+      key: "organization-module",
+      type: "group",
+      label: collapsed ? null : "Organization",
       children: [
         {
           key: "/p/businesses",
@@ -86,24 +85,48 @@ const PlatformLayout: React.FC = () => {
           label: <Link to="/p/businesses">Businesses</Link>,
         },
         {
-          key: "/p/users",
-          icon: <Lucide.Users size={16} />,
-          label: <Link to="/p/users">Users</Link>,
+          key: "/p/parties",
+          icon: <Lucide.Building2 size={16} />,
+          label: <Link to="/p/parties">Parties & Claims</Link>,
         },
       ],
     },
 
-    // Product Information
+    // Product Catalog
     {
-      key: "product-information",
-      icon: <Lucide.Boxes size={16} />,
-      label: "Product Information",
+      key: "catalog-module",
+      type: "group",
+      label: collapsed ? null : "Catalog",
       children: [
         {
           key: "/p/categories",
           icon: <Lucide.FolderTree size={16} />,
           label: <Link to="/p/categories">Categories</Link>,
         },
+        {
+          key: "/p/brands",
+          icon: <Lucide.Award size={16} />,
+          label: <Link to="/p/brands">Brands</Link>,
+        },
+        {
+          key: "/p/manufacturers",
+          icon: <Lucide.Factory size={16} />,
+          label: <Link to="/p/manufacturers">Manufacturers</Link>,
+        },
+        {
+          key: "/p/products",
+          icon: <Lucide.Box size={16} />,
+          label: <Link to="/p/products">Products</Link>,
+        },
+      ],
+    },
+
+    // Product Attributes
+    {
+      key: "attributes-module",
+      type: "group",
+      label: collapsed ? null : "Attributes",
+      children: [
         {
           key: "/p/attribute-groups",
           icon: <Lucide.Layers3 size={16} />,
@@ -122,68 +145,41 @@ const PlatformLayout: React.FC = () => {
         {
           key: "/p/attribute-mapping",
           icon: <Lucide.GitMerge size={16} />,
-          label: <Link to="/p/attribute-mapping">Category Mapping</Link>,
+          label: <Link to="/p/attribute-mapping">Attribute Mapping</Link>,
         },
       ],
     },
 
-    // Catalog
+    // Administration
     {
-      key: "catalog",
-      icon: <Lucide.Package size={16} />,
-      label: "Catalog",
-      children: [
-        {
-          key: "/p/products",
-          icon: <Lucide.Box size={16} />,
-          label: <Link to="/p/products">Products</Link>,
-        },
-      ],
-    },
-
-    // Access Control
-    {
-      key: "access-control",
-      icon: <Lucide.ShieldCheck size={16} />,
-      label: "Access Control",
-      children: [
-        {
-          key: "/p/platform-roles",
-          icon: <Lucide.KeyRound size={16} />,
-          label: <Link to="/p/platform-roles">Platform Roles</Link>,
-        },
-        {
-          key: "/p/business-roles",
-          icon: <Lucide.UsersRound size={16} />,
-          label: <Link to="/p/business-roles">Business Roles</Link>,
-        },
-      ],
-    },
-
-    // Governance
-    {
-      key: "governance",
-      icon: <Lucide.Scale size={16} />,
-      label: "Governance",
+      key: "administration-module",
+      type: "group",
+      label: collapsed ? null : "Administration",
       children: [
         {
           key: "/p/audit-logs",
           icon: <Lucide.ScrollText size={16} />,
           label: <Link to="/p/audit-logs">Audit Logs</Link>,
         },
-      ],
-    },
-
-    // My Account
-    {
-      key: "account-group",
-      type: "group",
-      label: collapsed ? null : "My Account",
-      children: [
         {
           key: "/p/profile",
           icon: <Lucide.User size={16} />,
           label: <Link to="/p/profile">Profile</Link>,
+        },
+        {
+          key: "/p/users",
+          icon: <Lucide.Users size={16} />,
+          label: <Link to="/p/users">Users</Link>,
+        },
+        {
+          key: "/p/business-roles",
+          icon: <Lucide.UsersRound size={16} />,
+          label: <Link to="/p/business-roles">Business Roles</Link>,
+        },
+        {
+          key: "/p/platform-roles",
+          icon: <Lucide.KeyRound size={16} />,
+          label: <Link to="/p/platform-roles">Platform Roles</Link>,
         },
       ],
     },
@@ -230,8 +226,8 @@ const PlatformLayout: React.FC = () => {
         className={cn(
           "bg-slate-900 text-slate-100 border-r border-slate-800 flex flex-col fixed left-0 top-0 bottom-0 z-40 transition-all duration-300",
           isMobile
-            ? (mobileOpen ? "w-64 translate-x-0 shadow-2xl" : "w-64 -translate-x-full")
-            : (collapsed ? "w-16" : "w-64")
+            ? (mobileOpen ? "w-72 translate-x-0 shadow-2xl" : "w-72 -translate-x-full")
+            : (collapsed ? "w-16" : "w-72")
         )}
       >
         {/* Brand */}
@@ -258,7 +254,6 @@ const PlatformLayout: React.FC = () => {
             mode="inline"
             theme="dark"
             selectedKeys={[location.pathname]}
-            defaultOpenKeys={['organizations', 'product-information', 'catalog', 'access-control', 'governance']}
             items={getMenuItems() as MenuProps['items']}
             className="border-none bg-transparent w-auto"
             inlineCollapsed={!isMobile && collapsed}
@@ -269,12 +264,12 @@ const PlatformLayout: React.FC = () => {
       {/* Main Content Area */}
       <div className={cn(
         "flex-1 flex flex-col transition-all duration-300",
-        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-64")
+        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-72")
       )}>
         {/* Top Navbar */}
         <header
           className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 fixed top-0 right-0 z-20 transition-all duration-300 left-0"
-          style={{ left: isMobile ? '0px' : (collapsed ? '4rem' : '16rem') }}
+          style={{ left: isMobile ? '0px' : (collapsed ? '4rem' : '18rem') }}
         >
           <div className="flex items-center gap-2 sm:gap-4">
             <AntButton

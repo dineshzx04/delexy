@@ -10,7 +10,6 @@ export interface Attribute {
   name: string;
   code?: string;
   label?: string;
-  type: "text" | "number" | "select" | "multiselect";
   valueIds?: string[];
   unit?: string;
   created_at?: string;

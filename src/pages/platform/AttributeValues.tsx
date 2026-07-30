@@ -2,14 +2,14 @@ import React, { useState, useMemo } from 'react';
 import { Table as AntTable, Button as AntButton, Input as AntInput, Modal as AntModal, Form as AntForm } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { catalogDb, type AttributeValue } from '../../../data/catalog';
+import { catalogDb, type AttributeValue } from '../../data/catalog';
 
 const AttributeValues: React.FC = () => {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [form] = AntForm.useForm();
-  
+
   // Use DB data from catalogDb
   const values = useLiveQuery(() => catalogDb.attributeValues.toArray()) || [];
   const [searchText, setSearchText] = useState('');
@@ -23,7 +23,7 @@ const AttributeValues: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const filteredValues = useMemo(() => {
-    return values.filter(v => 
+    return values.filter(v =>
       v.value.toLowerCase().includes(searchText.toLowerCase())
     );
   }, [values, searchText]);
@@ -78,18 +78,18 @@ const AttributeValues: React.FC = () => {
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-          <AntInput 
-            placeholder="Search thousands of values..." 
-            prefix={<Lucide.Search size={16} className="text-gray-400" />} 
+          <AntInput
+            placeholder="Search thousands of values..."
+            prefix={<Lucide.Search size={16} className="text-gray-400" />}
             className="w-80"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             allowClear
           />
         </div>
-        <AntTable 
-          columns={columns} 
-          dataSource={filteredValues} 
+        <AntTable
+          columns={columns}
+          dataSource={filteredValues}
           rowKey="id"
           pagination={{
             pageSize: 10,

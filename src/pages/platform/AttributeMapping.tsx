@@ -2,9 +2,9 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Table as AntTable, Tabs as AntTabs, Button as AntButton, Input as AntInput, message } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useBreadcrumb } from '../../../contexts/BreadcrumbContext';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { catalogDb } from '../../../data/catalog';
+import { catalogDb } from '../../data/catalog';
 
 const { TabPane } = AntTabs;
 
@@ -20,7 +20,7 @@ const AttributeMapping: React.FC = () => {
   const GROUPS = useLiveQuery(() => catalogDb.attributeGroups.toArray()) || [];
   const ATTRIBUTES = useLiveQuery(() => catalogDb.attributes.toArray()) || [];
   const VALUES = useLiveQuery(() => catalogDb.attributeValues.toArray()) || [];
-  
+
   // Mappings state
   const [groupToAttr, setGroupToAttr] = useState<Record<string, string[]>>({});
   const [attrToValue, setAttrToValue] = useState<Record<string, string[]>>({});
@@ -102,16 +102,16 @@ const AttributeMapping: React.FC = () => {
 
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <AntTabs defaultActiveKey="1" className="px-4 py-2">
-          
+
           <TabPane tab="Groups ↔ Attributes" key="1">
             <div className="flex flex-col lg:flex-row gap-6 mt-4 h-[600px]">
-              
+
               {/* MASTER PANE: GROUPS */}
               <div className="w-full lg:w-1/2 flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
                 <div className="p-3 border-b border-gray-200 bg-white">
                   <h3 className="font-semibold text-gray-700 mb-2">1. Select a Group</h3>
-                  <AntInput 
-                    placeholder="Search groups..." 
+                  <AntInput
+                    placeholder="Search groups..."
                     prefix={<Lucide.Search size={14} className="text-gray-400" />}
                     value={groupSearch}
                     onChange={e => setGroupSearch(e.target.value)}
@@ -119,11 +119,11 @@ const AttributeMapping: React.FC = () => {
                   />
                 </div>
                 <div className="flex-1 overflow-auto bg-white p-2">
-                  <AntTable 
-                    columns={[{ title: 'Group Name', dataIndex: 'name', key: 'name' }]} 
-                    dataSource={filteredGroups} 
+                  <AntTable
+                    columns={[{ title: 'Group Name', dataIndex: 'name', key: 'name' }]}
+                    dataSource={filteredGroups}
                     rowKey="id"
-                    pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10','50','100'] }}
+                    pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '50', '100'] }}
                     showHeader={false}
                     size="small"
                     rowClassName={(record) => record.id === selectedGroupId ? 'bg-sky-50 cursor-pointer' : 'cursor-pointer hover:bg-gray-100 transition-colors'}
@@ -138,8 +138,8 @@ const AttributeMapping: React.FC = () => {
               <div className="w-full lg:w-1/2 flex flex-col border border-gray-200 rounded-lg overflow-hidden">
                 <div className="p-3 border-b border-gray-200 bg-sky-50">
                   <h3 className="font-semibold text-sky-800 mb-2">2. Map Attributes to "{GROUPS.find(g => g.id === selectedGroupId)?.name}"</h3>
-                  <AntInput 
-                    placeholder="Search thousands of attributes..." 
+                  <AntInput
+                    placeholder="Search thousands of attributes..."
                     prefix={<Lucide.Search size={14} className="text-gray-400" />}
                     value={attrSearchTab1}
                     onChange={e => setAttrSearchTab1(e.target.value)}
@@ -147,17 +147,17 @@ const AttributeMapping: React.FC = () => {
                   />
                 </div>
                 <div className="flex-1 overflow-auto bg-white p-2">
-                  <AntTable 
+                  <AntTable
                     rowSelection={{
                       type: 'checkbox',
                       selectedRowKeys: selectedGroupId ? (groupToAttr[selectedGroupId] || []) : [],
                       onChange: handleGroupAttrChange,
                       preserveSelectedRowKeys: true,
                     }}
-                    columns={[{ title: 'Global Attribute', dataIndex: 'name', key: 'name' }]} 
-                    dataSource={filteredAttrsTab1} 
+                    columns={[{ title: 'Global Attribute', dataIndex: 'name', key: 'name' }]}
+                    dataSource={filteredAttrsTab1}
                     rowKey="id"
-                    pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10','50','100'] }}
+                    pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '50', '100'] }}
                     size="small"
                   />
                 </div>
@@ -168,13 +168,13 @@ const AttributeMapping: React.FC = () => {
 
           <TabPane tab="Attributes ↔ Values" key="2">
             <div className="flex flex-col lg:flex-row gap-6 mt-4 h-[600px]">
-              
+
               {/* MASTER PANE: ATTRIBUTES */}
               <div className="w-full lg:w-1/2 flex flex-col border border-gray-200 rounded-lg overflow-hidden bg-gray-50">
                 <div className="p-3 border-b border-gray-200 bg-white">
                   <h3 className="font-semibold text-gray-700 mb-2">1. Select an Attribute</h3>
-                  <AntInput 
-                    placeholder="Search attributes..." 
+                  <AntInput
+                    placeholder="Search attributes..."
                     prefix={<Lucide.Search size={14} className="text-gray-400" />}
                     value={attrSearchTab2}
                     onChange={e => setAttrSearchTab2(e.target.value)}
@@ -182,11 +182,11 @@ const AttributeMapping: React.FC = () => {
                   />
                 </div>
                 <div className="flex-1 overflow-auto bg-white p-2">
-                  <AntTable 
-                    columns={[{ title: 'Attribute Name', dataIndex: 'name', key: 'name' }]} 
-                    dataSource={filteredAttrsTab2} 
+                  <AntTable
+                    columns={[{ title: 'Attribute Name', dataIndex: 'name', key: 'name' }]}
+                    dataSource={filteredAttrsTab2}
                     rowKey="id"
-                    pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10','50','100'] }}
+                    pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '50', '100'] }}
                     showHeader={false}
                     size="small"
                     rowClassName={(record) => record.id === selectedAttrId ? 'bg-purple-50 cursor-pointer' : 'cursor-pointer hover:bg-gray-100 transition-colors'}
@@ -201,8 +201,8 @@ const AttributeMapping: React.FC = () => {
               <div className="w-full lg:w-1/2 flex flex-col border border-gray-200 rounded-lg overflow-hidden">
                 <div className="p-3 border-b border-gray-200 bg-purple-50">
                   <h3 className="font-semibold text-purple-800 mb-2">2. Map Values to "{ATTRIBUTES.find(a => a.id === selectedAttrId)?.name}"</h3>
-                  <AntInput 
-                    placeholder="Search thousands of values..." 
+                  <AntInput
+                    placeholder="Search thousands of values..."
                     prefix={<Lucide.Search size={14} className="text-gray-400" />}
                     value={valSearch}
                     onChange={e => setValSearch(e.target.value)}
@@ -210,17 +210,17 @@ const AttributeMapping: React.FC = () => {
                   />
                 </div>
                 <div className="flex-1 overflow-auto bg-white p-2">
-                  <AntTable 
+                  <AntTable
                     rowSelection={{
                       type: 'checkbox',
                       selectedRowKeys: selectedAttrId ? (attrToValue[selectedAttrId] || []) : [],
                       onChange: handleAttrValChange,
                       preserveSelectedRowKeys: true,
                     }}
-                    columns={[{ title: 'Global Value', dataIndex: 'value', key: 'value' }]} 
-                    dataSource={filteredValues} 
+                    columns={[{ title: 'Global Value', dataIndex: 'value', key: 'value' }]}
+                    dataSource={filteredValues}
                     rowKey="id"
-                    pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10','50','100'] }}
+                    pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: ['10', '50', '100'] }}
                     size="small"
                   />
                 </div>

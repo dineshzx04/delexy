@@ -58,6 +58,20 @@ export const mockBusinessMemberships: BusinessMembership[] = [
     created_at: "2026-03-15T08:00:00.000Z",
     updated_at: "2026-03-15T08:00:00.000Z",
   },
+  // Business C Owner: Alice Smith (usr-3)
+  {
+    id: "bm-5-owner",
+    business_id: "bus-c",
+    user_id: "usr-3",
+    membership_type: "OWNER",
+    email_id: null,
+    role_id: null,
+    status: "ACTIVE",
+    require_switch_password: false,
+    deletedAt: null,
+    created_at: "2026-03-15T08:00:00.000Z",
+    updated_at: "2026-03-15T08:00:00.000Z",
+  },
   // Business C Member: John Doe (usr-2)
   {
     id: "bm-5",

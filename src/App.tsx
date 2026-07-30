@@ -33,12 +33,17 @@ import BusinessBrands from './pages/business/BusinessBrands';
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 import PlatformLayout from './layouts/PlatformLayout';
 import PlatformDashboard from './pages/platform/PlatformDashboard';
-import AttributeValues from './pages/platform/attributes/AttributeValues';
-import Attributes from './pages/platform/attributes/Attributes';
-import AttributeGroups from './pages/platform/attributes/AttributeGroups';
-import AttributeMapping from './pages/platform/attributes/AttributeMapping';
+import AttributeValues from './pages/platform/AttributeValues';
+import Attributes from './pages/platform/Attributes';
+import AttributeGroups from './pages/platform/AttributeGroups';
+import AttributeMapping from './pages/platform/AttributeMapping';
 import CategoryManagement from './pages/platform/CategoryManagement';
 import CategoryProducts from './pages/platform/CategoryProducts';
+import PlatformUsers from './pages/platform/PlatformUsers';
+import PlatformBusinesses from './pages/platform/PlatformBusinesses';
+import PlatformBrands from './pages/platform/PlatformBrands';
+import PlatformParties from './pages/platform/PlatformParties';
+import PlatformManufacturers from './pages/platform/PlatformManufacturers';
 
 import NotFound from './pages/common/NotFound';
 
@@ -131,6 +136,11 @@ const App: React.FC = () => {
                 <Route path="attribute-mapping" element={<AttributeMapping />} />
                 <Route path="categories" element={<CategoryManagement />} />
                 <Route path="products" element={<CategoryProducts />} />
+                <Route path="users" element={<PlatformUsers />} />
+                <Route path="businesses" element={<PlatformBusinesses />} />
+                <Route path="parties" element={<PlatformParties />} />
+                <Route path="manufacturers" element={<PlatformManufacturers />} />
+                <Route path="brands" element={<PlatformBrands />} />
                 <Route path="*" element={<NotFound scope="platform" />} />
               </Route>
             </Route>

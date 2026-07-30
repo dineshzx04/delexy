@@ -28,7 +28,7 @@ export const mockParties: Party[] = [
   // Unclaimed Placeholder Business Party (No owner, target of clm-1)
   {
     id: "pty-3",
-    owner_type: undefined,
+    owner_type: "BUSINESS",
     owner_id: null,
     display_name: "ASICS Corp Placeholder Party",
     status: "ACTIVE",
@@ -76,7 +76,7 @@ export const mockParties: Party[] = [
   // Unclaimed Placeholder Business Party (No owner, target of clm-2 rejected claim)
   {
     id: "pty-7",
-    owner_type: undefined,
+    owner_type: "BUSINESS",
     owner_id: null,
     display_name: "Sony Logistics Unclaimed Party",
     status: "SUSPENDED",

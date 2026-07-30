@@ -2,7 +2,7 @@ export type PartyOwnerType = "USER" | "BUSINESS";
 
 export interface Party {
   id: string;
-  owner_type?: PartyOwnerType;
+  owner_type: PartyOwnerType;
   owner_id?: string | null; // Null if unclaimed placeholder party
   display_name: string;
   status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
@@ -38,7 +38,7 @@ export interface BrandParty {
   id: string;
   brand_id: string; // Foreign key to Brand.id
   party_id: string; // Foreign key to Party.id
-  claim_status: 'PENDING' | 'APPROVED' | 'VERIFIED';
+  claim_status: "PENDING" | "APPROVED" | "VERIFIED";
   created_at: string;
   updated_at: string;
 }
@@ -48,7 +48,7 @@ export interface Manufacturer {
   manufacturer_party_id: string; // Links strictly to Party.id (1:1)
   company_name: string;
   registration_number?: string;
-  status: 'ACTIVE' | 'INACTIVE' | 'PENDING_VERIFICATION';
+  status: "ACTIVE" | "INACTIVE" | "PENDING_VERIFICATION";
   created_at: string;
   updated_at: string;
 }

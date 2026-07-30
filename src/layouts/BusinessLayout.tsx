@@ -226,8 +226,8 @@ const BusinessLayout: React.FC = () => {
         className={cn(
           "bg-slate-900 text-slate-100 border-r border-slate-800 flex flex-col fixed left-0 top-0 bottom-0 z-40 transition-all duration-300",
           isMobile
-            ? (mobileOpen ? "w-64 translate-x-0 shadow-2xl" : "w-64 -translate-x-full")
-            : (collapsed ? "w-16" : "w-64")
+            ? (mobileOpen ? "w-72 translate-x-0 shadow-2xl" : "w-72 -translate-x-full")
+            : (collapsed ? "w-16" : "w-72")
         )}
       >
         {/* Brand Header */}
@@ -268,12 +268,12 @@ const BusinessLayout: React.FC = () => {
       {/* Main Container */}
       <div className={cn(
         "flex-1 flex flex-col transition-all duration-300",
-        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-64")
+        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-72")
       )}>
         {/* Top Navbar */}
         <header
           className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 fixed top-0 right-0 z-20 transition-all duration-300 left-0"
-          style={{ left: isMobile ? '0px' : (collapsed ? '4rem' : '16rem') }}
+          style={{ left: isMobile ? '0px' : (collapsed ? '4rem' : '18rem') }}
         >
           <div className="flex items-center gap-2 sm:gap-4">
             <AntButton
