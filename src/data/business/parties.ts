@@ -65,7 +65,7 @@ export const mockParties: Party[] = [
   {
     id: "pty-6",
     owner_type: "USER",
-    owner_id: "usr-1",
+    owner_id: "usr-2",
     display_name: "John Doe Personal Trading Party",
     status: "ACTIVE",
     is_claimed: true,

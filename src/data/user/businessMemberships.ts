@@ -1,10 +1,11 @@
 import type { BusinessMembership } from "./user.module";
 
 export const mockBusinessMemberships: BusinessMembership[] = [
+  // Business A Owner: John Doe (usr-2)
   {
     id: "bm-1",
     business_id: "bus-a",
-    user_id: "usr-1",
+    user_id: "usr-2",
     membership_type: "OWNER",
     email_id: null,
     role_id: null,
@@ -14,10 +15,11 @@ export const mockBusinessMemberships: BusinessMembership[] = [
     created_at: "2026-01-15T08:00:00.000Z",
     updated_at: "2026-01-15T08:00:00.000Z",
   },
+  // Business B Owner: John Doe (usr-2)
   {
     id: "bm-2",
     business_id: "bus-b",
-    user_id: "usr-1",
+    user_id: "usr-2",
     membership_type: "OWNER",
     email_id: null,
     role_id: null,
@@ -27,10 +29,11 @@ export const mockBusinessMemberships: BusinessMembership[] = [
     created_at: "2026-01-15T08:00:00.000Z",
     updated_at: "2026-01-15T08:00:00.000Z",
   },
+  // Business A Member: Alice Smith (usr-3)
   {
     id: "bm-3",
     business_id: "bus-a",
-    user_id: "usr-2",
+    user_id: "usr-3",
     membership_type: "MEMBER",
     email_id: "em-105",
     role_id: "ubr-1",
@@ -40,25 +43,28 @@ export const mockBusinessMemberships: BusinessMembership[] = [
     created_at: "2026-03-15T08:00:00.000Z",
     updated_at: "2026-03-15T08:00:00.000Z",
   },
+  // Business B Member: Alice Smith (usr-3) with Switch Password
   {
     id: "bm-4",
     business_id: "bus-b",
-    user_id: "usr-2",
+    user_id: "usr-3",
     membership_type: "MEMBER",
     email_id: "em-105",
     role_id: "ubr-1",
     status: "ACTIVE",
     require_switch_password: true,
+    switch_password: "123456",
     deletedAt: null,
     created_at: "2026-03-15T08:00:00.000Z",
     updated_at: "2026-03-15T08:00:00.000Z",
   },
+  // Business C Member: John Doe (usr-2)
   {
     id: "bm-5",
     business_id: "bus-c",
-    user_id: "usr-1",
+    user_id: "usr-2",
     membership_type: "MEMBER",
-    email_id: "em-106", // Fixed: separate MEMBER email for John
+    email_id: "em-106",
     role_id: "ubr-1",
     status: "ACTIVE",
     require_switch_password: false,
@@ -66,12 +72,13 @@ export const mockBusinessMemberships: BusinessMembership[] = [
     created_at: "2026-03-15T08:00:00.000Z",
     updated_at: "2026-03-15T08:00:00.000Z",
   },
+  // Business D Owner: Robert Johnson (usr-4)
   {
     id: "bm-6",
     business_id: "bus-d",
-    user_id: "usr-3",
+    user_id: "usr-4",
     membership_type: "OWNER",
-    email_id: null,
+    email_id: "em-108",
     role_id: "role-mgr-d",
     status: "ACTIVE",
     require_switch_password: false,

@@ -1,12 +1,20 @@
-# Delexy Prototype Workspace Rules
+# Strict Data Architecture & Multi-Context Rules
 
-## Data Architecture & Mock Data Rules
-1. **Strict Taxonomy Mapping**: All product filtering logic is strictly typed and tightly coupled to the underlying taxonomy defined in `db.categories`, `db.attributeGroups`, and `db.attributes`.
-2. **Category Leaf Nodes**: The leaf categories (e.g., `c-2-1-1-1`) determine the available attributes via `mappedGroupIds`.
-3. **Product & Variant Integrity**: 
-   - A mock product (e.g., in `seed.ts`) must map to a valid `categoryId`.
-   - The product's `dynamicAttributes` and `globalSpecs` must *only* contain attribute keys (`attr-X`) that are mapped to that category's `mappedGroupIds`.
-   - The values assigned to those attributes must belong to the valid `valueIds` of that specific attribute.
-4. **RFQ Filtering Behavior**: 
-   - In `CreateRFQ.tsx`, the UI computes dynamic attribute filters and dropdown choices (like Manufacturer/Brand) purely based on the strictly typed mapping from `baseMatches` (products matching the selected Category).
-   - Random dummy data should never be used, as it breaks the filtering logic (`Array.includes` and taxonomy matches).
+1. **User Identity & Multi-Context Versatility**:
+   - An individual user (`User`) can own businesses (`BusinessMembership.membership_type = 'OWNER'`), be a business member (`BusinessMembership.membership_type = 'MEMBER'`), and hold a platform role (`PlatformMembership`).
+   - A user MUST possess a primary `INDIVIDUAL` credential in `authCredentials` before holding any `BUSINESS` credential.
+
+2. **Email 3-Tier Separation Constraints**:
+   - Personal emails (`EmailRecord.type = 'PERSONAL'`) MUST ONLY be referenced in `userEmails.ts` for individual user account logins.
+   - Member emails (`EmailRecord.type = 'MEMBER'`) MUST ONLY be referenced in `businessMemberships.ts` and `businessEmails.ts` for single-tenant business logins.
+   - Member emails MUST NOT overlap with personal user emails, and personal user emails MUST NOT be used for member business logins.
+
+3. **Super Admin Isolation Constraints**:
+   - Super Admin (`usr-1`, `SUPERADMIN-001`) is strictly a Platform Root Owner.
+   - Super Admin MUST NOT have any email address in `userEmails` or `emails`.
+   - Super Admin MUST NOT have any business memberships in `businessMemberships`.
+   - Super Admin MUST NOT have personal user context (`/user/*`) or business workspace context (`/b/*`), and MUST operate exclusively within the Platform Admin Workspace (`/p/*`).
+
+4. **1 Business <-> 1 Claimed Party Rule**:
+   - One business entity can claim strictly ONE Party (`owner_type = 'BUSINESS'`).
+   - Individual users (`owner_type = 'USER'`) CANNOT own Manufacturer or Brand parties, but CAN operate personal seller trading parties (`pty-6`).

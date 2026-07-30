@@ -15,12 +15,13 @@ const PlatformLayout: React.FC = () => {
   const { customBreadcrumbs } = useBreadcrumbContext();
 
   const handleWorkspaceSwitch = (id: string) => {
-    switchWorkspace(id);
-    const ws = workspaces.find(w => w.id === id);
-    if (ws?.type === 'platform') {
-      navigate('/platform');
+    const ws = switchWorkspace(id);
+    if (ws?.type === 'PLATFORM') {
+      navigate('/p/dashboard');
+    } else if (ws?.type === 'BUSINESS') {
+      navigate('/b/dashboard');
     } else {
-      navigate('/');
+      navigate('/user/dashboard');
     }
   };
 
@@ -30,30 +31,7 @@ const PlatformLayout: React.FC = () => {
     {
       key: 'profile',
       icon: <Lucide.User size={16} />,
-      label: <Link to="/profile">Profile</Link>,
-    },
-    {
-      type: 'divider',
-    },
-    {
-      key: 'switch-user-group',
-      type: 'group',
-      label: 'Switch Persona',
-      children: allUsers.map((u) => ({
-        key: `user-${u.id}`,
-        label: (
-          <div
-            onClick={() => switchUser(u.id)}
-            className={cn(
-              "flex items-center justify-between text-xs py-1",
-              u.id === currentUser?.id ? "font-bold text-sky-600" : "text-slate-700"
-            )}
-          >
-            <span>{u.full_name}</span>
-            {u.id === currentUser?.id && <Lucide.Check size={14} className="text-sky-600" />}
-          </div>
-        ),
-      })),
+      label: <Link to="/p/profile">Profile</Link>,
     },
     {
       type: 'divider',
@@ -77,16 +55,16 @@ const PlatformLayout: React.FC = () => {
 
   const getMenuItems = () => {
     return [
-      { key: '/platform', icon: <Lucide.Globe size={16} />, label: <Link to="/platform">Global Overview</Link> },
+      { key: '/p/dashboard', icon: <Lucide.Globe size={16} />, label: <Link to="/p/dashboard">Global Overview</Link> },
       {
         key: 'taxonomies',
         icon: <Lucide.Layers size={16} />,
         label: 'Taxonomies',
         children: [
-          { key: '/platform/attributes', label: <Link to="/platform/attributes">Attributes</Link> },
-          { key: '/platform/attribute-values', label: <Link to="/platform/attribute-values">Values</Link> },
-          { key: '/platform/attribute-groups', label: <Link to="/platform/attribute-groups">Groups</Link> },
-          { key: '/platform/attribute-mapping', label: <Link to="/platform/attribute-mapping">Mapping</Link> },
+          { key: '/p/attributes', label: <Link to="/p/attributes">Attributes</Link> },
+          { key: '/p/attribute-values', label: <Link to="/p/attribute-values">Values</Link> },
+          { key: '/p/attribute-groups', label: <Link to="/p/attribute-groups">Groups</Link> },
+          { key: '/p/attribute-mapping', label: <Link to="/p/attribute-mapping">Mapping</Link> },
         ]
       },
       {
@@ -94,10 +72,10 @@ const PlatformLayout: React.FC = () => {
         icon: <Lucide.Database size={16} />,
         label: 'Global Data',
         children: [
-          { key: '/platform/businesses', label: <Link to="/platform/businesses">Businesses</Link> },
-          { key: '/platform/users', label: <Link to="/platform/users">Users</Link> },
-          { key: '/platform/categories', label: <Link to="/platform/categories">Categories</Link> },
-          { key: '/platform/products', label: <Link to="/platform/products">Global Products</Link> },
+          { key: '/p/businesses', label: <Link to="/p/businesses">Businesses</Link> },
+          { key: '/p/users', label: <Link to="/p/users">Users</Link> },
+          { key: '/p/categories', label: <Link to="/p/categories">Categories</Link> },
+          { key: '/p/products', label: <Link to="/p/products">Global Products</Link> },
         ]
       },
       {
@@ -105,9 +83,9 @@ const PlatformLayout: React.FC = () => {
         icon: <Lucide.ShieldCheck size={16} />,
         label: 'Governance & RBAC',
         children: [
-          { key: '/platform/platform-roles', label: <Link to="/platform/platform-roles">Platform Roles</Link> },
-          { key: '/platform/business-roles', label: <Link to="/platform/business-roles">Default Tenant Roles</Link> },
-          { key: '/platform/audit-logs', label: <Link to="/platform/audit-logs">Audit Logs</Link> },
+          { key: '/p/platform-roles', label: <Link to="/p/platform-roles">Platform Roles</Link> },
+          { key: '/p/business-roles', label: <Link to="/p/business-roles">Default Tenant Roles</Link> },
+          { key: '/p/audit-logs', label: <Link to="/p/audit-logs">Audit Logs</Link> },
         ]
       },
       {

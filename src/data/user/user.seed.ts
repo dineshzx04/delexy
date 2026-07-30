@@ -9,6 +9,8 @@ import { mockBusinessEmails } from './businessEmails';
 import { mockRoles } from './roles';
 import { mockBusinessMemberships } from './businessMemberships';
 import { mockAuthCredentials } from './authCredentials';
+import { mockPlatformRoles } from './platformRoles';
+import { mockPlatformMemberships } from './platformMemberships';
 
 export {
   mockUsers,
@@ -20,7 +22,9 @@ export {
   mockBusinessEmails,
   mockRoles,
   mockBusinessMemberships,
-  mockAuthCredentials
+  mockAuthCredentials,
+  mockPlatformRoles,
+  mockPlatformMemberships
 };
 
 export const seedUserModule = async () => {
@@ -36,6 +40,8 @@ export const seedUserModule = async () => {
     await userDb.roles.bulkPut(mockRoles);
     await userDb.businessMemberships.bulkPut(mockBusinessMemberships);
     await userDb.authCredentials.bulkPut(mockAuthCredentials);
+    await userDb.platformRoles.bulkPut(mockPlatformRoles);
+    await userDb.platformMemberships.bulkPut(mockPlatformMemberships);
     console.log('[User Module] Database seeded successfully.');
   }
 };

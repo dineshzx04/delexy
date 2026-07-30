@@ -9,7 +9,9 @@ import type {
   BusinessEmail,
   Role,
   BusinessMembership,
-  AuthCredential
+  AuthCredential,
+  PlatformRole,
+  PlatformMembership
 } from './user.module';
 
 export class UserDatabase extends Dexie {
@@ -23,6 +25,8 @@ export class UserDatabase extends Dexie {
   roles!: Table<Role, string>;
   businessMemberships!: Table<BusinessMembership, string>;
   authCredentials!: Table<AuthCredential, string>;
+  platformRoles!: Table<PlatformRole, string>;
+  platformMemberships!: Table<PlatformMembership, string>;
 
   constructor() {
     super('delexy_user_db');
@@ -37,6 +41,8 @@ export class UserDatabase extends Dexie {
       roles: 'id, business_id',
       businessMemberships: 'id, business_id, user_id, email_id',
       authCredentials: 'id, email_id, user_id, business_membership_id',
+      platformRoles: 'id, role_name',
+      platformMemberships: 'id, user_id, platform_role_id, status',
     });
   }
 }

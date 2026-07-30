@@ -30,7 +30,9 @@ const BusinessLayout: React.FC = () => {
     } else {
       const ws = switchWorkspace(id);
       if (!ws) return;
-      if (ws.type === 'tenant') {
+      if (ws.type === 'PLATFORM') {
+        navigate('/p/dashboard');
+      } else if (ws.type === 'BUSINESS') {
         navigate('/b/dashboard');
       } else {
         navigate('/user/dashboard');
@@ -48,7 +50,9 @@ const BusinessLayout: React.FC = () => {
       const ws = switchWorkspace(pendingWorkspace.id);
       setSwitchPassModalOpen(false);
       setPendingWorkspace(null);
-      if (ws?.type === 'tenant') {
+      if (ws?.type === 'PLATFORM') {
+        navigate('/p/dashboard');
+      } else if (ws?.type === 'BUSINESS') {
         navigate('/b/dashboard');
       } else {
         navigate('/user/dashboard');

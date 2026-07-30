@@ -90,7 +90,7 @@ const Dashboard: React.FC = () => {
               </div>
               <div>
                 <h3 className="font-semibold text-slate-800 text-base group-hover:text-indigo-600 transition-colors">Business Workspaces</h3>
-                <p className="text-xs text-slate-500">{workspaces.filter(w => w.type === 'tenant').length} Workspaces Linked</p>
+                <p className="text-xs text-slate-500">{workspaces.filter(w => w.type === 'BUSINESS').length} Workspaces Linked</p>
               </div>
             </div>
           </Card>

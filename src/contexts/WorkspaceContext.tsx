@@ -3,16 +3,21 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { userDb, type User, type Business, type AuthCredential } from '../data/user';
 import { seedDatabase } from '../data/seed';
 
-export type WorkspaceType = 'individual' | 'tenant' | 'platform';
+export type WorkspaceType = 'USER' | 'BUSINESS' | 'PLATFORM';
 
 export interface DynamicWorkspace {
   id: string;
   name: string;
   type: WorkspaceType;
-  role: string;
+  userId?: string;
+  appUserId?: string;
   email?: string;
   businessId?: string;
   business?: Business;
+  membershipId?: string;
+  platformMembershipId?: string;
+  permissions: string[];
+  role: string;
   requireSwitchPassword?: boolean;
 }
 
@@ -117,7 +122,18 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   const allUserEmails = useLiveQuery(() => (dbReady ? userDb.userEmails.toArray() : []), [dbReady]) || [];
   const allBusinessEmails = useLiveQuery(() => (dbReady ? userDb.businessEmails.toArray() : []), [dbReady]) || [];
 
-  // Live Query 4: Business membership for business-type credential
+  // Live Query 4: Platform Membership & Role for current user
+  const platformMembership = useLiveQuery(
+    async () => (currentUser && dbReady ? await userDb.platformMemberships.where('user_id').equals(currentUser.id).first() : undefined),
+    [currentUser?.id, dbReady]
+  );
+
+  const platformRole = useLiveQuery(
+    async () => (platformMembership?.platform_role_id && dbReady ? await userDb.platformRoles.get(platformMembership.platform_role_id) : undefined),
+    [platformMembership?.platform_role_id, dbReady]
+  );
+
+  // Live Query 5: Business membership for business-type credential
   const credentialBusinessMembership = useLiveQuery(
     async () => (currentCredential?.credential_type === 'BUSINESS' && currentCredential?.business_membership_id && dbReady
       ? await userDb.businessMemberships.get(currentCredential.business_membership_id)
@@ -160,50 +176,96 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
           workspaces.push({
             id: biz.id,
             name: biz.name,
-            type: 'tenant',
-            role: m.status === 'FROZEN_BY_PLATFORM' ? 'Frozen' : m.membership_type,
+            type: 'BUSINESS',
+            userId: currentUser.id,
+            appUserId: currentUser.app_user_id,
             email: bizEmailStr,
             businessId: biz.id,
             business: biz,
+            membershipId: m.id,
+            permissions: ['business:read', 'business:write'],
+            role: m.status === 'FROZEN_BY_PLATFORM' ? 'Frozen' : m.membership_type,
             requireSwitchPassword: Boolean(m.require_switch_password),
           });
         }
       });
     } else {
-      // INDIVIDUAL Credential Scope: Personal Account + ALL mapped business memberships
-      workspaces.push({
-        id: 'personal',
-        name: `${currentUser.full_name} (Personal)`,
-        type: 'individual',
-        role: 'Owner',
-        email: personalEmailStr,
-        requireSwitchPassword: false,
-      });
+      const isSuperAdmin = platformMembership && platformMembership.status === 'ACTIVE' && platformMembership.membership_type === 'SUPER_ADMIN';
 
-      memberships.forEach((m) => {
-        const biz = businesses.find((b) => b.id === m.business_id);
-        if (biz && biz.is_active) {
-          const bizEmailRecord = allBusinessEmails.find((be) => be.business_id === m.business_id);
-          const bizEmailObj = bizEmailRecord ? allEmails.find((e) => e.id === bizEmailRecord.email_id) : undefined;
-          const bizEmailStr = bizEmailObj?.email || personalEmailStr;
+      if (isSuperAdmin) {
+        // Super Admin HAS NO PERSONAL USER CONTEXT - ONLY PLATFORM WORKSPACE
+        workspaces.push({
+          id: 'ws-platform',
+          name: 'Platform',
+          type: 'PLATFORM',
+          userId: currentUser.id,
+          appUserId: currentUser.app_user_id,
+          email: `ID: ${currentUser.app_user_id || currentUser.id}`,
+          platformMembershipId: platformMembership?.id,
+          permissions: ['platform:admin', 'platform:read', 'platform:write'],
+          role: 'Super Admin',
+          requireSwitchPassword: Boolean(platformMembership?.require_switch_password),
+        });
+      } else {
+        // INDIVIDUAL Credential Scope: Personal Account + ALL mapped business memberships
+        workspaces.push({
+          id: 'personal',
+          name: `${currentUser.full_name} (Personal)`,
+          type: 'USER',
+          userId: currentUser.id,
+          appUserId: currentUser.app_user_id,
+          email: personalEmailStr,
+          permissions: ['user:read', 'user:write'],
+          role: 'Owner',
+          requireSwitchPassword: false,
+        });
 
+        memberships.forEach((m) => {
+          const biz = businesses.find((b) => b.id === m.business_id);
+          if (biz && biz.is_active) {
+            const bizEmailRecord = allBusinessEmails.find((be) => be.business_id === m.business_id);
+            const bizEmailObj = bizEmailRecord ? allEmails.find((e) => e.id === bizEmailRecord.email_id) : undefined;
+            const bizEmailStr = bizEmailObj?.email || personalEmailStr;
+
+            workspaces.push({
+              id: m.business_id,
+              name: biz.name,
+              type: 'BUSINESS',
+              userId: currentUser.id,
+              appUserId: currentUser.app_user_id,
+              email: bizEmailStr,
+              businessId: biz.id,
+              business: biz,
+              membershipId: m.id,
+              permissions: ['business:read', 'business:write'],
+              role: m.status === 'FROZEN_BY_PLATFORM' ? 'Frozen' : m.membership_type,
+              requireSwitchPassword: Boolean(m.require_switch_password),
+            });
+          }
+        });
+
+        // Inject Platform Admin Workspace for regular platform members
+        if (platformMembership && platformMembership.status === 'ACTIVE') {
           workspaces.push({
-            id: m.business_id,
-            name: biz.name,
-            type: 'tenant',
-            role: m.status === 'FROZEN_BY_PLATFORM' ? 'Frozen' : m.membership_type,
-            email: bizEmailStr,
-            businessId: biz.id,
-            business: biz,
-            requireSwitchPassword: Boolean(m.require_switch_password),
+            id: 'ws-platform',
+            name: 'Platform',
+            type: 'PLATFORM',
+            userId: currentUser.id,
+            appUserId: currentUser.app_user_id,
+            email: personalEmailStr,
+            platformMembershipId: platformMembership.id,
+            permissions: ['platform:read', 'platform:write'],
+            role: platformRole?.role_name || 'Platform Member',
+            requireSwitchPassword: Boolean(platformMembership.require_switch_password),
           });
         }
-      });
+      }
     }
   }
 
   // Check route type
   const isBusinessRoute = /^\/(?:b|business)(?:\/|$)/.test(currentPathname);
+  const isPlatformRoute = /^\/(?:p|platform|admin)(?:\/|$)/.test(currentPathname);
 
   // Derive active workspace
   let activeWorkspace: DynamicWorkspace | undefined;
@@ -213,12 +275,12 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
   }
 
   if (!activeWorkspace) {
-    if (isBusinessRoute || currentCredential?.credential_type === 'BUSINESS') {
-      // In business route or BUSINESS credential: default to first available business workspace, or workspaces[0]
-      activeWorkspace = workspaces.find((w) => w.type === 'tenant') || workspaces[0];
+    if (isPlatformRoute) {
+      activeWorkspace = workspaces.find((w) => w.type === 'PLATFORM') || workspaces[0];
+    } else if (isBusinessRoute || currentCredential?.credential_type === 'BUSINESS') {
+      activeWorkspace = workspaces.find((w) => w.type === 'BUSINESS') || workspaces[0];
     } else {
-      // In user route: default to personal workspace, or workspaces[0]
-      activeWorkspace = workspaces.find((w) => w.type === 'individual') || workspaces[0];
+      activeWorkspace = workspaces.find((w) => w.type === 'USER') || workspaces[0];
     }
   }
 
@@ -227,14 +289,18 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
       activeWorkspace = workspaces[0] || {
         id: 'business',
         name: 'Business Account',
-        type: 'tenant',
+        type: 'BUSINESS',
+        permissions: ['business:read'],
         role: 'Member',
       };
     } else {
       activeWorkspace = {
         id: 'personal',
         name: currentUser?.full_name ? `${currentUser.full_name} (Personal)` : 'Personal Account',
-        type: 'individual',
+        type: 'USER',
+        userId: currentUser?.id,
+        appUserId: currentUser?.app_user_id,
+        permissions: ['user:read'],
         role: 'Owner',
       };
     }
@@ -256,15 +322,18 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const validateSwitchPassword = async (workspaceId: string, inputPass: string): Promise<boolean> => {
     if (!currentUser) return false;
+
+    if (workspaceId === 'ws-platform') {
+      if (!platformMembership || !platformMembership.require_switch_password) return true;
+      const expected = platformMembership.switch_password || 'admin123';
+      return inputPass === expected;
+    }
+
     const m = memberships.find((bm) => bm.business_id === workspaceId);
     if (!m || !m.require_switch_password) return true;
 
-    const cred = await userDb.authCredentials
-      .where('business_membership_id').equals(m.id)
-      .first();
-
-    const expected = cred?.switch_password || cred?.password || '123456';
-    return inputPass === expected || inputPass === '123456';
+    const expected = m.switch_password || '123456';
+    return inputPass === expected;
   };
 
   const login = async (input: string, password?: string): Promise<LoginResult> => {
@@ -325,11 +394,15 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
           const targetWorkspace: DynamicWorkspace = {
             id: bm ? bm.business_id : 'business',
             name: bizName,
-            type: 'tenant',
+            type: 'BUSINESS',
+            userId: targetUser.id,
+            appUserId: targetUser.app_user_id,
             role: bm ? bm.membership_type : 'Member',
             email: cleanEmail,
             businessId: bm ? bm.business_id : undefined,
             business: targetBiz,
+            membershipId: bm?.id,
+            permissions: ['business:read', 'business:write'],
             requireSwitchPassword: Boolean(bm?.require_switch_password),
           };
 
@@ -369,9 +442,12 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
             const targetWorkspace: DynamicWorkspace = {
               id: 'personal',
               name: `${targetUser.full_name} (Personal)`,
-              type: 'individual',
+              type: 'USER',
+              userId: targetUser.id,
+              appUserId: targetUser.app_user_id,
               role: 'Owner',
               email: cleanEmail,
+              permissions: ['user:read', 'user:write'],
               requireSwitchPassword: false,
             };
 
@@ -400,7 +476,30 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
             return { success: false, message: 'User account is inactive or disabled.' };
           }
 
+          // Check if this user is Super Admin
+          const pMembership = await userDb.platformMemberships
+            .where('user_id').equals(userByIdentifier.id)
+            .first();
+
           setCurrentCredentialId(indCred.id);
+
+          if (pMembership && pMembership.membership_type === 'SUPER_ADMIN') {
+            setSelectedWorkspaceId('ws-platform');
+            const targetWorkspace: DynamicWorkspace = {
+              id: 'ws-platform',
+              name: 'Platform',
+              type: 'PLATFORM',
+              userId: userByIdentifier.id,
+              appUserId: userByIdentifier.app_user_id,
+              role: 'Super Admin',
+              email: `ID: ${userByIdentifier.app_user_id || userByIdentifier.id}`,
+              platformMembershipId: pMembership.id,
+              permissions: ['platform:admin', 'platform:read', 'platform:write'],
+              requireSwitchPassword: Boolean(pMembership.require_switch_password),
+            };
+            return { success: true, targetWorkspace };
+          }
+
           setSelectedWorkspaceId('personal');
 
           const primaryUserEmailRecord = await userDb.userEmails
@@ -414,9 +513,12 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
           const targetWorkspace: DynamicWorkspace = {
             id: 'personal',
             name: `${userByIdentifier.full_name} (Personal)`,
-            type: 'individual',
+            type: 'USER',
+            userId: userByIdentifier.id,
+            appUserId: userByIdentifier.app_user_id,
             role: 'Owner',
             email: primaryEmailObj?.email || cleanInput,
+            permissions: ['user:read', 'user:write'],
             requireSwitchPassword: false,
           };
 

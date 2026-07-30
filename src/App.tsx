@@ -31,10 +31,17 @@ import BusinessProducts from './pages/business/BusinessProducts';
 import BusinessProfile from './pages/business/BusinessProfile';
 import BusinessBrands from './pages/business/BusinessBrands';
 import IndexedDbManager from './pages/dev/IndexedDbManager';
+import PlatformLayout from './layouts/PlatformLayout';
+import PlatformDashboard from './pages/platform/PlatformDashboard';
+
+import NotFound from './pages/common/NotFound';
 
 const RootRedirect: React.FC = () => {
   const { activeWorkspace, currentCredential } = useWorkspace();
-  if (currentCredential?.credential_type === 'BUSINESS' || activeWorkspace?.type === 'tenant') {
+  if (activeWorkspace?.type === 'PLATFORM') {
+    return <Navigate to="/p/dashboard" replace />;
+  }
+  if (currentCredential?.credential_type === 'BUSINESS' || activeWorkspace?.type === 'BUSINESS') {
     return <Navigate to="/b/dashboard" replace />;
   }
   return <Navigate to="/user/dashboard" replace />;
@@ -86,6 +93,7 @@ const App: React.FC = () => {
                 <Route path="identifications" element={<UserIdentifications />} />
                 <Route path="brands" element={<UserBrands />} />
                 <Route path="create-business" element={<CreateBusiness />} />
+                <Route path="*" element={<NotFound scope="user" />} />
               </Route>
             </Route>
 
@@ -102,20 +110,31 @@ const App: React.FC = () => {
                 <Route path="settings" element={<BusinessSettings />} />
                 <Route path="rfqs" element={<BusinessRFQs />} />
                 <Route path="products" element={<BusinessProducts />} />
+                <Route path="*" element={<NotFound scope="business" />} />
               </Route>
             </Route>
 
-            {/* Backward Compatibility Redirects for legacy parameter routes */}
-            <Route path="/b/:businessId/*" element={<Navigate to="/b/dashboard" replace />} />
+            {/* Platform Admin Workspace Routes (/p/dashboard, etc.) */}
+            <Route path="/p" element={<PlatformLayout />}>
+              <Route element={<ErrorBoundary />}>
+                <Route index element={<Navigate to="dashboard" replace />} />
+                <Route path="dashboard" element={<PlatformDashboard />} />
+                <Route path="*" element={<NotFound scope="platform" />} />
+              </Route>
+            </Route>
+
+            {/* Backward Compatibility Redirects */}
+            <Route path="/platform/*" element={<Navigate to="/p/dashboard" replace />} />
+            <Route path="/admin/*" element={<Navigate to="/p/dashboard" replace />} />
             <Route path="/business/*" element={<Navigate to="/b/dashboard" replace />} />
 
             {/* Legacy route redirects */}
             <Route path="/dashboard" element={<RootRedirect />} />
             <Route path="/profile" element={<RootRedirect />} />
 
-            {/* Protected Root Redirect */}
+            {/* Protected Root Redirect & Global 404 Fallback */}
             <Route path="/" element={<RootRedirect />} />
-            <Route path="*" element={<RootRedirect />} />
+            <Route path="*" element={<NotFound scope="global" />} />
           </Route>
         </Routes>
       </BreadcrumbProvider>

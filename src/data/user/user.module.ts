@@ -103,6 +103,7 @@ export interface BusinessMembership {
   role_id?: string | null;
   status: string;
   require_switch_password?: boolean;
+  switch_password?: string | null;
   deletedAt?: string | null;
   created_at: string;
   updated_at: string;
@@ -114,9 +115,31 @@ export interface AuthCredential {
   email_id?: string | null;
   user_id: string;
   business_membership_id?: string | null;
-  switch_password?: string | null;
   password?: string;
   auth_type: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PlatformMembershipType = 'SUPER_ADMIN' | 'PLATFORM_MEMBER';
+
+export interface PlatformRole {
+  id: string;
+  role_name: string;
+  description?: string;
+  permissions: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformMembership {
+  id: string;
+  user_id: string;
+  membership_type: PlatformMembershipType;
+  platform_role_id?: string | null;
+  status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED';
+  require_switch_password: boolean;
+  switch_password?: string | null;
   created_at: string;
   updated_at: string;
 }
