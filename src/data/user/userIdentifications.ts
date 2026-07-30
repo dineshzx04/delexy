@@ -1,4 +1,6 @@
-export const mockUserIdentifications = [
+import type { UserIdentification } from './user.module';
+
+export const mockUserIdentifications: UserIdentification[] = [
   {
     id: 'uid-1',
     user_id: 'usr-1',

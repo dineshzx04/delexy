@@ -1,4 +1,3 @@
-
 export interface User {
   id: string;
   app_user_id?: string;
@@ -17,6 +16,7 @@ export interface User {
 export interface EmailRecord {
   id: string;
   email: string;
+  type: 'PERSONAL' | 'MEMBER';
   created_at: string;
   updated_at: string;
 }
@@ -32,15 +32,14 @@ export interface UserEmail {
   updated_at?: string;
 }
 
-export interface AuthCredential {
+export interface UserIdentification {
   id: string;
-  credential_type: 'INDIVIDUAL' | 'BUSINESS';
-  email_id?: string | null;
   user_id: string;
-  business_membership_id?: string | null;
-  switch_password?: string | null;
-  password?: string;
-  auth_type: string;
+  id_type: string;
+  issuing_country: string;
+  id_number: string;
+  verification_status: 'PENDING' | 'VERIFIED' | 'REJECTED';
+  expiry_date?: string;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +58,42 @@ export interface Business {
   updated_at: string;
 }
 
+export interface Address {
+  id: string;
+  owner_type: 'USER' | 'BUSINESS';
+  owner_id: string;
+  address_type?: 'HQ' | 'BRANCH' | 'HOME' | 'SHIPPING' | 'BILLING' | 'WAREHOUSE';
+  line1: string;
+  line2?: string;
+  city: string;
+  state_province: string;
+  postal_code: string;
+  country_code: string;
+  country_name?: string;
+  is_primary: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface BusinessEmail {
+  id: string;
+  business_id: string;
+  email_id: string;
+  email_type: string;
+  label?: string;
+  is_verified: boolean;
+  created_at: string;
+}
+
+export interface Role {
+  id: string;
+  business_id: string;
+  role_name: string;
+  permissions?: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface BusinessMembership {
   id: string;
   business_id: string;
@@ -73,44 +108,15 @@ export interface BusinessMembership {
   updated_at: string;
 }
 
-export interface UserBusinessRole {
+export interface AuthCredential {
   id: string;
-  business_id: string;
-  role_name: string;
+  credential_type: 'INDIVIDUAL' | 'BUSINESS';
+  email_id?: string | null;
+  user_id: string;
+  business_membership_id?: string | null;
+  switch_password?: string | null;
+  password?: string;
+  auth_type: string;
   created_at: string;
   updated_at: string;
 }
-
-export interface BusinessEmail {
-  id: string;
-  business_id: string;
-  email_id: string;
-  email_type: string;
-  label?: string;
-  is_verified: boolean;
-  created_at: string;
-}
-
-export interface UserAddress {
-  id: string;
-  user_id: string;
-  line1: string;
-  line2?: string;
-  city: string;
-  state_province: string;
-  postal_code: string;
-  country_code: string;
-  is_primary: boolean;
-}
-
-export interface UserIdentification {
-  id: string;
-  user_id: string;
-  id_type: string;
-  issuing_country: string;
-  id_number: string;
-  verification_status: string;
-  expiry_date?: string;
-  created_at: string;
-  updated_at: string;
-} 

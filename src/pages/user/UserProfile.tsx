@@ -16,14 +16,16 @@ import FormItem from '../../components/common/FormItem';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { userDb } from '../../data/user/userDb';
-
-import { mockUsers } from '../../data/user/users';
-import { mockEmails } from '../../data/user/emails';
-import { mockUserEmails } from '../../data/user/userEmails';
-import { mockBusinessEmails } from '../../data/user/businessEmails';
-import { mockBusinesses } from '../../data/user/businesses';
-import { mockBusinessMemberships } from '../../data/user/businessMemberships';
+import {
+  userDb,
+  type EmailRecord,
+  mockUsers,
+  mockEmails,
+  mockUserEmails,
+  mockBusinessEmails,
+  mockBusinesses,
+  mockBusinessMemberships
+} from '../../data/user';
 
 const { Option } = AntSelect;
 
@@ -60,7 +62,7 @@ const UserProfile: React.FC = () => {
 
   useBreadcrumb(breadcrumbs);
 
-  // 1. Fetch User Record from Dexie DB or fallback to mockUsers from src/data/users.ts
+  // 1. Fetch User Record from Dexie DB or fallback to mockUsers from src/data/user/users.ts
   const userRecord = useLiveQuery(
     async () => await userDb.users.get(targetUserId),
     [targetUserId]
@@ -131,6 +133,15 @@ const UserProfile: React.FC = () => {
     },
     [targetUserId]
   );
+
+  // 4. Query Personal Addresses directly from Dexie DB
+  const mappedAddresses = useLiveQuery(
+    async () => await userDb.addresses
+      .where('owner_id').equals(targetUserId)
+      .filter((a) => a.owner_type === 'USER')
+      .toArray(),
+    [targetUserId]
+  ) || [];
 
   const fallbackBusinessEmails: CompactEmailDisplay[] = React.useMemo(() => {
     const list: CompactEmailDisplay[] = [];
@@ -222,7 +233,7 @@ const UserProfile: React.FC = () => {
 
       if (!targetEmailObj) {
         const newEmailId = `em-${Date.now()}`;
-        const newRecord = { id: newEmailId, email: item.email.toLowerCase(), created_at: now, updated_at: now };
+        const newRecord: EmailRecord = { id: newEmailId, email: item.email.toLowerCase(), type: 'PERSONAL', created_at: now, updated_at: now };
         await userDb.emails.add(newRecord);
         targetEmailObj = newRecord;
       }
@@ -271,7 +282,7 @@ const UserProfile: React.FC = () => {
 
       if (!emailObj) {
         const newId = `em-${Date.now()}`;
-        const newRecord = { id: newId, email: inputEmail, created_at: now, updated_at: now };
+        const newRecord: EmailRecord = { id: newId, email: inputEmail, type: 'PERSONAL', created_at: now, updated_at: now };
         await userDb.emails.add(newRecord);
         emailObj = newRecord;
       }
@@ -416,7 +427,48 @@ const UserProfile: React.FC = () => {
               </form>
             </div>
           </div>
+          {/* PERSONAL PHYSICAL ADDRESSES SECTION */}
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden mt-6">
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-slate-800 text-lg flex items-center gap-2 m-0">
+                  <Lucide.MapPin size={18} className="text-sky-600" />
+                  Personal Physical Addresses ({mappedAddresses.length})
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 mb-0">Registered shipping and billing address locations.</p>
+              </div>
 
+              <Link to="/user/addresses">
+                <AntButton size="small" icon={<Lucide.ExternalLink size={13} />}>
+                  Manage Addresses
+                </AntButton>
+              </Link>
+            </div>
+
+            <div className="p-6">
+              {mappedAddresses.length === 0 ? (
+                <div className="text-xs text-slate-400 italic">No personal addresses registered.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {mappedAddresses.map((addr) => (
+                    <div key={addr.id} className="p-4 bg-slate-50/80 border border-slate-200 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <AntTag color="purple" className="text-xs font-semibold">{addr.address_type || 'HOME'}</AntTag>
+                        {addr.is_primary ? <AntTag color="green">Primary</AntTag> : <AntTag color="default">Secondary</AntTag>}
+                      </div>
+                      <div className="text-sm font-semibold text-slate-800">{addr.line1} {addr.line2 ? `, ${addr.line2}` : ''}</div>
+                      <div className="text-xs text-slate-500">
+                        {addr.city}, {addr.state_province} {addr.postal_code}
+                      </div>
+                      <div className="text-xs text-sky-700 font-medium flex items-center gap-1 pt-1 border-t border-slate-200/60">
+                        <Lucide.Globe size={12} /> {addr.country_name || addr.country_code} ({addr.country_code})
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           {/* Compact Emails & Roles View - Split into Individual & Business */}
           <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
@@ -529,7 +581,9 @@ const UserProfile: React.FC = () => {
               </div>
             </div>
           </div>
+
         </div>
+
       </div>
 
       {/* Add Secondary Individual Email Modal */}

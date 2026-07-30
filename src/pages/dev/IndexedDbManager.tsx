@@ -8,8 +8,8 @@ import {
   Spin
 } from 'antd';
 import * as Lucide from 'lucide-react';
-import { userDb } from '../../data/user/userDb';
-import { catalogDb } from '../../data/catelog/catalogDb';
+import { userDb } from '../../data/user';
+import { catalogDb } from '../../data/catalog';
 import { seedDatabase } from '../../data/seed';
 
 export interface IDBInfo {

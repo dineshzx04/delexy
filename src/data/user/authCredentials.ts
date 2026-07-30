@@ -1,4 +1,6 @@
-export const mockAuthCredentials = [
+import type { AuthCredential } from './user.module';
+
+export const mockAuthCredentials: AuthCredential[] = [
   {
     id: 'uc-1',
     credential_type: 'INDIVIDUAL',
@@ -58,5 +60,17 @@ export const mockAuthCredentials = [
     auth_type: 'PASSWORD',
     created_at: '2026-01-15T08:00:00.000Z',
     updated_at: '2026-01-15T08:00:00.000Z',
-  }
+  },
+  {
+    id: 'uc-6',
+    credential_type: 'BUSINESS',
+    email_id: 'em-103',
+    user_id: 'usr-3',
+    business_membership_id: 'bm-6',
+    switch_password: null,
+    password: '123456',
+    auth_type: 'PASSWORD',
+    created_at: '2026-04-10T08:00:00.000Z',
+    updated_at: '2026-04-10T08:00:00.000Z',
+  },
 ];

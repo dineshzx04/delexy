@@ -10,13 +10,14 @@ import { Link, useParams } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { userDb } from '../../data/user/userDb';
-
-import { mockBusinesses } from '../../data/user/businesses';
-import { mockBusinessEmails } from '../../data/user/businessEmails';
-import { mockEmails } from '../../data/user/emails';
-import { mockBusinessMemberships } from '../../data/user/businessMemberships';
-import { mockUsers } from '../../data/user/users';
+import {
+  userDb,
+  mockBusinesses,
+  mockBusinessEmails,
+  mockEmails,
+  mockBusinessMemberships,
+  mockUsers
+} from '../../data/user';
 
 const BusinessProfile: React.FC = () => {
   const { businessId: paramBizId } = useParams<{ businessId: string }>();
@@ -91,6 +92,15 @@ const BusinessProfile: React.FC = () => {
     },
     [currentBizId]
   );
+
+  // 4. Query Corporate Addresses from Dexie DB
+  const mappedBizAddresses = useLiveQuery(
+    async () => await userDb.addresses
+      .where('owner_id').equals(currentBizId)
+      .filter((a) => a.owner_type === 'BUSINESS')
+      .toArray(),
+    [currentBizId]
+  ) || [];
 
   const fallbackMemberships = React.useMemo(() => {
     const memberships = mockBusinessMemberships.filter((bm) => bm.business_id === currentBizId);
@@ -328,6 +338,43 @@ const BusinessProfile: React.FC = () => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+
+          {/* Corporate Locations & Addresses Section */}
+          <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-slate-800 text-lg flex items-center gap-2 m-0">
+                  <Lucide.MapPin size={18} className="text-indigo-600" />
+                  Corporate Locations & Addresses ({mappedBizAddresses.length})
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 mb-0">Registered headquarters, branch offices, and warehouse addresses.</p>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {mappedBizAddresses.length === 0 ? (
+                <div className="text-xs text-slate-400 italic">No corporate addresses registered.</div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {mappedBizAddresses.map((addr) => (
+                    <div key={addr.id} className="p-4 bg-indigo-50/30 border border-indigo-100 rounded-xl space-y-2">
+                      <div className="flex items-center justify-between">
+                        <AntTag color="purple" className="text-xs font-semibold">{addr.address_type || 'HQ'}</AntTag>
+                        {addr.is_primary ? <AntTag color="green">Primary HQ</AntTag> : <AntTag color="default">Branch / Location</AntTag>}
+                      </div>
+                      <div className="text-sm font-semibold text-slate-800">{addr.line1} {addr.line2 ? `, ${addr.line2}` : ''}</div>
+                      <div className="text-xs text-slate-500">
+                        {addr.city}, {addr.state_province} {addr.postal_code}
+                      </div>
+                      <div className="text-xs text-indigo-700 font-medium flex items-center gap-1 pt-1 border-t border-indigo-100/60">
+                        <Lucide.Globe size={12} /> {addr.country_name || addr.country_code} ({addr.country_code})
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

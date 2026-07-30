@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Card, Table, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { userDb } from '../../data/user/userDb';
+import { userDb } from '../../data/user';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
@@ -24,7 +24,7 @@ const BusinessMembers: React.FC = () => {
   ) || [];
 
   const users = useLiveQuery(() => userDb.users.toArray()) || [];
-  const roles = useLiveQuery(() => userDb.userBusinessRoles.toArray()) || [];
+  const roles = useLiveQuery(() => userDb.roles.toArray()) || [];
 
   const data = memberships.map((m) => {
     const usr = users.find((u) => u.id === m.user_id);

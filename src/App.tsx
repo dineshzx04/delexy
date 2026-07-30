@@ -18,6 +18,7 @@ import Dashboard from './pages/user/Dashboard';
 import UserProfile from './pages/user/UserProfile';
 import UserAddresses from './pages/user/UserAddresses';
 import UserIdentifications from './pages/user/UserIdentifications';
+import UserBrands from './pages/user/UserBrands';
 import CreateBusiness from './pages/user/CreateBusiness';
 
 import BusinessDashboard from './pages/business/BusinessDashboard';
@@ -28,6 +29,7 @@ import BusinessSettings from './pages/business/BusinessSettings';
 import BusinessRFQs from './pages/business/BusinessRFQs';
 import BusinessProducts from './pages/business/BusinessProducts';
 import BusinessProfile from './pages/business/BusinessProfile';
+import BusinessBrands from './pages/business/BusinessBrands';
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 
 const RootRedirect: React.FC = () => {
@@ -82,6 +84,7 @@ const App: React.FC = () => {
                 <Route path="profile" element={<UserProfile />} />
                 <Route path="addresses" element={<UserAddresses />} />
                 <Route path="identifications" element={<UserIdentifications />} />
+                <Route path="brands" element={<UserBrands />} />
                 <Route path="create-business" element={<CreateBusiness />} />
               </Route>
             </Route>
@@ -92,6 +95,7 @@ const App: React.FC = () => {
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<BusinessDashboard />} />
                 <Route path="profile" element={<BusinessProfile />} />
+                <Route path="brands" element={<BusinessBrands />} />
                 <Route path="members" element={<BusinessMembers />} />
                 <Route path="roles" element={<BusinessRoles />} />
                 <Route path="emails" element={<BusinessEmailsPage />} />

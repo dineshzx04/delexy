@@ -2,7 +2,7 @@ import React from 'react';
 import { Card, Table, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { userDb } from '../../data/user/userDb';
+import { userDb } from '../../data/user';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
@@ -16,11 +16,20 @@ const UserAddresses: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const addresses = useLiveQuery(
-    async () => await userDb.userAddresses.where('user_id').equals(currentUserId).toArray(),
+    async () => await userDb.addresses
+      .where('owner_id').equals(currentUserId)
+      .filter((a) => a.owner_type === 'USER')
+      .toArray(),
     [currentUserId]
   ) || [];
 
   const columns = [
+    {
+      title: 'Type',
+      dataIndex: 'address_type',
+      key: 'address_type',
+      render: (type?: string) => <Tag color="purple">{type || 'HOME'}</Tag>
+    },
     {
       title: 'Address Line 1',
       dataIndex: 'line1',
@@ -51,7 +60,12 @@ const UserAddresses: React.FC = () => {
       title: 'Country',
       dataIndex: 'country_code',
       key: 'country_code',
-      render: (code: string) => <Tag color="blue">{code}</Tag>
+      render: (code: string, record: any) => (
+        <span className="flex items-center gap-1.5 font-medium">
+          <Tag color="blue">{code}</Tag>
+          {record.country_name && <span className="text-slate-600 text-xs">{record.country_name}</span>}
+        </span>
+      )
     },
     {
       title: 'Primary',

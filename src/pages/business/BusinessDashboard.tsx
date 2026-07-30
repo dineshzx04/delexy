@@ -4,7 +4,7 @@ import { Card, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { userDb } from '../../data/user/userDb';
+import { userDb } from '../../data/user';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 const BusinessDashboard: React.FC = () => {

@@ -128,6 +128,11 @@ const UserLayout: React.FC = () => {
             icon: <Lucide.ShieldCheck size={18} />,
             label: <Link to="/user/identifications">Identity Verification (KYC)</Link>,
           },
+          {
+            key: '/user/brands',
+            icon: <Lucide.ShoppingBag size={18} />,
+            label: <Link to="/user/brands">Brands & Manufacturers I Sell</Link>,
+          },
         ],
       },
       {

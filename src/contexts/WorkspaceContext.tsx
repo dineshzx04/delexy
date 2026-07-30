@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { userDb, type User, type Business, type AuthCredential } from '../data/user/userDb';
+import { userDb, type User, type Business, type AuthCredential } from '../data/user';
 import { seedDatabase } from '../data/seed';
 
 export type WorkspaceType = 'individual' | 'tenant' | 'platform';

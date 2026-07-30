@@ -112,6 +112,11 @@ const BusinessLayout: React.FC = () => {
           label: <Link to="/b/profile">Business Profile</Link>,
         },
         {
+          key: '/b/brands',
+          icon: <Lucide.Award size={18} />,
+          label: <Link to="/b/brands">Brands & Manufacturer</Link>,
+        },
+        {
           key: '/b/members',
           icon: <Lucide.Users size={18} />,
           label: <Link to="/b/members">Team Members</Link>,

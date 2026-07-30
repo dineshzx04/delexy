@@ -1,4 +1,6 @@
-export const mockUsers = [
+import type { User } from './user.module';
+
+export const mockUsers: User[] = [
   {
     id: 'usr-1',
     app_user_id: 'USR-984201',
@@ -9,6 +11,7 @@ export const mockUsers = [
     place_of_birth: 'New York, USA',
     country_of_residence: 'United States',
     is_active: true,
+    is_platform_active: true,
     created_at: '2026-01-15T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z',
   },
@@ -22,7 +25,22 @@ export const mockUsers = [
     place_of_birth: 'Los Angeles, USA',
     country_of_residence: 'United States',
     is_active: true,
+    is_platform_active: true,
     created_at: '2026-03-15T08:00:00.000Z',
+    updated_at: '2026-07-20T12:00:00.000Z',
+  },
+  {
+    id: 'usr-3',
+    app_user_id: 'USR-984203',
+    first_name: 'Robert',
+    last_name: 'Johnson',
+    full_name: 'Robert Johnson',
+    date_of_birth: '1995-07-24',
+    place_of_birth: 'Chicago, USA',
+    country_of_residence: 'United States',
+    is_active: true,
+    is_platform_active: true,
+    created_at: '2026-04-10T08:00:00.000Z',
     updated_at: '2026-07-20T12:00:00.000Z',
   }
 ];

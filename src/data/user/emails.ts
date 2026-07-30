@@ -1,4 +1,6 @@
-export const mockEmails = [
+import type { EmailRecord } from './user.module';
+
+export const mockEmails: EmailRecord[] = [
   {
     id: 'em-101',
     email: 'john.personal@gmail.com',

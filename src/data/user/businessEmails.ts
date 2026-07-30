@@ -1,4 +1,6 @@
-export const mockBusinessEmails = [
+import type { BusinessEmail } from './user.module';
+
+export const mockBusinessEmails: BusinessEmail[] = [
   {
     id: 'be-1',
     business_id: 'bus-a',
