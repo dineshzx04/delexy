@@ -33,6 +33,12 @@ import BusinessBrands from './pages/business/BusinessBrands';
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 import PlatformLayout from './layouts/PlatformLayout';
 import PlatformDashboard from './pages/platform/PlatformDashboard';
+import AttributeValues from './pages/platform/attributes/AttributeValues';
+import Attributes from './pages/platform/attributes/Attributes';
+import AttributeGroups from './pages/platform/attributes/AttributeGroups';
+import AttributeMapping from './pages/platform/attributes/AttributeMapping';
+import CategoryManagement from './pages/platform/CategoryManagement';
+import CategoryProducts from './pages/platform/CategoryProducts';
 
 import NotFound from './pages/common/NotFound';
 
@@ -119,6 +125,12 @@ const App: React.FC = () => {
               <Route element={<ErrorBoundary />}>
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<PlatformDashboard />} />
+                <Route path="attributes" element={<Attributes />} />
+                <Route path="attribute-values" element={<AttributeValues />} />
+                <Route path="attribute-groups" element={<AttributeGroups />} />
+                <Route path="attribute-mapping" element={<AttributeMapping />} />
+                <Route path="categories" element={<CategoryManagement />} />
+                <Route path="products" element={<CategoryProducts />} />
                 <Route path="*" element={<NotFound scope="platform" />} />
               </Route>
             </Route>

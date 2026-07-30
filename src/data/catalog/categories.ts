@@ -1,6 +1,6 @@
-import type { Category } from './catalog.module';
+import type { CatalogCategory } from './catalog.module';
 
-export const mockCategories: Category[] = [
+export const mockCategories: CatalogCategory[] = [
   // Electronics Hierarchy
   { id: 'c-1', name: 'Electronics', slug: 'electronics', isActive: true, parentId: null, mappedGroupIds: [] },
   { id: 'c-2', name: 'Computers & Laptops', slug: 'computers-laptops', isActive: true, parentId: 'c-1', mappedGroupIds: [] },

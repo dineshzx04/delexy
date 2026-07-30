@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Tag as AntTag, Modal as AntModal, Input as AntInput, message as antMessage } from 'antd';
 import type { MenuProps } from 'antd';
@@ -9,6 +9,9 @@ import { cn } from '../lib/utils';
 
 const BusinessLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   const location = useLocation();
   const navigate = useNavigate();
   const { activeWorkspace, workspaces, switchWorkspace, validateSwitchPassword, currentUser, logout, currentCredential } = useWorkspace();
@@ -18,6 +21,17 @@ const BusinessLayout: React.FC = () => {
   const [switchPassInput, setSwitchPassInput] = useState('123456');
   const [switchPassModalOpen, setSwitchPassModalOpen] = useState(false);
   const [loadingPass, setLoadingPass] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setMobileOpen(false);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleWorkspaceSwitch = (id: string) => {
     const targetWs = workspaces.find((w) => w.id === id);
@@ -66,21 +80,17 @@ const BusinessLayout: React.FC = () => {
 
   const userMenuItems: MenuProps['items'] = [
     {
-      key: 'business-profile',
-      icon: <Lucide.Building2 size={16} />,
-      label: <Link to="/b/profile">Business Profile</Link>,
+      key: 'profile',
+      icon: <Lucide.User size={16} />,
+      label: <Link to="/user/profile">My Individual Profile</Link>,
     },
-    ...(currentCredential?.credential_type !== 'BUSINESS'
-      ? [
-          {
-            key: 'user-profile',
-            icon: <Lucide.User size={16} />,
-            label: <Link to="/user/profile">Personal Profile</Link>,
-          },
-        ]
-      : []),
     {
-      type: 'divider' as const,
+      key: 'settings',
+      icon: <Lucide.Building size={16} />,
+      label: <Link to="/b/settings">Business Settings</Link>,
+    },
+    {
+      type: 'divider',
     },
     {
       key: 'logout',
@@ -99,74 +109,83 @@ const BusinessLayout: React.FC = () => {
     },
   ];
 
-  const getMenuItems = () => [
-    {
-      key: 'business-core',
-      type: 'group',
-      label: collapsed ? null : 'Business Management',
-      children: [
-        {
-          key: '/b/dashboard',
-          icon: <Lucide.LayoutDashboard size={18} />,
-          label: <Link to="/b/dashboard">Business Dashboard</Link>,
-        },
-        {
-          key: '/b/profile',
-          icon: <Lucide.Building2 size={18} />,
-          label: <Link to="/b/profile">Business Profile</Link>,
-        },
-        {
-          key: '/b/brands',
-          icon: <Lucide.Award size={18} />,
-          label: <Link to="/b/brands">Brands & Manufacturer</Link>,
-        },
-        {
-          key: '/b/members',
-          icon: <Lucide.Users size={18} />,
-          label: <Link to="/b/members">Team Members</Link>,
-        },
-        {
-          key: '/b/roles',
-          icon: <Lucide.ShieldCheck size={18} />,
-          label: <Link to="/b/roles">Roles & Permissions</Link>,
-        },
-        {
-          key: '/b/emails',
-          icon: <Lucide.Mail size={18} />,
-          label: <Link to="/b/emails">Business Emails</Link>,
-        },
-        {
-          key: '/b/settings',
-          icon: <Lucide.Settings size={18} />,
-          label: <Link to="/b/settings">Business Settings</Link>,
-        },
-      ],
-    },
-    {
-      key: 'b2b-operations',
-      type: 'group',
-      label: collapsed ? null : 'Procurement & Catalog',
-      children: [
-        {
-          key: '/b/rfqs',
-          icon: <Lucide.FileText size={18} />,
-          label: <Link to="/b/rfqs">RFQs & Quotes</Link>,
-        },
-        {
-          key: '/b/products',
-          icon: <Lucide.Package size={18} />,
-          label: <Link to="/b/products">Business Products</Link>,
-        },
-      ],
-    },
-  ];
+  const getMenuItems = () => {
+    return [
+      {
+        key: 'tenant-dashboard-group',
+        type: 'group',
+        label: collapsed ? null : 'Overview',
+        children: [
+          {
+            key: '/b/dashboard',
+            icon: <Lucide.LayoutDashboard size={18} />,
+            label: <Link to="/b/dashboard">Dashboard</Link>,
+          },
+          {
+            key: '/b/profile',
+            icon: <Lucide.Building size={18} />,
+            label: <Link to="/b/profile">Business Profile</Link>,
+          },
+        ],
+      },
+      {
+        key: 'commerce-catalog-group',
+        type: 'group',
+        label: collapsed ? null : 'Commerce & Selling',
+        children: [
+          {
+            key: '/b/products',
+            icon: <Lucide.Package size={18} />,
+            label: <Link to="/b/products">Seller Catalog Products</Link>,
+          },
+          {
+            key: '/b/rfqs',
+            icon: <Lucide.FileText size={18} />,
+            label: <Link to="/b/rfqs">RFQs & Quotes</Link>,
+          },
+          {
+            key: '/b/brands',
+            icon: <Lucide.Award size={18} />,
+            label: <Link to="/b/brands">Brands & Claiming</Link>,
+          },
+        ],
+      },
+      {
+        key: 'team-rbac-group',
+        type: 'group',
+        label: collapsed ? null : 'Organization & Team',
+        children: [
+          {
+            key: '/b/members',
+            icon: <Lucide.Users size={18} />,
+            label: <Link to="/b/members">Team Members</Link>,
+          },
+          {
+            key: '/b/roles',
+            icon: <Lucide.ShieldCheck size={18} />,
+            label: <Link to="/b/roles">Roles & RBAC Permissions</Link>,
+          },
+          {
+            key: '/b/business-emails',
+            icon: <Lucide.Mail size={18} />,
+            label: <Link to="/b/business-emails">Corporate Emails</Link>,
+          },
+          {
+            key: '/b/settings',
+            icon: <Lucide.Settings size={18} />,
+            label: <Link to="/b/settings">Settings</Link>,
+          },
+        ],
+      },
+    ];
+  };
 
   const workspaceMenuItems: MenuProps['items'] = workspaces.map((w) => ({
     key: w.id,
     label: (
       <div
         onClick={() => handleWorkspaceSwitch(w.id)}
-        className="flex items-center justify-between gap-4 py-2 min-w-[240px] cursor-pointer"
+        className={`flex items-center justify-between gap-4 py-2 min-w-[240px] cursor-pointer`}
       >
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
@@ -176,14 +195,14 @@ const BusinessLayout: React.FC = () => {
             )}
           </div>
           {w.email && (
-            <span className="text-xs text-indigo-700 font-mono flex items-center gap-1 mt-0.5">
-              <Lucide.Mail size={12} className="text-indigo-600 shrink-0" />
+            <span className="text-xs text-sky-700 font-mono flex items-center gap-1 mt-0.5">
+              <Lucide.Mail size={12} className="text-sky-600 shrink-0" />
               {w.email}
             </span>
           )}
           <span className="text-[11px] text-slate-500 capitalize mt-0.5">{w.type} • Role: {w.role}</span>
         </div>
-        {w.id === activeWorkspace.id && <Lucide.Check size={16} className="text-indigo-600 shrink-0" />}
+        {w.id === activeWorkspace.id && <Lucide.Check size={16} className="text-sky-600 shrink-0" />}
       </div>
     ),
   }));
@@ -194,11 +213,21 @@ const BusinessLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900 antialiased">
+      {/* Mobile Overlay Backdrop */}
+      {isMobile && mobileOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 z-30 transition-opacity"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
       {/* Business Sidebar */}
       <aside
         className={cn(
-          "bg-slate-900 text-slate-100 border-r border-slate-800 flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300",
-          collapsed ? "w-16" : "w-64"
+          "bg-slate-900 text-slate-100 border-r border-slate-800 flex flex-col fixed left-0 top-0 bottom-0 z-40 transition-all duration-300",
+          isMobile
+            ? (mobileOpen ? "w-64 translate-x-0 shadow-2xl" : "w-64 -translate-x-full")
+            : (collapsed ? "w-16" : "w-64")
         )}
       >
         {/* Brand Header */}
@@ -207,7 +236,7 @@ const BusinessLayout: React.FC = () => {
             <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-md">
               <Lucide.Building2 size={18} />
             </div>
-            {!collapsed && (
+            {(!collapsed || isMobile) && (
               <div className="flex flex-col leading-none">
                 <span className="font-bold text-base text-white tracking-tight truncate max-w-[140px]">
                   {activeWorkspace.name.replace(/\(Personal\)/g, '')}
@@ -218,6 +247,9 @@ const BusinessLayout: React.FC = () => {
               </div>
             )}
           </Link>
+          {isMobile && (
+            <AntButton type="text" icon={<Lucide.X size={18} className="text-slate-400" />} onClick={() => setMobileOpen(false)} />
+          )}
         </div>
 
         {/* Sidebar Navigation */}
@@ -228,20 +260,32 @@ const BusinessLayout: React.FC = () => {
             selectedKeys={[location.pathname]}
             items={getMenuItems() as MenuProps['items']}
             className="border-none bg-transparent w-auto"
-            inlineCollapsed={collapsed}
+            inlineCollapsed={!isMobile && collapsed}
           />
         </div>
       </aside>
 
       {/* Main Container */}
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", collapsed ? "ml-16" : "ml-64")}>
+      <div className={cn(
+        "flex-1 flex flex-col transition-all duration-300",
+        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-64")
+      )}>
         {/* Top Navbar */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 fixed top-0 right-0 z-20 transition-all duration-300" style={{ left: collapsed ? '4rem' : '16rem' }}>
-          <div className="flex items-center gap-4">
+        <header
+          className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 fixed top-0 right-0 z-20 transition-all duration-300 left-0"
+          style={{ left: isMobile ? '0px' : (collapsed ? '4rem' : '16rem') }}
+        >
+          <div className="flex items-center gap-2 sm:gap-4">
             <AntButton
               type="text"
-              icon={collapsed ? <Lucide.Menu size={20} /> : <Lucide.ChevronLeft size={20} />}
-              onClick={() => setCollapsed(!collapsed)}
+              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.ChevronLeft size={20} />)}
+              onClick={() => {
+                if (isMobile) {
+                  setMobileOpen(!mobileOpen);
+                } else {
+                  setCollapsed(!collapsed);
+                }
+              }}
               className="text-slate-600 hover:text-slate-900 flex items-center justify-center"
             />
             <div className="hidden sm:flex items-center gap-2">
@@ -324,7 +368,7 @@ const BusinessLayout: React.FC = () => {
         </AntModal>
 
         {/* Content Body */}
-        <main className="flex-1 p-6 md:p-8 mt-16">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16">
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />

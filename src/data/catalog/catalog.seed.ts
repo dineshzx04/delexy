@@ -4,7 +4,6 @@ import { mockAttributeGroups } from './attributeGroups';
 import { mockAttributes } from './attributes';
 import { mockAttributeValues } from './attributeValues';
 import { mockProducts } from './products';
-import { mockProductCategories } from './productCategories';
 import { mockSellerProducts } from './sellerProducts';
 
 export {
@@ -13,7 +12,6 @@ export {
   mockAttributes,
   mockAttributeValues,
   mockProducts,
-  mockProductCategories,
   mockSellerProducts
 };
 
@@ -25,7 +23,6 @@ export const seedCatalogModule = async () => {
     await catalogDb.attributes.bulkPut(mockAttributes);
     await catalogDb.attributeValues.bulkPut(mockAttributeValues);
     await catalogDb.products.bulkPut(mockProducts);
-    await catalogDb.productCategories.bulkPut(mockProductCategories);
     await catalogDb.sellerProducts.bulkPut(mockSellerProducts);
     console.log('[Catalog Module] Database seeded successfully.');
   }

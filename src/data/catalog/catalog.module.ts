@@ -1,12 +1,18 @@
-export interface Category {
+export interface AttributeValue {
+  id: string;
+  attributeId: string;
+  value: string;
+  label?: string;
+}
+
+export interface Attribute {
   id: string;
   name: string;
-  slug: string;
-  isActive: boolean;
-  parentId: string | null;
-  level?: number;
-  mappedGroupIds: string[];
-  childrenCount?: number;
+  code?: string;
+  label?: string;
+  type: "text" | "number" | "select" | "multiselect";
+  valueIds?: string[];
+  unit?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -19,39 +25,28 @@ export interface AttributeGroup {
   updated_at?: string;
 }
 
-export interface Attribute {
+export interface CatalogCategory {
   id: string;
   name: string;
-  code?: string;
-  label?: string;
-  type: 'text' | 'number' | 'select' | 'multiselect';
-  valueIds?: string[];
-  unit?: string;
+  slug: string;
+  isActive: boolean;
+  parentId: string | null;
+  level?: number;
+  mappedGroupIds: string[];
+  childrenCount?: number;
   created_at?: string;
   updated_at?: string;
 }
 
-export interface AttributeValue {
-  id: string;
-  attributeId: string;
-  value: string;
-  label?: string;
-}
-
-export interface Product {
+export interface CatalogProduct {
   id: string;
   name: string;
   description?: string;
-  status: 'ACTIVE' | 'DRAFT' | 'ARCHIVED';
+  categoryId: string;
+  isActive?: boolean;
+  status: "ACTIVE" | "DRAFT" | "ARCHIVED";
   created_at?: string;
   updated_at?: string;
-}
-
-export interface ProductCategory {
-  id: string;
-  product_id: string;
-  category_id: string;
-  created_at?: string;
 }
 
 export interface SellerProduct {
@@ -65,7 +60,7 @@ export interface SellerProduct {
   price: number;
   currency: string;
   stock: number;
-  status: 'ACTIVE' | 'INACTIVE' | 'OUT_OF_STOCK';
+  status: "ACTIVE" | "INACTIVE" | "OUT_OF_STOCK";
   dynamicAttributes: Record<string, any>;
   globalSpecs?: Record<string, any>;
   created_at?: string;

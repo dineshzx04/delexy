@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
 import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Modal as AntModal, Input as AntInput, message as antMessage, Tag as AntTag } from 'antd';
 import type { MenuProps } from 'antd';
@@ -9,6 +9,9 @@ import { cn } from '../lib/utils';
 
 const UserLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   const location = useLocation();
   const navigate = useNavigate();
   const { activeWorkspace, workspaces, switchWorkspace, validateSwitchPassword, currentUser, logout, currentCredential } = useWorkspace();
@@ -18,6 +21,17 @@ const UserLayout: React.FC = () => {
   const [switchPassInput, setSwitchPassInput] = useState('123456');
   const [switchPassModalOpen, setSwitchPassModalOpen] = useState(false);
   const [loadingPass, setLoadingPass] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setMobileOpen(false);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Route Guard: BUSINESS credential users do not have permission/rights to access user routes
   if (currentCredential?.credential_type === 'BUSINESS') {
@@ -187,11 +201,21 @@ const UserLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900 antialiased">
+      {/* Mobile Drawer Overlay Backdrop */}
+      {isMobile && mobileOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 z-30 transition-opacity"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
         className={cn(
-          "bg-white border-r border-slate-200 flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300",
-          collapsed ? "w-16" : "w-64"
+          "bg-white border-r border-slate-200 flex flex-col fixed left-0 top-0 bottom-0 z-40 transition-all duration-300",
+          isMobile
+            ? (mobileOpen ? "w-64 translate-x-0 shadow-2xl" : "w-64 -translate-x-full")
+            : (collapsed ? "w-16" : "w-64")
         )}
       >
         {/* Brand */}
@@ -200,13 +224,16 @@ const UserLayout: React.FC = () => {
             <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-sm">
               D
             </div>
-            {!collapsed && (
+            {(!collapsed || isMobile) && (
               <div className="flex flex-col leading-none">
                 <span className="font-bold text-lg text-slate-900 tracking-tight">Delexy</span>
                 <span className="text-[10px] text-sky-600 font-semibold tracking-wider uppercase">User Portal</span>
               </div>
             )}
           </Link>
+          {isMobile && (
+            <AntButton type="text" icon={<Lucide.X size={18} />} onClick={() => setMobileOpen(false)} />
+          )}
         </div>
 
         {/* Navigation Menu */}
@@ -216,20 +243,32 @@ const UserLayout: React.FC = () => {
             selectedKeys={[location.pathname]}
             items={getMenuItems() as MenuProps['items']}
             className="border-none text-slate-700 w-auto"
-            inlineCollapsed={collapsed}
+            inlineCollapsed={!isMobile && collapsed}
           />
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", collapsed ? "ml-16" : "ml-64")}>
+      <div className={cn(
+        "flex-1 flex flex-col transition-all duration-300",
+        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-64")
+      )}>
         {/* Top Navbar */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 fixed top-0 right-0 z-20 transition-all duration-300" style={{ left: collapsed ? '4rem' : '16rem' }}>
-          <div className="flex items-center gap-4">
+        <header
+          className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 fixed top-0 right-0 z-20 transition-all duration-300 left-0"
+          style={{ left: isMobile ? '0px' : (collapsed ? '4rem' : '16rem') }}
+        >
+          <div className="flex items-center gap-2 sm:gap-4">
             <AntButton
               type="text"
-              icon={collapsed ? <Lucide.Menu size={20} /> : <Lucide.ChevronLeft size={20} />}
-              onClick={() => setCollapsed(!collapsed)}
+              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.ChevronLeft size={20} />)}
+              onClick={() => {
+                if (isMobile) {
+                  setMobileOpen(!mobileOpen);
+                } else {
+                  setCollapsed(!collapsed);
+                }
+              }}
               className="text-slate-600 hover:text-slate-900 flex items-center justify-center"
             />
           </div>
@@ -307,7 +346,7 @@ const UserLayout: React.FC = () => {
         </AntModal>
 
         {/* Main Body */}
-        <main className="flex-1 p-6 md:p-8 mt-16">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16">
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb

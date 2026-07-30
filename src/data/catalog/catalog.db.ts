@@ -1,13 +1,12 @@
 import Dexie, { type Table } from 'dexie';
-import type { Category, AttributeGroup, Attribute, AttributeValue, Product, ProductCategory, SellerProduct } from './catalog.module';
+import type { CatalogCategory, AttributeGroup, Attribute, AttributeValue, CatalogProduct, SellerProduct } from './catalog.module';
 
 export class CatalogDatabase extends Dexie {
-  categories!: Table<Category, string>;
+  categories!: Table<CatalogCategory, string>;
   attributeGroups!: Table<AttributeGroup, string>;
   attributes!: Table<Attribute, string>;
   attributeValues!: Table<AttributeValue, string>;
-  products!: Table<Product, string>;
-  productCategories!: Table<ProductCategory, string>;
+  products!: Table<CatalogProduct, string>;
   sellerProducts!: Table<SellerProduct, string>;
 
   constructor() {
@@ -17,8 +16,7 @@ export class CatalogDatabase extends Dexie {
       attributeGroups: 'id',
       attributes: 'id',
       attributeValues: 'id, attributeId',
-      products: 'id, status',
-      productCategories: 'id, product_id, category_id',
+      products: 'id, categoryId, status',
       sellerProducts: 'id, seller_party_id, product_id, brand_id, manufacturer_party_id, sku',
     });
   }

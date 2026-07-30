@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Layout as AntLayout } from 'antd';
 import type { MenuProps } from 'antd';
@@ -9,10 +9,23 @@ import { cn } from '../lib/utils';
 
 const PlatformLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { activeWorkspace, workspaces, switchWorkspace, currentUser, allUsers, logout, switchUser } = useWorkspace();
   const { customBreadcrumbs } = useBreadcrumbContext();
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setMobileOpen(false);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const handleWorkspaceSwitch = (id: string) => {
     const ws = switchWorkspace(id);
@@ -53,58 +66,135 @@ const PlatformLayout: React.FC = () => {
     },
   ];
 
-  const getMenuItems = () => {
-    return [
-      { key: '/p/dashboard', icon: <Lucide.Globe size={16} />, label: <Link to="/p/dashboard">Global Overview</Link> },
-      {
-        key: 'taxonomies',
-        icon: <Lucide.Layers size={16} />,
-        label: 'Taxonomies',
-        children: [
-          { key: '/p/attributes', label: <Link to="/p/attributes">Attributes</Link> },
-          { key: '/p/attribute-values', label: <Link to="/p/attribute-values">Values</Link> },
-          { key: '/p/attribute-groups', label: <Link to="/p/attribute-groups">Groups</Link> },
-          { key: '/p/attribute-mapping', label: <Link to="/p/attribute-mapping">Mapping</Link> },
-        ]
-      },
-      {
-        key: 'global-entities',
-        icon: <Lucide.Database size={16} />,
-        label: 'Global Data',
-        children: [
-          { key: '/p/businesses', label: <Link to="/p/businesses">Businesses</Link> },
-          { key: '/p/users', label: <Link to="/p/users">Users</Link> },
-          { key: '/p/categories', label: <Link to="/p/categories">Categories</Link> },
-          { key: '/p/products', label: <Link to="/p/products">Global Products</Link> },
-        ]
-      },
-      {
-        key: 'governance',
-        icon: <Lucide.ShieldCheck size={16} />,
-        label: 'Governance & RBAC',
-        children: [
-          { key: '/p/platform-roles', label: <Link to="/p/platform-roles">Platform Roles</Link> },
-          { key: '/p/business-roles', label: <Link to="/p/business-roles">Default Tenant Roles</Link> },
-          { key: '/p/audit-logs', label: <Link to="/p/audit-logs">Audit Logs</Link> },
-        ]
-      },
-      {
-        key: 'settings-group',
-        type: 'group',
-        label: collapsed ? null : 'Personal Settings',
-        children: [
-          { key: '/profile', icon: <Lucide.User size={16} />, label: <Link to="/profile">Profile</Link> }, 
-        ]
-      }
-    ];
-  };
+  const getMenuItems = () => [
+    // Dashboard
+    {
+      key: "/p/dashboard",
+      icon: <Lucide.LayoutDashboard size={16} />,
+      label: <Link to="/p/dashboard">Dashboard</Link>,
+    },
+
+    // Organizations
+    {
+      key: "organizations",
+      icon: <Lucide.Building2 size={16} />,
+      label: "Organizations",
+      children: [
+        {
+          key: "/p/businesses",
+          icon: <Lucide.Building size={16} />,
+          label: <Link to="/p/businesses">Businesses</Link>,
+        },
+        {
+          key: "/p/users",
+          icon: <Lucide.Users size={16} />,
+          label: <Link to="/p/users">Users</Link>,
+        },
+      ],
+    },
+
+    // Product Information
+    {
+      key: "product-information",
+      icon: <Lucide.Boxes size={16} />,
+      label: "Product Information",
+      children: [
+        {
+          key: "/p/categories",
+          icon: <Lucide.FolderTree size={16} />,
+          label: <Link to="/p/categories">Categories</Link>,
+        },
+        {
+          key: "/p/attribute-groups",
+          icon: <Lucide.Layers3 size={16} />,
+          label: <Link to="/p/attribute-groups">Attribute Groups</Link>,
+        },
+        {
+          key: "/p/attributes",
+          icon: <Lucide.ListTree size={16} />,
+          label: <Link to="/p/attributes">Attributes</Link>,
+        },
+        {
+          key: "/p/attribute-values",
+          icon: <Lucide.Tag size={16} />,
+          label: <Link to="/p/attribute-values">Attribute Values</Link>,
+        },
+        {
+          key: "/p/attribute-mapping",
+          icon: <Lucide.GitMerge size={16} />,
+          label: <Link to="/p/attribute-mapping">Category Mapping</Link>,
+        },
+      ],
+    },
+
+    // Catalog
+    {
+      key: "catalog",
+      icon: <Lucide.Package size={16} />,
+      label: "Catalog",
+      children: [
+        {
+          key: "/p/products",
+          icon: <Lucide.Box size={16} />,
+          label: <Link to="/p/products">Products</Link>,
+        },
+      ],
+    },
+
+    // Access Control
+    {
+      key: "access-control",
+      icon: <Lucide.ShieldCheck size={16} />,
+      label: "Access Control",
+      children: [
+        {
+          key: "/p/platform-roles",
+          icon: <Lucide.KeyRound size={16} />,
+          label: <Link to="/p/platform-roles">Platform Roles</Link>,
+        },
+        {
+          key: "/p/business-roles",
+          icon: <Lucide.UsersRound size={16} />,
+          label: <Link to="/p/business-roles">Business Roles</Link>,
+        },
+      ],
+    },
+
+    // Governance
+    {
+      key: "governance",
+      icon: <Lucide.Scale size={16} />,
+      label: "Governance",
+      children: [
+        {
+          key: "/p/audit-logs",
+          icon: <Lucide.ScrollText size={16} />,
+          label: <Link to="/p/audit-logs">Audit Logs</Link>,
+        },
+      ],
+    },
+
+    // My Account
+    {
+      key: "account-group",
+      type: "group",
+      label: collapsed ? null : "My Account",
+      children: [
+        {
+          key: "/p/profile",
+          icon: <Lucide.User size={16} />,
+          label: <Link to="/p/profile">Profile</Link>,
+        },
+      ],
+    },
+  ];
 
   const workspaceMenuItems: MenuProps['items'] = workspaces.map((w) => ({
     key: w.id,
     label: (
       <div
         onClick={() => handleWorkspaceSwitch(w.id)}
-        className="flex items-center justify-between gap-4 py-2 min-w-[240px]"
+        className="flex items-center justify-between gap-4 py-2 min-w-[240px] cursor-pointer"
       >
         <div className="flex flex-col">
           <span className="font-semibold text-slate-800 text-sm">{w.name}</span>
@@ -127,11 +217,21 @@ const PlatformLayout: React.FC = () => {
 
   return (
     <div className="min-h-screen flex bg-gray-50 text-gray-900 antialiased">
+      {/* Mobile Overlay Backdrop */}
+      {isMobile && mobileOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 z-30 transition-opacity"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
       <aside
         className={cn(
-          "bg-slate-900 text-slate-100 border-r border-slate-800 flex flex-col fixed left-0 top-0 bottom-0 z-30 transition-all duration-300",
-          collapsed ? "w-16" : "w-64"
+          "bg-slate-900 text-slate-100 border-r border-slate-800 flex flex-col fixed left-0 top-0 bottom-0 z-40 transition-all duration-300",
+          isMobile
+            ? (mobileOpen ? "w-64 translate-x-0 shadow-2xl" : "w-64 -translate-x-full")
+            : (collapsed ? "w-16" : "w-64")
         )}
       >
         {/* Brand */}
@@ -140,13 +240,16 @@ const PlatformLayout: React.FC = () => {
             <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center font-bold text-lg flex-shrink-0 shadow-md">
               <Lucide.ShieldCheck size={20} />
             </div>
-            {!collapsed && (
+            {(!collapsed || isMobile) && (
               <div className="flex flex-col">
                 <span className="font-bold text-lg text-white tracking-tight leading-none">Delexy</span>
                 <span className="text-[10px] text-sky-400 font-semibold uppercase tracking-wider">Platform Admin</span>
               </div>
             )}
           </Link>
+          {isMobile && (
+            <AntButton type="text" icon={<Lucide.X size={18} className="text-slate-400" />} onClick={() => setMobileOpen(false)} />
+          )}
         </div>
 
         {/* Navigation Menu */}
@@ -155,23 +258,36 @@ const PlatformLayout: React.FC = () => {
             mode="inline"
             theme="dark"
             selectedKeys={[location.pathname]}
+            defaultOpenKeys={['organizations', 'product-information', 'catalog', 'access-control', 'governance']}
             items={getMenuItems() as MenuProps['items']}
-            className="bg-slate-900 border-none"
-            inlineCollapsed={collapsed}
+            className="border-none bg-transparent w-auto"
+            inlineCollapsed={!isMobile && collapsed}
           />
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <div className={cn("flex-1 flex flex-col transition-all duration-300", collapsed ? "ml-16" : "ml-64")}>
+      <div className={cn(
+        "flex-1 flex flex-col transition-all duration-300",
+        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-64")
+      )}>
         {/* Top Navbar */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 fixed top-0 right-0 z-20 transition-all duration-300 left-0" style={{ left: collapsed ? '4rem' : '16rem' }}>
-          <div className="flex items-center gap-4">
+        <header
+          className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 fixed top-0 right-0 z-20 transition-all duration-300 left-0"
+          style={{ left: isMobile ? '0px' : (collapsed ? '4rem' : '16rem') }}
+        >
+          <div className="flex items-center gap-2 sm:gap-4">
             <AntButton
               type="text"
-              icon={collapsed ? <Lucide.PanelLeftOpen size={16} /> : <Lucide.PanelLeftClose size={16} />}
-              onClick={() => setCollapsed(!collapsed)}
-              className="text-lg w-10 h-10 flex items-center justify-center"
+              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.PanelLeftOpen size={16} /> : <Lucide.PanelLeftClose size={16} />)}
+              onClick={() => {
+                if (isMobile) {
+                  setMobileOpen(!mobileOpen);
+                } else {
+                  setCollapsed(!collapsed);
+                }
+              }}
+              className="text-lg w-10 h-10 flex items-center justify-center text-gray-600 hover:text-gray-900"
             />
           </div>
 
@@ -214,7 +330,7 @@ const PlatformLayout: React.FC = () => {
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 p-6 md:p-8 mt-12">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16">
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb

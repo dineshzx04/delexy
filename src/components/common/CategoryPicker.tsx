@@ -3,7 +3,7 @@ import { Modal, Button, Input } from 'antd';
 import * as Lucide from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { catalogDb, type Category } from '../../data/catalog';
+import { catalogDb, type CatalogCategory } from '../../data/catalog';
 
 interface CategoryPickerProps {
   value?: string; // Category ID
@@ -25,12 +25,12 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   // Compute columns based on selected path
   const columns = useMemo(() => {
     // First column is always roots (where parentId is null)
-    const cols = [dbCategories.filter((c: Category) => c.parentId === null)];
+    const cols = [dbCategories.filter((c: CatalogCategory) => c.parentId === null)];
 
     // For each selected item in the path, if it has children, add the next column
     for (let i = 0; i < selectedPath.length; i++) {
       const currentId = selectedPath[i];
-      const children = dbCategories.filter((c: Category) => c.parentId === currentId);
+      const children = dbCategories.filter((c: CatalogCategory) => c.parentId === currentId);
       if (children.length > 0) {
         cols.push(children);
       }
@@ -42,7 +42,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   // If search query exists, we flatten the UI to just show search results instead of columns
   const searchResults = useMemo(() => {
     if (!searchQuery) return [];
-    return dbCategories.filter((c: Category) => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || (c.slug && c.slug.toLowerCase().includes(searchQuery.toLowerCase()))).slice(0, 50); // limit for performance
+    return dbCategories.filter((c: CatalogCategory) => c.name.toLowerCase().includes(searchQuery.toLowerCase()) || (c.slug && c.slug.toLowerCase().includes(searchQuery.toLowerCase()))).slice(0, 50); // limit for performance
   }, [searchQuery, dbCategories]);
 
   const handleSelectCategory = (categoryId: string, columnIndex: number) => {
@@ -55,7 +55,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   const handleConfirm = () => {
     if (selectedPath.length > 0) {
       const finalId = selectedPath[selectedPath.length - 1];
-      const finalCat = dbCategories.find((c: Category) => c.id === finalId);
+      const finalCat = dbCategories.find((c: CatalogCategory) => c.id === finalId);
       if (finalCat && onChange) {
         onChange(finalCat.id, finalCat.name);
       }
@@ -82,10 +82,10 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
   const currentCategoryPathNames = useMemo(() => {
     if (!value || dbCategories.length === 0) return null;
     const pathNames: string[] = [];
-    let curr = dbCategories.find((c: Category) => c.id === value);
+    let curr = dbCategories.find((c: CatalogCategory) => c.id === value);
     while (curr) {
       pathNames.unshift(curr.name);
-      curr = dbCategories.find((c: Category) => c.id === curr!.parentId);
+      curr = dbCategories.find((c: CatalogCategory) => c.id === curr!.parentId);
     }
     return pathNames.length > 0 ? pathNames : null;
   }, [value, dbCategories]);
@@ -98,10 +98,10 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
             // Re-hydrate path if editing existing value
             if (value && dbCategories.length > 0) {
               const path: string[] = [];
-              let curr = dbCategories.find((c: Category) => c.id === value);
+              let curr = dbCategories.find((c: CatalogCategory) => c.id === value);
               while (curr) {
                 path.unshift(curr.id);
-                curr = dbCategories.find((c: Category) => c.id === curr!.parentId);
+                curr = dbCategories.find((c: CatalogCategory) => c.id === curr!.parentId);
               }
               setSelectedPath(path);
             } else {
@@ -180,7 +180,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
                   <div className="h-full flex items-center justify-center text-gray-400">No categories found.</div>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {searchResults.map((cat: Category) => (
+                    {searchResults.map((cat: CatalogCategory) => (
                       <div
                         key={cat.id}
                         className="p-3 border border-gray-100 rounded hover:border-sky-500 cursor-pointer flex items-center justify-between transition-colors"
@@ -190,7 +190,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
                           let curr: any = cat;
                           while (curr) {
                             path.unshift(curr.id);
-                            curr = dbCategories.find((c: Category) => c.id === curr!.parentId);
+                            curr = dbCategories.find((c: CatalogCategory) => c.id === curr!.parentId);
                           }
                           setSelectedPath(path);
                           setSearchQuery('');
@@ -218,9 +218,9 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
                       Level {colIndex + 1}
                     </div>
                     <div className="flex-1 overflow-y-auto p-1">
-                      {colItems.map((item: Category) => {
+                      {colItems.map((item: CatalogCategory) => {
                         const isSelected = selectedPath[colIndex] === item.id;
-                        const hasChildren = dbCategories.some((c: Category) => c.parentId === item.id);
+                        const hasChildren = dbCategories.some((c: CatalogCategory) => c.parentId === item.id);
                         return (
                           <div
                             key={item.id}
@@ -251,7 +251,7 @@ const CategoryPicker: React.FC<CategoryPickerProps> = ({ value, onChange }) => {
               <span className="italic text-gray-400">No category selected</span>
             ) : (
               selectedPath.map((id, idx) => {
-                const cat = dbCategories.find((c: Category) => c.id === id);
+                const cat = dbCategories.find((c: CatalogCategory) => c.id === id);
                 return (
                   <React.Fragment key={id}>
                     {idx > 0 && <Lucide.ChevronRight size={12} className="text-gray-300 shrink-0" />}
