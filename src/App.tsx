@@ -20,6 +20,7 @@ import UserAddresses from './pages/user/UserAddresses';
 import UserIdentifications from './pages/user/UserIdentifications';
 import UserBrands from './pages/user/UserBrands';
 import CreateBusiness from './pages/user/CreateBusiness';
+import UserSellerProducts from './pages/user/UserSellerProducts';
 
 import BusinessDashboard from './pages/business/BusinessDashboard';
 import BusinessMembers from './pages/business/BusinessMembers';
@@ -27,7 +28,6 @@ import BusinessRoles from './pages/business/BusinessRoles';
 import BusinessEmailsPage from './pages/business/BusinessEmailsPage';
 import BusinessSettings from './pages/business/BusinessSettings';
 import BusinessRFQs from './pages/business/BusinessRFQs';
-import BusinessProducts from './pages/business/BusinessProducts';
 import BusinessProfile from './pages/business/BusinessProfile';
 import BusinessBrands from './pages/business/BusinessBrands';
 import IndexedDbManager from './pages/dev/IndexedDbManager';
@@ -106,6 +106,7 @@ const App: React.FC = () => {
                 <Route path="addresses" element={<UserAddresses />} />
                 <Route path="identifications" element={<UserIdentifications />} />
                 <Route path="brands" element={<UserBrands />} />
+                <Route path="seller-products" element={<UserSellerProducts />} />
                 <Route path="create-business" element={<CreateBusiness />} />
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
@@ -123,7 +124,7 @@ const App: React.FC = () => {
                 <Route path="emails" element={<BusinessEmailsPage />} />
                 <Route path="settings" element={<BusinessSettings />} />
                 <Route path="rfqs" element={<BusinessRFQs />} />
-                <Route path="products" element={<BusinessProducts />} />
+                <Route path="products" element={<UserSellerProducts />} />
                 <Route path="*" element={<NotFound scope="business" />} />
               </Route>
             </Route>

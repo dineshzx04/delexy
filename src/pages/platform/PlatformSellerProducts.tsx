@@ -180,7 +180,7 @@ const PlatformSellerProducts: React.FC = () => {
   ];
 
   return (
-    <div className="w-full max-w-7xl pb-12">
+    <div className="w-full min-w-0 max-w-7xl mx-auto pb-12">
       {/* Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
@@ -188,17 +188,7 @@ const PlatformSellerProducts: React.FC = () => {
           <p className="text-gray-500 text-sm">
             Platform directory of active seller product listings, technical specifications, variants matrix, inventory, and entity assignments.
           </p>
-        </div>
-        {/* Simple non-actionable button as requested */}
-        <AntButton
-          type="primary"
-          icon={<Lucide.Plus size={16} />}
-          className="bg-sky-600 font-medium cursor-not-allowed opacity-80"
-          size="large"
-          onClick={(e) => e.preventDefault()}
-        >
-          Create Seller Product
-        </AntButton>
+        </div> 
       </div>
 
       {/* Toolbar & Search */}
@@ -207,7 +197,7 @@ const PlatformSellerProducts: React.FC = () => {
           <AntInput
             placeholder="Search seller products by title, product ID, part number, brand, or seller..."
             prefix={<Lucide.Search size={16} className="text-gray-400" />}
-            className="w-96"
+            className="w-full sm:w-96"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             allowClear

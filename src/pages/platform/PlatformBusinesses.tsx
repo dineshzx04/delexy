@@ -204,7 +204,7 @@ const PlatformBusinesses: React.FC = () => {
   };
 
   return (
-    <div className="w-full max-w-7xl pb-12">
+    <div className="w-full min-w-0 max-w-7xl mx-auto pb-12">
       {/* Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
@@ -221,7 +221,7 @@ const PlatformBusinesses: React.FC = () => {
           <AntInput
             placeholder="Search businesses by name, legal name, or country..."
             prefix={<Lucide.Search size={16} className="text-gray-400" />}
-            className="w-80"
+            className="w-full sm:w-80"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             allowClear

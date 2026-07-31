@@ -136,7 +136,7 @@ const BusinessLayout: React.FC = () => {
           {
             key: '/b/products',
             icon: <Lucide.Package size={18} />,
-            label: <Link to="/b/products">Seller Catalog Products</Link>,
+            label: <Link to="/b/products">Products</Link>,
           },
           {
             key: '/b/rfqs',
@@ -267,7 +267,7 @@ const BusinessLayout: React.FC = () => {
 
       {/* Main Container */}
       <div className={cn(
-        "flex-1 flex flex-col transition-all duration-300",
+        "flex-1 flex flex-col transition-all duration-300 min-w-0",
         isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-72")
       )}>
         {/* Top Navbar */}
@@ -368,13 +368,13 @@ const BusinessLayout: React.FC = () => {
         </AntModal>
 
         {/* Content Body */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16  min-w-0 w-full overflow-x-hidden">
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />
             </div>
           )}
-          <div className="max-w-7xl mx-auto">
+          <div className="max-w-7xl w-full mx-auto min-w-0">
             <Outlet />
           </div>
         </main>

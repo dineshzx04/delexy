@@ -263,7 +263,7 @@ const PlatformLayout: React.FC = () => {
 
       {/* Main Content Area */}
       <div className={cn(
-        "flex-1 flex flex-col transition-all duration-300",
+        "flex-1 flex flex-col transition-all duration-300 min-w-0",
         isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-72")
       )}>
         {/* Top Navbar */}
@@ -325,7 +325,7 @@ const PlatformLayout: React.FC = () => {
         </header>
 
         {/* Scrollable Content */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full overflow-x-hidden">
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb
@@ -352,7 +352,7 @@ const PlatformLayout: React.FC = () => {
               />
             </div>
           )}
-          <div className="max-w-6xl mx-auto">
+          <div className="max-w-7xl w-full mx-auto min-w-0">
             <Outlet />
           </div>
         </main>
