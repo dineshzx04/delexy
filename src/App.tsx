@@ -40,10 +40,12 @@ import AttributeMapping from './pages/platform/AttributeMapping';
 import CategoryManagement from './pages/platform/CategoryManagement';
 import CategoryProducts from './pages/platform/CategoryProducts';
 import PlatformUsers from './pages/platform/PlatformUsers';
+import PlatformUserRegistry from './pages/platform/PlatformUserRegistry';
 import PlatformBusinesses from './pages/platform/PlatformBusinesses';
 import PlatformBrands from './pages/platform/PlatformBrands';
 import PlatformParties from './pages/platform/PlatformParties';
 import PlatformManufacturers from './pages/platform/PlatformManufacturers';
+import PlatformRoles from './pages/platform/PlatformRoles';
 
 import NotFound from './pages/common/NotFound';
 
@@ -137,10 +139,12 @@ const App: React.FC = () => {
                 <Route path="categories" element={<CategoryManagement />} />
                 <Route path="products" element={<CategoryProducts />} />
                 <Route path="users" element={<PlatformUsers />} />
+                <Route path="user-registry" element={<PlatformUserRegistry />} />
                 <Route path="businesses" element={<PlatformBusinesses />} />
                 <Route path="parties" element={<PlatformParties />} />
                 <Route path="manufacturers" element={<PlatformManufacturers />} />
                 <Route path="brands" element={<PlatformBrands />} />
+                <Route path="platform-roles" element={<PlatformRoles />} />
                 <Route path="*" element={<NotFound scope="platform" />} />
               </Route>
             </Route>

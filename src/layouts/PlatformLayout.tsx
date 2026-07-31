@@ -85,6 +85,11 @@ const PlatformLayout: React.FC = () => {
           label: <Link to="/p/businesses">Businesses</Link>,
         },
         {
+          key: "/p/user-registry",
+          icon: <Lucide.UserCheck size={16} />,
+          label: <Link to="/p/user-registry">All Users Registry</Link>,
+        },
+        {
           key: "/p/parties",
           icon: <Lucide.Building2 size={16} />,
           label: <Link to="/p/parties">Parties & Claims</Link>,
@@ -170,11 +175,6 @@ const PlatformLayout: React.FC = () => {
           key: "/p/users",
           icon: <Lucide.Users size={16} />,
           label: <Link to="/p/users">Users</Link>,
-        },
-        {
-          key: "/p/business-roles",
-          icon: <Lucide.UsersRound size={16} />,
-          label: <Link to="/p/business-roles">Business Roles</Link>,
         },
         {
           key: "/p/platform-roles",

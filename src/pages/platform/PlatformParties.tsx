@@ -28,8 +28,9 @@ const PlatformParties: React.FC = () => {
   const businesses = useLiveQuery(() => userDb.businesses.toArray()) || [];
   const brands = useLiveQuery(() => businessDb.brands.toArray()) || [];
   const brandParties = useLiveQuery(() => businessDb.brandParties.toArray()) || [];
+  const addresses = useLiveQuery(() => userDb.addresses.toArray()) || [];
 
-  // Enriched Party records with associated Business, Manufacturer, and Brands (BUSINESS parties only)
+  // Enriched Party records with associated Business, Manufacturer, Brands, and Physical Locations
   const partyData = useMemo(() => {
     return parties
       .filter((pty: Party) => pty.owner_type === 'BUSINESS')
@@ -39,6 +40,7 @@ const PlatformParties: React.FC = () => {
           : null;
         
         const mfg = manufacturers.find((m: Manufacturer) => m.manufacturer_party_id === pty.id);
+        const partyAddrs = addresses.filter((a: any) => a.party_id === pty.id);
 
         const claimedBrandRecords = brandParties.filter((bp: BrandParty) => bp.party_id === pty.id);
         const claimedBrandsList = claimedBrandRecords.map((bp: BrandParty) => {
@@ -55,6 +57,7 @@ const PlatformParties: React.FC = () => {
           business: bus,
           business_name: bus?.name || 'Unclaimed Corporate Placeholder',
           manufacturer: mfg,
+          partyAddresses: partyAddrs,
           claimedBrands: claimedBrandsList
         };
       }).filter(p => 
@@ -62,7 +65,7 @@ const PlatformParties: React.FC = () => {
         p.id.toLowerCase().includes(searchText.toLowerCase()) ||
         p.business_name.toLowerCase().includes(searchText.toLowerCase())
       );
-  }, [parties, businesses, manufacturers, brands, brandParties, searchText]);
+  }, [parties, businesses, manufacturers, brands, brandParties, addresses, searchText]);
 
   // Enriched Party Claims audit records
   const claimsData = useMemo(() => {
@@ -453,6 +456,32 @@ const PlatformParties: React.FC = () => {
                       <Lucide.Award size={12} className="inline mr-1 text-sky-600" />
                       {b.name} ({b.claim_status})
                     </AntTag>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Physical Locations attached to party_id */}
+            <div className="space-y-2">
+              <span className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                <Lucide.MapPin size={16} className="text-indigo-600" />
+                Party Physical Locations ({selectedParty.partyAddresses?.length || 0})
+              </span>
+              {(!selectedParty.partyAddresses || selectedParty.partyAddresses.length === 0) ? (
+                <div className="text-xs text-gray-400 italic bg-gray-50 p-4 rounded text-center border border-dashed border-gray-200">
+                  No physical addresses attached to party_id {selectedParty.id}.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedParty.partyAddresses.map((addr: any) => (
+                    <div key={addr.id} className="bg-white p-3 rounded-lg border border-gray-200 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <AntTag color="purple" className="text-[10px] font-semibold">{addr.address_type || 'HQ'}</AntTag>
+                        {addr.is_primary && <AntTag color="green" className="text-[10px]">PRIMARY</AntTag>}
+                      </div>
+                      <div className="font-medium text-gray-800">{addr.line1}{addr.line2 ? `, ${addr.line2}` : ''}</div>
+                      <div className="text-gray-500">{addr.city}, {addr.state_province} {addr.postal_code} — <span className="font-semibold text-gray-700">{addr.country_name || addr.country_code}</span></div>
+                    </div>
                   ))}
                 </div>
               )}

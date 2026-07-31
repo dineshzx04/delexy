@@ -60,9 +60,8 @@ export interface Business {
 
 export interface Address {
   id: string;
-  owner_type: 'USER' | 'BUSINESS';
-  owner_id: string;
-  address_type?: 'HQ' | 'BRANCH' | 'HOME' | 'SHIPPING' | 'BILLING' | 'WAREHOUSE';
+  party_id: string;
+  address_type?: 'HQ' | 'BRANCH' | 'WAREHOUSE' | 'RESIDENTIAL';
   line1: string;
   line2?: string;
   city: string;

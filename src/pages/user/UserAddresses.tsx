@@ -3,6 +3,7 @@ import { Card, Table, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { userDb } from '../../data/user';
+import { businessDb } from '../../data/business';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
@@ -15,20 +16,38 @@ const UserAddresses: React.FC = () => {
 
   useBreadcrumb(breadcrumbs);
 
-  const addresses = useLiveQuery(
-    async () => await userDb.addresses
+  // 1. Resolve User's Personal Party
+  const userParty = useLiveQuery(
+    async () => await businessDb.parties
       .where('owner_id').equals(currentUserId)
-      .filter((a) => a.owner_type === 'USER')
-      .toArray(),
+      .filter((p) => p.owner_type === 'USER')
+      .first(),
     [currentUserId]
+  );
+
+  // 2. Query Personal Addresses attached directly to party_id
+  const addresses = useLiveQuery(
+    async () => {
+      if (!userParty) return [];
+      return await userDb.addresses
+        .where('party_id').equals(userParty.id)
+        .toArray();
+    },
+    [userParty]
   ) || [];
 
   const columns = [
     {
+      title: 'Party ID',
+      dataIndex: 'party_id',
+      key: 'party_id',
+      render: (partyId: string) => <Tag color="geekblue" className="font-mono">{partyId}</Tag>
+    },
+    {
       title: 'Type',
       dataIndex: 'address_type',
       key: 'address_type',
-      render: (type?: string) => <Tag color="purple">{type || 'HOME'}</Tag>
+      render: (type?: string) => <Tag color="purple">{type || 'RESIDENTIAL'}</Tag>
     },
     {
       title: 'Address Line 1',
@@ -80,7 +99,10 @@ const UserAddresses: React.FC = () => {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">My Addresses</h1>
-          <p className="text-slate-500 text-sm">Manage personal shipping and billing address records.</p>
+          <p className="text-slate-500 text-sm">
+            Personal physical locations attached to your Personal Trading Party 
+            {userParty && <Tag color="purple" className="ml-2 font-mono">{userParty.id}</Tag>}.
+          </p>
         </div>
         <Button type="primary" icon={<Lucide.Plus size={16} />} className="bg-sky-600 hover:bg-sky-700">
           Add New Address
@@ -93,7 +115,7 @@ const UserAddresses: React.FC = () => {
           columns={columns}
           rowKey="id"
           pagination={false}
-          locale={{ emptyText: 'No address records found for this user.' }}
+          locale={{ emptyText: 'No personal address records found for this user party.' }}
         />
       </Card>
     </div>

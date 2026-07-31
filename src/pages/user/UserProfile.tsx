@@ -26,6 +26,7 @@ import {
   mockBusinesses,
   mockBusinessMemberships
 } from '../../data/user';
+import { businessDb } from '../../data/business';
 
 const { Option } = AntSelect;
 
@@ -134,12 +135,18 @@ const UserProfile: React.FC = () => {
     [targetUserId]
   );
 
-  // 4. Query Personal Addresses directly from Dexie DB
+  // 4. Query Personal Addresses directly from Dexie DB (via User's Personal Party party_id)
   const mappedAddresses = useLiveQuery(
-    async () => await userDb.addresses
-      .where('owner_id').equals(targetUserId)
-      .filter((a) => a.owner_type === 'USER')
-      .toArray(),
+    async () => {
+      const userParty = await businessDb.parties
+        .where('owner_id').equals(targetUserId)
+        .filter((p) => p.owner_type === 'USER')
+        .first();
+      if (!userParty) return [];
+      return await userDb.addresses
+        .where('party_id').equals(userParty.id)
+        .toArray();
+    },
     [targetUserId]
   ) || [];
 

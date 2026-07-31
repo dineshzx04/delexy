@@ -1,29 +1,11 @@
 import type { Address } from "./user.module";
 
 export const mockAddresses: Address[] = [
-  // User 1 Address (US)
-  {
-    id: "addr-1",
-    owner_type: "USER",
-    owner_id: "usr-1",
-    address_type: "HOME",
-    line1: "123 Main St",
-    line2: "Apt 4B",
-    city: "New York",
-    state_province: "NY",
-    postal_code: "10001",
-    country_code: "US",
-    country_name: "United States",
-    is_primary: true,
-    created_at: "2026-01-15T08:00:00.000Z",
-    updated_at: "2026-01-15T08:00:00.000Z",
-  },
-  // User 2 Address (UK)
+  // John Doe Personal Trading Party Address (pty-6, RESIDENTIAL)
   {
     id: "addr-2",
-    owner_type: "USER",
-    owner_id: "usr-2",
-    address_type: "HOME",
+    party_id: "pty-6",
+    address_type: "RESIDENTIAL",
     line1: "45 Oxford Street",
     city: "London",
     state_province: "Greater London",
@@ -34,12 +16,11 @@ export const mockAddresses: Address[] = [
     created_at: "2026-03-15T08:00:00.000Z",
     updated_at: "2026-03-15T08:00:00.000Z",
   },
-  // User 3 Address (JP)
+  // Alice Smith Personal Trading Party Address (pty-8, RESIDENTIAL)
   {
     id: "addr-3",
-    owner_type: "USER",
-    owner_id: "usr-3",
-    address_type: "HOME",
+    party_id: "pty-8",
+    address_type: "RESIDENTIAL",
     line1: "1-1 Chiyoda",
     city: "Chiyoda-ku",
     state_province: "Tokyo",
@@ -50,11 +31,10 @@ export const mockAddresses: Address[] = [
     created_at: "2026-04-10T08:00:00.000Z",
     updated_at: "2026-04-10T08:00:00.000Z",
   },
-  // Business A HQ Address (IN)
+  // Samsung India Business Party HQ Address (pty-1, HQ)
   {
     id: "addr-4",
-    owner_type: "BUSINESS",
-    owner_id: "bus-a",
+    party_id: "pty-1",
     address_type: "HQ",
     line1: "128 Tech Park Road",
     line2: "Suite 400",
@@ -67,11 +47,10 @@ export const mockAddresses: Address[] = [
     created_at: "2026-01-15T08:00:00.000Z",
     updated_at: "2026-01-15T08:00:00.000Z",
   },
-  // Business B HQ Address (GB)
+  // Samsung UK Business Party HQ Address (pty-2, HQ)
   {
     id: "addr-5",
-    owner_type: "BUSINESS",
-    owner_id: "bus-b",
+    party_id: "pty-2",
     address_type: "HQ",
     line1: "100 Thames Promenade",
     city: "London",
@@ -83,11 +62,10 @@ export const mockAddresses: Address[] = [
     created_at: "2026-01-15T08:00:00.000Z",
     updated_at: "2026-01-15T08:00:00.000Z",
   },
-  // Business C HQ Address (US)
+  // Business C HQ Address (pty-4, HQ)
   {
     id: "addr-6",
-    owner_type: "BUSINESS",
-    owner_id: "bus-c",
+    party_id: "pty-4",
     address_type: "HQ",
     line1: "750 Madison Avenue",
     city: "New York",
@@ -99,11 +77,10 @@ export const mockAddresses: Address[] = [
     created_at: "2026-03-15T08:00:00.000Z",
     updated_at: "2026-03-15T08:00:00.000Z",
   },
-  // Business D HQ Address (US)
+  // Tech World Global HQ Address (pty-5, HQ)
   {
     id: "addr-7",
-    owner_type: "BUSINESS",
-    owner_id: "bus-d",
+    party_id: "pty-5",
     address_type: "HQ",
     line1: "200 Silicon Valley Way",
     city: "San Jose",
@@ -115,11 +92,10 @@ export const mockAddresses: Address[] = [
     created_at: "2026-04-10T08:00:00.000Z",
     updated_at: "2026-04-10T08:00:00.000Z",
   },
-  // Global Logistics Warehouse Address (AE)
+  // Samsung India Logistics Warehouse Address (pty-1, WAREHOUSE)
   {
     id: "addr-8",
-    owner_type: "BUSINESS",
-    owner_id: "bus-a",
+    party_id: "pty-1",
     address_type: "WAREHOUSE",
     line1: "Business Bay Tower",
     line2: "Floor 14",
@@ -131,5 +107,36 @@ export const mockAddresses: Address[] = [
     is_primary: false,
     created_at: "2026-05-01T08:00:00.000Z",
     updated_at: "2026-05-01T08:00:00.000Z",
+  },
+  // ASICS Corp Unclaimed Placeholder Party HQ Address (pty-3, HQ)
+  {
+    id: "addr-9",
+    party_id: "pty-3",
+    address_type: "HQ",
+    line1: "7-1-1 Minatojima Minamimachi",
+    city: "Kobe",
+    state_province: "Hyogo",
+    postal_code: "650-8555",
+    country_code: "JP",
+    country_name: "Japan",
+    is_primary: true,
+    created_at: "2026-05-10T08:00:00.000Z",
+    updated_at: "2026-05-10T08:00:00.000Z",
+  },
+  // Sony Logistics Unclaimed Placeholder Party Warehouse (pty-7, WAREHOUSE)
+  {
+    id: "addr-10",
+    party_id: "pty-7",
+    address_type: "WAREHOUSE",
+    line1: "Jebel Ali Free Zone South",
+    line2: "Plot 42",
+    city: "Dubai",
+    state_province: "Dubai",
+    postal_code: "00000",
+    country_code: "AE",
+    country_name: "United Arab Emirates",
+    is_primary: true,
+    created_at: "2026-06-01T08:00:00.000Z",
+    updated_at: "2026-06-01T08:00:00.000Z",
   },
 ];

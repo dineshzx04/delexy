@@ -208,21 +208,6 @@ const PlatformUsers: React.FC = () => {
         </AntButton>
       </div>
 
-      {/* Architecture Alert Banner */}
-      {/* <AntCard className="mb-6 border-sky-200 bg-sky-50/50 shadow-sm rounded-lg">
-        <div className="flex items-start gap-3">
-          <Lucide.ShieldCheck size={22} className="text-sky-600 shrink-0 mt-0.5" />
-          <div className="text-sm text-slate-700 space-y-1">
-            <span className="font-bold text-slate-900 block">3-Tier Email & Multi-Context Security Rules Enforced:</span>
-            <ul className="list-disc pl-4 space-y-0.5 text-xs text-slate-600">
-              <li><strong>Personal Emails (`PERSONAL`):</strong> Referenced in <code className="text-sky-700">userEmails.ts</code> for individual user account logins across user & platform contexts.</li>
-              <li><strong>Member Emails (`MEMBER`):</strong> Referenced exclusively in <code className="text-indigo-700">businessMemberships.ts</code> for single-tenant business logins. Zero overlap with personal emails.</li>
-              <li><strong>Super Admin (`usr-1`):</strong> Root platform owner with 0 email addresses and 0 business memberships, operating exclusively in <code className="text-purple-700">/p/*</code> workspace.</li>
-            </ul>
-          </div>
-        </div>
-      </AntCard> */}
-
       {/* Users Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
         <AntTable

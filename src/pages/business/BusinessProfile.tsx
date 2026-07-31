@@ -18,6 +18,7 @@ import {
   mockBusinessMemberships,
   mockUsers
 } from '../../data/user';
+import { businessDb } from '../../data/business';
 
 const BusinessProfile: React.FC = () => {
   const { businessId: paramBizId } = useParams<{ businessId: string }>();
@@ -93,12 +94,18 @@ const BusinessProfile: React.FC = () => {
     [currentBizId]
   );
 
-  // 4. Query Corporate Addresses from Dexie DB
+  // 4. Query Corporate Addresses from Dexie DB (via Business's Claimed Party party_id)
   const mappedBizAddresses = useLiveQuery(
-    async () => await userDb.addresses
-      .where('owner_id').equals(currentBizId)
-      .filter((a) => a.owner_type === 'BUSINESS')
-      .toArray(),
+    async () => {
+      const bizParty = await businessDb.parties
+        .where('owner_id').equals(currentBizId)
+        .filter((p) => p.owner_type === 'BUSINESS')
+        .first();
+      if (!bizParty) return [];
+      return await userDb.addresses
+        .where('party_id').equals(bizParty.id)
+        .toArray();
+    },
     [currentBizId]
   ) || [];
 

@@ -31,8 +31,9 @@ const PlatformBusinesses: React.FC = () => {
   const brands = useLiveQuery(() => businessDb.brands.toArray()) || [];
   const brandParties = useLiveQuery(() => businessDb.brandParties.toArray()) || [];
   const manufacturers = useLiveQuery(() => businessDb.manufacturers.toArray()) || [];
+  const addresses = useLiveQuery(() => userDb.addresses.toArray()) || [];
 
-  // Enriched business records with owner name, member count, claimed party, claimed brands, and manufacturers
+  // Enriched business records with owner name, member count, claimed party, party addresses, claimed brands, and manufacturers
   const businessData = useMemo(() => {
     return businesses.map((bus: Business) => {
       const memberships = businessMemberships.filter((bm: BusinessMembership) => bm.business_id === bus.id);
@@ -41,6 +42,9 @@ const PlatformBusinesses: React.FC = () => {
 
       // Resolve 1 Business <-> 1 Claimed Party (owner_type = 'BUSINESS' & owner_id = bus.id)
       const claimedParty = parties.find((p: Party) => p.owner_type === 'BUSINESS' && p.owner_id === bus.id);
+
+      // Resolve party physical addresses attached directly to party_id
+      const partyAddresses = claimedParty ? addresses.filter((a: any) => a.party_id === claimedParty.id) : [];
 
       // Resolve claimed brands for this party
       const claimedBrandRecords = claimedParty
@@ -71,6 +75,7 @@ const PlatformBusinesses: React.FC = () => {
         ownerName: ownerUser ? ownerUser.full_name : 'No Owner Assigned',
         ownerAppUserId: ownerUser ? ownerUser.app_user_id : '-',
         claimedParty,
+        partyAddresses,
         claimedBrands: claimedBrandsList,
         claimedManufacturers: claimedManufacturersList
       };
@@ -79,7 +84,7 @@ const PlatformBusinesses: React.FC = () => {
       (b.legal_name && b.legal_name.toLowerCase().includes(searchText.toLowerCase())) ||
       b.country_code.toLowerCase().includes(searchText.toLowerCase())
     );
-  }, [businesses, businessMemberships, users, parties, brands, brandParties, manufacturers, searchText]);
+  }, [businesses, businessMemberships, users, parties, brands, brandParties, manufacturers, addresses, searchText]);
 
   const columns = [
     {
@@ -331,7 +336,33 @@ const PlatformBusinesses: React.FC = () => {
               </div>
             </div>
 
-            {/* 2. 1 Business <-> 1 Claimed Party Card */}
+            {/* 2. Party Physical Locations (attached directly to party_id) */}
+            <div className="space-y-2">
+              <span className="font-bold text-sm text-gray-900 flex items-center gap-2">
+                <Lucide.MapPin size={16} className="text-indigo-600" />
+                Party Physical Locations ({selectedBusiness.partyAddresses?.length || 0})
+              </span>
+              {(!selectedBusiness.partyAddresses || selectedBusiness.partyAddresses.length === 0) ? (
+                <div className="text-xs text-gray-400 italic bg-gray-50 p-4 rounded text-center border border-dashed border-gray-200">
+                  No physical locations registered under this business party.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedBusiness.partyAddresses.map((addr: any) => (
+                    <div key={addr.id} className="bg-white p-3 rounded-lg border border-gray-200 text-xs space-y-1">
+                      <div className="flex items-center justify-between">
+                        <AntTag color="purple" className="text-[10px] font-semibold">{addr.address_type || 'HQ'}</AntTag>
+                        {addr.is_primary && <AntTag color="green" className="text-[10px]">PRIMARY</AntTag>}
+                      </div>
+                      <div className="font-medium text-gray-800">{addr.line1}{addr.line2 ? `, ${addr.line2}` : ''}</div>
+                      <div className="text-gray-500">{addr.city}, {addr.state_province} {addr.postal_code} — <span className="font-semibold text-gray-700">{addr.country_name || addr.country_code}</span></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 3. 1 Business <-> 1 Claimed Party Card */}
             <div className="border border-indigo-200 bg-indigo-50/40 p-4 rounded-lg space-y-2">
               <div className="flex items-center gap-2 text-indigo-900 font-bold text-sm">
                 <Lucide.ShieldCheck size={18} className="text-indigo-600" /> Claimed Corporate Party

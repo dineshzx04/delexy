@@ -82,9 +82,13 @@ The application supports three distinct authentication pathways:
    - `PlatformMembership` links a `user_id` to a `membership_type` (`SUPER_ADMIN` | `PLATFORM_MEMBER`) and `platform_role_id`.
    - Contains security flags `require_switch_password` and `switch_password`.
 
-5. **Unified Global Address Model (`addresses.ts`)**:
-   - A single, consolidated `Address` entity represents global international locations.
-   - Contains global fields: `country_code`, `country_name`, `address_type` (`HQ`, `BRANCH`, `WAREHOUSE`, `RESIDENTIAL`), `is_primary`, `owner_type` (`'USER'` | `'BUSINESS'`), and `owner_id`.
+5. **Unified Party-Centric Address Model (`addresses.ts`)**:
+   - Every physical location in the system belongs directly to a `Party` via `party_id`.
+   - **Corporate Business Location**: Belongs to the Business's claimed Party (`pty-1`, `pty-2`, etc.).
+   - **Personal Trading Location**: Belongs to the User's Personal Party (`pty-6`, `pty-8`).
+   - **Unclaimed Entity Location**: Belongs directly to the Unclaimed Placeholder Party (`pty-3`, `pty-7`).
+   - **Zero-Migration Claim Architecture**: When an Unclaimed Party is claimed by a Business, all address records remain attached to `party_id` with zero migration required.
+   - **Multi-Location Support**: A single Party can hold multiple address records across types: `HQ`, `WAREHOUSE`, `BRANCH`, and `RESIDENTIAL`.
 
 ---
 

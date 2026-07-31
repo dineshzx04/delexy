@@ -36,7 +36,7 @@ export class UserDatabase extends Dexie {
       userEmails: 'id, user_id, email_id',
       userIdentifications: 'id, user_id',
       businesses: 'id, slug',
-      addresses: 'id, owner_type, owner_id, country_code, is_primary',
+      addresses: 'id, party_id, country_code, is_primary',
       businessEmails: 'id, business_id, email_id',
       roles: 'id, business_id',
       businessMemberships: 'id, business_id, user_id, email_id',
