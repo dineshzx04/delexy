@@ -19,6 +19,8 @@ const AttributeGroups: React.FC = () => {
   // Search states
   const [groupSearchText, setGroupSearchText] = useState('');
   const [attrSearchText, setAttrSearchText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/p/dashboard" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/p/dashboard' },
@@ -37,6 +39,17 @@ const AttributeGroups: React.FC = () => {
   }, [GLOBAL_ATTRIBUTES, attrSearchText]);
 
   const columns = [
+    {
+      title: 'S.No',
+      key: 'sno',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-mono text-xs text-gray-500 font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
     { title: 'Group Name', dataIndex: 'name', key: 'name', render: (text: string) => <span className="font-semibold text-gray-900">{text}</span> },
     { title: 'Description', dataIndex: 'description', key: 'description' },
     {
@@ -125,7 +138,15 @@ const AttributeGroups: React.FC = () => {
           columns={columns}
           dataSource={filteredGroups}
           rowKey="id"
-          pagination={{ pageSize: 10, showSizeChanger: true }}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showSizeChanger: true
+          }}
         />
       </div>
 

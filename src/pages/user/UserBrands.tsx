@@ -39,17 +39,18 @@ const UserBrands: React.FC = () => {
         return { ...b, listingsCount: count };
       });
 
-      // Unique Manufacturer Party IDs sold by user
-      const mfgPartyIds = Array.from(new Set(mySellerProducts.map((sp) => sp.manufacturer_party_id).filter(Boolean))) as string[];
+      // Unique Manufacturers sold by user
+      const mfgIds = Array.from(new Set(mySellerProducts.map((sp) => sp.manufacturer_id).filter(Boolean))) as string[];
       const allMfgs = await businessDb.manufacturers.toArray();
       const allParties = await businessDb.parties.toArray();
 
-      const sellingMfgs = mfgPartyIds.map((mfgPtyId) => {
-        const mfg = allMfgs.find((m) => m.manufacturer_party_id === mfgPtyId);
-        const party = allParties.find((p) => p.id === mfgPtyId);
-        const count = mySellerProducts.filter((sp) => sp.manufacturer_party_id === mfgPtyId).length;
+      const sellingMfgs = mfgIds.map((mfgId) => {
+        const mfg = allMfgs.find((m) => m.id === mfgId);
+        const mfgPartyId = mfg?.manufacturer_party_id;
+        const party = mfgPartyId ? allParties.find((p) => p.id === mfgPartyId) : null;
+        const count = mySellerProducts.filter((sp) => sp.manufacturer_id === mfgId).length;
         return {
-          partyId: mfgPtyId,
+          partyId: mfgPartyId || mfgId,
           companyName: mfg?.company_name || party?.display_name || 'Unclaimed Manufacturer',
           status: mfg?.status || 'PENDING_VERIFICATION',
           isClaimed: party?.is_claimed ?? false,

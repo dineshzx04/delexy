@@ -13,6 +13,8 @@ const AttributeValues: React.FC = () => {
   // Use DB data from catalogDb
   const values = useLiveQuery(() => catalogDb.attributeValues.toArray()) || [];
   const [searchText, setSearchText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/p/dashboard" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/p/dashboard' },
@@ -29,6 +31,17 @@ const AttributeValues: React.FC = () => {
   }, [values, searchText]);
 
   const columns = [
+    {
+      title: 'S.No',
+      key: 'sno',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-mono text-xs text-gray-500 font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
     { title: 'Value', dataIndex: 'value', key: 'value', render: (text: string) => <span className="font-semibold text-gray-900">{text}</span> },
     {
       title: 'Actions',
@@ -92,7 +105,12 @@ const AttributeValues: React.FC = () => {
           dataSource={filteredValues}
           rowKey="id"
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
             showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} items`

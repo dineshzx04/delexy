@@ -18,6 +18,8 @@ const PlatformUserRegistry: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [selectedUserRecord, setSelectedUserRecord] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/p/dashboard" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/p/dashboard' },
@@ -89,6 +91,17 @@ const PlatformUserRegistry: React.FC = () => {
   }, [users, userEmails, emails, parties, addresses, businessMemberships, businesses, platformMemberships, platformRoles, searchText]);
 
   const columns = [
+    {
+      title: 'S.No',
+      key: 'sno',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-mono text-xs text-gray-500 font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
     {
       title: 'User Identity',
       key: 'user_identity',
@@ -187,7 +200,15 @@ const PlatformUserRegistry: React.FC = () => {
           dataSource={allUserData}
           rowKey="id"
           scroll={{ x: 'max-content' }}
-          pagination={{ pageSize: 10, showSizeChanger: true }}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showSizeChanger: true
+          }}
         />
       </div>
 

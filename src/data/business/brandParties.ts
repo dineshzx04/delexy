@@ -19,7 +19,7 @@ export const mockBrandParties: BrandParty[] = [
     created_at: "2026-01-15T08:00:00.000Z",
     updated_at: "2026-01-15T08:00:00.000Z",
   },
-  // ASUS (brd-2) claimed by Tech World Global (pty-5)
+  // ASUS (brd-2) claimed by ASUSTeK Computer Inc (pty-5)
   {
     id: "brd-pty-3",
     brand_id: "brd-2",
@@ -28,11 +28,11 @@ export const mockBrandParties: BrandParty[] = [
     created_at: "2026-01-15T08:00:00.000Z",
     updated_at: "2026-01-15T08:00:00.000Z",
   },
-  // Sony (brd-3) claimed by Samsung UK (pty-2)
+  // Sony (brd-3) claimed by Sony Corporation (pty-4)
   {
     id: "brd-pty-4",
     brand_id: "brd-3",
-    party_id: "pty-2",
+    party_id: "pty-4",
     claim_status: "VERIFIED",
     created_at: "2026-02-01T08:00:00.000Z",
     updated_at: "2026-02-01T08:00:00.000Z",
@@ -46,13 +46,13 @@ export const mockBrandParties: BrandParty[] = [
     created_at: "2026-05-10T08:00:00.000Z",
     updated_at: "2026-05-10T08:00:00.000Z",
   },
-  // Logitech (brd-5) claimed by Business C (pty-4)
+  // Logitech (brd-5) linked to unclaimed placeholder Logitech Inc (pty-7)
   {
     id: "brd-pty-6",
     brand_id: "brd-5",
-    party_id: "pty-4",
-    claim_status: "APPROVED",
-    created_at: "2026-03-15T08:00:00.000Z",
-    updated_at: "2026-03-15T08:00:00.000Z",
+    party_id: "pty-7",
+    claim_status: "PENDING",
+    created_at: "2026-06-01T08:00:00.000Z",
+    updated_at: "2026-06-01T08:00:00.000Z",
   },
 ];

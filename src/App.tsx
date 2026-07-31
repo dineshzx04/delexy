@@ -46,6 +46,7 @@ import PlatformBrands from './pages/platform/PlatformBrands';
 import PlatformParties from './pages/platform/PlatformParties';
 import PlatformManufacturers from './pages/platform/PlatformManufacturers';
 import PlatformRoles from './pages/platform/PlatformRoles';
+import PlatformSellerProducts from './pages/platform/PlatformSellerProducts';
 
 import NotFound from './pages/common/NotFound';
 
@@ -138,6 +139,7 @@ const App: React.FC = () => {
                 <Route path="attribute-mapping" element={<AttributeMapping />} />
                 <Route path="categories" element={<CategoryManagement />} />
                 <Route path="products" element={<CategoryProducts />} />
+                <Route path="seller-products" element={<PlatformSellerProducts />} />
                 <Route path="users" element={<PlatformUsers />} />
                 <Route path="user-registry" element={<PlatformUserRegistry />} />
                 <Route path="businesses" element={<PlatformBusinesses />} />

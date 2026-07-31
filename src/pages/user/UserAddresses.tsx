@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, Table, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -9,6 +9,8 @@ import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 const UserAddresses: React.FC = () => {
   const { currentUserId } = useWorkspace();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const breadcrumbs = React.useMemo(() => [
     { title: <span className="text-slate-800 font-semibold">My Addresses</span> }
@@ -37,6 +39,17 @@ const UserAddresses: React.FC = () => {
   ) || [];
 
   const columns = [
+    {
+      title: 'S.No',
+      key: 'sno',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-mono text-xs text-slate-500 font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
     {
       title: 'Party ID',
       dataIndex: 'party_id',
@@ -114,7 +127,15 @@ const UserAddresses: React.FC = () => {
           dataSource={addresses}
           columns={columns}
           rowKey="id"
-          pagination={false}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showSizeChanger: true
+          }}
           locale={{ emptyText: 'No personal address records found for this user party.' }}
         />
       </Card>

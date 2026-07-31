@@ -10,6 +10,8 @@ const PlatformRoles: React.FC = () => {
   const [searchText, setSearchText] = useState('');
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/p/dashboard" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/p/dashboard' },
@@ -53,6 +55,17 @@ const PlatformRoles: React.FC = () => {
   }, [platformRoles, platformMemberships, users, searchText]);
 
   const columns = [
+    {
+      title: 'S.No',
+      key: 'sno',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-mono text-xs text-gray-500 font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
     {
       title: 'Role Identity',
       key: 'role_identity',
@@ -161,7 +174,15 @@ const PlatformRoles: React.FC = () => {
           dataSource={roleData}
           rowKey="id"
           scroll={{ x: 'max-content' }}
-          pagination={false}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showSizeChanger: true
+          }}
         />
       </div>
 

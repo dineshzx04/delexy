@@ -10,6 +10,8 @@ const CategoryManagement: React.FC = () => {
   const categories = useLiveQuery(() => catalogDb.categories.toArray());
   const GLOBAL_GROUPS = useLiveQuery(() => catalogDb.attributeGroups.toArray()) || [];
   const [searchText, setSearchText] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Drill-down Breadcrumb State
   const [path, setPath] = useState<CatalogCategory[]>([]);
@@ -142,6 +144,17 @@ const CategoryManagement: React.FC = () => {
 
   const columns = [
     {
+      title: 'S.No',
+      key: 'sno',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-mono text-xs text-gray-500 font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
+    {
       title: 'Category Name',
       dataIndex: 'name',
       key: 'name',
@@ -270,7 +283,12 @@ const CategoryManagement: React.FC = () => {
           dataSource={currentLevelCategories}
           rowKey="id"
           pagination={{
-            pageSize: 10,
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
             showSizeChanger: true,
             pageSizeOptions: ['10', '20', '50', '100'],
           }}

@@ -121,7 +121,12 @@ const PlatformLayout: React.FC = () => {
         {
           key: "/p/products",
           icon: <Lucide.Box size={16} />,
-          label: <Link to="/p/products">Products</Link>,
+          label: <Link to="/p/products">Master Products</Link>,
+        },
+        {
+          key: "/p/seller-products",
+          icon: <Lucide.Package size={16} />,
+          label: <Link to="/p/seller-products">Seller Products</Link>,
         },
       ],
     },
@@ -162,11 +167,6 @@ const PlatformLayout: React.FC = () => {
       label: collapsed ? null : "Administration",
       children: [
         {
-          key: "/p/audit-logs",
-          icon: <Lucide.ScrollText size={16} />,
-          label: <Link to="/p/audit-logs">Audit Logs</Link>,
-        },
-        {
           key: "/p/profile",
           icon: <Lucide.User size={16} />,
           label: <Link to="/p/profile">Profile</Link>,
@@ -174,7 +174,7 @@ const PlatformLayout: React.FC = () => {
         {
           key: "/p/users",
           icon: <Lucide.Users size={16} />,
-          label: <Link to="/p/users">Users</Link>,
+          label: <Link to="/p/users">Platform Users</Link>,
         },
         {
           key: "/p/platform-roles",

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, Table, Tag, Button } from 'antd';
 import * as Lucide from 'lucide-react';
@@ -10,6 +10,8 @@ import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 const BusinessEmailsPage: React.FC = () => {
   const { businessId } = useParams<{ businessId: string }>();
   const { activeWorkspace } = useWorkspace();
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const currentBizId = businessId || activeWorkspace.businessId || activeWorkspace.id;
 
   const breadcrumbs = React.useMemo(() => [
@@ -34,6 +36,17 @@ const BusinessEmailsPage: React.FC = () => {
   });
 
   const columns = [
+    {
+      title: 'S.No',
+      key: 'sno',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-mono text-xs text-slate-500 font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
     {
       title: 'Email Address',
       dataIndex: 'email',
@@ -80,7 +93,15 @@ const BusinessEmailsPage: React.FC = () => {
           dataSource={data}
           columns={columns}
           rowKey="id"
-          pagination={false}
+          pagination={{
+            current: currentPage,
+            pageSize: pageSize,
+            onChange: (page, size) => {
+              setCurrentPage(page);
+              setPageSize(size);
+            },
+            showSizeChanger: true
+          }}
           locale={{ emptyText: 'No business emails listed.' }}
         />
       </Card>

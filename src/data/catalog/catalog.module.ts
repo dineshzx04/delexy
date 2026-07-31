@@ -48,20 +48,76 @@ export interface CatalogProduct {
   updated_at?: string;
 }
 
-export interface SellerProduct {
-  id: string;
-  seller_party_id: string;
-  product_id: string;
-  brand_id?: string;
-  manufacturer_party_id?: string;
-  sku: string;
-  barcode?: string;
+export interface SellerProductAttributeSelection {
+  group_id: string;
+  attribute_id: string;
+  selected_value_ids: string[];
+  is_variant: boolean;
+}
+
+export interface SellerProductSpecification {
+  group_id: string;
+  group_name?: string;
+  attribute_id: string;
+  attribute_name: string;
+  values: Array<{ id: string; label: string }>;
+}
+
+export interface SellerProductVariantCombinationValue {
+  group_id: string;
+  group_name?: string;
+  attribute_id: string;
+  attribute_name: string;
+  value_id: string;
+  label: string;
+}
+
+export interface SellerProductVariant {
+  id: string;                          // Seller Variant Local ID ('sprod-1-v1')
+  variant_platform_id: string;         // Universal Platform Product ID ('gpid-10101')
+  sku: string;                         // SKU code ('SM-S928B-BLK-512')
   price: number;
   currency: string;
   stock: number;
-  status: "ACTIVE" | "INACTIVE" | "OUT_OF_STOCK";
-  dynamicAttributes: Record<string, any>;
-  globalSpecs?: Record<string, any>;
-  created_at?: string;
-  updated_at?: string;
+  min_order_quantity: number;
+  combination_values: SellerProductVariantCombinationValue[];
+}
+
+export interface SellerProduct {
+  id: string;                          // Unique Seller Product ID (e.g. 'sprod-1')
+  category_id: string;                 // Leaf Category ID ('c-2-1-1')
+  catalog_product_id: string;          // Master Catalog Product Template ID ('prod-1')
+  product_name: string;                // Listing Title
+  manufacturer_id: string;             // Manufacturer Table ID ('mfg-1')
+  brand_id: string;                    // Brand ID ('brd-1')
+  party_id: string;                    // Seller Party ID ('pty-1' or 'pty-6')
+
+  year_of_manufacture?: number;
+  country_of_origin?: string;
+  model_number?: string;
+  part_number: string;
+
+  height?: string;
+  width?: string;
+  length?: string;
+  weight?: string;
+
+  deviations?: string;
+  exclusions?: string;
+  assumptions?: string;
+  operation_instructions?: string;
+  safety_instructions?: string;
+  handling_instructions?: string;
+  maintenance_instructions?: string;
+  additional_requirements?: string;
+  additional_information?: string;
+
+  dynamic_attributes: SellerProductAttributeSelection[];
+  specifications: SellerProductSpecification[];
+  variants: SellerProductVariant[];
+
+  is_locked?: boolean;                 // Governance flag: true once platform IDs are assigned and specs are locked
+  status: "ACTIVE" | "INACTIVE";
+  created_at: string;
+  updated_at: string;
 }

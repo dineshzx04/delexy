@@ -12,6 +12,8 @@ const PlatformParties: React.FC = () => {
   const [activeTab, setActiveTab] = useState('1');
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [selectedParty, setSelectedParty] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/p/dashboard" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/p/dashboard' },
@@ -112,6 +114,17 @@ const PlatformParties: React.FC = () => {
   };
 
   const partyColumns = [
+    {
+      title: 'S.No',
+      key: 'sno',
+      width: 70,
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-mono text-xs text-gray-500 font-medium">
+          {(currentPage - 1) * pageSize + index + 1}
+        </span>
+      )
+    },
     {
       title: 'Party Entity',
       key: 'party',
@@ -319,7 +332,15 @@ const PlatformParties: React.FC = () => {
                   dataSource={partyData}
                   rowKey="id"
                   scroll={{ x: 'max-content' }}
-                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                  pagination={{
+                    current: currentPage,
+                    pageSize: pageSize,
+                    onChange: (page, size) => {
+                      setCurrentPage(page);
+                      setPageSize(size);
+                    },
+                    showSizeChanger: true
+                  }}
                 />
               )
             },
