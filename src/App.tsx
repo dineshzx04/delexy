@@ -21,6 +21,7 @@ import UserIdentifications from './pages/user/UserIdentifications';
 import UserBrands from './pages/user/UserBrands';
 import CreateBusiness from './pages/user/CreateBusiness';
 import UserSellerProducts from './pages/user/UserSellerProducts';
+import SellerProductSubmissionForm from './pages/user/SellerProductSubmissionForm';
 
 import BusinessDashboard from './pages/business/BusinessDashboard';
 import BusinessMembers from './pages/business/BusinessMembers';
@@ -47,6 +48,8 @@ import PlatformParties from './pages/platform/PlatformParties';
 import PlatformManufacturers from './pages/platform/PlatformManufacturers';
 import PlatformRoles from './pages/platform/PlatformRoles';
 import PlatformSellerProducts from './pages/platform/PlatformSellerProducts';
+import PlatformSellerProductReviewQueue from './pages/platform/PlatformSellerProductReviewQueue';
+import PlatformSellerProductReviewDetail from './pages/platform/PlatformSellerProductReviewDetail';
 
 import NotFound from './pages/common/NotFound';
 
@@ -107,6 +110,8 @@ const App: React.FC = () => {
                 <Route path="identifications" element={<UserIdentifications />} />
                 <Route path="brands" element={<UserBrands />} />
                 <Route path="seller-products" element={<UserSellerProducts />} />
+                <Route path="seller-products/create" element={<SellerProductSubmissionForm />} />
+                <Route path="seller-products/edit/:id" element={<SellerProductSubmissionForm />} />
                 <Route path="create-business" element={<CreateBusiness />} />
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
@@ -125,6 +130,8 @@ const App: React.FC = () => {
                 <Route path="settings" element={<BusinessSettings />} />
                 <Route path="rfqs" element={<BusinessRFQs />} />
                 <Route path="products" element={<UserSellerProducts />} />
+                <Route path="products/create" element={<SellerProductSubmissionForm />} />
+                <Route path="products/edit/:id" element={<SellerProductSubmissionForm />} />
                 <Route path="*" element={<NotFound scope="business" />} />
               </Route>
             </Route>
@@ -141,6 +148,8 @@ const App: React.FC = () => {
                 <Route path="categories" element={<CategoryManagement />} />
                 <Route path="products" element={<CategoryProducts />} />
                 <Route path="seller-products" element={<PlatformSellerProducts />} />
+                <Route path="seller-product-reviews" element={<PlatformSellerProductReviewQueue />} />
+                <Route path="seller-product-reviews/:id" element={<PlatformSellerProductReviewDetail />} />
                 <Route path="users" element={<PlatformUsers />} />
                 <Route path="user-registry" element={<PlatformUserRegistry />} />
                 <Route path="businesses" element={<PlatformBusinesses />} />

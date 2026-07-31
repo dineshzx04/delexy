@@ -121,3 +121,50 @@ export interface SellerProduct {
   created_at: string;
   updated_at: string;
 }
+
+export interface AttributeRoundHistory {
+  round: number;
+  value: any;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejection_comment?: string;
+  reviewed_by_user_name?: string;
+  timestamp: string;
+}
+
+export interface SubmissionAttributeItem {
+  field_key: string;
+  field_label: string;
+  field_group: 'IDENTIFIERS' | 'MANUFACTURING' | 'DIMENSIONS' | 'OPERATIONAL' | 'SPECS' | 'VARIANTS';
+  value: any;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejection_comment?: string;
+  reviewed_by_user_id?: string;
+  reviewed_by_user_name?: string;
+  reviewed_at?: string;
+  round_history?: AttributeRoundHistory[];
+}
+
+export interface SubmissionAuditLog {
+  id: string;
+  round: number;
+  actor_id: string;
+  actor_name: string;
+  action: 'CREATED_DRAFT' | 'SUBMITTED' | 'ATTRIBUTE_APPROVED' | 'ATTRIBUTE_REJECTED' | 'REQUESTED_REVISION' | 'RESUBMITTED' | 'FINAL_APPROVED' | 'PUBLISHED';
+  notes?: string;
+  timestamp: string;
+}
+
+export interface SellerProductSubmission {
+  id: string;
+  party_id: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'NEEDS_REVISION' | 'APPROVED' | 'PUBLISHED';
+  current_round: number;
+  published_seller_product_id?: string;
+  attributes: Record<string, SubmissionAttributeItem>;
+  audit_history: SubmissionAuditLog[];
+  created_at: string;
+  updated_at: string;
+  submitted_at?: string;
+  published_at?: string;
+}
+

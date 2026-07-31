@@ -368,7 +368,7 @@ const BusinessLayout: React.FC = () => {
         </AntModal>
 
         {/* Content Body */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16  min-w-0 w-full overflow-x-hidden">
+        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full">
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />
