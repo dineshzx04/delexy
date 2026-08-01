@@ -30,7 +30,7 @@ const Dashboard: React.FC = () => {
               Manage your personal identity, addresses, KYC verification, and linked business workspaces.
             </p>
           </div>
-          <Link to="/user/create-business">
+          <Link to="/user/business-submissions/new">
             <Button size="large" type="primary" icon={<Lucide.PlusCircle size={18} />} className="bg-white text-sky-700 hover:bg-sky-50 border-none font-semibold shadow-sm">
               Create New Business
             </Button>
@@ -82,14 +82,14 @@ const Dashboard: React.FC = () => {
           </Card>
         </Link>
 
-        <Link to="/user/create-business" className="block group">
+        <Link to="/user/business-submissions" className="block group">
           <Card className="hover:border-sky-300 transition-all shadow-sm group-hover:shadow-md">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-lg bg-indigo-100 text-indigo-600">
                 <Lucide.Building2 size={24} />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-800 text-base group-hover:text-indigo-600 transition-colors">Business Workspaces</h3>
+                <h3 className="font-semibold text-slate-800 text-base group-hover:text-indigo-600 transition-colors">Business Applications</h3>
                 <p className="text-xs text-slate-500">{workspaces.filter(w => w.type === 'BUSINESS').length} Workspaces Linked</p>
               </div>
             </div>

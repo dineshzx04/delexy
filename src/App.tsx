@@ -20,6 +20,7 @@ import UserAddresses from './pages/user/UserAddresses';
 import UserIdentifications from './pages/user/UserIdentifications';
 import UserBrands from './pages/user/UserBrands';
 import CreateBusiness from './pages/user/CreateBusiness';
+import UserBusinessSubmissions from './pages/user/UserBusinessSubmissions';
 import UserSellerProducts from './pages/user/UserSellerProducts';
 import SellerProductSubmissionForm from './pages/user/SellerProductSubmissionForm';
 
@@ -50,6 +51,8 @@ import PlatformRoles from './pages/platform/PlatformRoles';
 import PlatformSellerProducts from './pages/platform/PlatformSellerProducts';
 import PlatformSellerProductReviewQueue from './pages/platform/PlatformSellerProductReviewQueue';
 import PlatformSellerProductReviewDetail from './pages/platform/PlatformSellerProductReviewDetail';
+import PlatformBusinessReviewQueue from './pages/platform/PlatformBusinessReviewQueue';
+import PlatformBusinessReviewDetail from './pages/platform/PlatformBusinessReviewDetail';
 
 import NotFound from './pages/common/NotFound';
 
@@ -112,7 +115,9 @@ const App: React.FC = () => {
                 <Route path="seller-products" element={<UserSellerProducts />} />
                 <Route path="seller-products/create" element={<SellerProductSubmissionForm />} />
                 <Route path="seller-products/edit/:id" element={<SellerProductSubmissionForm />} />
-                <Route path="create-business" element={<CreateBusiness />} />
+                <Route path="business-submissions" element={<UserBusinessSubmissions />} />
+                <Route path="business-submissions/new" element={<CreateBusiness />} />
+                <Route path="business-submissions/edit/:id" element={<CreateBusiness />} />
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
             </Route>
@@ -150,6 +155,8 @@ const App: React.FC = () => {
                 <Route path="seller-products" element={<PlatformSellerProducts />} />
                 <Route path="seller-product-reviews" element={<PlatformSellerProductReviewQueue />} />
                 <Route path="seller-product-reviews/:id" element={<PlatformSellerProductReviewDetail />} />
+                <Route path="business-reviews" element={<PlatformBusinessReviewQueue />} />
+                <Route path="business-reviews/:id" element={<PlatformBusinessReviewDetail />} />
                 <Route path="users" element={<PlatformUsers />} />
                 <Route path="user-registry" element={<PlatformUserRegistry />} />
                 <Route path="businesses" element={<PlatformBusinesses />} />

@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { userDb, type Business, type BusinessMembership, type User } from '../../data/user';
-import { businessDb, type Party, type Brand, type BrandParty, type Manufacturer } from '../../data/business';
+import { businessDb, type Party, type Brand, type BrandParty, type Manufacturer, type BusinessSubmission } from '../../data/business';
 
 const PlatformBusinesses: React.FC = () => {
   const [searchText, setSearchText] = useState('');
@@ -34,6 +34,7 @@ const PlatformBusinesses: React.FC = () => {
   const brandParties = useLiveQuery(() => businessDb.brandParties.toArray()) || [];
   const manufacturers = useLiveQuery(() => businessDb.manufacturers.toArray()) || [];
   const addresses = useLiveQuery(() => userDb.addresses.toArray()) || [];
+  const businessSubmissions = useLiveQuery(() => businessDb.businessSubmissions.toArray()) || [];
 
   // Enriched business records with owner name, member count, claimed party, party addresses, claimed brands, and manufacturers
   const businessData = useMemo(() => {
@@ -71,6 +72,13 @@ const PlatformBusinesses: React.FC = () => {
         ? manufacturers.filter((m: Manufacturer) => m.manufacturer_party_id === claimedParty.id)
         : [];
 
+      // Resolve linked approved business submission record
+      const linkedSubmission = businessSubmissions.find((s: BusinessSubmission) =>
+        s.business_name.toLowerCase() === bus.name.toLowerCase() ||
+        s.id === `bsub-${bus.id.split('-')[1]}` ||
+        s.id === bus.id
+      );
+
       return {
         ...bus,
         memberCount: memberships.length,
@@ -79,14 +87,15 @@ const PlatformBusinesses: React.FC = () => {
         claimedParty,
         partyAddresses,
         claimedBrands: claimedBrandsList,
-        claimedManufacturers: claimedManufacturersList
+        claimedManufacturers: claimedManufacturersList,
+        linkedSubmission
       };
     }).filter(b =>
       b.name.toLowerCase().includes(searchText.toLowerCase()) ||
       (b.legal_name && b.legal_name.toLowerCase().includes(searchText.toLowerCase())) ||
       b.country_code.toLowerCase().includes(searchText.toLowerCase())
     );
-  }, [businesses, businessMemberships, users, parties, brands, brandParties, manufacturers, addresses, searchText]);
+  }, [businesses, businessMemberships, users, parties, brands, brandParties, manufacturers, addresses, businessSubmissions, searchText]);
 
   const columns = [
     {
@@ -355,6 +364,46 @@ const PlatformBusinesses: React.FC = () => {
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* 1.5 Verification Submission & Audit Card */}
+            <div className="bg-purple-50/70 p-4 rounded-lg border border-purple-200 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-sm text-purple-950 flex items-center gap-2">
+                  <Lucide.FileCheck size={16} className="text-purple-600" />
+                  Verification Application & Document Audit
+                </span>
+                {selectedBusiness.linkedSubmission ? (
+                  <AntTag color="success" className="font-mono text-xs font-semibold">
+                    {selectedBusiness.linkedSubmission.status} (Round {selectedBusiness.linkedSubmission.current_round})
+                  </AntTag>
+                ) : (
+                  <AntTag color="default" className="text-xs">SYSTEM REGISTERED</AntTag>
+                )}
+              </div>
+
+              {selectedBusiness.linkedSubmission ? (
+                <div className="bg-white p-3 rounded border border-purple-100 space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="font-bold text-gray-900 font-mono">Submission #{selectedBusiness.linkedSubmission.id}</span>
+                    <span className="text-gray-400 text-[11px]">Tax ID: <strong>{selectedBusiness.linkedSubmission.tax_id}</strong></span>
+                  </div>
+                  <div className="text-gray-600 text-[11px]">
+                    Attached Proof Docs: <strong>{selectedBusiness.linkedSubmission.documents?.length || 0} File(s)</strong> • Audit Rounds: <strong>{selectedBusiness.linkedSubmission.audit_history?.length || 1} Event(s)</strong>
+                  </div>
+                  <div className="pt-1">
+                    <Link to={`/p/business-reviews/${selectedBusiness.linkedSubmission.id}`}>
+                      <AntButton size="small" type="primary" className="bg-purple-600 hover:bg-purple-700 font-semibold text-xs" icon={<Lucide.ShieldCheck size={13} />}>
+                        Inspect Full Audit Trail & Docs
+                      </AntButton>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-xs text-purple-800 italic bg-white p-3 rounded border border-purple-100">
+                  Pre-existing system business tenant. All new business applications originate via the multi-round registration workflow.
+                </div>
+              )}
             </div>
 
             {/* 2. Party Physical Locations (attached directly to party_id) */}

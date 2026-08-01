@@ -154,7 +154,7 @@ const UserLayout: React.FC = () => {
                     {
                         key: '/user/seller-products',
                         icon: <Lucide.Package size={18} />,
-                        label: <Link to="/user/seller-products">Sell My Products</Link>,
+                        label: <Link to="/user/seller-products">My Products</Link>,
                     },
                 ],
             },
@@ -164,9 +164,9 @@ const UserLayout: React.FC = () => {
                 label: collapsed ? null : 'Business Actions',
                 children: [
                     {
-                        key: '/user/create-business',
-                        icon: <Lucide.PlusCircle size={18} />,
-                        label: <Link to="/user/create-business">Create Business</Link>,
+                        key: '/user/business-submissions',
+                        icon: <Lucide.FileCheck size={18} />,
+                        label: <Link to="/user/business-submissions">Business Applications</Link>,
                     },
                 ],
             },
