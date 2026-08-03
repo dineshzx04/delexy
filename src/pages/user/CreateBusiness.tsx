@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { businessDb, type BusinessSubmission, type BusinessSubmissionDocument, type BusinessSubmissionSectionItem, type Brand, mockParties } from '../../data/business';
+import { businessDb, type BusinessSubmission, type BusinessSubmissionDocument, type BusinessSubmissionSectionItem, type Brand } from '../../data/business';
 
 const CreateBusiness: React.FC = () => {
   const { message: antMessage } = AntApp.useApp();
@@ -20,10 +20,9 @@ const CreateBusiness: React.FC = () => {
   const dbBrands = useLiveQuery(() => businessDb.brands.toArray()) || [];
   const dbParties = useLiveQuery(() => businessDb.parties.toArray()) || [];
 
-  // Available Unclaimed Placeholder Business Parties
+  // Available Unclaimed Placeholder Business Parties strictly from Dexie DB
   const unclaimedParties = useMemo(() => {
-    const pool = dbParties.length > 0 ? dbParties : mockParties;
-    return pool.filter(p => p.owner_type === 'BUSINESS' && !p.is_claimed);
+    return dbParties.filter(p => p.owner_type === 'BUSINESS' && !p.is_claimed);
   }, [dbParties]);
 
   // Editing Submission Target
@@ -186,8 +185,8 @@ const CreateBusiness: React.FC = () => {
       updatedAudit.push({
         id: `aud-b-${Date.now()}`,
         round: currentRound,
-        actor_id: currentUser?.id,
-        actor_name: currentUser?.full_name,
+        actor_id: currentUser?.id || 'usr-1',
+        actor_name: currentUser?.full_name || 'Business User',
         action: 'SUBMITTED',
         notes: `Submitted Round ${currentRound} business registration & party claim application.`,
         timestamp: now
@@ -195,7 +194,7 @@ const CreateBusiness: React.FC = () => {
 
       const submissionRecord: BusinessSubmission = {
         id: subId,
-        user_id: currentUser?.id,
+        user_id: currentUser?.id || 'usr-1',
         business_name: businessName,
         legal_name: legalName || businessName,
         website: website || undefined,

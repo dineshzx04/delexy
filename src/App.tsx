@@ -163,6 +163,7 @@ const App: React.FC = () => {
                 <Route path="parties" element={<PlatformParties />} />
                 <Route path="manufacturers" element={<PlatformManufacturers />} />
                 <Route path="brands" element={<PlatformBrands />} />
+                <Route path="brand-claims" element={<PlatformBrands />} />
                 <Route path="platform-roles" element={<PlatformRoles />} />
                 <Route path="*" element={<NotFound scope="platform" />} />
               </Route>

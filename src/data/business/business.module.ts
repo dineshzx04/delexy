@@ -119,3 +119,42 @@ export interface BusinessSubmission {
   created_at: string;
   updated_at: string;
 }
+
+export type BrandSubmissionType = 'CLAIM' | 'CREATE_NEW';
+
+export interface BrandSubmission {
+  id: string;
+  party_id: string;
+  user_id: string;
+  submission_type: BrandSubmissionType;
+  brand_id?: string;
+  brand_name: string;
+  brand_slug: string;
+  logo_url?: string;
+  manufacturer_party_id?: string;
+  manufacturer_company_name?: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'NEEDS_REVISION' | 'APPROVED' | 'REJECTED';
+  current_round: number;
+  rejection_comments?: string;
+  sections?: Record<string, BusinessSubmissionSectionItem>;
+  audit_history?: BusinessSubmissionAudit[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type ManufacturerSubmissionType = 'REGISTER_NEW' | 'CLAIM_PARTY';
+
+export interface ManufacturerSubmission {
+  id: string;
+  party_id: string;
+  user_id: string;
+  submission_type: ManufacturerSubmissionType;
+  company_name: string;
+  registration_number?: string;
+  target_party_id?: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'NEEDS_REVISION' | 'APPROVED' | 'REJECTED';
+  current_round: number;
+  rejection_comments?: string;
+  created_at: string;
+  updated_at: string;
+}

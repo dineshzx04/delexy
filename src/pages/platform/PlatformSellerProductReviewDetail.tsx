@@ -434,6 +434,42 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
       displayVal = <pre className="text-[11px] font-mono leading-tight">{JSON.stringify(item.value, null, 2)}</pre>;
     }
 
+    // Collect all auditor review comments across round history + current state
+    const allComments: Array<{
+      round: number;
+      comment: string;
+      reviewerName?: string;
+      timestamp?: string;
+      status?: string;
+    }> = [];
+
+    if (item.round_history && item.round_history.length > 0) {
+      item.round_history.forEach((rh) => {
+        if (rh.rejection_comment && rh.rejection_comment.trim()) {
+          allComments.push({
+            round: rh.round,
+            comment: rh.rejection_comment.trim(),
+            reviewerName: rh.reviewed_by_user_name || 'Platform Admin',
+            timestamp: rh.timestamp,
+            status: rh.status,
+          });
+        }
+      });
+    }
+
+    if (item.rejection_comment && item.rejection_comment.trim()) {
+      const lastHistComment = allComments[allComments.length - 1]?.comment;
+      if (lastHistComment !== item.rejection_comment.trim()) {
+        allComments.push({
+          round: submission.current_round,
+          comment: item.rejection_comment.trim(),
+          reviewerName: item.reviewed_by_user_name || 'Platform Admin',
+          timestamp: item.reviewed_at,
+          status: item.status,
+        });
+      }
+    }
+
     return (
       <div
         key={fieldKey}
@@ -502,13 +538,42 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
           {isComplexValue ? displayVal : (item.value || <span className="text-gray-400 italic">No value provided</span>)}
         </div>
 
-        {/* Rejection comment display */}
-        {item.status === 'REJECTED' && item.rejection_comment && (
-          <div className="mt-1.5 text-xs bg-red-100/80 border border-red-200 p-2 rounded text-red-800 space-y-0.5">
-            <div className="font-semibold flex items-center gap-1">
-              <Lucide.MessageSquare size={12} /> Reviewer Comment:
+        {/* All Platform Auditor Review Comments Across Rounds */}
+        {allComments.length > 0 && (
+          <div className="mt-2.5 space-y-1.5">
+            <div className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
+              <Lucide.MessageSquare size={13} className="text-sky-600" />
+              <span>Platform Auditor Review Comments ({allComments.length}):</span>
             </div>
-            <div>{item.rejection_comment}</div>
+            <div className="space-y-1.5">
+              {allComments.map((c, idx) => (
+                <div
+                  key={idx}
+                  className={`text-xs p-2.5 rounded border space-y-1 ${
+                    c.status === 'REJECTED' || (idx === allComments.length - 1 && item.status === 'REJECTED')
+                      ? 'bg-red-50/90 border-red-300 text-red-900'
+                      : c.status === 'APPROVED'
+                      ? 'bg-emerald-50/90 border-emerald-300 text-emerald-900'
+                      : 'bg-amber-50/90 border-amber-300 text-amber-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[11px] font-semibold border-b border-black/5 pb-1">
+                    <span className="flex items-center gap-1.5">
+                      <AntTag color="purple" className="text-[10px] py-0 px-1 font-mono">
+                        Round {c.round}
+                      </AntTag>
+                      <span className="text-gray-800 font-bold">{c.reviewerName}</span>
+                    </span>
+                    {c.timestamp && (
+                      <span className="text-[10px] text-gray-500 font-mono">
+                        {new Date(c.timestamp).toLocaleDateString()} {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mb-0 text-xs font-medium leading-relaxed">{c.comment}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

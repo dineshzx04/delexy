@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Table as AntTable, Button as AntButton, Tag as AntTag, Input as AntInput, Modal as AntModal, Form as AntForm, Select as AntSelect, Card as AntCard, Tooltip as AntTooltip, Drawer as AntDrawer, Avatar as AntAvatar, App as AntApp } from 'antd';
+import { Table as AntTable, Button as AntButton, Tag as AntTag, Input as AntInput, Modal as AntModal, Form as AntForm, Select as AntSelect, Card as AntCard, Tooltip as AntTooltip, Drawer as AntDrawer, Avatar as AntAvatar, Tabs as AntTabs, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { userDb, type Business } from '../../data/user';
-import { businessDb, type Brand, type BrandParty, type Party } from '../../data/business';
+import { businessDb, type Brand, type BrandParty, type Party, type BrandSubmission } from '../../data/business';
 
 const PlatformBrands: React.FC = () => {
   const { message: antMessage } = AntApp.useApp();
   const [searchText, setSearchText] = useState('');
+  const [activeTab, setActiveTab] = useState('1');
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [selectedBrand, setSelectedBrand] = useState<any>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -18,19 +19,24 @@ const PlatformBrands: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Revision Modal State
+  const [revisionSub, setRevisionSub] = useState<BrandSubmission | null>(null);
+  const [revisionForm] = AntForm.useForm();
+
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/p/dashboard" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/p/dashboard' },
     { title: <span className="text-gray-500">Product Information</span> },
-    { title: <span className="text-gray-900 font-semibold">Brands</span> }
+    { title: <span className="text-gray-900 font-semibold">Brands & Onboarding Audit</span> }
   ], []);
 
   useBreadcrumb(breadcrumbs);
 
-  // Live Query Dexie Tables
+  // Live Query Dexie Tables strictly from DB
   const brands = useLiveQuery(() => businessDb.brands.toArray()) || [];
   const brandParties = useLiveQuery(() => businessDb.brandParties.toArray()) || [];
   const parties = useLiveQuery(() => businessDb.parties.toArray()) || [];
   const businesses = useLiveQuery(() => userDb.businesses.toArray()) || [];
+  const brandSubmissions = useLiveQuery(() => businessDb.brandSubmissions.toArray()) || [];
 
   // Enriched Brand records with co-claimants
   const brandData = useMemo(() => {
@@ -176,14 +182,168 @@ const PlatformBrands: React.FC = () => {
     setIsModalVisible(false);
   };
 
+  // Handle Platform Approval for Brand Submissions
+  const handleApproveBrandSubmission = async (sub: BrandSubmission) => {
+    let brandId = sub.brand_id;
+
+    if (sub.submission_type === 'CREATE_NEW' || !brandId) {
+      brandId = `brd-${Date.now().toString().slice(-4)}`;
+      await businessDb.brands.put({
+        id: brandId,
+        name: sub.brand_name,
+        slug: sub.brand_slug,
+        logo_url: sub.logo_url,
+        is_verified: true,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+    }
+
+    await businessDb.brandParties.put({
+      id: `bp-${Date.now()}`,
+      brand_id: brandId,
+      party_id: sub.party_id,
+      claim_status: 'VERIFIED',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    await businessDb.brandSubmissions.update(sub.id, {
+      status: 'APPROVED',
+      updated_at: new Date().toISOString(),
+    });
+
+    antMessage.success(`Brand submission ${sub.id} APPROVED! Brand "${sub.brand_name}" is now active in DB.`);
+  };
+
+  // Handle Request Revision
+  const handleConfirmRequestRevision = async (values: { comments: string }) => {
+    if (!revisionSub) return;
+
+    await businessDb.brandSubmissions.update(revisionSub.id, {
+      status: 'NEEDS_REVISION',
+      rejection_comments: values.comments,
+      updated_at: new Date().toISOString(),
+    });
+
+    antMessage.warning(`Revision requested for Brand submission ${revisionSub.id}. Feedback sent to Tenant Workbench.`);
+    setRevisionSub(null);
+    revisionForm.resetFields();
+  };
+
+  // Brand Submission Table Columns
+  const submissionColumns = [
+    {
+      title: 'Submission ID',
+      dataIndex: 'id',
+      key: 'id',
+      render: (id: string) => <span className="font-mono text-xs font-semibold text-indigo-700">{id}</span>
+    },
+    {
+      title: 'Type',
+      dataIndex: 'submission_type',
+      key: 'submission_type',
+      render: (type: string) => (
+        <AntTag color={type === 'CLAIM' ? 'blue' : 'purple'} className="font-mono text-xs font-semibold">
+          {type}
+        </AntTag>
+      )
+    },
+    {
+      title: 'Brand Title & Slug',
+      key: 'brand_info',
+      render: (_: any, record: BrandSubmission) => (
+        <div>
+          <div className="font-bold text-gray-900">{record.brand_name}</div>
+          <div className="text-xs text-gray-500 font-mono">{record.brand_slug}</div>
+        </div>
+      )
+    },
+    {
+      title: 'Submitting Party',
+      dataIndex: 'party_id',
+      key: 'party_id',
+      render: (partyId: string) => {
+        const party = parties.find((p) => p.id === partyId);
+        return (
+          <div>
+            <div className="font-semibold text-gray-800 text-xs">{party?.display_name || partyId}</div>
+            <div className="text-[11px] font-mono text-gray-400">{partyId}</div>
+          </div>
+        );
+      }
+    },
+    {
+      title: 'Round',
+      dataIndex: 'current_round',
+      key: 'current_round',
+      render: (round: number) => <span className="font-semibold text-xs">Round {round}</span>
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <AntTag
+          color={
+            status === 'APPROVED'
+              ? 'success'
+              : status === 'NEEDS_REVISION'
+              ? 'warning'
+              : status === 'REJECTED'
+              ? 'error'
+              : 'processing'
+          }
+          className="font-bold text-xs"
+        >
+          {status}
+        </AntTag>
+      )
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: BrandSubmission) => (
+        <div className="flex items-center gap-2">
+          {record.status !== 'APPROVED' && (
+            <>
+              <AntButton
+                type="text"
+                size="small"
+                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium"
+                onClick={() => handleApproveBrandSubmission(record)}
+              >
+                Approve
+              </AntButton>
+              <AntButton
+                type="text"
+                size="small"
+                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-medium"
+                onClick={() => {
+                  setRevisionSub(record);
+                  revisionForm.setFieldsValue({
+                    comments: record.rejection_comments || 'Please verify trademark documentation and update brand logo asset.'
+                  });
+                }}
+              >
+                Request Revision
+              </AntButton>
+            </>
+          )}
+        </div>
+      )
+    }
+  ];
+
   return (
     <div className="w-full max-w-7xl pb-12">
       {/* Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Standalone Brand Directory</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Brand Management & Onboarding Audit</h1>
           <p className="text-gray-500">
-            Manage global product brands, platform verification, and multi-business co-claimant parties.
+            Manage global product brands, platform verification, and audit tenant brand claim & creation submissions.
           </p>
         </div>
       </div>
@@ -199,27 +359,58 @@ const PlatformBrands: React.FC = () => {
             onChange={(e) => setSearchText(e.target.value)}
             allowClear
           />
-          <div className="text-xs text-gray-500">
-            Total {brandData.length} Registered Brands
-          </div>
         </div>
 
-        {/* Table */}
-        <AntTable
-          size="small"
-          columns={columns}
-          dataSource={brandData}
-          rowKey="id"
-          scroll={{ x: 'max-content' }}
-          pagination={{
-            current: currentPage,
-            pageSize: pageSize,
-            onChange: (page, size) => {
-              setCurrentPage(page);
-              setPageSize(size);
+        <AntTabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          className="px-4"
+          items={[
+            {
+              key: '1',
+              label: (
+                <span className="flex items-center gap-2">
+                  <Lucide.Award size={16} /> Standalone Brand Directory ({brandData.length})
+                </span>
+              ),
+              children: (
+                <AntTable
+                  size="small"
+                  columns={columns}
+                  dataSource={brandData}
+                  rowKey="id"
+                  scroll={{ x: 'max-content' }}
+                  pagination={{
+                    current: currentPage,
+                    pageSize: pageSize,
+                    onChange: (page, size) => {
+                      setCurrentPage(page);
+                      setPageSize(size);
+                    },
+                    showSizeChanger: true
+                  }}
+                />
+              )
             },
-            showSizeChanger: true
-          }}
+            {
+              key: '2',
+              label: (
+                <span className="flex items-center gap-2">
+                  <Lucide.GitPullRequest size={16} /> Brand Submissions Review Queue ({brandSubmissions.length})
+                </span>
+              ),
+              children: (
+                <AntTable
+                  size="small"
+                  columns={submissionColumns}
+                  dataSource={brandSubmissions}
+                  rowKey="id"
+                  scroll={{ x: 'max-content' }}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                />
+              )
+            }
+          ]}
         />
       </div>
 
@@ -338,6 +529,46 @@ const PlatformBrands: React.FC = () => {
           </div>
         )}
       </AntDrawer>
+
+      {/* Platform Request Revision Modal */}
+      <AntModal
+        title={
+          <div className="flex items-center gap-2 text-gray-900 font-bold border-b border-gray-100 pb-3">
+            <Lucide.AlertTriangle className="text-amber-600" size={20} />
+            <span>Request Revision for Submission {revisionSub?.id}</span>
+          </div>
+        }
+        open={Boolean(revisionSub)}
+        onCancel={() => setRevisionSub(null)}
+        footer={null}
+        destroyOnClose
+      >
+        <AntForm
+          form={revisionForm}
+          layout="vertical"
+          onFinish={handleConfirmRequestRevision}
+          className="pt-2 space-y-4"
+        >
+          <div className="text-xs text-gray-600 bg-amber-50 p-3 rounded border border-amber-200">
+            Enter auditor comments outlining required changes for Brand <strong>"{revisionSub?.brand_name}"</strong>. This will set the submission status to <code className="text-amber-700 font-bold">NEEDS_REVISION</code> and notify the Tenant Business.
+          </div>
+
+          <AntForm.Item
+            name="comments"
+            label="Auditor Revision Feedback & Instructions"
+            rules={[{ required: true, message: 'Auditor comments are required' }]}
+          >
+            <AntInput.TextArea rows={4} placeholder="Specify missing documentation or required field corrections..." />
+          </AntForm.Item>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <AntButton onClick={() => setRevisionSub(null)}>Cancel</AntButton>
+            <AntButton type="primary" htmlType="submit" className="bg-amber-600 hover:bg-amber-700">
+              Send Revision Feedback
+            </AntButton>
+          </div>
+        </AntForm>
+      </AntModal>
     </div>
   );
 };

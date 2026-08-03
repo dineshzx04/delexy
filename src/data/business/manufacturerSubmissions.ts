@@ -1,0 +1,85 @@
+import type { ManufacturerSubmission } from "./business.module";
+
+export const mockManufacturerSubmissions: ManufacturerSubmission[] = [
+  // 1. Samsung India Manufacturer Registration (mfg-1) [APPROVED]
+  {
+    id: "msub-mfg-1",
+    party_id: "pty-1",
+    user_id: "usr-2",
+    submission_type: "REGISTER_NEW",
+    company_name: "Samsung India Electronics Pvt Ltd",
+    registration_number: "REG-IN-884920",
+    status: "APPROVED",
+    current_round: 1,
+    created_at: "2026-01-15T08:00:00.000Z",
+    updated_at: "2026-01-15T08:00:00.000Z",
+  },
+  // 2. Sony Corporation Manufacturer Registration (mfg-2) [APPROVED]
+  {
+    id: "msub-mfg-2",
+    party_id: "pty-4",
+    user_id: "usr-4",
+    submission_type: "REGISTER_NEW",
+    company_name: "Sony Corporation Manufacturing",
+    registration_number: "REG-JP-991240",
+    status: "APPROVED",
+    current_round: 1,
+    created_at: "2026-01-15T08:00:00.000Z",
+    updated_at: "2026-01-15T08:00:00.000Z",
+  },
+  // 3. ASICS Global Manufacturer Party Claim (mfg-3 / pty-3) [NEEDS_REVISION]
+  {
+    id: "msub-mfg-3",
+    party_id: "pty-1",
+    user_id: "usr-2",
+    submission_type: "CLAIM_PARTY",
+    company_name: "ASICS Global Manufacturing Placeholder",
+    target_party_id: "pty-3",
+    registration_number: "REG-JP-551029",
+    status: "NEEDS_REVISION",
+    current_round: 1,
+    rejection_comments: "Platform Auditor Feedback: Please submit official corporate authorization letter and manufacturing license to claim party pty-3.",
+    created_at: "2026-05-10T08:00:00.000Z",
+    updated_at: "2026-05-12T10:00:00.000Z",
+  },
+  // 4. ASUSTeK Computer Inc Manufacturer Registration (mfg-4) [APPROVED]
+  {
+    id: "msub-mfg-4",
+    party_id: "pty-5",
+    user_id: "usr-5",
+    submission_type: "REGISTER_NEW",
+    company_name: "ASUSTeK Computer Inc Manufacturing",
+    registration_number: "REG-TW-331001",
+    status: "APPROVED",
+    current_round: 2,
+    created_at: "2026-04-10T08:00:00.000Z",
+    updated_at: "2026-04-12T09:00:00.000Z",
+  },
+  // 5. Logitech International Manufacturer Registration (mfg-5) [SUBMITTED]
+  {
+    id: "msub-mfg-5",
+    party_id: "pty-8",
+    user_id: "usr-6",
+    submission_type: "REGISTER_NEW",
+    company_name: "Logitech International Manufacturing Placeholder",
+    registration_number: "REG-CH-771802",
+    status: "SUBMITTED",
+    current_round: 1,
+    created_at: "2026-06-01T08:00:00.000Z",
+    updated_at: "2026-06-01T08:00:00.000Z",
+  },
+  // 6. Samsung UK Manufacturer Registration - Samsung UK (pty-2) [NEEDS_REVISION]
+  {
+    id: "msub-mfg-6",
+    party_id: "pty-2",
+    user_id: "usr-3",
+    submission_type: "REGISTER_NEW",
+    company_name: "Samsung UK Electronics Manufacturing Party",
+    registration_number: "REG-UK-7766",
+    status: "NEEDS_REVISION",
+    current_round: 1,
+    rejection_comments: "Platform Auditor Feedback: Please submit official UK corporate license document to verify registration number REG-UK-7766.",
+    created_at: "2026-06-01T10:00:00.000Z",
+    updated_at: "2026-06-03T11:30:00.000Z",
+  },
+];

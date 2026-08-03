@@ -1,15 +1,16 @@
 import React, { useState, useMemo } from 'react';
-import { Table as AntTable, Button as AntButton, Tag as AntTag, Input as AntInput, Modal as AntModal, Form as AntForm, Select as AntSelect, Drawer as AntDrawer, App as AntApp } from 'antd';
+import { Table as AntTable, Button as AntButton, Tag as AntTag, Input as AntInput, Modal as AntModal, Form as AntForm, Select as AntSelect, Drawer as AntDrawer, Tabs as AntTabs, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { userDb, type Business } from '../../data/user';
-import { businessDb, type Manufacturer, type Party } from '../../data/business';
+import { businessDb, type Manufacturer, type Party, type ManufacturerSubmission } from '../../data/business';
 
 const PlatformManufacturers: React.FC = () => {
   const { message: antMessage } = AntApp.useApp();
   const [searchText, setSearchText] = useState('');
+  const [activeTab, setActiveTab] = useState('1');
   const [isDetailsDrawerOpen, setIsDetailsDrawerOpen] = useState(false);
   const [selectedManufacturer, setSelectedManufacturer] = useState<any>(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -18,18 +19,23 @@ const PlatformManufacturers: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
+  // Revision Modal State
+  const [revisionSub, setRevisionSub] = useState<ManufacturerSubmission | null>(null);
+  const [revisionForm] = AntForm.useForm();
+
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/p/dashboard" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/p/dashboard' },
     { title: <span className="text-gray-500">Organizations</span> },
-    { title: <span className="text-gray-900 font-semibold">Manufacturers</span> }
+    { title: <span className="text-gray-900 font-semibold">Manufacturers & Onboarding Audit</span> }
   ], []);
 
   useBreadcrumb(breadcrumbs);
 
-  // Live Query Dexie Tables
+  // Live Query Dexie Tables strictly from DB
   const manufacturers = useLiveQuery(() => businessDb.manufacturers.toArray()) || [];
   const parties = useLiveQuery(() => businessDb.parties.toArray()) || [];
   const businesses = useLiveQuery(() => userDb.businesses.toArray()) || [];
+  const mfgSubmissions = useLiveQuery(() => businessDb.manufacturerSubmissions.toArray()) || [];
 
   // Enriched Manufacturer records
   const manufacturerData = useMemo(() => {
@@ -157,14 +163,167 @@ const PlatformManufacturers: React.FC = () => {
     setIsModalVisible(false);
   };
 
+  // Handle Platform Approval for Manufacturer Submissions
+  const handleApproveMfgSubmission = async (sub: ManufacturerSubmission) => {
+    let targetPartyId = sub.party_id;
+
+    if (sub.submission_type === 'CLAIM_PARTY' && sub.target_party_id) {
+      targetPartyId = sub.target_party_id;
+      const party = parties.find((p) => p.id === targetPartyId);
+      if (party) {
+        await businessDb.parties.update(party.id, {
+          is_claimed: true,
+          is_verified: true,
+          updated_at: new Date().toISOString(),
+        });
+      }
+    }
+
+    await businessDb.manufacturers.put({
+      id: `mfg-${Date.now()}`,
+      manufacturer_party_id: targetPartyId,
+      company_name: sub.company_name,
+      registration_number: sub.registration_number,
+      status: 'ACTIVE',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    await businessDb.manufacturerSubmissions.update(sub.id, {
+      status: 'APPROVED',
+      updated_at: new Date().toISOString(),
+    });
+
+    antMessage.success(`Manufacturer submission ${sub.id} APPROVED! Manufacturer account registered in DB.`);
+  };
+
+  // Handle Request Revision
+  const handleConfirmMfgRevision = async (values: { comments: string }) => {
+    if (!revisionSub) return;
+
+    await businessDb.manufacturerSubmissions.update(revisionSub.id, {
+      status: 'NEEDS_REVISION',
+      rejection_comments: values.comments,
+      updated_at: new Date().toISOString(),
+    });
+
+    antMessage.warning(`Revision requested for Manufacturer submission ${revisionSub.id}. Feedback sent to Tenant Workbench.`);
+    setRevisionSub(null);
+    revisionForm.resetFields();
+  };
+
+  // Manufacturer Submission Table Columns
+  const submissionColumns = [
+    {
+      title: 'Submission ID',
+      dataIndex: 'id',
+      key: 'id',
+      render: (id: string) => <span className="font-mono text-xs font-semibold text-sky-700">{id}</span>
+    },
+    {
+      title: 'Type',
+      dataIndex: 'submission_type',
+      key: 'submission_type',
+      render: (type: string) => (
+        <AntTag color={type === 'CLAIM_PARTY' ? 'blue' : 'cyan'} className="font-mono text-xs font-semibold">
+          {type}
+        </AntTag>
+      )
+    },
+    {
+      title: 'Company & Reg Number',
+      key: 'company_info',
+      render: (_: any, record: ManufacturerSubmission) => (
+        <div>
+          <div className="font-bold text-gray-900">{record.company_name}</div>
+          <div className="text-xs text-gray-500 font-mono">Reg: {record.registration_number || 'N/A'}</div>
+        </div>
+      )
+    },
+    {
+      title: 'Submitting Party',
+      dataIndex: 'party_id',
+      key: 'party_id',
+      render: (partyId: string) => {
+        const party = parties.find((p) => p.id === partyId);
+        return (
+          <div>
+            <div className="font-semibold text-gray-800 text-xs">{party?.display_name || partyId}</div>
+            <div className="text-[11px] font-mono text-gray-400">{partyId}</div>
+          </div>
+        );
+      }
+    },
+    {
+      title: 'Round',
+      dataIndex: 'current_round',
+      key: 'current_round',
+      render: (round: number) => <span className="font-semibold text-xs">Round {round}</span>
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <AntTag
+          color={
+            status === 'APPROVED'
+              ? 'success'
+              : status === 'NEEDS_REVISION'
+              ? 'warning'
+              : status === 'REJECTED'
+              ? 'error'
+              : 'processing'
+          }
+          className="font-bold text-xs"
+        >
+          {status}
+        </AntTag>
+      )
+    },
+    {
+      title: 'Actions',
+      key: 'actions',
+      render: (_: any, record: ManufacturerSubmission) => (
+        <div className="flex items-center gap-2">
+          {record.status !== 'APPROVED' && (
+            <>
+              <AntButton
+                type="text"
+                size="small"
+                className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium"
+                onClick={() => handleApproveMfgSubmission(record)}
+              >
+                Approve
+              </AntButton>
+              <AntButton
+                type="text"
+                size="small"
+                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 font-medium"
+                onClick={() => {
+                  setRevisionSub(record);
+                  revisionForm.setFieldsValue({
+                    comments: record.rejection_comments || 'Please provide official corporate registration document and confirm registration number.'
+                  });
+                }}
+              >
+                Request Revision
+              </AntButton>
+            </>
+          )}
+        </div>
+      )
+    }
+  ];
+
   return (
     <div className="w-full max-w-7xl pb-12">
       {/* Header */}
       <div className="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Manufacturer Directory</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Manufacturer Management & Onboarding Audit</h1>
           <p className="text-gray-500">
-            View registered corporate manufacturing units, party mappings, and verification status.
+            View registered corporate manufacturing units, party mappings, and audit onboarding submissions.
           </p>
         </div>
       </div>
@@ -180,27 +339,58 @@ const PlatformManufacturers: React.FC = () => {
             onChange={(e) => setSearchText(e.target.value)}
             allowClear
           />
-          <div className="text-xs text-gray-500">
-            Total {manufacturerData.length} Registered Manufacturers
-          </div>
         </div>
 
-        {/* Table */}
-        <AntTable
-          size="small"
-          columns={columns}
-          dataSource={manufacturerData}
-          rowKey="id"
-          scroll={{ x: 'max-content' }}
-          pagination={{
-            current: currentPage,
-            pageSize: pageSize,
-            onChange: (page, size) => {
-              setCurrentPage(page);
-              setPageSize(size);
+        <AntTabs
+          activeKey={activeTab}
+          onChange={setActiveTab}
+          className="px-4"
+          items={[
+            {
+              key: '1',
+              label: (
+                <span className="flex items-center gap-2">
+                  <Lucide.Factory size={16} /> Manufacturer Directory ({manufacturerData.length})
+                </span>
+              ),
+              children: (
+                <AntTable
+                  size="small"
+                  columns={columns}
+                  dataSource={manufacturerData}
+                  rowKey="id"
+                  scroll={{ x: 'max-content' }}
+                  pagination={{
+                    current: currentPage,
+                    pageSize: pageSize,
+                    onChange: (page, size) => {
+                      setCurrentPage(page);
+                      setPageSize(size);
+                    },
+                    showSizeChanger: true
+                  }}
+                />
+              )
             },
-            showSizeChanger: true
-          }}
+            {
+              key: '2',
+              label: (
+                <span className="flex items-center gap-2">
+                  <Lucide.GitPullRequest size={16} /> Manufacturer Submissions Review Queue ({mfgSubmissions.length})
+                </span>
+              ),
+              children: (
+                <AntTable
+                  size="small"
+                  columns={submissionColumns}
+                  dataSource={mfgSubmissions}
+                  rowKey="id"
+                  scroll={{ x: 'max-content' }}
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                />
+              )
+            }
+          ]}
         />
       </div>
 
@@ -292,6 +482,46 @@ const PlatformManufacturers: React.FC = () => {
           </div>
         )}
       </AntDrawer>
+
+      {/* Platform Request Revision Modal */}
+      <AntModal
+        title={
+          <div className="flex items-center gap-2 text-gray-900 font-bold border-b border-gray-100 pb-3">
+            <Lucide.AlertTriangle className="text-amber-600" size={20} />
+            <span>Request Revision for Manufacturer Submission {revisionSub?.id}</span>
+          </div>
+        }
+        open={Boolean(revisionSub)}
+        onCancel={() => setRevisionSub(null)}
+        footer={null}
+        destroyOnClose
+      >
+        <AntForm
+          form={revisionForm}
+          layout="vertical"
+          onFinish={handleConfirmMfgRevision}
+          className="pt-2 space-y-4"
+        >
+          <div className="text-xs text-gray-600 bg-amber-50 p-3 rounded border border-amber-200">
+            Enter auditor comments outlining required changes for Manufacturer <strong>"{revisionSub?.company_name}"</strong>. This will set the submission status to <code className="text-amber-700 font-bold">NEEDS_REVISION</code> and notify the Tenant Business.
+          </div>
+
+          <AntForm.Item
+            name="comments"
+            label="Auditor Revision Feedback & Instructions"
+            rules={[{ required: true, message: 'Auditor comments are required' }]}
+          >
+            <AntInput.TextArea rows={4} placeholder="Specify missing documentation or required registration number corrections..." />
+          </AntForm.Item>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+            <AntButton onClick={() => setRevisionSub(null)}>Cancel</AntButton>
+            <AntButton type="primary" htmlType="submit" className="bg-amber-600 hover:bg-amber-700">
+              Send Revision Feedback
+            </AntButton>
+          </div>
+        </AntForm>
+      </AntModal>
     </div>
   );
 };

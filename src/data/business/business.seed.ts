@@ -5,8 +5,10 @@ import { mockManufacturers } from "./manufacturers";
 import { mockParties } from "./parties";
 import { mockPartyClaims } from "./partyClaims";
 import { mockBusinessSubmissions } from "./businessSubmissions";
+import { mockBrandSubmissions } from "./brandSubmissions";
+import { mockManufacturerSubmissions } from "./manufacturerSubmissions";
 
-export { mockBrands, mockBrandParties, mockManufacturers, mockParties, mockPartyClaims, mockBusinessSubmissions };
+export { mockBrands, mockBrandParties, mockManufacturers, mockParties, mockPartyClaims, mockBusinessSubmissions, mockBrandSubmissions, mockManufacturerSubmissions };
 
 export const seedBusinessModule = async () => {
   const count = await businessDb.brands.count();
@@ -17,11 +19,21 @@ export const seedBusinessModule = async () => {
     await businessDb.parties.bulkPut(mockParties);
     await businessDb.partyClaims.bulkPut(mockPartyClaims);
     await businessDb.businessSubmissions.bulkPut(mockBusinessSubmissions);
+    await businessDb.brandSubmissions.bulkPut(mockBrandSubmissions);
+    await businessDb.manufacturerSubmissions.bulkPut(mockManufacturerSubmissions);
     console.log("[Business Module] Database seeded successfully.");
   } else {
     const subCount = await businessDb.businessSubmissions.count();
     if (subCount === 0) {
       await businessDb.businessSubmissions.bulkPut(mockBusinessSubmissions);
+    }
+    const brandSubCount = await businessDb.brandSubmissions.count();
+    if (brandSubCount === 0) {
+      await businessDb.brandSubmissions.bulkPut(mockBrandSubmissions);
+    }
+    const mfgSubCount = await businessDb.manufacturerSubmissions.count();
+    if (mfgSubCount === 0) {
+      await businessDb.manufacturerSubmissions.bulkPut(mockManufacturerSubmissions);
     }
   }
 };

@@ -116,7 +116,7 @@ const PlatformLayout: React.FC = () => {
         {
           key: "/p/brands",
           icon: <Lucide.Award size={16} />,
-          label: <Link to="/p/brands">Brands</Link>,
+          label: <Link to="/p/brands">Brands & Claims Audit</Link>,
         },
         {
           key: "/p/manufacturers",

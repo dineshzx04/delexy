@@ -139,6 +139,8 @@ const SellerProductSubmissionForm: React.FC = () => {
   const formValues = useWatch({ control });
   const selectedCategoryId = useWatch({ control, name: 'category_id' });
   const selectedProductId = useWatch({ control, name: 'catalog_product_id' });
+  const selectedBrandId = useWatch({ control, name: 'brand_id' });
+  const selectedManufacturerId = useWatch({ control, name: 'manufacturer_id' });
 
   // Dexie DB live queries
   const parties = useLiveQuery(() => businessDb.parties.toArray()) || [];
@@ -146,6 +148,7 @@ const SellerProductSubmissionForm: React.FC = () => {
   const masterProducts = useLiveQuery(() => catalogDb.products.toArray()) || [];
   const brands = useLiveQuery(() => businessDb.brands.toArray()) || [];
   const manufacturers = useLiveQuery(() => businessDb.manufacturers.toArray()) || [];
+  const brandParties = useLiveQuery(() => businessDb.brandParties.toArray()) || [];
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray()) || [];
   const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray()) || [];
   const allAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray()) || [];
@@ -218,6 +221,84 @@ const SellerProductSubmissionForm: React.FC = () => {
     const matchingProds = masterProducts.filter(p => p.categoryId === nextCatId);
     if (selectedProductId && !matchingProds.some(p => p.id === selectedProductId)) {
       setValue('catalog_product_id', '', { shouldValidate: true });
+    }
+  };
+
+  // Bidirectional Brand <-> Manufacturer Filtering
+  const availableBrands = useMemo(() => {
+    if (!selectedManufacturerId) return brands;
+    const selectedMfg = manufacturers.find((m) => m.id === selectedManufacturerId);
+    if (!selectedMfg) return brands;
+
+    const partyId = selectedMfg.manufacturer_party_id;
+    const linkedBrandIds = brandParties
+      .filter((bp) => bp.party_id === partyId)
+      .map((bp) => bp.brand_id);
+
+    const filtered = brands.filter((b) => linkedBrandIds.includes(b.id));
+    return filtered.length > 0 ? filtered : brands;
+  }, [brands, manufacturers, brandParties, selectedManufacturerId]);
+
+  const availableManufacturers = useMemo(() => {
+    if (!selectedBrandId) return manufacturers;
+
+    const linkedPartyIds = brandParties
+      .filter((bp) => bp.brand_id === selectedBrandId)
+      .map((bp) => bp.party_id);
+
+    const filtered = manufacturers.filter((m) => linkedPartyIds.includes(m.manufacturer_party_id));
+    return filtered.length > 0 ? filtered : manufacturers;
+  }, [manufacturers, brandParties, selectedBrandId]);
+
+  const handleBrandChange = (brandId: string | undefined) => {
+    if (isReadOnly) return;
+    const nextBrandId = brandId || '';
+    setValue('brand_id', nextBrandId, { shouldValidate: true });
+
+    if (nextBrandId) {
+      const linkedPartyIds = brandParties
+        .filter((bp) => bp.brand_id === nextBrandId)
+        .map((bp) => bp.party_id);
+      const matchingMfgs = manufacturers.filter((m) => linkedPartyIds.includes(m.manufacturer_party_id));
+
+      if (selectedManufacturerId) {
+        const currentMfg = manufacturers.find((m) => m.id === selectedManufacturerId);
+        if (currentMfg && !linkedPartyIds.includes(currentMfg.manufacturer_party_id)) {
+          if (matchingMfgs.length === 1) {
+            setValue('manufacturer_id', matchingMfgs[0].id, { shouldValidate: true });
+          } else {
+            setValue('manufacturer_id', '', { shouldValidate: true });
+          }
+        }
+      } else if (matchingMfgs.length === 1) {
+        setValue('manufacturer_id', matchingMfgs[0].id, { shouldValidate: true });
+      }
+    }
+  };
+
+  const handleManufacturerChange = (mfgId: string | undefined) => {
+    if (isReadOnly) return;
+    const nextMfgId = mfgId || '';
+    setValue('manufacturer_id', nextMfgId, { shouldValidate: true });
+
+    if (nextMfgId) {
+      const selectedMfg = manufacturers.find((m) => m.id === nextMfgId);
+      if (selectedMfg) {
+        const linkedBrandIds = brandParties
+          .filter((bp) => bp.party_id === selectedMfg.manufacturer_party_id)
+          .map((bp) => bp.brand_id);
+        const matchingBrands = brands.filter((b) => linkedBrandIds.includes(b.id));
+
+        if (selectedBrandId && !linkedBrandIds.includes(selectedBrandId)) {
+          if (matchingBrands.length === 1) {
+            setValue('brand_id', matchingBrands[0].id, { shouldValidate: true });
+          } else {
+            setValue('brand_id', '', { shouldValidate: true });
+          }
+        } else if (!selectedBrandId && matchingBrands.length === 1) {
+          setValue('brand_id', matchingBrands[0].id, { shouldValidate: true });
+        }
+      }
     }
   };
 
@@ -882,9 +963,11 @@ const SellerProductSubmissionForm: React.FC = () => {
                       render={({ field }) => (
                         <AntSelect
                           {...field}
+                          allowClear
                           disabled={isReadOnly}
+                          onChange={(val) => handleBrandChange(val)}
                           placeholder="Select Brand"
-                          options={brands.map(b => ({ value: b.id, label: `${b.name} (${b.id})` }))}
+                          options={availableBrands.map(b => ({ value: b.id, label: `${b.name} (${b.id})` }))}
                           className="w-full"
                           status={errors.brand_id ? 'error' : ''}
                         />
@@ -902,9 +985,11 @@ const SellerProductSubmissionForm: React.FC = () => {
                       render={({ field }) => (
                         <AntSelect
                           {...field}
+                          allowClear
                           disabled={isReadOnly}
+                          onChange={(val) => handleManufacturerChange(val)}
                           placeholder="Select Manufacturer"
-                          options={manufacturers.map(m => ({ value: m.id, label: `${m.company_name} (${m.id})` }))}
+                          options={availableManufacturers.map(m => ({ value: m.id, label: `${m.company_name} (${m.id})` }))}
                           className="w-full"
                           status={errors.manufacturer_id ? 'error' : ''}
                         />
@@ -1121,6 +1206,31 @@ const SellerProductSubmissionForm: React.FC = () => {
                       )}
                     />
                     {renderFieldStatusBadge('assumptions')}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">Additional Requirements</label>
+                    <Controller
+                      name="additional_requirements"
+                      control={control}
+                      render={({ field }) => (
+                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={2} placeholder="e.g. Requires Knox Mobile Enrollment registration upon first boot..." />
+                      )}
+                    />
+                    {renderFieldStatusBadge('additional_requirements')}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">Additional Information</label>
+                    <Controller
+                      name="additional_information"
+                      control={control}
+                      render={({ field }) => (
+                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={2} placeholder="e.g. Includes 3-year Knox Suite Enterprise warranty..." />
+                      )}
+                    />
+                    {renderFieldStatusBadge('additional_information')}
                   </div>
                 </div>
               </div>
