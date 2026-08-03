@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card as AntCard, Input as AntInput, Button as AntButton, Tag as AntTag, Select as AntSelect, Upload as AntUpload, message as antMessage, Space as AntSpace } from 'antd';
+import { Card as AntCard, Input as AntInput, Button as AntButton, Tag as AntTag, Select as AntSelect, Upload as AntUpload, Space as AntSpace, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { businessDb, type BusinessSubmission, type BusinessSubmissionDocument, type Brand, mockParties } from '../../data/business';
+import { businessDb, type BusinessSubmission, type BusinessSubmissionDocument, type BusinessSubmissionSectionItem, type Brand, mockParties } from '../../data/business';
 
 const CreateBusiness: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const navigate = useNavigate();
   const { id: submissionIdParam } = useParams<{ id?: string }>();
   const { currentUser } = useWorkspace();
@@ -55,24 +56,7 @@ const CreateBusiness: React.FC = () => {
   const [claimMode, setClaimMode] = useState<'EXISTING' | 'NEW'>('EXISTING');
 
   // Documents State
-  const [documents, setDocuments] = useState<BusinessSubmissionDocument[]>([
-    {
-      id: `doc-init-1`,
-      doc_type: 'TAX_CERTIFICATE',
-      doc_name: 'XYZ_Tax_Registration_Proof.pdf',
-      doc_url: 'https://docs.delexy.com/xyz_tax_proof.pdf',
-      file_size: '1.4 MB',
-      status: 'PENDING'
-    },
-    {
-      id: `doc-init-2`,
-      doc_type: 'BUSINESS_LICENSE',
-      doc_name: 'ABC_Certificate_of_Incorporation.pdf',
-      doc_url: 'https://docs.delexy.com/abc_incorporation_cert.pdf',
-      file_size: '2.1 MB',
-      status: 'PENDING'
-    }
-  ]);
+  const [documents, setDocuments] = useState<BusinessSubmissionDocument[]>([]);
 
   // Document upload modal simulation inputs
   const [newDocType, setNewDocType] = useState<any>('TRADEMARK_REGISTRATION');
@@ -158,8 +142,17 @@ const CreateBusiness: React.FC = () => {
 
   // Handle Submit Application Action
   const handleSubmitForm = async () => {
-    if (!businessName.trim() || !taxId.trim() || !line1.trim() || !toClaimPartyName.trim()) {
-      antMessage.error('Please complete all required fields (Business Name, Tax ID, Street Address, Target Party Title).');
+    if (
+      !businessName.trim() ||
+      !legalName.trim() ||
+      !taxId.trim() ||
+      !line1.trim() ||
+      !city.trim() ||
+      !stateProvince.trim() ||
+      !postalCode.trim() ||
+      !toClaimPartyName.trim()
+    ) {
+      antMessage.error('Please complete all required fields (Business Name, Legal Entity Name, Tax ID, Street Address, City, State/Province, Postal Code, Target Party Title).');
       return;
     }
 
@@ -169,13 +162,23 @@ const CreateBusiness: React.FC = () => {
       const currentRound = existingSubmission ? (existingSubmission.status === 'NEEDS_REVISION' ? existingSubmission.current_round + 1 : existingSubmission.current_round) : 1;
       const subId = existingSubmission ? existingSubmission.id : `bsub-${Date.now().toString().slice(-4)}`;
 
-      // Construct Sections Record
-      const sectionsRecord: Record<string, any> = {
+      const addressString = [
+        line1,
+        line2,
+        `${city}${stateProvince ? `, ${stateProvince}` : ''} ${postalCode}`.trim(),
+        countryCode
+      ].filter(Boolean).join(', ');
+
+      // Construct Sections Record with all form fields
+      const sectionsRecord: Record<string, BusinessSubmissionSectionItem> = {
         business_name: { field_key: 'business_name', field_label: 'Business Name', section: 'CORE_INFO', value: businessName, status: 'PENDING' },
-        legal_name: { field_key: 'legal_name', field_label: 'Legal Entity Name', section: 'CORE_INFO', value: legalName, status: 'PENDING' },
+        legal_name: { field_key: 'legal_name', field_label: 'Legal Entity Name', section: 'CORE_INFO', value: legalName || businessName, status: 'PENDING' },
+        website: { field_key: 'website', field_label: 'Corporate Website', section: 'CORE_INFO', value: website || 'N/A', status: 'PENDING' },
+        phone: { field_key: 'phone', field_label: 'Primary Phone Number', section: 'CORE_INFO', value: phone || 'N/A', status: 'PENDING' },
+        country_code: { field_key: 'country_code', field_label: 'Registration Country', section: 'CORE_INFO', value: countryCode, status: 'PENDING' },
         tax_id: { field_key: 'tax_id', field_label: 'Tax Identification Number', section: 'LEGAL_TAX', value: taxId, status: 'PENDING' },
         registration_number: { field_key: 'registration_number', field_label: 'Registration / License Number', section: 'LEGAL_TAX', value: registrationNumber || 'N/A', status: 'PENDING' },
-        address: { field_key: 'address', field_label: 'Corporate HQ Address', section: 'ADDRESS', value: `${line1}, ${city} ${stateProvince} ${postalCode}`, status: 'PENDING' },
+        address: { field_key: 'address', field_label: 'Corporate HQ Address', section: 'ADDRESS', value: addressString, status: 'PENDING' },
         to_claim_party_name: { field_key: 'to_claim_party_name', field_label: 'Target Party Title', section: 'CLAIMED_BRANDS', value: toClaimPartyName, status: 'PENDING' }
       };
 
@@ -183,8 +186,8 @@ const CreateBusiness: React.FC = () => {
       updatedAudit.push({
         id: `aud-b-${Date.now()}`,
         round: currentRound,
-        actor_id: currentUser?.id || 'usr-curr',
-        actor_name: currentUser?.full_name || 'Business Applicant',
+        actor_id: currentUser?.id,
+        actor_name: currentUser?.full_name,
         action: 'SUBMITTED',
         notes: `Submitted Round ${currentRound} business registration & party claim application.`,
         timestamp: now
@@ -192,7 +195,7 @@ const CreateBusiness: React.FC = () => {
 
       const submissionRecord: BusinessSubmission = {
         id: subId,
-        user_id: currentUser?.id || 'usr-2',
+        user_id: currentUser?.id,
         business_name: businessName,
         legal_name: legalName || businessName,
         website: website || undefined,
@@ -208,7 +211,7 @@ const CreateBusiness: React.FC = () => {
           postal_code: postalCode,
           country_code: countryCode
         },
-        to_claim_party_id: toClaimPartyId,
+        to_claim_party_id: toClaimPartyId || undefined,
         to_claim_party_name: toClaimPartyName,
         documents: documents.map(d => ({ ...d, status: 'PENDING', rejection_comment: undefined })),
         sections: sectionsRecord,
@@ -224,6 +227,7 @@ const CreateBusiness: React.FC = () => {
       antMessage.success(`Business application submitted for platform review (Round ${currentRound})!`);
       navigate('/user/business-submissions');
     } catch (err) {
+      console.error('Failed to submit business application:', err);
       antMessage.error('Failed to submit business application.');
     } finally {
       setIsSubmitting(false);
@@ -516,8 +520,8 @@ const CreateBusiness: React.FC = () => {
                 disabled={isReadOnly}
                 onClick={() => { setClaimMode('EXISTING'); setToClaimPartyId(undefined); setToClaimPartyName(''); }}
                 className={`flex-1 p-3 rounded-lg border text-left text-xs font-semibold transition-all ${claimMode === 'EXISTING'
-                    ? 'border-sky-600 bg-sky-50 text-sky-900 ring-2 ring-sky-200'
-                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  ? 'border-sky-600 bg-sky-50 text-sky-900 ring-2 ring-sky-200'
+                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
                   }`}
               >
                 <div className="flex items-center gap-2 mb-1">
@@ -534,8 +538,8 @@ const CreateBusiness: React.FC = () => {
                 disabled={isReadOnly}
                 onClick={() => { setClaimMode('NEW'); setToClaimPartyId(undefined); setToClaimPartyName(''); }}
                 className={`flex-1 p-3 rounded-lg border text-left text-xs font-semibold transition-all ${claimMode === 'NEW'
-                    ? 'border-purple-600 bg-purple-50 text-purple-900 ring-2 ring-purple-200'
-                    : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
+                  ? 'border-purple-600 bg-purple-50 text-purple-900 ring-2 ring-purple-200'
+                  : 'border-gray-200 bg-white text-gray-700 hover:bg-gray-50'
                   }`}
               >
                 <div className="flex items-center gap-2 mb-1">

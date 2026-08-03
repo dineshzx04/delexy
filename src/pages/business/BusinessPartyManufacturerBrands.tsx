@@ -7,18 +7,18 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 import { businessDb } from '../../data/business';
 
-const BusinessBrands: React.FC = () => {
+const BusinessPartyManufacturerBrands: React.FC = () => {
   const { businessId } = useParams<{ businessId: string }>();
   const { activeWorkspace } = useWorkspace();
   const currentBizId = businessId || activeWorkspace.businessId || activeWorkspace.id || 'bus-a';
 
   const breadcrumbs = React.useMemo(() => [
-    { title: <span className="text-slate-800 font-semibold">Brands & Manufacturer Account</span> }
+    { title: <span className="text-slate-800 font-semibold">Party, Manufacturer & Brands</span> }
   ], []);
 
   useBreadcrumb(breadcrumbs);
 
-  // 1. Fetch Business Record
+  // 1. Fetch Business Party Record strictly from Dexie DB
   const bizRecord = useLiveQuery(
     async () => await businessDb.parties
       .where('owner_id').equals(currentBizId)
@@ -27,13 +27,13 @@ const BusinessBrands: React.FC = () => {
     [currentBizId]
   );
 
-  // 2. Fetch Manufacturer Account for this Party
+  // 2. Fetch Manufacturer Account for this Party strictly from Dexie DB
   const manufacturer = useLiveQuery(
     async () => (bizRecord ? await businessDb.manufacturers.where('manufacturer_party_id').equals(bizRecord.id).first() : undefined),
     [bizRecord?.id]
   );
 
-  // 3. Fetch Brands Owned / Claimed by this Party
+  // 3. Fetch Brands Owned / Claimed by this Party strictly from Dexie DB
   const ownedBrandParties = useLiveQuery(
     async () => {
       if (!bizRecord) return [];
@@ -54,10 +54,10 @@ const BusinessBrands: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
             <Lucide.Building2 className="text-indigo-600" size={26} />
-            Brands & Manufacturer Account
+            Party, Manufacturer & Brand Assets
           </h1>
           <p className="text-slate-500 text-sm">
-            Manage your corporate Party identity, Manufacturer profile, and owned/claimed Brand assets.
+            Manage your 1:1 Corporate Party identity, Manufacturer account profile, and owned/claimed Brand assets.
           </p>
         </div>
         <Button type="primary" icon={<Lucide.PlusCircle size={16} />} className="bg-indigo-600 hover:bg-indigo-700">
@@ -79,7 +79,7 @@ const BusinessBrands: React.FC = () => {
                 {bizRecord?.is_claimed ? <Tag color="blue">Claimed</Tag> : <Tag color="orange">Unclaimed</Tag>}
               </div>
               <p className="text-xs text-slate-500 font-mono mt-0.5">
-                Party ID: <span className="font-semibold text-slate-700">{bizRecord?.id || 'pty-1'}</span> | Owner ID: <span className="font-semibold text-slate-700">{bizRecord?.owner_id || currentBizId}</span>
+                Party ID: <span className="font-semibold text-slate-700">{bizRecord?.id || 'N/A'}</span> | Owner ID: <span className="font-semibold text-slate-700">{bizRecord?.owner_id || currentBizId}</span>
               </p>
             </div>
           </div>
@@ -180,4 +180,4 @@ const BusinessBrands: React.FC = () => {
   );
 };
 
-export default BusinessBrands;
+export default BusinessPartyManufacturerBrands;

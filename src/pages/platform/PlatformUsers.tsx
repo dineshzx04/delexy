@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Table as AntTable, Button as AntButton, Tag as AntTag, Modal as AntModal, Form as AntForm, Select as AntSelect, message as antMessage, Card as AntCard, Tooltip as AntTooltip } from 'antd';
+import { Table as AntTable, Button as AntButton, Tag as AntTag, Modal as AntModal, Form as AntForm, Select as AntSelect, Card as AntCard, Tooltip as AntTooltip, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -7,6 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { userDb, type User, type PlatformMembership, type PlatformRole } from '../../data/user';
 
 const PlatformUsers: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingMembership, setEditingMembership] = useState<any>(null);
   const [form] = AntForm.useForm();

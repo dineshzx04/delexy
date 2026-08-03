@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Tag as AntTag, Modal as AntModal, Input as AntInput, message as antMessage } from 'antd';
+import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Tag as AntTag, Modal as AntModal, Input as AntInput, App as AntApp } from 'antd';
 import type { MenuProps } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useWorkspace, type DynamicWorkspace } from '../contexts/WorkspaceContext';
@@ -8,6 +8,7 @@ import { useBreadcrumbContext } from '../contexts/BreadcrumbContext';
 import { cn } from '../lib/utils';
 
 const BusinessLayout: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -144,9 +145,9 @@ const BusinessLayout: React.FC = () => {
             label: <Link to="/b/rfqs">RFQs & Quotes</Link>,
           },
           {
-            key: '/b/brands',
+            key: '/b/party-brands',
             icon: <Lucide.Award size={18} />,
-            label: <Link to="/b/brands">Brands & Claiming</Link>,
+            label: <Link to="/b/party-brands">Party, Manufacturer & Brands</Link>,
           },
         ],
       },

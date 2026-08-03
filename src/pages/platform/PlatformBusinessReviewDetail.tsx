@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card as AntCard, Button as AntButton, Tag as AntTag, Input as AntInput, Modal as AntModal, message as antMessage, Space as AntSpace, Progress as AntProgress } from 'antd';
+import { Card as AntCard, Button as AntButton, Tag as AntTag, Input as AntInput, Modal as AntModal, Space as AntSpace, Progress as AntProgress, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -9,6 +9,7 @@ import { businessDb, type BusinessSubmission, type BusinessSubmissionSectionItem
 import { userDb, type Business as UserBusiness, type Address as UserAddress, type BusinessMembership } from '../../data/user';
 
 const PlatformBusinessReviewDetail: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { currentUser } = useWorkspace();
@@ -27,15 +28,27 @@ const PlatformBusinessReviewDetail: React.FC = () => {
   const [rejectingKey, setRejectingKey] = useState<{ type: 'SECTION' | 'DOC'; id: string } | null>(null);
   const [rejectionCommentInput, setRejectionCommentInput] = useState('');
 
-  // Normalize sections to guarantee all 6 standard fields exist
+  // Normalize sections to guarantee all standard fields exist
   const initialSections = useMemo(() => {
     if (!submission) return {};
     const defaultFields: Record<string, { label: string; section: any; value: any }> = {
       business_name: { label: 'Business Operating Title', section: 'CORE_INFO', value: submission.business_name },
       legal_name: { label: 'Legal Entity Registered Name', section: 'CORE_INFO', value: submission.legal_name },
+      website: { label: 'Corporate Website', section: 'CORE_INFO', value: submission.website || 'N/A' },
+      phone: { label: 'Primary Phone Number', section: 'CORE_INFO', value: submission.phone || 'N/A' },
+      country_code: { label: 'Registration Country', section: 'CORE_INFO', value: submission.country_code || 'US' },
       tax_id: { label: 'Tax Identification Number', section: 'LEGAL_TAX', value: submission.tax_id },
       registration_number: { label: 'Registration / License Number', section: 'LEGAL_TAX', value: submission.registration_number || 'N/A' },
-      address: { label: 'Corporate HQ Address', section: 'ADDRESS', value: `${submission.address?.line1 || ''}, ${submission.address?.city || ''}` },
+      address: {
+        label: 'Corporate HQ Address',
+        section: 'ADDRESS',
+        value: submission.sections?.address?.value || [
+          submission.address?.line1,
+          submission.address?.line2,
+          `${submission.address?.city || ''}${submission.address?.state_province ? `, ${submission.address.state_province}` : ''} ${submission.address?.postal_code || ''}`.trim(),
+          submission.address?.country_code
+        ].filter(Boolean).join(', ')
+      },
       to_claim_party_name: { label: 'Target Business Party Title', section: 'CLAIMED_BRANDS', value: submission.to_claim_party_name }
     };
 
@@ -72,16 +85,24 @@ const PlatformBusinessReviewDetail: React.FC = () => {
 
   useBreadcrumb(breadcrumbs);
 
-  // Verification Stats Calculation
-  const totalSectionItems = Object.keys(sectionsState).length + documentsState.length;
+  // Saved DB Submission Metrics
+  const savedSections = initialSections;
+  const savedDocs = useMemo(() => submission?.documents || [], [submission]);
 
-  const approvedCount = Object.values(sectionsState).filter(s => s.status === 'APPROVED').length + documentsState.filter(d => d.status === 'APPROVED').length;
-  const rejectedCount = Object.values(sectionsState).filter(s => s.status === 'REJECTED').length + documentsState.filter(d => d.status === 'REJECTED').length;
-  const pendingCount = Object.values(sectionsState).filter(s => s.status === 'PENDING').length + documentsState.filter(d => d.status === 'PENDING').length;
+  const savedTotalItems = Object.keys(savedSections).length + savedDocs.length;
+  const savedApprovedCount = Object.values(savedSections).filter(s => s.status === 'APPROVED').length + savedDocs.filter(d => d.status === 'APPROVED').length;
+  const savedRejectedCount = Object.values(savedSections).filter(s => s.status === 'REJECTED').length + savedDocs.filter(d => d.status === 'REJECTED').length;
+  const savedPendingCount = Object.values(savedSections).filter(s => s.status === 'PENDING').length + savedDocs.filter(d => d.status === 'PENDING').length;
+  const savedPercentApproved = savedTotalItems > 0 ? Math.round((savedApprovedCount / savedTotalItems) * 100) : 0;
 
-  const percentApproved = totalSectionItems > 0 ? Math.round((approvedCount / totalSectionItems) * 100) : 0;
+  // Current Local Component State Metrics
+  const currentTotalItems = Object.keys(sectionsState).length + documentsState.length;
+  const currentApprovedCount = Object.values(sectionsState).filter(s => s.status === 'APPROVED').length + documentsState.filter(d => d.status === 'APPROVED').length;
+  const currentRejectedCount = Object.values(sectionsState).filter(s => s.status === 'REJECTED').length + documentsState.filter(d => d.status === 'REJECTED').length;
+  const currentPendingCount = Object.values(sectionsState).filter(s => s.status === 'PENDING').length + documentsState.filter(d => d.status === 'PENDING').length;
+  const currentPercentApproved = currentTotalItems > 0 ? Math.round((currentApprovedCount / currentTotalItems) * 100) : 0;
 
-  // Unsaved changes detection
+  // Local Component State Unsaved Edits Detection
   const hasUnsavedChanges = useMemo(() => {
     if (!submission) return false;
     return JSON.stringify(sectionsState) !== JSON.stringify(initialSections) ||
@@ -278,12 +299,16 @@ const PlatformBusinessReviewDetail: React.FC = () => {
   // Request Revision Action
   const handleRequestRevision = async () => {
     if (!submission) return;
-    if (pendingCount > 0) {
-      antMessage.warning('Please complete review of all pending items before requesting revision.');
+    if (hasUnsavedChanges) {
+      antMessage.warning('You have unsaved review changes. Please click "Save Progress" first.');
       return;
     }
-    if (rejectedCount === 0) {
-      antMessage.error('Please reject at least 1 section item or document with a comment before requesting revision.');
+    if (savedPendingCount > 0) {
+      antMessage.warning('Please complete review of all pending items and save progress before requesting revision.');
+      return;
+    }
+    if (savedRejectedCount === 0) {
+      antMessage.error('Please reject at least 1 section item or document with a comment and save progress before requesting revision.');
       return;
     }
 
@@ -297,7 +322,7 @@ const PlatformBusinessReviewDetail: React.FC = () => {
         actor_id: currentUser?.id || 'usr-admin',
         actor_name: currentUser?.full_name || 'Platform Compliance Admin',
         action: 'REQUESTED_REVISION',
-        notes: `Rejected ${rejectedCount} field(s)/document(s) with comments. Requested Round ${submission.current_round} revision.`,
+        notes: `Rejected ${savedRejectedCount} field(s)/document(s) with comments. Requested Round ${submission.current_round} revision.`,
         timestamp: now
       });
 
@@ -323,8 +348,12 @@ const PlatformBusinessReviewDetail: React.FC = () => {
   // Approve Business Registration & Generate Entities Execution Engine
   const handleApproveBusiness = async () => {
     if (!submission) return;
-    if (pendingCount > 0 || rejectedCount > 0) {
-      antMessage.error('All section items and verification documents must be APPROVED to activate business workspace.');
+    if (hasUnsavedChanges) {
+      antMessage.warning('You have unsaved review changes. Please click "Save Progress" first.');
+      return;
+    }
+    if (savedPendingCount > 0 || savedRejectedCount > 0) {
+      antMessage.error('All section items and verification documents must be APPROVED and saved to activate business workspace.');
       return;
     }
 
@@ -508,22 +537,27 @@ const PlatformBusinessReviewDetail: React.FC = () => {
           {!isReviewReadOnly && (
             <>
               <AntButton
-                type="default"
+                type={hasUnsavedChanges ? 'primary' : 'default'}
                 icon={<Lucide.Save size={14} />}
                 loading={isSaving}
                 onClick={handleSaveProgress}
-                className={hasUnsavedChanges ? 'border-amber-500 text-amber-600 font-bold' : ''}
+                className={hasUnsavedChanges ? 'bg-amber-500 hover:bg-amber-600 border-amber-500 font-bold' : ''}
               >
-                Save Progress
+                Save Progress {hasUnsavedChanges && '(Unsaved)'}
               </AntButton>
 
-              {/* Status-Wise Contextual Primary Action Button */}
-              {pendingCount > 0 ? (
+              {/* Status-Wise Contextual Primary Action Button (Depends on Saved DB State) */}
+              {hasUnsavedChanges ? (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs px-3 py-1.5 rounded-md font-semibold flex items-center gap-1.5">
+                  <Lucide.AlertCircle size={14} className="text-amber-600 shrink-0" />
+                  <span>Unsaved Edits — Click Save Progress First</span>
+                </div>
+              ) : savedPendingCount > 0 ? (
                 <div className="bg-sky-50 border border-sky-200 text-sky-800 text-xs px-3 py-1.5 rounded-md font-semibold flex items-center gap-1.5">
                   <Lucide.Clock size={14} className="text-sky-600 shrink-0" />
-                  <span>Audit Pending ({pendingCount} item{pendingCount > 1 ? 's' : ''} remaining)</span>
+                  <span>Audit Pending ({savedPendingCount} item{savedPendingCount > 1 ? 's' : ''} remaining)</span>
                 </div>
-              ) : rejectedCount > 0 ? (
+              ) : savedRejectedCount > 0 ? (
                 <AntButton
                   type="primary"
                   danger
@@ -531,9 +565,9 @@ const PlatformBusinessReviewDetail: React.FC = () => {
                   loading={isSaving}
                   onClick={handleRequestRevision}
                 >
-                  Request Revision ({rejectedCount} rejected)
+                  Request Revision ({savedRejectedCount} rejected)
                 </AntButton>
-              ) : approvedCount === totalSectionItems ? (
+              ) : savedApprovedCount === savedTotalItems ? (
                 <AntButton
                   type="primary"
                   icon={<Lucide.CheckCircle2 size={14} />}
@@ -552,22 +586,19 @@ const PlatformBusinessReviewDetail: React.FC = () => {
       {/* Progress & Verification Overview Card */}
       <AntCard className="border border-sky-200 bg-sky-50/40 shadow-sm">
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-sky-200/60 pb-3">
             <div>
               <span className="text-xs font-bold text-sky-900 uppercase tracking-wider block">
-                Verification Audit Progress (Round {submission.current_round})
+                Verification Audit Progress Overview (Round {submission.current_round})
               </span>
-              <div className="text-xs text-slate-600 mt-1 flex items-center gap-3 font-mono">
-                <span>Total Items: <strong>{totalSectionItems}</strong></span>
-                <span className="text-emerald-700">Approved: <strong>{approvedCount}</strong></span>
-                <span className="text-red-700">Rejected: <strong>{rejectedCount}</strong></span>
-                <span className="text-sky-700">Pending: <strong>{pendingCount}</strong></span>
-              </div>
+              <p className="text-[11px] text-slate-500 mb-0 mt-0.5">
+                Comparison of persisted database review status vs. active workbench edits.
+              </p>
             </div>
 
             {!isReviewReadOnly && (
               <AntSpace>
-                {pendingCount > 0 && (
+                {currentPendingCount > 0 && (
                   <AntButton
                     size="small"
                     type="primary"
@@ -575,10 +606,10 @@ const PlatformBusinessReviewDetail: React.FC = () => {
                     icon={<Lucide.CheckCheck size={13} />}
                     onClick={handleBulkApprovePending}
                   >
-                    Approve All Pending ({pendingCount})
+                    Approve All Pending ({currentPendingCount})
                   </AntButton>
                 )}
-                {(approvedCount > 0 || rejectedCount > 0) && (
+                {(currentApprovedCount > 0 || currentRejectedCount > 0) && (
                   <AntButton
                     size="small"
                     type="default"
@@ -586,14 +617,58 @@ const PlatformBusinessReviewDetail: React.FC = () => {
                     icon={<Lucide.RotateCcw size={13} />}
                     onClick={handleBulkResetAll}
                   >
-                    Revert All to Pending ({approvedCount + rejectedCount})
+                    Revert All to Pending
                   </AntButton>
                 )}
               </AntSpace>
             )}
           </div>
 
-          <AntProgress percent={percentApproved} status={percentApproved === 100 ? 'success' : 'active'} strokeColor={{ '0%': '#0284c7', '100%': '#059669' }} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 1. Saved Database State Box */}
+            <div className="bg-white/90 p-3.5 rounded-lg border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
+                  <Lucide.Database size={14} className="text-sky-600" />
+                  <span>Saved Database State</span>
+                </div>
+                <AntTag color="blue" className="text-[10px] font-mono">PERSISTED IN DB</AntTag>
+              </div>
+              <div className="text-xs text-slate-600 flex items-center justify-between font-mono">
+                <span>Items: <strong>{savedTotalItems}</strong></span>
+                <span className="text-emerald-700">Approved: <strong>{savedApprovedCount}</strong></span>
+                <span className="text-red-700">Rejected: <strong>{savedRejectedCount}</strong></span>
+                <span className="text-sky-700">Pending: <strong>{savedPendingCount}</strong></span>
+              </div>
+              <AntProgress percent={savedPercentApproved} status={savedPercentApproved === 100 ? 'success' : 'active'} strokeColor={{ '0%': '#0284c7', '100%': '#059669' }} size="small" />
+            </div>
+
+            {/* 2. Current Workbench Component State Box */}
+            <div className={`p-3.5 rounded-lg border space-y-2 transition-all ${
+              hasUnsavedChanges
+                ? 'bg-amber-50/80 border-amber-300 shadow-2xs'
+                : 'bg-white/90 border-slate-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 font-bold text-xs text-slate-800">
+                  <Lucide.Edit3 size={14} className={hasUnsavedChanges ? 'text-amber-600' : 'text-slate-600'} />
+                  <span>Current Workbench State</span>
+                </div>
+                {hasUnsavedChanges ? (
+                  <AntTag color="warning" className="text-[10px] font-mono animate-pulse">UNSAVED EDITS</AntTag>
+                ) : (
+                  <AntTag color="default" className="text-[10px] font-mono">IN SYNC WITH DB</AntTag>
+                )}
+              </div>
+              <div className="text-xs text-slate-600 flex items-center justify-between font-mono">
+                <span>Items: <strong>{currentTotalItems}</strong></span>
+                <span className="text-emerald-700">Approved: <strong>{currentApprovedCount}</strong></span>
+                <span className="text-red-700">Rejected: <strong>{currentRejectedCount}</strong></span>
+                <span className="text-sky-700">Pending: <strong>{currentPendingCount}</strong></span>
+              </div>
+              <AntProgress percent={currentPercentApproved} status={currentPercentApproved === 100 ? 'success' : 'active'} strokeColor={hasUnsavedChanges ? { '0%': '#f59e0b', '100%': '#10b981' } : { '0%': '#0284c7', '100%': '#059669' }} size="small" />
+            </div>
+          </div>
         </div>
       </AntCard>
 
@@ -609,37 +684,89 @@ const PlatformBusinessReviewDetail: React.FC = () => {
           }
           className="border border-gray-200 shadow-sm"
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-            <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400 font-medium">Business Operating Title</span>
-                  {sectionsState.business_name?.status === 'APPROVED' && <AntTag color="success" className="text-[10px]">APPROVED</AntTag>}
-                  {sectionsState.business_name?.status === 'REJECTED' && <AntTag color="error" className="text-[10px]">REJECTED</AntTag>}
-                  {sectionsState.business_name?.status === 'PENDING' && <AntTag color="processing" className="text-[10px]">PENDING</AntTag>}
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 font-medium">Business Operating Title</span>
+                    {sectionsState.business_name?.status === 'APPROVED' && <AntTag color="success" className="text-[10px]">APPROVED</AntTag>}
+                    {sectionsState.business_name?.status === 'REJECTED' && <AntTag color="error" className="text-[10px]">REJECTED</AntTag>}
+                    {sectionsState.business_name?.status === 'PENDING' && <AntTag color="processing" className="text-[10px]">PENDING</AntTag>}
+                  </div>
+                  {renderItemActionButtons('SECTION', 'business_name', sectionsState.business_name?.status)}
                 </div>
-                {renderItemActionButtons('SECTION', 'business_name', sectionsState.business_name?.status)}
+                <div className="font-bold text-gray-900 text-sm">{submission.business_name}</div>
+                {sectionsState.business_name?.status === 'REJECTED' && (
+                  <div className="text-red-600 font-semibold text-[11px]">Comment: {sectionsState.business_name.rejection_comment}</div>
+                )}
               </div>
-              <div className="font-bold text-gray-900 text-sm">{submission.business_name}</div>
-              {sectionsState.business_name?.status === 'REJECTED' && (
-                <div className="text-red-600 font-semibold text-[11px]">Comment: {sectionsState.business_name.rejection_comment}</div>
-              )}
+
+              <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 font-medium">Legal Entity Registered Name</span>
+                    {sectionsState.legal_name?.status === 'APPROVED' && <AntTag color="success" className="text-[10px]">APPROVED</AntTag>}
+                    {sectionsState.legal_name?.status === 'REJECTED' && <AntTag color="error" className="text-[10px]">REJECTED</AntTag>}
+                    {sectionsState.legal_name?.status === 'PENDING' && <AntTag color="processing" className="text-[10px]">PENDING</AntTag>}
+                  </div>
+                  {renderItemActionButtons('SECTION', 'legal_name', sectionsState.legal_name?.status)}
+                </div>
+                <div className="font-bold text-gray-900 text-sm">{submission.legal_name}</div>
+                {sectionsState.legal_name?.status === 'REJECTED' && (
+                  <div className="text-red-600 font-semibold text-[11px]">Comment: {sectionsState.legal_name.rejection_comment}</div>
+                )}
+              </div>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1">
-              <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="text-gray-400 font-medium">Legal Entity Registered Name</span>
-                  {sectionsState.legal_name?.status === 'APPROVED' && <AntTag color="success" className="text-[10px]">APPROVED</AntTag>}
-                  {sectionsState.legal_name?.status === 'REJECTED' && <AntTag color="error" className="text-[10px]">REJECTED</AntTag>}
-                  {sectionsState.legal_name?.status === 'PENDING' && <AntTag color="processing" className="text-[10px]">PENDING</AntTag>}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 font-medium">Corporate Website</span>
+                    {sectionsState.website?.status === 'APPROVED' && <AntTag color="success" className="text-[10px]">APPROVED</AntTag>}
+                    {sectionsState.website?.status === 'REJECTED' && <AntTag color="error" className="text-[10px]">REJECTED</AntTag>}
+                    {sectionsState.website?.status === 'PENDING' && <AntTag color="processing" className="text-[10px]">PENDING</AntTag>}
+                  </div>
+                  {renderItemActionButtons('SECTION', 'website', sectionsState.website?.status)}
                 </div>
-                {renderItemActionButtons('SECTION', 'legal_name', sectionsState.legal_name?.status)}
+                <div className="font-bold text-gray-900 text-sm">{submission.website || 'N/A'}</div>
+                {sectionsState.website?.status === 'REJECTED' && (
+                  <div className="text-red-600 font-semibold text-[11px]">Comment: {sectionsState.website.rejection_comment}</div>
+                )}
               </div>
-              <div className="font-bold text-gray-900 text-sm">{submission.legal_name}</div>
-              {sectionsState.legal_name?.status === 'REJECTED' && (
-                <div className="text-red-600 font-semibold text-[11px]">Comment: {sectionsState.legal_name.rejection_comment}</div>
-              )}
+
+              <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 font-medium">Primary Phone Number</span>
+                    {sectionsState.phone?.status === 'APPROVED' && <AntTag color="success" className="text-[10px]">APPROVED</AntTag>}
+                    {sectionsState.phone?.status === 'REJECTED' && <AntTag color="error" className="text-[10px]">REJECTED</AntTag>}
+                    {sectionsState.phone?.status === 'PENDING' && <AntTag color="processing" className="text-[10px]">PENDING</AntTag>}
+                  </div>
+                  {renderItemActionButtons('SECTION', 'phone', sectionsState.phone?.status)}
+                </div>
+                <div className="font-bold text-gray-900 text-sm">{submission.phone || 'N/A'}</div>
+                {sectionsState.phone?.status === 'REJECTED' && (
+                  <div className="text-red-600 font-semibold text-[11px]">Comment: {sectionsState.phone.rejection_comment}</div>
+                )}
+              </div>
+
+              <div className="bg-slate-50 p-3 rounded border border-slate-200 space-y-1">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-400 font-medium">Registration Country</span>
+                    {sectionsState.country_code?.status === 'APPROVED' && <AntTag color="success" className="text-[10px]">APPROVED</AntTag>}
+                    {sectionsState.country_code?.status === 'REJECTED' && <AntTag color="error" className="text-[10px]">REJECTED</AntTag>}
+                    {sectionsState.country_code?.status === 'PENDING' && <AntTag color="processing" className="text-[10px]">PENDING</AntTag>}
+                  </div>
+                  {renderItemActionButtons('SECTION', 'country_code', sectionsState.country_code?.status)}
+                </div>
+                <div className="font-bold text-gray-900 text-sm">{submission.country_code || 'US'}</div>
+                {sectionsState.country_code?.status === 'REJECTED' && (
+                  <div className="text-red-600 font-semibold text-[11px]">Comment: {sectionsState.country_code.rejection_comment}</div>
+                )}
+              </div>
             </div>
           </div>
         </AntCard>

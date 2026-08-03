@@ -7,7 +7,7 @@ import {
   Select as AntSelect,
   Tag as AntTag,
   Modal as AntModal,
-  message as antMessage
+  App as AntApp
 } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -52,6 +52,7 @@ interface AddEmailFormValues {
 }
 
 const UserProfile: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const { currentUserId } = useWorkspace();
   const targetUserId = currentUserId || 'usr-1';
 

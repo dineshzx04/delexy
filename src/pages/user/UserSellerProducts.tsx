@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Table as AntTable, Button as AntButton, Tag as AntTag, Input as AntInput, InputNumber as AntInputNumber, Drawer as AntDrawer, Tabs as AntTabs, Card as AntCard, Space as AntSpace, Modal as AntModal, Timeline as AntTimeline, message as antMessage } from 'antd';
+import { Table as AntTable, Button as AntButton, Tag as AntTag, Input as AntInput, InputNumber as AntInputNumber, Drawer as AntDrawer, Tabs as AntTabs, Card as AntCard, Space as AntSpace, Modal as AntModal, Timeline as AntTimeline, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -9,6 +9,7 @@ import { catalogDb, type SellerProduct, type SellerProductSubmission } from '../
 import { businessDb, type Party } from '../../data/business';
 
 const UserSellerProducts: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, currentUserId, activeWorkspace } = useWorkspace();

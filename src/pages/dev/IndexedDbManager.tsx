@@ -3,9 +3,9 @@ import {
   Button as AntButton,
   Tag as AntTag,
   Popconfirm as AntPopconfirm,
-  message as antMessage,
   Card as AntCard,
-  Spin
+  Spin,
+  App as AntApp
 } from 'antd';
 import * as Lucide from 'lucide-react';
 import { userDb } from '../../data/user';
@@ -24,6 +24,7 @@ export interface StorageItem {
 }
 
 const IndexedDbManager: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const [databases, setDatabases] = useState<IDBInfo[]>([]);
   const [localStorageItems, setLocalStorageItems] = useState<StorageItem[]>([]);
   const [sessionStorageItems, setSessionStorageItems] = useState<StorageItem[]>([]);

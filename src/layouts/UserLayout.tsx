@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Modal as AntModal, Input as AntInput, message as antMessage, Tag as AntTag } from 'antd';
+import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Modal as AntModal, Input as AntInput, Tag as AntTag, App as AntApp } from 'antd';
 import type { MenuProps } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useWorkspace, type DynamicWorkspace } from '../contexts/WorkspaceContext';
@@ -8,6 +8,7 @@ import { useBreadcrumbContext } from '../contexts/BreadcrumbContext';
 import { cn } from '../lib/utils';
 
 const UserLayout: React.FC = () => {
+    const { message: antMessage } = AntApp.useApp();
     const [collapsed, setCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);

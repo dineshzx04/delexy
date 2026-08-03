@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Table as AntTable, Button as AntButton, Tag as AntTag, Input as AntInput, Tabs as AntTabs, Card as AntCard, Tooltip as AntTooltip, message as antMessage, Avatar as AntAvatar } from 'antd';
+import { Table as AntTable, Button as AntButton, Tag as AntTag, Input as AntInput, Tabs as AntTabs, Card as AntCard, Tooltip as AntTooltip, Avatar as AntAvatar, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -8,6 +8,7 @@ import { userDb, type Business } from '../../data/user';
 import { businessDb, type Brand, type BrandParty, type Manufacturer, type Party, type PartyClaim } from '../../data/business';
 
 const PlatformBrandClaims: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const [searchText, setSearchText] = useState('');
   const [activeTab, setActiveTab] = useState('1');
   const [currentPage, setCurrentPage] = useState(1);

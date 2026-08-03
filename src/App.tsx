@@ -31,7 +31,7 @@ import BusinessEmailsPage from './pages/business/BusinessEmailsPage';
 import BusinessSettings from './pages/business/BusinessSettings';
 import BusinessRFQs from './pages/business/BusinessRFQs';
 import BusinessProfile from './pages/business/BusinessProfile';
-import BusinessBrands from './pages/business/BusinessBrands';
+import BusinessPartyManufacturerBrands from './pages/business/BusinessPartyManufacturerBrands';
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 import PlatformLayout from './layouts/PlatformLayout';
 import PlatformDashboard from './pages/platform/PlatformDashboard';
@@ -128,7 +128,7 @@ const App: React.FC = () => {
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<BusinessDashboard />} />
                 <Route path="profile" element={<BusinessProfile />} />
-                <Route path="brands" element={<BusinessBrands />} />
+                <Route path="party-brands" element={<BusinessPartyManufacturerBrands />} />
                 <Route path="members" element={<BusinessMembers />} />
                 <Route path="roles" element={<BusinessRoles />} />
                 <Route path="emails" element={<BusinessEmailsPage />} />

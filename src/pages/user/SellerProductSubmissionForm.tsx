@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useForm, Controller, useWatch } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Input as AntInput, InputNumber as AntInputNumber, Select as AntSelect, Button as AntButton, Tag as AntTag, Alert as AntAlert, message as antMessage, Space as AntSpace, Card as AntCard, Switch as AntSwitch, Descriptions as AntDescriptions, Table as AntTable, Collapse as AntCollapse } from 'antd';
+import { Input as AntInput, InputNumber as AntInputNumber, Select as AntSelect, Button as AntButton, Tag as AntTag, Alert as AntAlert, Space as AntSpace, Card as AntCard, Switch as AntSwitch, Descriptions as AntDescriptions, Table as AntTable, Collapse as AntCollapse, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -92,6 +92,7 @@ const EditableCellNumber: React.FC<{
 });
 
 const SellerProductSubmissionForm: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();

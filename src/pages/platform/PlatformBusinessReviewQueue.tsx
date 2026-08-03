@@ -21,7 +21,7 @@ const PlatformBusinessReviewQueue: React.FC = () => {
 
   // Live Query Submissions
   const submissions = useLiveQuery(() => businessDb.businessSubmissions.toArray()) || [];
-
+  console.log(submissions)
   const queueActionNeeded = useMemo(() => submissions.filter(s => s.status === 'SUBMITTED' || s.status === 'UNDER_REVIEW'), [submissions]);
   const queueNeedsRevision = useMemo(() => submissions.filter(s => s.status === 'NEEDS_REVISION'), [submissions]);
   const queueApproved = useMemo(() => submissions.filter(s => s.status === 'APPROVED'), [submissions]);
