@@ -29,7 +29,7 @@ const UserBrands: React.FC = () => {
   const sellingInfo = useLiveQuery(
     async () => {
       const sellerPartyId = userParty?.id || 'pty-6';
-      const mySellerProducts = await catalogDb.sellerProducts.where('seller_party_id').equals(sellerPartyId).toArray();
+      const mySellerProducts = await catalogDb.sellerProducts.where('party_id').equals(sellerPartyId).toArray();
 
       // Unique Brand IDs sold by user
       const brandIds = Array.from(new Set(mySellerProducts.map((sp) => sp.brand_id).filter(Boolean))) as string[];
