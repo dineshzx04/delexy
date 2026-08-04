@@ -160,6 +160,28 @@ const UserLayout: React.FC = () => {
                 ],
             },
             {
+                key: 'user-sourcing-group',
+                type: 'group',
+                label: collapsed ? null : 'Enterprise Sourcing (RFQs)',
+                children: [
+                    {
+                        key: '/user/rfqs/dashboard',
+                        icon: <Lucide.BarChart3 size={18} />,
+                        label: <Link to="/user/rfqs/dashboard">Sourcing Dashboard</Link>,
+                    },
+                    {
+                        key: '/user/rfqs',
+                        icon: <Lucide.FileText size={18} />,
+                        label: <Link to="/user/rfqs">My RFQs</Link>,
+                    },
+                    {
+                        key: '/user/supplier/rfqs',
+                        icon: <Lucide.Inbox size={18} />,
+                        label: <Link to="/user/supplier/rfqs">Supplier Opportunities</Link>,
+                    },
+                ],
+            },
+            {
                 key: 'business-action-group',
                 type: 'group',
                 label: collapsed ? null : 'Business Actions',

@@ -140,14 +140,31 @@ const BusinessLayout: React.FC = () => {
             label: <Link to="/b/products">Products</Link>,
           },
           {
-            key: '/b/rfqs',
-            icon: <Lucide.FileText size={18} />,
-            label: <Link to="/b/rfqs">RFQs & Quotes</Link>,
-          },
-          {
             key: '/b/party-brands',
             icon: <Lucide.Award size={18} />,
             label: <Link to="/b/party-brands">Party, Manufacturer & Brands</Link>,
+          },
+        ],
+      },
+      {
+        key: 'enterprise-sourcing-group',
+        type: 'group',
+        label: collapsed ? null : 'Enterprise Sourcing (RFQs)',
+        children: [
+          {
+            key: '/b/rfqs/dashboard',
+            icon: <Lucide.BarChart3 size={18} />,
+            label: <Link to="/b/rfqs/dashboard">Sourcing Dashboard</Link>,
+          },
+          {
+            key: '/b/rfqs',
+            icon: <Lucide.FileText size={18} />,
+            label: <Link to="/b/rfqs">RFQ Containers</Link>,
+          },
+          {
+            key: '/b/supplier/rfqs',
+            icon: <Lucide.Inbox size={18} />,
+            label: <Link to="/b/supplier/rfqs">Supplier Opportunities</Link>,
           },
         ],
       },

@@ -32,6 +32,17 @@ import BusinessSettings from './pages/business/BusinessSettings';
 import BusinessRFQs from './pages/business/BusinessRFQs';
 import BusinessProfile from './pages/business/BusinessProfile';
 import BusinessPartyManufacturerBrands from './pages/business/BusinessPartyManufacturerBrands';
+
+// Enterprise Sourcing RFQ Pages
+import { BuyerDashboard } from './pages/rfq/BuyerDashboard';
+import { RfqList } from './pages/rfq/RfqList';
+import { RfqCreateWizard } from './pages/rfq/RfqCreateWizard';
+import { RfqWorkspace } from './pages/rfq/RfqWorkspace';
+import { ItemDetailWorkspace } from './pages/rfq/ItemDetailWorkspace';
+import { SupplierRfqInbox } from './pages/rfq/SupplierRfqInbox';
+import { SupplierItemRespond } from './pages/rfq/SupplierItemRespond';
+import { SupplierProductMapping } from './pages/rfq/SupplierProductMapping';
+
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 import PlatformLayout from './layouts/PlatformLayout';
 import PlatformDashboard from './pages/platform/PlatformDashboard';
@@ -118,6 +129,17 @@ const App: React.FC = () => {
                 <Route path="business-submissions" element={<UserBusinessSubmissions />} />
                 <Route path="business-submissions/new" element={<CreateBusiness />} />
                 <Route path="business-submissions/edit/:id" element={<CreateBusiness />} />
+
+                {/* User RFQ Sourcing Routes */}
+                <Route path="rfqs/dashboard" element={<BuyerDashboard />} />
+                <Route path="rfqs" element={<RfqList />} />
+                <Route path="rfqs/create" element={<RfqCreateWizard />} />
+                <Route path="rfqs/:rfqId" element={<RfqWorkspace />} />
+                <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
+                <Route path="supplier/rfqs" element={<SupplierRfqInbox />} />
+                <Route path="supplier/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="supplier/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
+
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
             </Route>
@@ -133,10 +155,20 @@ const App: React.FC = () => {
                 <Route path="roles" element={<BusinessRoles />} />
                 <Route path="emails" element={<BusinessEmailsPage />} />
                 <Route path="settings" element={<BusinessSettings />} />
-                <Route path="rfqs" element={<BusinessRFQs />} />
                 <Route path="products" element={<UserSellerProducts />} />
                 <Route path="products/create" element={<SellerProductSubmissionForm />} />
                 <Route path="products/edit/:id" element={<SellerProductSubmissionForm />} />
+
+                {/* Business RFQ Sourcing Routes */}
+                <Route path="rfqs/dashboard" element={<BuyerDashboard />} />
+                <Route path="rfqs" element={<RfqList />} />
+                <Route path="rfqs/create" element={<RfqCreateWizard />} />
+                <Route path="rfqs/:rfqId" element={<RfqWorkspace />} />
+                <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
+                <Route path="supplier/rfqs" element={<SupplierRfqInbox />} />
+                <Route path="supplier/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="supplier/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
+
                 <Route path="*" element={<NotFound scope="business" />} />
               </Route>
             </Route>
