@@ -1,19 +1,21 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Tabs, Tag, Button, Breadcrumb, Table, Space, message } from 'antd';
+import { Card, Tabs, Tag, Button, Breadcrumb, Table, Space, App as AntApp } from 'antd';
 import {
   ToolOutlined,
   SafetyCertificateOutlined,
   DollarOutlined,
   TrophyOutlined,
   CheckCircleOutlined,
+  MessageOutlined,
 } from '@ant-design/icons';
-import { rfqDb, type CommercialNegotiationRound } from '../../data/rfq';
+import { rfqDb, type CommercialNegotiationRound, type ItemSupplierResponse } from '../../data/rfq';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqItemStatusBadge, ItemSupplierStatusBadge } from '../../components/rfq/RfqStatusBadge';
 import { TechnicalComparisonTable } from '../../components/rfq/TechnicalComparisonTable';
-import { CommercialNegotiationDrawer } from '../../components/rfq/CommercialNegotiationDrawer';
+import { BuyerTechnicalReviewDrawer } from '../../components/rfq/BuyerTechnicalReviewDrawer';
+import { CommercialNegotiationModal } from '../../components/rfq/CommercialNegotiationModal';
 import { SplitOrderAwardDrawer } from '../../components/rfq/SplitOrderAwardDrawer';
 
 export const ItemDetailWorkspace: React.FC = () => {
@@ -22,10 +24,12 @@ export const ItemDetailWorkspace: React.FC = () => {
   const { activeWorkspace } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
+  const { message: antMessage } = AntApp.useApp();
 
   const [activeTab, setActiveTab] = useState('comparison');
-  const [selectedResponse, setSelectedResponse] = useState<any>(null);
-  const [negotiationDrawerOpen, setNegotiationDrawerOpen] = useState(false);
+  const [selectedResponse, setSelectedResponse] = useState<ItemSupplierResponse | null>(null);
+  const [techReviewDrawerOpen, setTechReviewDrawerOpen] = useState(false);
+  const [negotiationModalOpen, setNegotiationModalOpen] = useState(false);
   const [awardDrawerOpen, setAwardDrawerOpen] = useState(false);
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
@@ -42,50 +46,6 @@ export const ItemDetailWorkspace: React.FC = () => {
       </div>
     );
   }
-
-  const handleApproveTechnical = async (respId: string) => {
-    try {
-      await rfqDb.itemSupplierResponses.update(respId, {
-        status: 'TECHNICAL_APPROVED',
-        updated_at: new Date().toISOString(),
-      });
-      message.success('Technical response approved! Supplier can now complete product mapping.');
-    } catch (err) {
-      message.error('Failed to approve technical response');
-    }
-  };
-
-  const handleApproveProductMapping = async (respId: string) => {
-    try {
-      const resp = responses.find((r) => r.id === respId);
-      if (resp?.product_mapping) {
-        await rfqDb.itemSupplierResponses.update(respId, {
-          status: 'COMMERCIAL_UNDER_NEGOTIATION',
-          product_mapping: { ...resp.product_mapping, is_buyer_approved: true },
-          updated_at: new Date().toISOString(),
-        });
-        message.success('Product mapping approved! Commercial negotiation opened.');
-      }
-    } catch (err) {
-      message.error('Failed to approve product mapping');
-    }
-  };
-
-  const handleSendCounterOffer = async (respId: string, round: CommercialNegotiationRound) => {
-    try {
-      const resp = responses.find((r) => r.id === respId);
-      if (resp) {
-        const history = [...(resp.commercial_negotiation_rounds || []), round];
-        await rfqDb.itemSupplierResponses.update(respId, {
-          commercial_negotiation_rounds: history,
-          status: 'COMMERCIAL_UNDER_NEGOTIATION',
-          updated_at: new Date().toISOString(),
-        });
-      }
-    } catch (err) {
-      message.error('Failed to record counter offer');
-    }
-  };
 
   const handleGrantSplitAwards = async (allocations: { responseId: string; awardedQty: number; unitPrice: number }[]) => {
     try {
@@ -129,10 +89,10 @@ export const ItemDetailWorkspace: React.FC = () => {
         awarded_quantity_total: totalQty,
       });
 
-      message.success('Multi-supplier split order awards granted!');
+      antMessage.success('Multi-supplier split order awards granted!');
     } catch (err) {
       console.error(err);
-      message.error('Failed to process split order awards');
+      antMessage.error('Failed to process split order awards');
     }
   };
 
@@ -147,30 +107,22 @@ export const ItemDetailWorkspace: React.FC = () => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      width: 190,
+      width: 220,
       render: (status: any) => <ItemSupplierStatusBadge status={status} />,
     },
     {
-      title: 'Product Mapping',
-      key: 'mapping',
-      width: 220,
-      render: (_: any, record: any) => {
-        if (!record.product_mapping?.seller_product_id) {
-          return <span className="text-xs text-slate-400 italic">Not mapped yet</span>;
-        }
-        return (
-          <div>
-            <div className="text-xs font-semibold text-purple-700">{record.product_mapping.seller_product_id}</div>
-            <div className="text-[10px] text-slate-500">Variant: {record.product_mapping.variant_id}</div>
-          </div>
-        );
-      },
+      title: 'Technical Round',
+      key: 'round',
+      width: 140,
+      render: (_: any, record: ItemSupplierResponse) => (
+        <Tag color="cyan">Round #{record.current_technical_round || 1}</Tag>
+      ),
     },
     {
       title: 'Offered Price ($)',
       key: 'price',
       width: 140,
-      render: (_: any, record: any) => {
+      render: (_: any, record: ItemSupplierResponse) => {
         const lastOffer = record.commercial_negotiation_rounds?.[record.commercial_negotiation_rounds.length - 1];
         const price = lastOffer?.unit_price ?? record.commercial_terms?.offered_unit_price ?? '-';
         return <span className="font-bold text-emerald-600">${price}</span>;
@@ -179,28 +131,29 @@ export const ItemDetailWorkspace: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      width: 280,
-      render: (_: any, record: any) => (
+      width: 320,
+      render: (_: any, record: ItemSupplierResponse) => (
         <Space size="small">
-          {record.status === 'TECHNICAL_SUBMITTED' && (
-            <Button type="primary" size="small" onClick={() => handleApproveTechnical(record.id)} icon={<CheckCircleOutlined />}>
-              Approve Tech
-            </Button>
-          )}
-
-          {record.status === 'PRODUCT_MAPPED' && (
-            <Button type="primary" size="small" className="bg-purple-600 hover:bg-purple-700" onClick={() => handleApproveProductMapping(record.id)}>
-              Approve Product
-            </Button>
-          )}
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => {
+              setSelectedResponse(record);
+              setTechReviewDrawerOpen(true);
+            }}
+            icon={<CheckCircleOutlined />}
+          >
+            Review Tech
+          </Button>
 
           <Button
             size="small"
             icon={<DollarOutlined />}
             onClick={() => {
               setSelectedResponse(record);
-              setNegotiationDrawerOpen(true);
+              setNegotiationModalOpen(true);
             }}
+            className="border-emerald-500 text-emerald-700 hover:bg-emerald-50"
           >
             Negotiate
           </Button>
@@ -260,7 +213,20 @@ export const ItemDetailWorkspace: React.FC = () => {
                   <ToolOutlined /> Technical Comparison
                 </span>
               ),
-              children: <TechnicalComparisonTable item={item} responses={responses} />,
+              children: (
+                <TechnicalComparisonTable
+                  item={item}
+                  responses={responses}
+                  onReviewTechnical={(resp) => {
+                    setSelectedResponse(resp);
+                    setTechReviewDrawerOpen(true);
+                  }}
+                  onOpenNegotiation={(resp) => {
+                    setSelectedResponse(resp);
+                    setNegotiationModalOpen(true);
+                  }}
+                />
+              ),
             },
             {
               key: 'responses',
@@ -275,17 +241,19 @@ export const ItemDetailWorkspace: React.FC = () => {
         />
       </Card>
 
-      {selectedResponse && (
-        <CommercialNegotiationDrawer
-          visible={negotiationDrawerOpen}
-          onClose={() => setNegotiationDrawerOpen(false)}
-          response={selectedResponse}
-          currentPartyId="pty-1"
-          currentUserId="usr-2"
-          currentUserName="John Doe"
-          onSendCounterOffer={handleSendCounterOffer}
-        />
-      )}
+      <BuyerTechnicalReviewDrawer
+        open={techReviewDrawerOpen}
+        onClose={() => setTechReviewDrawerOpen(false)}
+        response={selectedResponse}
+        itemTitle={item.product_name}
+      />
+
+      <CommercialNegotiationModal
+        open={negotiationModalOpen}
+        onClose={() => setNegotiationModalOpen(false)}
+        response={selectedResponse}
+        item={item}
+      />
 
       <SplitOrderAwardDrawer
         visible={awardDrawerOpen}

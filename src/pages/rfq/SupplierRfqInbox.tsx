@@ -33,9 +33,55 @@ export const SupplierRfqInbox: React.FC = () => {
   const items = useLiveQuery(() => rfqDb.rfqItems.toArray(), []) || [];
   const rfqs = useLiveQuery(() => rfqDb.rfqs.toArray(), []) || [];
 
-  const filteredResponses = sellerResponses.filter((resp) => {
+  // Also check for open RFQs where no explicit ItemSupplierResponse record exists yet for activePartyId
+  const openMarketplaceItems = items.filter((item) => {
+    const rfq = rfqs.find((r) => r.id === item.rfq_id);
+    if (!rfq || rfq.status === 'DRAFT' || rfq.status === 'CANCELLED') return false;
+    // Exclude if buyer party is current active party
+    if (rfq.requester_party_id === activePartyId) return false;
+
+    const isOpenForMarketplace = !item.target_seller_party_ids || item.target_seller_party_ids.length === 0 || item.target_seller_party_ids.includes(activePartyId);
+    const alreadyHasResponse = sellerResponses.some((resp) => resp.rfq_item_id === item.id);
+
+    return isOpenForMarketplace && !alreadyHasResponse;
+  });
+
+  // Synthesize virtual response records for open marketplace items
+  const virtualResponses = openMarketplaceItems.map((item) => {
+    return {
+      id: `isr-open-${item.id}-${activePartyId}`,
+      assignment_id: `sa-open-${item.id}-${activePartyId}`,
+      rfq_id: item.rfq_id,
+      rfq_item_id: item.id,
+      seller_party_id: activePartyId,
+      seller_party_name: activeParty.display_name,
+      supplier_user_id: currentUserId || 'usr-3',
+      status: 'ASSIGNED' as ItemSupplierResponseStatus,
+      current_technical_round: 1,
+      technical_revision_rounds: [],
+      product_mapping: item.seller_product_id ? {
+        seller_product_id: item.seller_product_id,
+        variant_id: item.variant_id || '',
+        mapped_at: new Date().toISOString(),
+        is_buyer_approved: true,
+      } : null,
+      commercial_negotiation_rounds: [],
+      is_awarded: false,
+      created_at: item.created_at,
+      updated_at: item.updated_at,
+    };
+  });
+
+  const allResponses = [...sellerResponses, ...virtualResponses];
+
+  const filteredResponses = allResponses.filter((resp) => {
+    const item = items.find((i) => i.id === resp.rfq_item_id);
+    const rfq = rfqs.find((r) => r.id === resp.rfq_id);
     const matchesTab = activeTab === 'ALL' || resp.status === activeTab;
-    const matchesSearch = resp.seller_party_name.toLowerCase().includes(searchText.toLowerCase());
+    const matchesSearch =
+      (item?.product_name || '').toLowerCase().includes(searchText.toLowerCase()) ||
+      (rfq?.title || '').toLowerCase().includes(searchText.toLowerCase()) ||
+      (rfq?.rfq_number || '').toLowerCase().includes(searchText.toLowerCase());
     return matchesTab && matchesSearch;
   });
 
@@ -123,7 +169,7 @@ export const SupplierRfqInbox: React.FC = () => {
             activeKey={activeTab}
             onChange={setActiveTab}
             items={[
-              { key: 'ALL', label: `All Requests (${sellerResponses.length})` },
+              { key: 'ALL', label: `All Requests (${allResponses.length})` },
               { key: 'ASSIGNED', label: 'Assigned' },
               { key: 'TECHNICAL_SUBMITTED', label: 'Tech Submitted' },
               { key: 'TECHNICAL_APPROVED', label: 'Tech Approved' },

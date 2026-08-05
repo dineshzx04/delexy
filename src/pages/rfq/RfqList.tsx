@@ -33,7 +33,7 @@ export const RfqList: React.FC = () => {
     () => rfqDb.rfqs.where('requester_party_id').equals(activePartyId).toArray(),
     [activePartyId]
   ) || [];
-
+  console.log(activePartyId)
   const filteredRfqs = partyRfqs.filter((r) => {
     const matchesTab = activeTab === 'ALL' || r.status === activeTab;
     const matchesSearch =

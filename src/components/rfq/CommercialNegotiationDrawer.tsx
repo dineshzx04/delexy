@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Drawer, Button, Input, InputNumber, Form, Card, Tag, Timeline, message } from 'antd';
+import { Drawer, Button, Input, InputNumber, Form, Card, Tag, Timeline, App as AntApp } from 'antd';
 import { DollarOutlined, SendOutlined, UserOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import type { ItemSupplierResponse, CommercialNegotiationRound } from '../../data/rfq';
 
@@ -23,6 +23,7 @@ export const CommercialNegotiationDrawer: React.FC<CommercialNegotiationDrawerPr
   onSendCounterOffer,
 }) => {
   const [form] = Form.useForm();
+  const { message: antMessage } = AntApp.useApp();
   const [submitting, setSubmitting] = useState(false);
 
   const negotiationHistory = response.commercial_negotiation_rounds || [];
@@ -43,10 +44,10 @@ export const CommercialNegotiationDrawer: React.FC<CommercialNegotiationDrawerPr
       };
 
       onSendCounterOffer(response.id, newRound);
-      message.success('Counter-offer submitted successfully!');
+      antMessage.success('Counter-offer submitted successfully!');
       form.resetFields();
     } catch (err) {
-      message.error('Failed to submit counter-offer');
+      antMessage.error('Failed to submit counter-offer');
     } finally {
       setSubmitting(false);
     }

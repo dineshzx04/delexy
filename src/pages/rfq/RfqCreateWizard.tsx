@@ -7,7 +7,7 @@ import {
   Button,
   Table,
   Tag,
-  message,
+  App as AntApp,
   Divider,
   Drawer,
   Popconfirm,
@@ -48,6 +48,7 @@ export const RfqCreateWizard: React.FC = () => {
   const { activeWorkspace, currentUser, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
+  const { message: antMessage } = AntApp.useApp();
 
   // Live queries from Dexie IndexedDB database stores
   const allParties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
@@ -59,6 +60,7 @@ export const RfqCreateWizard: React.FC = () => {
   const allAttributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
   const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
   const allAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
+  console.log(allMasterProducts);
 
   // Active party resolution
   const activeParty = isBusinessContext
@@ -72,7 +74,7 @@ export const RfqCreateWizard: React.FC = () => {
   const [activeDrawerIndex, setActiveDrawerIndex] = useState<number | null>(null);
   const [previewProduct, setPreviewProduct] = useState<{ sellerProduct: any; variant: any; drawerIndex: number } | null>(null);
   const [variantPage, setVariantPage] = useState<number>(1);
-  const VARIANTS_PER_PAGE = 3;
+  const VARIANTS_PER_PAGE = 10;
 
   // Leaf categories from catalog (categories mapped to attribute groups)
   const leafCategories = useMemo(
@@ -138,11 +140,14 @@ export const RfqCreateWizard: React.FC = () => {
     if (!selectedValIds || selectedValIds.length === 0) return true;
     return selectedValIds.some((selectedId) => {
       if (candidateValId === selectedId) return true;
+      if (candidateLabel && candidateLabel === selectedId) return true;
       const masterValObj = allAttributeValues.find((v) => v.id === selectedId);
       if (masterValObj) {
         if (candidateValId === masterValObj.value || candidateValId === masterValObj.label) return true;
         if (candidateLabel && (candidateLabel === masterValObj.label || candidateLabel === masterValObj.value)) return true;
       }
+      if (candidateValId && typeof candidateValId === 'string' && candidateValId.toLowerCase() === selectedId.toLowerCase()) return true;
+      if (candidateLabel && typeof candidateLabel === 'string' && candidateLabel.toLowerCase() === selectedId.toLowerCase()) return true;
       return false;
     });
   };
@@ -157,19 +162,19 @@ export const RfqCreateWizard: React.FC = () => {
   const handleNext = () => {
     if (currentStep === 0) {
       if (!globalDetails.title || !globalDetails.submission_deadline || !globalDetails.shipping_destination || !globalDetails.contact_email) {
-        message.error('Please fill in all required global RFQ fields (Title, Deadline, Contact Email, Shipping Destination)');
+        antMessage.error('Please fill in all required global RFQ fields (Title, Deadline, Contact Email, Shipping Destination)');
         return;
       }
     }
     if (currentStep === 1) {
       if (items.length === 0) {
-        message.error('Please add at least one line item before proceeding');
+        antMessage.error('Please add at least one line item before proceeding');
         return;
       }
       for (let idx = 0; idx < items.length; idx++) {
         const item = items[idx];
         if (!item.product_name || !item.category_id || !item.quantity) {
-          message.error(`Line Item #${idx + 1} requires a Specification Title, Category, and Quantity`);
+          antMessage.error(`Line Item #${idx + 1} requires a Specification Title, Category, and Quantity`);
           return;
         }
       }
@@ -204,12 +209,12 @@ export const RfqCreateWizard: React.FC = () => {
     setItems((prev) => [...prev, newItem]);
     setActiveDrawerIndex(items.length); // Open configuration drawer for the new empty item
     setVariantPage(1);
-    message.info('Line item added. Fill in details or select a catalog variant.');
+    antMessage.info('Line item added. Fill in details or select a catalog variant.');
   };
 
   const handleRemoveItem = (index: number) => {
     setItems((prev) => prev.filter((_, idx) => idx !== index));
-    message.info('Line item removed');
+    antMessage.info('Line item removed');
   };
 
   // Auto-fill line item from catalog seller product & variant (Targeted Variant Mode)
@@ -254,7 +259,7 @@ export const RfqCreateWizard: React.FC = () => {
     }
 
     setItems(updated);
-    message.success(`Bound line item to catalog variant: ${variant?.sku || sellerProduct.product_name} (Targeted Variant Sourcing)`);
+    antMessage.success(`Bound line item to catalog variant: ${variant?.sku || sellerProduct.product_name} (Targeted Variant Sourcing)`);
   };
 
   // Convert Targeted Variant item back to Open Spec RFQ item
@@ -266,12 +271,12 @@ export const RfqCreateWizard: React.FC = () => {
     itemToUpdate.variant_id = undefined;
     itemToUpdate.variant_sku = undefined;
     setItems(updated);
-    message.info('Converted line item to Open Spec / Custom Requirements RFQ.');
+    antMessage.info('Converted line item to Open Spec / Custom Requirements RFQ.');
   };
 
   const handleIssueRfq = async () => {
     if (!agreements.termsAgreed || !agreements.shareContact) {
-      message.error('You must agree to the terms and consent to share contact details.');
+      antMessage.error('You must agree to the terms and consent to share contact details.');
       return;
     }
 
@@ -349,14 +354,51 @@ export const RfqCreateWizard: React.FC = () => {
         updated_at: new Date().toISOString(),
       }));
 
+      const newResponses: any[] = [];
+
+      newRfqItems.forEach((item, itemIdx) => {
+        const targetSellers = item.target_seller_party_ids && item.target_seller_party_ids.length > 0
+          ? item.target_seller_party_ids
+          : allParties.filter((p: any) => p.id !== activePartyId).map((p: any) => p.id);
+
+        targetSellers.forEach((sellerPartyId: string, sIdx: number) => {
+          const sellerParty = allParties.find((p: any) => p.id === sellerPartyId);
+          newResponses.push({
+            id: `isr-${newRfqId}-${itemIdx + 1}-${sIdx + 1}`,
+            assignment_id: `sa-${newRfqId}-${itemIdx + 1}-${sIdx + 1}`,
+            rfq_id: newRfqId,
+            rfq_item_id: item.id,
+            seller_party_id: sellerPartyId,
+            seller_party_name: sellerParty?.display_name || sellerPartyId,
+            supplier_user_id: '',
+            status: 'ASSIGNED',
+            current_technical_round: 1,
+            technical_revision_rounds: [],
+            product_mapping: item.seller_product_id ? {
+              seller_product_id: item.seller_product_id,
+              variant_id: item.variant_id || '',
+              mapped_at: new Date().toISOString(),
+              is_buyer_approved: true,
+            } : null,
+            commercial_negotiation_rounds: [],
+            is_awarded: false,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        });
+      });
+
       await rfqDb.rfqs.put(newRfq);
       await rfqDb.rfqItems.bulkPut(newRfqItems);
+      if (newResponses.length > 0) {
+        await rfqDb.itemSupplierResponses.bulkPut(newResponses);
+      }
 
-      message.success('RFQ Container issued successfully!');
+      antMessage.success('RFQ Container issued successfully!');
       navigate(`${basePath}/${newRfqId}`);
     } catch (err) {
       console.error(err);
-      message.error('Failed to issue RFQ container');
+      antMessage.error('Failed to issue RFQ container');
     }
   };
 
@@ -730,9 +772,15 @@ export const RfqCreateWizard: React.FC = () => {
             // Master product filter (only filter if master_product_id is selected)
             if (item.master_product_id && sp.catalog_product_id !== item.master_product_id) return;
             // Brand filter
-            if (item.brand_id && sp.brand_id !== item.brand_id) return;
+            if (item.brand_id) {
+              const selectedBrands = Array.isArray(item.brand_id) ? item.brand_id : [item.brand_id];
+              if (selectedBrands.length > 0 && !selectedBrands.includes(sp.brand_id)) return;
+            }
             // Manufacturer filter
-            if (item.manufacturer_id && sp.manufacturer_id !== item.manufacturer_id) return;
+            if (item.manufacturer_id) {
+              const selectedMfgs = Array.isArray(item.manufacturer_id) ? item.manufacturer_id : [item.manufacturer_id];
+              if (selectedMfgs.length > 0 && !selectedMfgs.includes(sp.manufacturer_id)) return;
+            }
 
             const variantsList = sp.variants && sp.variants.length > 0 ? sp.variants : [{ id: `${sp.id}-base`, sku: sp.part_number || sp.id, price: undefined }];
 
@@ -787,9 +835,11 @@ export const RfqCreateWizard: React.FC = () => {
             });
           });
 
-          // Paginate flat variants list
+          // Paginate flat variants list with safe page clamping
           const totalVariants = matchingFlatVariants.length;
-          const startIndex = (variantPage - 1) * VARIANTS_PER_PAGE;
+          const maxPage = Math.max(1, Math.ceil(totalVariants / VARIANTS_PER_PAGE));
+          const safePage = Math.min(variantPage, maxPage);
+          const startIndex = (safePage - 1) * VARIANTS_PER_PAGE;
           const paginatedVariants = matchingFlatVariants.slice(startIndex, startIndex + VARIANTS_PER_PAGE);
 
           return (
@@ -861,7 +911,7 @@ export const RfqCreateWizard: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-700">Master Product (Optional)</label>
+                      <label className="text-xs font-semibold text-slate-700">Master Product</label>
                       <Select
                         allowClear
                         placeholder="Select Master Product"
@@ -944,12 +994,13 @@ export const RfqCreateWizard: React.FC = () => {
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-xs font-semibold text-slate-700">Preferred Brand</label>
+                      <label className="text-xs font-semibold text-slate-700">Preferred Brand(s)</label>
                       <Select
+                        mode="multiple"
                         allowClear
-                        placeholder="Select Preferred Brand"
-                        value={item.brand_id}
-                        onChange={(val) => {
+                        placeholder="Select Preferred Brand(s)"
+                        value={Array.isArray(item.brand_id) ? item.brand_id : item.brand_id ? [item.brand_id] : []}
+                        onChange={(val: string[]) => {
                           const updated = [...items];
                           updated[activeDrawerIndex].brand_id = val;
                           setItems(updated);
@@ -961,12 +1012,13 @@ export const RfqCreateWizard: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-700">Preferred Manufacturer</label>
+                      <label className="text-xs font-semibold text-slate-700">Preferred Manufacturer(s)</label>
                       <Select
+                        mode="multiple"
                         allowClear
-                        placeholder="Select Preferred Manufacturer"
-                        value={item.manufacturer_id}
-                        onChange={(val) => {
+                        placeholder="Select Preferred Manufacturer(s)"
+                        value={Array.isArray(item.manufacturer_id) ? item.manufacturer_id : item.manufacturer_id ? [item.manufacturer_id] : []}
+                        onChange={(val: string[]) => {
                           const updated = [...items];
                           updated[activeDrawerIndex].manufacturer_id = val;
                           setItems(updated);
@@ -1162,104 +1214,112 @@ export const RfqCreateWizard: React.FC = () => {
               </div>
 
               {/* RIGHT SIDE: Interactive Catalog Variants Selection Panel (5 cols) */}
-              <div className="lg:col-span-5 space-y-4 bg-blue-50/40 p-4 rounded-xl border border-blue-200 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between border-b border-blue-200 pb-2">
-                    <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5 m-0">
-                      <ShopOutlined className="text-blue-600" /> Catalog Variants ({totalVariants})
-                    </h4>
-                    {item.selected_dynamic_attributes && item.selected_dynamic_attributes.some((a: any) => a.selected_value_ids?.length > 0) && (
-                      <Tag color="purple" icon={<FilterOutlined />}>Filtered by Specs</Tag>
+              <div className='lg:col-span-5 space-y-4'>
+                <div className="bg-blue-50/40 p-4 rounded-xl border border-blue-200 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-blue-200 pb-2">
+                      <h4 className="font-bold text-slate-900 text-sm flex items-center gap-1.5 m-0">
+                        <ShopOutlined className="text-blue-600" /> Catalog Variants ({totalVariants})
+                      </h4>
+                      {item.selected_dynamic_attributes && item.selected_dynamic_attributes.some((a: any) => a.selected_value_ids?.length > 0) && (
+                        <Tag color="purple" icon={<FilterOutlined />}>Filtered by Specs</Tag>
+                      )}
+                    </div>
+
+                    <p className="text-xs text-slate-500 m-0">
+                      Variants filtered in real-time by category, brand, mfg, and selected dynamic attributes. Click to view details or bind variant focus.
+                    </p>
+
+                    {totalVariants === 0 ? (
+                      <div className="p-4 bg-white rounded-lg border border-slate-200 text-xs text-slate-500 text-center italic">
+                        No catalog variants match the current filters. You can adjust your attribute filters or raise a custom RFQ line item spec manually.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {paginatedVariants.map(({ sellerProduct: sp, variant: v }) => {
+                          const brand = allBrands.find((b: any) => b.id === sp.brand_id);
+                          const mfg = allManufacturers.find((m: any) => m.id === sp.manufacturer_id);
+                          const isBoundVariant = item.variant_id === v.id || item.variant_id === `${sp.id}-base`;
+
+                          const party = allParties.find((p: any) => p.id === sp.party_id);
+
+                          return (
+                            <div key={`${sp.id}-${v.id}`} className="mb-2">
+                              <div
+                                className={`border rounded-lg p-3 transition-all bg-white flex flex-col hover:shadow-md cursor-pointer ${isBoundVariant ? 'border-2 border-emerald-500 bg-emerald-50/40' : 'border-slate-200 hover:border-blue-400'
+                                  }`}
+                                onClick={() => setPreviewProduct({ sellerProduct: sp, variant: v, drawerIndex: activeDrawerIndex })}
+                              >
+                                <div className="flex items-center gap-3 mb-2">
+                                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-sm uppercase flex-shrink-0">
+                                    {sp.product_name.charAt(0)}
+                                  </div>
+                                  <div className="flex-1 overflow-hidden">
+                                    <div className="font-semibold text-slate-800 text-sm truncate flex items-center gap-1.5">
+                                      {sp.product_name}
+                                      {isBoundVariant && <Tag color="green" className="m-0 text-[10px]">Bound</Tag>}
+                                    </div>
+                                    <div className="font-medium text-blue-600 text-xs truncate">
+                                      {v.sku ? `SKU: ${v.sku}` : (v.name || sp.model_number || 'Standard Variant')}
+                                    </div>
+                                  </div>
+                                  <div className="font-bold text-emerald-600 text-sm flex-shrink-0">
+                                    {v.price ? `$${v.price.toLocaleString()}` : 'Quote'}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center justify-between mt-auto border-t border-slate-100 pt-2 gap-2">
+                                  <div className="text-xs text-slate-500 truncate">
+                                    Seller: <span className="font-medium text-slate-700">{party?.display_name || sp.party_id}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                                    <Button
+                                      size="small"
+                                      type="text"
+                                      icon={<EyeOutlined />}
+                                      onClick={() => setPreviewProduct({ sellerProduct: sp, variant: v, drawerIndex: activeDrawerIndex })}
+                                      className="text-xs text-blue-600 hover:bg-blue-50 px-1.5"
+                                    >
+                                      Details
+                                    </Button>
+                                    <Button
+                                      size="small"
+                                      type={isBoundVariant ? 'default' : 'primary'}
+                                      icon={isBoundVariant ? <CheckOutlined /> : <AimOutlined />}
+                                      onClick={() => handleSelectCatalogSellerProduct(activeDrawerIndex, sp, v)}
+                                      className={isBoundVariant ? 'text-emerald-700 border-emerald-500 font-semibold text-xs h-7 px-2' : 'bg-blue-600 hover:bg-blue-700 font-semibold text-xs h-7 px-2'}
+                                    >
+                                      {isBoundVariant ? 'Bound' : 'Bind'}
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
 
-                  <p className="text-xs text-slate-500 m-0">
-                    Variants filtered in real-time by category, brand, mfg, and selected dynamic attributes. Click to view details or bind variant focus.
-                  </p>
-
-                  {totalVariants === 0 ? (
-                    <div className="p-4 bg-white rounded-lg border border-slate-200 text-xs text-slate-500 text-center italic">
-                      No catalog variants match the current filters. You can adjust your attribute filters or raise a custom RFQ line item spec manually.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {paginatedVariants.map(({ sellerProduct: sp, variant: v }) => {
-                        const brand = allBrands.find((b: any) => b.id === sp.brand_id);
-                        const mfg = allManufacturers.find((m: any) => m.id === sp.manufacturer_id);
-                        const isBoundVariant = item.variant_id === v.id || item.variant_id === `${sp.id}-base`;
-
-                        return (
-                          <Card
-                            key={`${sp.id}-${v.id}`}
-                            size="small"
-                            className={`shadow-sm transition-all ${isBoundVariant ? 'border-2 border-emerald-500 bg-emerald-50/30' : 'border-slate-200 bg-white hover:border-blue-400'}`}
-                          >
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <div className="font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                                  {sp.product_name}
-                                  {isBoundVariant && <Tag color="green" className="m-0 text-[10px]">Bound</Tag>}
-                                </div>
-                                {v.sku && <div className="text-xs font-mono font-bold text-blue-700">SKU: {v.sku}</div>}
-                              </div>
-                              {v.price && <Tag color="green" className="font-bold text-xs">${v.price.toLocaleString()}</Tag>}
-                            </div>
-
-                            <div className="text-[11px] text-slate-500 space-y-0.5 my-2 bg-slate-50 p-2 rounded border border-slate-100">
-                              <div>Brand: <strong className="text-slate-800">{brand?.name || sp.brand_id}</strong> | Mfg: <strong className="text-slate-800">{mfg?.company_name || sp.manufacturer_id}</strong></div>
-                              {sp.model_number && <div>Model: {sp.model_number} | Origin: {sp.country_of_origin || 'KR'}</div>}
-
-                              {/* Combination values */}
-                              {v.combination_values && v.combination_values.length > 0 && (
-                                <div className="flex items-center gap-1 flex-wrap mt-1">
-                                  {v.combination_values.map((cv: any) => (
-                                    <Tag key={cv.value_id} color="purple" className="text-[10px] m-0">
-                                      {cv.attribute_name}: {cv.label}
-                                    </Tag>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="small"
-                                icon={<EyeOutlined />}
-                                onClick={() => setPreviewProduct({ sellerProduct: sp, variant: v, drawerIndex: activeDrawerIndex })}
-                                className="text-xs font-semibold"
-                              >
-                                View Details
-                              </Button>
-                              <Button
-                                size="small"
-                                type={isBoundVariant ? 'default' : 'primary'}
-                                icon={isBoundVariant ? <CheckOutlined /> : <AimOutlined />}
-                                onClick={() => handleSelectCatalogSellerProduct(activeDrawerIndex, sp, v)}
-                                className={isBoundVariant ? 'text-emerald-700 border-emerald-500 font-semibold text-xs flex-1' : 'bg-blue-600 hover:bg-blue-700 font-semibold text-xs flex-1'}
-                              >
-                                {isBoundVariant ? 'Bound Variant' : 'Select & Bind Variant'}
-                              </Button>
-                            </div>
-                          </Card>
-                        );
-                      })}
+                  {/* Pagination Controls at Bottom */}
+                  {totalVariants > 0 && (
+                    <div className="pt-3 border-t border-blue-200 flex items-center justify-between text-xs text-slate-500">
+                      <div>
+                        Showing <span className="font-semibold text-slate-800">{startIndex + 1}</span>–<span className="font-semibold text-slate-800">{Math.min(startIndex + VARIANTS_PER_PAGE, totalVariants)}</span> of <span className="font-semibold text-slate-800">{totalVariants}</span>
+                      </div>
+                      {totalVariants > VARIANTS_PER_PAGE && (
+                        <Pagination
+                          size="small"
+                          current={safePage}
+                          pageSize={VARIANTS_PER_PAGE}
+                          total={totalVariants}
+                          onChange={(page) => setVariantPage(page)}
+                          showSizeChanger={false}
+                        />
+                      )}
                     </div>
                   )}
                 </div>
-
-                {/* Pagination Controls at Bottom */}
-                {totalVariants > VARIANTS_PER_PAGE && (
-                  <div className="pt-3 border-t border-blue-200 flex justify-center">
-                    <Pagination
-                      size="small"
-                      current={variantPage}
-                      pageSize={VARIANTS_PER_PAGE}
-                      total={totalVariants}
-                      onChange={(page) => setVariantPage(page)}
-                      showSizeChanger={false}
-                    />
-                  </div>
-                )}
               </div>
             </div>
           );

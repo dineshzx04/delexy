@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Select, Button, Alert, message, Breadcrumb, Tag, Divider } from 'antd';
+import { Card, Select, Button, Alert, App as AntApp, Breadcrumb, Tag, Divider } from 'antd';
 import { CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
@@ -13,6 +13,7 @@ export const SupplierProductMapping: React.FC = () => {
   const { activeWorkspace } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/supplier' : '/user/supplier';
+  const { message: antMessage } = AntApp.useApp();
 
   const [selectedProductId, setSelectedProductId] = useState<string>('sprod-1');
   const [selectedVariantId, setSelectedVariantId] = useState<string>('sprod-1-v2');
@@ -44,10 +45,10 @@ export const SupplierProductMapping: React.FC = () => {
         });
       }
 
-      message.success('Catalog product & variant mapped successfully!');
+      antMessage.success('Catalog product & variant mapped successfully!');
       navigate(basePath);
     } catch (err) {
-      message.error('Failed to map product');
+      antMessage.error('Failed to map product');
     } finally {
       setSubmitting(false);
     }

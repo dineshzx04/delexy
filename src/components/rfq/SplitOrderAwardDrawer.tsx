@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Drawer, Button, InputNumber, Card, Tag, Table, Alert, message } from 'antd';
+import { Drawer, Button, InputNumber, Card, Tag, Table, Alert, App as AntApp } from 'antd';
 import { TrophyOutlined, CheckCircleOutlined, InfoCircleOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import type { RfqItem, ItemSupplierResponse } from '../../data/rfq';
 
@@ -33,6 +33,7 @@ export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
     return initial;
   });
 
+  const { message: antMessage } = AntApp.useApp();
   const [submitting, setSubmitting] = useState(false);
 
   const totalAllocatedQty = Object.values(quantities).reduce((acc, val) => acc + (val || 0), 0);
@@ -48,7 +49,7 @@ export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
 
   const handleAwardClick = () => {
     if (!isAllocationValid) {
-      message.error(`Total awarded quantity (${totalAllocatedQty}) must equal total requested quantity (${item.quantity}).`);
+      antMessage.error(`Total awarded quantity (${totalAllocatedQty}) must equal total requested quantity (${item.quantity}).`);
       return;
     }
 
@@ -65,10 +66,10 @@ export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
       });
 
       onGrantSplitAwards(allocations);
-      message.success('Multi-supplier split order awards granted & Purchase Orders generated!');
+      antMessage.success('Multi-supplier split order awards granted & Purchase Orders generated!');
       onClose();
     } catch (err) {
-      message.error('Failed to grant split awards');
+      antMessage.error('Failed to grant split awards');
     } finally {
       setSubmitting(false);
     }

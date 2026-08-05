@@ -112,8 +112,8 @@ export interface RfqItem {
   variant_id?: string | null;          // Seller Product Variant ID e.g. 'sprod-1-v1'
   variant_sku?: string | null;         // Variant SKU e.g. 'SM-S928B-BLK-512'
   product_name: string;                // Item Title / Name
-  brand_id?: string | null;            // Preferred Brand ID ('brd-1')
-  manufacturer_id?: string | null;     // Preferred Manufacturer ID ('mfg-1')
+  brand_id?: string | string[] | null;            // Preferred Brand ID(s) ('brd-1' or ['brd-1', 'brd-2'])
+  manufacturer_id?: string | string[] | null;     // Preferred Manufacturer ID(s) ('mfg-1' or ['mfg-1', 'mfg-2'])
 
   manufacturing_inputs: ManufacturingInput[];
   height?: string;
@@ -155,6 +155,15 @@ export type ItemSupplierResponseStatus =
   | 'AWARDED'
   | 'REJECTED';
 
+export interface AttributeCommentEntry {
+  id: string;
+  sender_role: 'BUYER' | 'SELLER';
+  sender_name: string;
+  sender_user_id: string;
+  comment: string;
+  timestamp: string;
+}
+
 export interface TechnicalAttributeResponse {
   attribute_key: string;               // e.g. 'attr-7' or 'tolerance_specs'
   attribute_name: string;              // Human label e.g. 'Operating Voltage' or 'Tolerance'
@@ -162,6 +171,10 @@ export interface TechnicalAttributeResponse {
   offered_value: any;                  // Value offered by supplier
   is_deviated: boolean;                // true if offered_value !== requested_value
   deviation_reason?: string;           // Remarks e.g. "Equivalent grade SS316"
+  buyer_status?: 'APPROVED' | 'REVISION_REQUESTED' | 'REJECTED';
+  buyer_comment?: string;
+  seller_comment?: string;
+  comment_history?: AttributeCommentEntry[];
 }
 
 export interface TechnicalRevisionRound {
@@ -171,7 +184,9 @@ export interface TechnicalRevisionRound {
   buyer_requirement_snapshot: TechnicalAttributeResponse[];
   supplier_response: TechnicalAttributeResponse[];
   buyer_review_notes?: string;
-  round_status: 'PENDING' | 'REVISION_REQUESTED' | 'APPROVED';
+  buyer_reviewed_at?: string;
+  buyer_reviewed_by_user_id?: string;
+  round_status: 'PENDING' | 'REVISION_REQUESTED' | 'APPROVED' | 'REJECTED';
 }
 
 export interface ProductMapping {

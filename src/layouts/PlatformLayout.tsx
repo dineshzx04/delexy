@@ -136,7 +136,7 @@ const PlatformLayout: React.FC = () => {
         {
           key: "/p/seller-product-reviews",
           icon: <Lucide.ShieldCheck size={16} />,
-          label: <Link to="/p/seller-product-reviews">Product Reviews & Audit</Link>,
+          label: <Link to="/p/seller-product-reviews">Seller Product Reviews</Link>,
         },
       ],
     },
