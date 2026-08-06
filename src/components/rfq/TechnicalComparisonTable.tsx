@@ -6,7 +6,6 @@ import {
   ExclamationCircleFilled,
   InfoCircleOutlined,
   CheckCircleOutlined,
-  DollarOutlined,
   MessageOutlined,
 } from '@ant-design/icons';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -18,14 +17,12 @@ interface TechnicalComparisonTableProps {
   item: RfqItem;
   responses: ItemSupplierResponse[];
   onReviewTechnical?: (response: ItemSupplierResponse) => void;
-  onOpenNegotiation?: (response: ItemSupplierResponse) => void;
 }
 
 export const TechnicalComparisonTable: React.FC<TechnicalComparisonTableProps> = ({
   item,
   responses,
   onReviewTechnical,
-  onOpenNegotiation,
 }) => {
   const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
   const allAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
@@ -153,17 +150,6 @@ export const TechnicalComparisonTable: React.FC<TechnicalComparisonTableProps> =
               className="text-[11px] h-6 px-2"
             >
               Review Tech
-            </Button>
-          )}
-
-          {onOpenNegotiation && (
-            <Button
-              size="small"
-              icon={<DollarOutlined />}
-              onClick={() => onOpenNegotiation(resp)}
-              className="text-[11px] h-6 px-2 border-emerald-500 text-emerald-700 hover:bg-emerald-50"
-            >
-              Negotiate Quote
             </Button>
           )}
         </div>

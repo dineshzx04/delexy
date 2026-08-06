@@ -34,35 +34,34 @@ export type RfqStatus =
   | 'PARTIALLY_AWARDED'    // Some items awarded, others still under negotiation/open
   | 'FULLY_AWARDED'        // All items in the container 100% awarded
   | 'CLOSED'
-  | 'CANCELLED';
+  | 'CANCELLED'
+  | 'IN_PROGRESS'          // Added for agent flow
+  | 'AWARDED';             // Added for agent flow
 
 export interface Rfq {
-  id: string;                          // e.g. 'rfq-2026-1001'
-  rfq_number: string;                  // e.g. 'RFQ-2026-1001'
-  title: string;                       // RFQ Title
-  description?: string;
-  
-  requester_party_id: string;          // Party ID ('pty-1' for Business or 'pty-6' for Individual)
-  requester_party_type: PartyOwnerType;// 'BUSINESS' | 'USER'
-  requester_name: string;              // Business display name or User full name
-  created_by_user_id: string;          // User ID ('usr-2')
-
-  contact_email: string;
-  contact_phone?: string;
-  shipping_destination: string;
-
+  id: string;                          // e.g. 'rfq-01' or 'rfq-2026-1001'
   status: RfqStatus;
-  submission_deadline: string;        // ISO Date String
-  
-  total_items_count: number;           // Can scale 1..1000+ items
+  createdAt?: string;                   // ISO Date String
+  created_at?: string;                  // compatibility
+
+  // Optional fields from legacy Rfq for compatibility
+  rfq_number: string;
+  title: string;
+  description?: string;
+  requester_party_id?: string;
+  requester_party_type?: PartyOwnerType;
+  requester_name: string;
+  created_by_user_id?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  shipping_destination?: string;
+  submission_deadline: string;
+  total_items_count?: number;
   total_estimated_budget?: number;
-  currency: string;                    // 'USD'
-
-  attachments: RfqAttachment[];
-  timeline: RfqTimelineEvent[];
-
-  created_at: string;
-  updated_at: string;
+  currency?: string;
+  attachments?: RfqAttachment[];
+  timeline?: RfqTimelineEvent[];
+  updated_at?: string;
 }
 
 // =============================================================
@@ -71,26 +70,26 @@ export interface Rfq {
 
 export type RfqItemStatus = 
   | 'OPEN'                     // Item issued & accepting/evaluating supplier responses
-  | 'PARTIALLY_AWARDED'        // Partial split quantity awarded (e.g., 60 of 100 units)
-  | 'FULLY_AWARDED'            // 100% requested quantity awarded across winning suppliers
+  | 'PARTIALLY_AWARDED'        // Partial split quantity awarded
+  | 'FULLY_AWARDED'            // 100% requested quantity awarded
   | 'CANCELLED';
 
 export interface ManufacturingInput {
-  field_id: string;                    // e.g. 'tolerance_specs', 'surface_finish', 'heat_treatment'
-  field_name: string;                  // Human label e.g. 'Tolerance', 'Surface Finish'
-  value: string | number;              // e.g. "±0.03 mm", "Ra 1.6"
+  field_id: string;
+  field_name: string;
+  value: string | number;
 }
 
 export interface RfqItemDynamicAttribute {
-  group_id: string;                    // AttributeGroup.id ('grp-4')
-  attribute_id: string;                // Attribute.id ('attr-7')
-  selected_value_ids: string[];        // AttributeValue.id[] (['val-7-1'])
+  group_id: string;
+  attribute_id: string;
+  selected_value_ids: string[];
 }
 
 export interface SellerAssignment {
-  id: string;                          // e.g. 'sa-101'
-  rfq_item_id: string;                 // Foreign key to RfqItem.id
-  seller_party_id: string;             // Seller Party ID ('pty-4', 'pty-5')
+  id: string;
+  rfq_item_id: string;
+  seller_party_id: string;
   assignment_type: 'DIRECT_INVITATION' | 'PUBLIC_MARKETPLACE';
   assigned_by_user_id: string;
   assigned_at: string;
@@ -100,47 +99,150 @@ export interface SellerAssignment {
 export type RfqItemSource = 'CATALOG_PRODUCT_VARIANT' | 'CUSTOM_REQUIREMENTS';
 
 export interface RfqItem {
-  id: string;                          // e.g. 'rfqi-101'
-  rfq_id: string;                      // Foreign key to Rfq.id ('rfq-2026-1001')
-  item_index: number;                  // 1..1000+ position
-  status: RfqItemStatus;               // Item-level sourcing status
-  item_source?: RfqItemSource;          // Computed: 'CATALOG_PRODUCT_VARIANT' | 'CUSTOM_REQUIREMENTS'
-  
-  category_id: string;                 // Leaf Category ID ('c-3-1-1')
-  catalog_product_id?: string | null;  // Master Product Template ID ('prod-2')
-  seller_product_id?: string | null;   // Seller Product ID e.g. 'sprod-1'
-  variant_id?: string | null;          // Seller Product Variant ID e.g. 'sprod-1-v1'
-  variant_sku?: string | null;         // Variant SKU e.g. 'SM-S928B-BLK-512'
-  product_name: string;                // Item Title / Name
-  brand_id?: string | string[] | null;            // Preferred Brand ID(s) ('brd-1' or ['brd-1', 'brd-2'])
-  manufacturer_id?: string | string[] | null;     // Preferred Manufacturer ID(s) ('mfg-1' or ['mfg-1', 'mfg-2'])
+  id: string;                          // e.g. 'item-01' or 'rfqi-101'
+  rfqId?: string;
+  rfq_id?: string;                      // compatibility
+  itemRevision?: number;                // Buyer-led item revision/version
+  categoryId?: string;
+  category_id?: string;                 // compatibility
+  quantity: number;
+  unit_price?: number;
+  unit?: string;                        // new
+  targettedSellerIds?: string[];        // new
 
-  manufacturing_inputs: ManufacturingInput[];
+  // Optional/Required fields from legacy RfqItem for compatibility
+  item_index?: number;
+  status: RfqItemStatus;
+  item_source?: RfqItemSource;
+  catalog_product_id?: string | null;
+  seller_product_id?: string | null;
+  variant_id?: string | null;
+  variant_sku?: string | null;
+  product_name?: string;
+  brand_id?: string | string[] | null;
+  manufacturer_id?: string | string[] | null;
+  manufacturing_inputs?: ManufacturingInput[];
   height?: string;
   width?: string;
   length?: string;
   weight?: string;
-
-  // Quantity Requirements & Award Tracking
-  quantity: number;                    // Required total qty e.g. 100
-  awarded_quantity_total?: number;     // Sum of split awarded quantities (e.g. 100)
-  unit_of_measure: string;             // 'Units', 'Pieces', 'Kg'
-  target_unit_price?: number;          // Target budget price
-
-  // Category Dynamic Attributes
-  dynamic_attributes: RfqItemDynamicAttribute[];
-
-  // Attachments & Seller Assignments
-  attachments: RfqAttachment[];
-  target_seller_party_ids?: string[];   // Assigned seller parties (empty array = Open RFQ)
-  seller_assignments: SellerAssignment[];
-
-  created_at: string;
-  updated_at: string;
+  unit_of_measure?: string;
+  target_unit_price?: number;
+  awarded_quantity_total?: number;
+  dynamic_attributes?: RfqItemDynamicAttribute[];
+  attachments?: RfqAttachment[];
+  target_seller_party_ids?: string[];
+  seller_assignments?: SellerAssignment[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 // =============================================================
-// 4. ITEM-SUPPLIER RESPONSE (Per Item × Seller Transaction Record)
+// 4. ITEM SPECIFICATIONS / ATTRIBUTES
+// =============================================================
+
+export interface ItemAttributeValue {
+  valueId: string;
+  valueLabel: string;
+}
+
+export interface ItemAttribute {
+  id: string;                          // Unique attribute config ID (e.g. 'ia-01')
+  itemId: string;
+  groupId: string;
+  attributeId: string;
+  attributeName: string;
+  description: string;
+  currentBuyerValues: ItemAttributeValue[];
+}
+
+// =============================================================
+// 5. SELLER QUOTATION & ACTIVE RESPONSES
+// =============================================================
+
+export type SellerQuoteStatus = 'DRAFT' | 'SUBMITTED' | 'FINALIZED';
+
+export interface SellerQuote {
+  id: string;                          // Quote ID (e.g. 'q-001')
+  itemId: string;
+  sellerId: string;
+  itemRevision: number;
+  round: number;
+  unit_price: number;
+  status: SellerQuoteStatus;
+}
+
+export interface SellerAttributeResponse {
+  id: string;                          // Response ID (e.g. 'resp-001')
+  quoteId: string;
+  groupId: string;
+  attributeId: string;
+  buyerValue: ItemAttributeValue[];
+  value: ItemAttributeValue[];
+}
+
+// =============================================================
+// 6. COMMENTS / NEGOTIATION THREADS
+// =============================================================
+
+export interface AttributeComment {
+  id: string;                          // Comment ID (e.g. 'c-001')
+  quoteId: string;
+  groupId: string;
+  attributeId: string;
+  round: number;
+  senderType: 'BUYER' | 'SELLER';
+  senderId: string;
+  comment: string;
+  createdAt: string;
+}
+
+// =============================================================
+// 7. RESPONSE HISTORY (AUDIT TRAIL)
+// =============================================================
+
+export interface AttributeResponseHistory {
+  id: string;                          // History ID (e.g. 'hist-001')
+  responseId: string;
+  quoteId: string;
+  round: number;
+  groupId: string;
+  attributeId: string;
+  buyerValue: ItemAttributeValue[];
+  value: ItemAttributeValue[];
+  archivedAt: string;
+}
+
+// =============================================================
+// 8. SPLIT AWARD DETAILS
+// =============================================================
+
+export interface RfqAward {
+  id: string;                          // Award ID (e.g. 'awd-01')
+  rfqId?: string;
+  rfq_id?: string;                     // compatibility
+  itemId?: string;
+  rfq_item_id?: string;                // compatibility
+  sellerId?: string;
+  seller_party_id?: string;            // compatibility
+  awardedQuantity?: number;
+  awarded_quantity?: number;           // compatibility
+  unitPrice?: number;
+  awarded_unit_price?: number;         // compatibility
+  awarded_total_amount?: number;        // compatibility
+  awardedAt?: string;
+  awarded_at?: string;                 // compatibility
+  currency?: string;
+  status?: 'AWARDED' | 'PURCHASE_ORDER_GENERATED';
+  purchase_order_id?: string;
+  item_supplier_response_id?: string;  // compatibility
+  seller_product_id?: string;          // compatibility
+  variant_id?: string;                 // compatibility
+  awarded_by_user_id?: string;         // compatibility
+}
+
+// =============================================================
+// 9. LEGACY TYPES FOR BACKWARD COMPATIBILITY
 // =============================================================
 
 export type ItemSupplierResponseStatus = 
@@ -165,12 +267,12 @@ export interface AttributeCommentEntry {
 }
 
 export interface TechnicalAttributeResponse {
-  attribute_key: string;               // e.g. 'attr-7' or 'tolerance_specs'
-  attribute_name: string;              // Human label e.g. 'Operating Voltage' or 'Tolerance'
-  requested_value: any;                // Value requested by buyer
-  offered_value: any;                  // Value offered by supplier
-  is_deviated: boolean;                // true if offered_value !== requested_value
-  deviation_reason?: string;           // Remarks e.g. "Equivalent grade SS316"
+  attribute_key: string;
+  attribute_name: string;
+  requested_value: any;
+  offered_value: any;
+  is_deviated: boolean;
+  deviation_reason?: string;
   buyer_status?: 'APPROVED' | 'REVISION_REQUESTED' | 'REJECTED';
   buyer_comment?: string;
   seller_comment?: string;
@@ -190,8 +292,8 @@ export interface TechnicalRevisionRound {
 }
 
 export interface ProductMapping {
-  seller_product_id: string;           // Mapped Catalog Product ID ('sprod-1')
-  variant_id: string;                  // Mapped Variant ID ('sprod-1-v2')
+  seller_product_id: string;
+  variant_id: string;
   mapped_at: string;
   is_buyer_approved: boolean;
 }
@@ -200,11 +302,11 @@ export interface CommercialTerms {
   offered_unit_price: number;
   discount_percent?: number;
   lead_time_days: number;
-  moq: number;                         // Minimum Order Quantity
-  payment_terms: string;               // e.g. "Net 30 Days"
-  freight_terms: string;               // e.g. "FOB Origin"
-  warranty_terms: string;              // e.g. "2 Years Factory Warranty"
-  total_commercial_amount: number;     // (offered_unit_price * offered_quantity)
+  moq: number;
+  payment_terms: string;
+  freight_terms: string;
+  warranty_terms: string;
+  total_commercial_amount: number;
 }
 
 export interface CommercialNegotiationRound {
@@ -224,68 +326,33 @@ export interface CommercialNegotiationRound {
 }
 
 export interface PurchaseOrderRef {
-  po_id: string;                       // e.g. 'po-2026-801'
-  po_number: string;                   // e.g. 'PO-2026-801'
+  po_id: string;
+  po_number: string;
   status: 'ISSUED' | 'ACCEPTED' | 'DELIVERED';
 }
 
 export interface ItemSupplierResponse {
-  id: string;                          // e.g. 'isr-501'
-  assignment_id: string;               // Foreign key to SellerAssignment.id
-  rfq_id: string;                      // Foreign key to Rfq.id ('rfq-2026-1001')
-  rfq_item_id: string;                 // Foreign key to RfqItem.id ('rfqi-101')
-  
-  seller_party_id: string;             // Responding Seller Party ID ('pty-4' Sony Corp)
-  seller_party_name: string;           // 'Sony Corporation Global Party'
-  supplier_user_id: string;            // Responding Supplier User ID ('usr-3' Sarah Smith)
-
+  id: string;
+  assignment_id: string;
+  rfq_id: string;
+  rfq_item_id: string;
+  seller_party_id: string;
+  seller_party_name: string;
+  supplier_user_id: string;
   status: ItemSupplierResponseStatus;
   current_technical_round: number;
-
-  // Technical Revisions (Phases 3-5)
   technical_revision_rounds: TechnicalRevisionRound[];
-
-  // Product Mapping (Phase 6 - After Tech Approval)
   product_mapping: ProductMapping | null;
-
-  // Commercial Negotiation Rounds (Phase 7)
   commercial_terms?: CommercialTerms;
   commercial_negotiation_rounds: CommercialNegotiationRound[];
-
-  // Multi-Supplier Award & Purchase Order (Phases 8-9)
   is_awarded: boolean;
   awarded_quantity?: number;
   awarded_unit_price?: number;
   awarded_total_amount?: number;
   awarded_at?: string;
   purchase_order?: PurchaseOrderRef | null;
-
   created_at: string;
   updated_at: string;
 }
 
-// =============================================================
-// 5. MULTI-SELLER SPLIT AWARD ENTITY (Phase 8)
-// =============================================================
-
-export interface RfqItemAward {
-  id: string;                          // e.g. 'award-801'
-  rfq_id: string;                      // 'rfq-2026-1001'
-  rfq_item_id: string;                 // 'rfqi-101'
-  item_supplier_response_id: string;   // Winning ItemSupplierResponse.id ('isr-501')
-  
-  seller_party_id: string;             // Winning Seller Party ID ('pty-4')
-  seller_product_id: string;           // Mapped Product ID ('sprod-1')
-  variant_id: string;                  // Mapped Variant ID ('sprod-1-v2')
-
-  awarded_quantity: number;            // Split quantity e.g. 60 units
-  awarded_unit_price: number;          // e.g. $1,000/unit
-  awarded_total_amount: number;        // e.g. $60,000
-  currency: string;                    // 'USD'
-
-  awarded_by_user_id: string;          // Buyer User ID ('usr-2')
-  awarded_at: string;
-  
-  status: 'AWARDED' | 'PURCHASE_ORDER_GENERATED';
-  purchase_order_id?: string;
-}
+export type RfqItemAward = RfqAward; // Alias for backward compatibility

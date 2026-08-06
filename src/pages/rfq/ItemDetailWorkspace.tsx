@@ -5,18 +5,17 @@ import { Card, Tabs, Tag, Button, Breadcrumb, Table, Space, App as AntApp } from
 import {
   ToolOutlined,
   SafetyCertificateOutlined,
-  DollarOutlined,
   TrophyOutlined,
   CheckCircleOutlined,
   MessageOutlined,
 } from '@ant-design/icons';
-import { rfqDb, type CommercialNegotiationRound, type ItemSupplierResponse } from '../../data/rfq';
+import { rfqDb, type ItemSupplierResponse, type ItemSupplierResponseStatus } from '../../data/rfq';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqItemStatusBadge, ItemSupplierStatusBadge } from '../../components/rfq/RfqStatusBadge';
 import { TechnicalComparisonTable } from '../../components/rfq/TechnicalComparisonTable';
 import { BuyerTechnicalReviewDrawer } from '../../components/rfq/BuyerTechnicalReviewDrawer';
-import { CommercialNegotiationModal } from '../../components/rfq/CommercialNegotiationModal';
 import { SplitOrderAwardDrawer } from '../../components/rfq/SplitOrderAwardDrawer';
+import { mockParties } from '../../data/business/parties';
 
 export const ItemDetailWorkspace: React.FC = () => {
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
@@ -26,15 +25,101 @@ export const ItemDetailWorkspace: React.FC = () => {
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
   const { message: antMessage } = AntApp.useApp();
 
-  const [activeTab, setActiveTab] = useState('comparison');
+  const [activeTab, setActiveTab] = useState('responses');
   const [selectedResponse, setSelectedResponse] = useState<ItemSupplierResponse | null>(null);
   const [techReviewDrawerOpen, setTechReviewDrawerOpen] = useState(false);
-  const [negotiationModalOpen, setNegotiationModalOpen] = useState(false);
   const [awardDrawerOpen, setAwardDrawerOpen] = useState(false);
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const item = useLiveQuery(() => (itemId ? rfqDb.rfqItems.get(itemId) : undefined), [itemId]);
-  const responses = useLiveQuery(() => (itemId ? rfqDb.itemSupplierResponses.where('rfq_item_id').equals(itemId).toArray() : []), [itemId]) || [];
+  const quotes = useLiveQuery(() => (itemId ? rfqDb.sellerQuote.where('itemId').equals(itemId).toArray() : []), [itemId]) || [];
+
+  const responses = React.useMemo(() => {
+    if (!item) return [];
+    const sellerIds = item.targettedSellerIds || item.target_seller_party_ids || [];
+    return sellerIds.map((sellerId) => {
+      const activeQuote = quotes.find((q) => q.sellerId === sellerId);
+      const party = mockParties.find((p) => p.id === sellerId) || { display_name: `Seller ${sellerId}` };
+
+      if (activeQuote) {
+        let mappedStatus: ItemSupplierResponseStatus = 'TECHNICAL_SUBMITTED';
+        if (activeQuote.status === 'FINALIZED') {
+          mappedStatus = 'COMMERCIAL_FINALIZED';
+        } else if (activeQuote.status === 'DRAFT') {
+          mappedStatus = 'VIEWED';
+        }
+
+        return {
+          id: activeQuote.id,
+          assignment_id: `sa-${item.id}-${sellerId}`,
+          rfq_id: item.rfqId || item.rfq_id || '',
+          rfq_item_id: item.id,
+          seller_party_id: sellerId,
+          seller_party_name: party.display_name,
+          supplier_user_id: `usr-${sellerId}`,
+          status: mappedStatus,
+          current_technical_round: activeQuote.round,
+          technical_revision_rounds: [
+            {
+              round_number: activeQuote.round,
+              submitted_by_user_id: `usr-${sellerId}`,
+              submitted_at: new Date().toISOString(),
+              buyer_requirement_snapshot: [],
+              supplier_response: [],
+              round_status: activeQuote.status === 'FINALIZED' ? 'APPROVED' : 'PENDING'
+            }
+          ],
+          product_mapping: {
+            seller_product_id: 'sprod-1',
+            variant_id: 'sprod-1-v1',
+            mapped_at: new Date().toISOString(),
+            is_buyer_approved: true
+          },
+          commercial_terms: {
+            offered_unit_price: activeQuote.unit_price,
+            moq: 1,
+            lead_time_days: 7,
+            payment_terms: 'Net 30',
+            freight_terms: 'FOB',
+            warranty_terms: '1 Year',
+            total_commercial_amount: activeQuote.unit_price * item.quantity
+          },
+          commercial_negotiation_rounds: [
+            {
+              round_number: activeQuote.round,
+              sender_party_id: sellerId,
+              sender_user_id: `usr-${sellerId}`,
+              sender_name: party.display_name,
+              unit_price: activeQuote.unit_price,
+              quantity: item.quantity,
+              timestamp: new Date().toISOString()
+            }
+          ],
+          is_awarded: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as ItemSupplierResponse;
+      } else {
+        return {
+          id: `no-quote-${item.id}-${sellerId}`,
+          assignment_id: `sa-${item.id}-${sellerId}`,
+          rfq_id: item.rfqId || item.rfq_id || '',
+          rfq_item_id: item.id,
+          seller_party_id: sellerId,
+          seller_party_name: party.display_name,
+          supplier_user_id: `usr-${sellerId}`,
+          status: 'ASSIGNED' as ItemSupplierResponseStatus,
+          current_technical_round: 0,
+          technical_revision_rounds: [],
+          product_mapping: null,
+          commercial_negotiation_rounds: [],
+          is_awarded: false,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        } as ItemSupplierResponse;
+      }
+    });
+  }, [item, quotes]);
 
   if (!rfq || !item) {
     return (
@@ -74,13 +159,18 @@ export const ItemDetailWorkspace: React.FC = () => {
             purchase_order_id: `po-2026-${Math.floor(100 + Math.random() * 900)}`,
           });
 
-          await rfqDb.itemSupplierResponses.update(alloc.responseId, {
-            status: 'AWARDED',
-            is_awarded: true,
-            awarded_quantity: alloc.awardedQty,
-            awarded_unit_price: alloc.unitPrice,
-            awarded_total_amount: subtotal,
-          });
+          if (!alloc.responseId.startsWith('no-quote-')) {
+            await rfqDb.sellerQuote.update(alloc.responseId, {
+              status: 'FINALIZED',
+            });
+            await rfqDb.itemSupplierResponses.update(alloc.responseId, {
+              status: 'AWARDED',
+              is_awarded: true,
+              awarded_quantity: alloc.awardedQty,
+              awarded_unit_price: alloc.unitPrice,
+              awarded_total_amount: subtotal,
+            });
+          }
         }
       }
 
@@ -131,7 +221,7 @@ export const ItemDetailWorkspace: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      width: 320,
+      width: 160,
       render: (_: any, record: ItemSupplierResponse) => (
         <Space size="small">
           <Button
@@ -144,18 +234,6 @@ export const ItemDetailWorkspace: React.FC = () => {
             icon={<CheckCircleOutlined />}
           >
             Review Tech
-          </Button>
-
-          <Button
-            size="small"
-            icon={<DollarOutlined />}
-            onClick={() => {
-              setSelectedResponse(record);
-              setNegotiationModalOpen(true);
-            }}
-            className="border-emerald-500 text-emerald-700 hover:bg-emerald-50"
-          >
-            Negotiate
           </Button>
         </Space>
       ),
@@ -207,6 +285,15 @@ export const ItemDetailWorkspace: React.FC = () => {
           onChange={setActiveTab}
           items={[
             {
+              key: 'responses',
+              label: (
+                <span className="font-bold flex items-center gap-2">
+                  <SafetyCertificateOutlined /> Assigned Suppliers ({responses.length})
+                </span>
+              ),
+              children: <Table dataSource={responses} columns={responseColumns} rowKey="id" pagination={false} />,
+            },
+            {
               key: 'comparison',
               label: (
                 <span className="font-bold flex items-center gap-2">
@@ -221,21 +308,8 @@ export const ItemDetailWorkspace: React.FC = () => {
                     setSelectedResponse(resp);
                     setTechReviewDrawerOpen(true);
                   }}
-                  onOpenNegotiation={(resp) => {
-                    setSelectedResponse(resp);
-                    setNegotiationModalOpen(true);
-                  }}
                 />
               ),
-            },
-            {
-              key: 'responses',
-              label: (
-                <span className="font-bold flex items-center gap-2">
-                  <SafetyCertificateOutlined /> Assigned Suppliers ({responses.length})
-                </span>
-              ),
-              children: <Table dataSource={responses} columns={responseColumns} rowKey="id" pagination={false} />,
             },
           ]}
         />
@@ -246,13 +320,6 @@ export const ItemDetailWorkspace: React.FC = () => {
         onClose={() => setTechReviewDrawerOpen(false)}
         response={selectedResponse}
         itemTitle={item.product_name}
-      />
-
-      <CommercialNegotiationModal
-        open={negotiationModalOpen}
-        onClose={() => setNegotiationModalOpen(false)}
-        response={selectedResponse}
-        item={item}
       />
 
       <SplitOrderAwardDrawer

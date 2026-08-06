@@ -37,12 +37,15 @@ export const BuyerDashboard: React.FC = () => {
     [activePartyId]
   ) || [];
 
-  const responses = useLiveQuery(() => rfqDb.itemSupplierResponses.toArray(), []) || [];
+  const responses = useLiveQuery(() => rfqDb.sellerQuote.toArray(), []) || [];
   const awards = useLiveQuery(() => rfqDb.rfqAwards.toArray(), []) || [];
 
-  const activeRfqs = partyRfqs.filter((r) => r.status === 'ISSUED' || r.status === 'UNDER_EVALUATION');
-  const totalAwardedAmount = awards.reduce((acc, a) => acc + (a.awarded_total_amount || 0), 0);
-  const pendingReviewsCount = responses.filter((r) => r.status === 'TECHNICAL_SUBMITTED').length;
+  const activeRfqs = partyRfqs.filter((r) => r.status === 'ISSUED' || r.status === 'UNDER_EVALUATION' || r.status === 'IN_PROGRESS');
+  const totalAwardedAmount = awards.reduce(
+    (acc, a) => acc + ((a.awardedQuantity || 0) * (a.unitPrice || 0) || a.awarded_total_amount || 0),
+    0
+  );
+  const pendingReviewsCount = responses.filter((r) => r.status === 'SUBMITTED').length;
 
   const columns = [
     {
