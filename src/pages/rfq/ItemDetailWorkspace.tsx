@@ -35,9 +35,11 @@ export const ItemDetailWorkspace: React.FC = () => {
   const item = useLiveQuery(() => (itemId ? rfqDb.rfqItems.get(itemId) : undefined), [itemId]);
   const quotes = useLiveQuery(() => (itemId ? rfqDb.sellerQuote.where('itemId').equals(itemId).toArray() : []), [itemId]) || [];
   const allResponses = useLiveQuery(() => rfqDb.sellerAttributeResponses.toArray(), []) || [];
-  const allComments = useLiveQuery(() => rfqDb.attributeComments.toArray(), []) || [];
-  const allHistory = useLiveQuery(() => rfqDb.attributeResponseHistory.toArray(), []) || [];
+  const allComments = useLiveQuery(() => (itemId ? rfqDb.itemAttributeComments.where('itemId').equals(itemId).toArray() : rfqDb.itemAttributeComments.toArray()), [itemId]) || [];
+  const allHistory = useLiveQuery(() => (itemId ? rfqDb.itemAttributeChangeHistory.where('itemId').equals(itemId).toArray() : rfqDb.itemAttributeChangeHistory.toArray()), [itemId]) || [];
   const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
+  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
+  const categoryName = categories.find((c) => c.id === item?.category_id)?.name;
 
   const responses = React.useMemo(() => {
     if (!item) return [];
@@ -74,7 +76,7 @@ export const ItemDetailWorkspace: React.FC = () => {
           const reqLabel = resp.buyerValue.map(v => v.valueLabel || v.valueId).join(', ') || '-';
           const offLabel = resp.value.map(v => v.valueLabel || v.valueId).join(', ') || '-';
           const isDev = resp.value.some((v) => !resp.buyerValue.some((r) => r.valueId === v.valueId)) ||
-                        resp.buyerValue.some((r) => !resp.value.some((v) => v.valueId === r.valueId));
+            resp.buyerValue.some((r) => !resp.value.some((v) => v.valueId === r.valueId));
 
           const sellerComment = quoteComments.find(c => c.groupId === resp.groupId && c.attributeId === resp.attributeId && c.senderType === 'SELLER' && c.round === activeQuote.round);
           const buyerComment = quoteComments.find(c => c.groupId === resp.groupId && c.attributeId === resp.attributeId && c.senderType === 'BUYER' && c.round === activeQuote.round);
@@ -126,7 +128,7 @@ export const ItemDetailWorkspace: React.FC = () => {
             const reqLabel = h.buyerValue.map(v => v.valueLabel || v.valueId).join(', ') || '-';
             const offLabel = h.value.map(v => v.valueLabel || v.valueId).join(', ') || '-';
             const isDev = h.value.some((v) => !h.buyerValue.some((r) => r.valueId === v.valueId)) ||
-                          h.buyerValue.some((r) => !h.value.some((v) => v.valueId === r.valueId));
+              h.buyerValue.some((r) => !h.value.some((v) => v.valueId === r.valueId));
 
             const sellerComment = roundComments.find(c => c.groupId === h.groupId && c.attributeId === h.attributeId && c.senderType === 'SELLER');
             const buyerComment = roundComments.find(c => c.groupId === h.groupId && c.attributeId === h.attributeId && c.senderType === 'BUYER');
@@ -372,12 +374,12 @@ export const ItemDetailWorkspace: React.FC = () => {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       <Breadcrumb
         items={[
           { title: <a onClick={() => navigate(basePath)}>RFQs</a> },
           { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq.rfq_number}</a> },
-          { title: `Item #${item.item_index}: ${item.product_name}` },
+          { title: `Item ${item.item_index}: ${item.product_name}` },
         ]}
       />
 
@@ -385,16 +387,16 @@ export const ItemDetailWorkspace: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <span className="text-xs font-bold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md">
+              <span className="text-md font-bold px-2.5 py-1 bg-slate-100 text-slate-700 rounded-md">
                 Line Item #{item.item_index}
               </span>
-              <h1 className="text-2xl font-black text-slate-900">{item.product_name}</h1>
+              <h1 className="text-xl font-black text-slate-900">{item.product_name}</h1>
               <RfqItemStatusBadge status={item.status} />
             </div>
             <div className="flex items-center gap-6 mt-3 text-xs text-slate-600 font-medium">
-              <div>Category: <Tag color="purple">{item.category_id}</Tag></div>
-              <div>Required Qty: <strong className="text-blue-600 text-sm font-bold">{item.quantity} {item.unit_of_measure}</strong></div>
-              <div>Target Unit Price: <strong className="text-emerald-600 text-sm font-bold">${item.target_unit_price}</strong></div>
+              <div>Category: <Tag color="purple">{categoryName}</Tag></div>
+              <div>Required Qty: <strong className="text-blue-600  font-bold">{item.quantity} {item.unit_of_measure}</strong></div>
+              <div>Target Unit Price: <strong className="text-emerald-600  font-bold">${item.target_unit_price}</strong></div>
             </div>
           </div>
 

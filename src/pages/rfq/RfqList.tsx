@@ -33,7 +33,8 @@ export const RfqList: React.FC = () => {
     () => rfqDb.rfqs.where('requester_party_id').equals(activePartyId).toArray(),
     [activePartyId]
   ) || [];
-  console.log(activePartyId)
+  console.log(partyRfqs);
+
   const filteredRfqs = partyRfqs.filter((r) => {
     const matchesTab = activeTab === 'ALL' || r.status === activeTab;
     const matchesSearch =
@@ -45,108 +46,104 @@ export const RfqList: React.FC = () => {
 
   const columns = [
     {
-      title: 'RFQ Number & Title',
+      title: 'RFQ Details',
       dataIndex: 'title',
       key: 'title',
       render: (text: string, record: any) => (
         <div>
-          <div className="font-bold text-slate-900 text-base">{record.rfq_number} - {text}</div>
-          <div className="text-xs text-slate-500">{record.description}</div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-900 text-sm">{record.rfq_number}</span>
+            <span className="text-slate-700 font-medium text-sm">• {text}</span>
+          </div>
+          {record.description && (
+            <div className="text-xs text-slate-500 line-clamp-1">{record.description}</div>
+          )}
+          <div className="text-[11px] text-slate-400 mt-0.5">
+            Requester: <span className="font-medium text-slate-600">{record.requester_name}</span> ({record.requester_party_id})
+          </div>
         </div>
       ),
     },
     {
-      title: 'Requester Party',
-      dataIndex: 'requester_name',
-      key: 'requester_name',
-      width: 240,
-      render: (text: string, record: any) => (
-        <div>
-          <span className="font-semibold text-slate-800">{text}</span>
-          <div className="text-[10px] text-slate-400 font-mono">Party ID: {record.requester_party_id}</div>
-        </div>
-      ),
-    },
-    {
-      title: 'Items',
-      dataIndex: 'total_items_count',
-      key: 'total_items_count',
-      width: 100,
-      render: (val: number) => <Tag color="blue" className="font-bold">{val} Items</Tag>,
-    },
-    {
-      title: 'Budget',
-      dataIndex: 'total_estimated_budget',
-      key: 'total_estimated_budget',
-      width: 150,
-      render: (val: number) => <span className="font-bold text-slate-900">${(val || 0).toLocaleString()}</span>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 180,
-      render: (status: RfqStatus) => <RfqStatusBadge status={status} />,
-    },
-    {
-      title: 'Deadline',
-      dataIndex: 'submission_deadline',
-      key: 'submission_deadline',
-      width: 150,
-      render: (date: string) => (
-        <span className="text-xs text-slate-600 font-medium">
-          <ClockCircleOutlined className="mr-1" />
-          {new Date(date).toLocaleDateString()}
-        </span>
-      ),
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
+      title: 'Items & Budget',
+      key: 'items_budget',
       width: 160,
+      render: (_: any, record: any) => (
+        <div className="space-y-1">
+          <div className="font-bold text-slate-900 text-sm">
+            ${(record.total_estimated_budget || 0).toLocaleString()}
+          </div>
+          <div>
+            <Tag color="blue" className="font-semibold text-xs py-0 px-1.5">
+              {record.total_items_count} Items
+            </Tag>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'Status & Deadline',
+      key: 'status_deadline',
+      width: 180,
+      render: (_: any, record: any) => (
+        <div className="space-y-1">
+          <div>
+            <RfqStatusBadge status={record.status} />
+          </div>
+          <div className="text-xs text-slate-500">
+            <ClockCircleOutlined className="mr-1 text-slate-400" />
+            {new Date(record.submission_deadline).toLocaleDateString()}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: 'Action',
+      key: 'actions',
+      width: 130,
+      align: 'right' as const,
       render: (_: any, record: any) => (
         <Button
           type="primary"
+          size="small"
           onClick={() => navigate(`${basePath}/${record.id}`)}
           icon={<FolderOpenOutlined />}
-          className="bg-blue-600 hover:bg-blue-700 font-semibold"
+          className="bg-blue-600 hover:bg-blue-700 font-medium text-xs"
         >
-          Open Workspace
+          Open
         </Button>
       ),
     },
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className=" max-w-7xl mx-auto space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black text-slate-900">RFQ Sourcing Containers</h1>
-            <Tag color={isBusinessContext ? 'purple' : 'cyan'} icon={isBusinessContext ? <BankOutlined /> : <UserOutlined />} className="px-2.5 py-0.5 font-bold">
-              Party: {activePartyName} ({activePartyId})
-            </Tag>
+            <h1 className="text-xl font-bold text-slate-900">RFQ Sourcing Containers</h1>
+
           </div>
-          <p className="text-sm text-slate-500">Party-centric sourcing view showing procurement requests created by active party {activePartyName}.</p>
+          <p className="text-xs text-slate-500">Party-centric sourcing view for {activePartyName}.</p>
         </div>
         <Button
           type="primary"
-          size="large"
           onClick={() => navigate(`${basePath}/create`)}
           icon={<PlusOutlined />}
-          className="bg-blue-600 hover:bg-blue-700 h-11 px-5 font-bold shadow-md"
+          className="bg-blue-600 hover:bg-blue-700 font-semibold shadow-sm"
         >
-          Create RFQ Container
+          Create RFQ
         </Button>
       </div>
 
-      <Card className="shadow-sm border-slate-200">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <Card className="shadow-sm border-slate-200" bodyStyle={{ padding: '12px 16px' }}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2">
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
+            size="small"
             items={[
-              { key: 'ALL', label: `All RFQs (${partyRfqs.length})` },
+              { key: 'ALL', label: `All (${partyRfqs.length})` },
               { key: 'ISSUED', label: 'Issued' },
               { key: 'UNDER_EVALUATION', label: 'Under Evaluation' },
               { key: 'PARTIALLY_AWARDED', label: 'Partially Awarded' },
@@ -156,16 +153,23 @@ export const RfqList: React.FC = () => {
           />
 
           <Input
-            placeholder="Search by RFQ #, title, party..."
+            placeholder="Search RFQs..."
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="w-full md:w-72"
+            className="w-full md:w-64"
+            size="small"
             allowClear
           />
         </div>
 
-        <Table dataSource={filteredRfqs} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} />
+        <Table
+          dataSource={filteredRfqs}
+          columns={columns}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 10, size: 'small' }}
+        />
       </Card>
     </div>
   );

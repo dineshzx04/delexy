@@ -5,8 +5,8 @@ import type {
   ItemAttribute,
   SellerQuote,
   SellerAttributeResponse,
-  AttributeComment,
-  AttributeResponseHistory,
+  ItemAttributeComment,
+  ItemAttributeChangeHistory,
   RfqAward,
 } from "./rfq.module";
 
@@ -16,26 +16,34 @@ export class RfqDatabase extends Dexie {
   itemAttributes!: Table<ItemAttribute, string>;
   sellerQuote!: Table<SellerQuote, string>;
   sellerAttributeResponses!: Table<SellerAttributeResponse, string>;
-  attributeComments!: Table<AttributeComment, string>;
-  attributeResponseHistory!: Table<AttributeResponseHistory, string>;
+  itemAttributeComments!: Table<ItemAttributeComment, string>;
+  itemAttributeChangeHistory!: Table<ItemAttributeChangeHistory, string>;
   rfqAwards!: Table<RfqAward, string>;
+
+  // Backward compatibility getters for existing callers
+  get attributeComments(): Table<ItemAttributeComment, string> {
+    return this.itemAttributeComments;
+  }
+
+  get attributeResponseHistory(): Table<ItemAttributeChangeHistory, string> {
+    return this.itemAttributeChangeHistory;
+  }
 
   // Kept for legacy compatibility so type checks in code referencing db.ts don't instantly break
   itemSupplierResponses!: Table<any, string>;
 
   constructor() {
     super("delexy_rfq_db");
-    this.version(3).stores({
+    this.version(5).stores({
       rfqs: "id, status, requester_party_id",
       rfqItems: "id, rfq_id, categoryId, itemRevision",
       itemAttributes: "id, itemId, groupId, attributeId",
       sellerQuote: "id, itemId, sellerId, itemRevision, status",
       sellerAttributeResponses: "id, quoteId, groupId, attributeId",
-      attributeComments: "id, quoteId, groupId, attributeId, round",
-      attributeResponseHistory:
-        "id, responseId, quoteId, round, groupId, attributeId",
+      itemAttributeComments: "id, itemId, quoteId, groupId, attributeId, round",
+      itemAttributeChangeHistory:
+        "id, itemId, quoteId, round, groupId, attributeId, actorType",
       rfqAwards: "id, rfqId, itemId, sellerId",
-      // Register legacy table index to prevent runtime crashes during DB creation
       itemSupplierResponses: "id, rfq_id, rfq_item_id, seller_party_id, status",
     });
   }

@@ -80,13 +80,13 @@ export const SupplierItemRespond: React.FC = () => {
     return allAttributeResponses.filter(r => r.quoteId === activeQuote.id);
   }, [allAttributeResponses, activeQuote]);
 
-  const allComments = useLiveQuery(() => rfqDb.attributeComments.toArray(), []) || [];
+  const allComments = useLiveQuery(() => rfqDb.itemAttributeComments.toArray(), []) || [];
   const activeComments = useMemo(() => {
     if (!activeQuote) return [];
     return allComments.filter(c => c.quoteId === activeQuote.id);
   }, [allComments, activeQuote]);
 
-  const allHistory = useLiveQuery(() => rfqDb.attributeResponseHistory.toArray(), []) || [];
+  const allHistory = useLiveQuery(() => rfqDb.itemAttributeChangeHistory.toArray(), []) || [];
   const activeHistory = useMemo(() => {
     if (!activeQuote) return [];
     return allHistory.filter(h => h.quoteId === activeQuote.id);
@@ -428,17 +428,23 @@ export const SupplierItemRespond: React.FC = () => {
         const currentResponses = await rfqDb.sellerAttributeResponses.where('quoteId').equals(currentQuote.id).toArray();
         const historyEntries = currentResponses.map((r) => ({
           id: `hist-${r.id}-${currentQuote.round}`,
+          itemId: itemId!,
           responseId: r.id,
           quoteId: r.quoteId,
           round: currentQuote.round,
           groupId: r.groupId,
           attributeId: r.attributeId,
+          actorType: 'SELLER' as const,
+          actorId: activePartyId,
           buyerValue: r.buyerValue,
           value: r.value,
+          oldValue: r.value,
+          newValue: r.value,
           archivedAt: new Date().toISOString(),
+          timestamp: new Date().toISOString(),
         }));
         if (historyEntries.length > 0) {
-          await rfqDb.attributeResponseHistory.bulkPut(historyEntries);
+          await rfqDb.itemAttributeChangeHistory.bulkPut(historyEntries);
         }
 
         // 2. Update existing quote
@@ -479,6 +485,7 @@ export const SupplierItemRespond: React.FC = () => {
         .filter((spec) => spec.isDeviated && spec.reason)
         .map((spec) => ({
           id: `c-${quoteId}-${spec.groupId}-${spec.attributeId}-${nextRoundNum}`,
+          itemId: itemId!,
           quoteId: quoteId,
           groupId: spec.groupId,
           attributeId: spec.attributeId,
@@ -489,7 +496,7 @@ export const SupplierItemRespond: React.FC = () => {
           createdAt: new Date().toISOString(),
         }));
       if (commentEntries.length > 0) {
-        await rfqDb.attributeComments.bulkPut(commentEntries);
+        await rfqDb.itemAttributeComments.bulkPut(commentEntries);
       }
 
       antMessage.success(`Technical response (Round #${nextRoundNum}) submitted for ${activePartyName}!`);

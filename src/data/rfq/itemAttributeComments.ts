@@ -1,9 +1,10 @@
-import type { AttributeComment } from './rfq.module';
+import type { ItemAttributeComment } from './rfq.module';
 
-export const mockAttributeComments: AttributeComment[] = [
-  // Comments for Seller 1 (q-001)
+export const mockItemAttributeComments: ItemAttributeComment[] = [
+  // Comments for Seller 1 (q-001) / Item 1
   {
     id: "c-001",
+    itemId: "item-01",
     quoteId: "q-001",
     groupId: "grp-1",
     attributeId: "attr-1",
@@ -15,6 +16,7 @@ export const mockAttributeComments: AttributeComment[] = [
   },
   {
     id: "c-002",
+    itemId: "item-01",
     quoteId: "q-001",
     groupId: "grp-1",
     attributeId: "attr-1",
@@ -26,6 +28,7 @@ export const mockAttributeComments: AttributeComment[] = [
   },
   {
     id: "c-003",
+    itemId: "item-01",
     quoteId: "q-001",
     groupId: "grp-1",
     attributeId: "attr-1",
@@ -35,9 +38,10 @@ export const mockAttributeComments: AttributeComment[] = [
     comment: "The final UV protection rating is UV400.",
     createdAt: "2026-08-02T10:15:00Z"
   },
-  // Comments for Seller 2 (q-002)
+  // Comments for Seller 2 (q-002) / Item 1
   {
     id: "c-004",
+    itemId: "item-01",
     quoteId: "q-002",
     groupId: "grp-1",
     attributeId: "attr-1",
@@ -47,9 +51,23 @@ export const mockAttributeComments: AttributeComment[] = [
     comment: "We can supply the exact black color as requested.",
     createdAt: "2026-08-01T11:00:00Z"
   },
-  // Comments for Item 3 / q-005 (Revision Requested dialogue)
+  // Buyer-led spec clarification comment directly on Item 2 (No Quote ID)
   {
     id: "c-005",
+    itemId: "item-02",
+    quoteId: null,
+    groupId: "grp-1",
+    attributeId: "attr-2",
+    itemRevision: 1,
+    senderType: "BUYER",
+    senderId: "pty-1",
+    comment: "Windows 11 Pro build 23H2 or higher required for enterprise management.",
+    createdAt: "2026-08-01T09:30:00Z"
+  },
+  // Comments for Item 3 / q-005 (Revision Requested dialogue)
+  {
+    id: "c-006",
+    itemId: "item-03",
     quoteId: "q-005",
     groupId: "grp-7",
     attributeId: "attr-13",
@@ -60,7 +78,8 @@ export const mockAttributeComments: AttributeComment[] = [
     createdAt: "2026-08-02T14:00:00Z"
   },
   {
-    id: "c-006",
+    id: "c-007",
+    itemId: "item-03",
     quoteId: "q-005",
     groupId: "grp-7",
     attributeId: "attr-13",

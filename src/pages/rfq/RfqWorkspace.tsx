@@ -14,6 +14,8 @@ import { mockParties } from '../../data/business/parties';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqStatusBadge, RfqItemStatusBadge } from '../../components/rfq/RfqStatusBadge';
 
+import { catalogDb } from '../../data/catalog/catalog.db';
+
 export const RfqWorkspace: React.FC = () => {
   const { rfqId } = useParams<{ rfqId: string }>();
   const navigate = useNavigate();
@@ -25,6 +27,7 @@ export const RfqWorkspace: React.FC = () => {
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const items = useLiveQuery(() => (rfqId ? rfqDb.rfqItems.where('rfq_id').equals(rfqId).toArray() : []), [rfqId]) || [];
+  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
 
   if (!rfq) {
     return (
@@ -39,25 +42,28 @@ export const RfqWorkspace: React.FC = () => {
 
   const itemColumns = [
     {
-      title: '#',
+      title: 'S.No.',
       dataIndex: 'item_index',
       key: 'item_index',
       width: 60,
-      render: (val: number) => <span className="font-bold text-slate-500">#{val}</span>,
+      render: (val: number) => <span className="font-bold text-slate-500">{val}</span>,
     },
     {
       title: 'Item Title & Category',
       dataIndex: 'product_name',
       key: 'product_name',
-      render: (text: string, record: any) => (
-        <div>
-          <div className="font-bold text-slate-900 text-base">{text}</div>
-          <div className="text-xs text-slate-500">Category: <Tag color="purple">{record.category_id}</Tag></div>
-        </div>
-      ),
+      render: (text: string, record: any) => {
+        const catName = categories.find((c) => c.id === record.category_id)?.name;
+        return (
+          <div>
+            <div className="font-bold text-slate-900">{text}</div>
+            <div className="text-xs text-slate-500">Category: <Tag color="purple">{catName}</Tag></div>
+          </div>
+        );
+      },
     },
     {
-      title: 'Quantity Requested',
+      title: 'Req.Qty',
       dataIndex: 'quantity',
       key: 'quantity',
       width: 160,
@@ -97,7 +103,7 @@ export const RfqWorkspace: React.FC = () => {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
       <Breadcrumb
         items={[
           { title: <a onClick={() => navigate(basePath)}>RFQs Workspace</a> },
@@ -161,27 +167,27 @@ export const RfqWorkspace: React.FC = () => {
             //     </div>
             //   ),
             // },
-            {
-              key: 'timeline',
-              label: (
-                <span className="font-bold flex items-center gap-2">
-                  <HistoryOutlined /> Audit Timeline
-                </span>
-              ),
-              children: (
-                <Timeline
-                  items={(rfq.timeline || []).map((t) => ({
-                    children: (
-                      <div>
-                        <div className="font-bold text-slate-800">{t.event_type} - {t.actor_name}</div>
-                        <div className="text-xs text-slate-500">{t.remarks}</div>
-                        <div className="text-[10px] text-slate-400 mt-1">{new Date(t.timestamp).toLocaleString()}</div>
-                      </div>
-                    ),
-                  }))}
-                />
-              ),
-            },
+            // {
+            //   key: 'timeline',
+            //   label: (
+            //     <span className="font-bold flex items-center gap-2">
+            //       <HistoryOutlined /> Audit Timeline
+            //     </span>
+            //   ),
+            //   children: (
+            //     <Timeline
+            //       items={(rfq.timeline || []).map((t) => ({
+            //         children: (
+            //           <div>
+            //             <div className="font-bold text-slate-800">{t.event_type} - {t.actor_name}</div>
+            //             <div className="text-xs text-slate-500">{t.remarks}</div>
+            //             <div className="text-[10px] text-slate-400 mt-1">{new Date(t.timestamp).toLocaleString()}</div>
+            //           </div>
+            //         ),
+            //       }))}
+            //     />
+            //   ),
+            // },
           ]}
         />
       </Card>

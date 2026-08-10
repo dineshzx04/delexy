@@ -347,6 +347,7 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
 
           return {
             id: `c-${response.id}-${groupId}-${attributeId}-${latestRound?.round_number || 1}`,
+            itemId: response.rfq_item_id,
             quoteId: response.id,
             groupId,
             attributeId,
@@ -359,7 +360,7 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
         });
 
       if (commentEntries.length > 0) {
-        await rfqDb.attributeComments.bulkPut(commentEntries);
+        await rfqDb.itemAttributeComments.bulkPut(commentEntries);
       }
 
       await rfqDb.itemSupplierResponses.update(response.id, {

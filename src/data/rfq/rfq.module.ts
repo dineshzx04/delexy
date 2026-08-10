@@ -185,36 +185,65 @@ export interface SellerAttributeResponse {
 }
 
 // =============================================================
-// 6. COMMENTS / NEGOTIATION THREADS
+// 6. ITEM ATTRIBUTE COMMENTS
 // =============================================================
 
-export interface AttributeComment {
+export interface ItemAttributeComment {
   id: string; // Comment ID (e.g. 'c-001')
-  quoteId: string;
-  groupId: string;
+  itemId: string; // RFQ Item ID (Mandatory)
+  groupId?: string; // Optional Attribute Group ID
   attributeId: string;
-  round: number;
+  itemRevision?: number;
+  quoteId?: string | null; // Optional Seller Quote ID (null for buyer spec comments)
+  round?: number | null; // Optional Negotiation Round
   senderType: "BUYER" | "SELLER";
   senderId: string;
+  senderName?: string;
   comment: string;
   createdAt: string;
 }
 
+// Backward compatibility alias
+export type AttributeComment = ItemAttributeComment;
+
 // =============================================================
-// 7. RESPONSE HISTORY (AUDIT TRAIL)
+// 7. ITEM ATTRIBUTE CHANGE HISTORY (AUDIT LOG)
 // =============================================================
 
-export interface AttributeResponseHistory {
+export type AttributeValuePayload =
+  | ItemAttributeValue[]
+  | string
+  | number
+  | boolean
+  | { min?: number; max?: number; unit?: string }
+  | Record<string, any>
+  | any;
+
+export interface ItemAttributeChangeHistory {
   id: string; // History ID (e.g. 'hist-001')
-  responseId: string;
-  quoteId: string;
-  round: number;
-  groupId: string;
+  itemId: string; // RFQ Item ID (Mandatory)
+  itemRevision?: number;
+  quoteId?: string | null; // Optional Seller Quote ID
+  round?: number | null; // Optional Negotiation Round
+  groupId?: string; // Optional Attribute Group ID
   attributeId: string;
-  buyerValue: ItemAttributeValue[];
-  value: ItemAttributeValue[];
-  archivedAt: string;
+  attributeName?: string;
+  valueType?: string; // e.g. 'SELECT', 'TEXT', 'NUMBER', 'RANGE'
+  actorType: "BUYER" | "SELLER" | "SYSTEM";
+  actorId: string;
+  oldValue?: AttributeValuePayload | null;
+  newValue?: AttributeValuePayload | null;
+  changeReason?: string;
+  timestamp?: string;
+  archivedAt?: string; // ISO Date string for audit timestamp
+  // Backward compatibility fields
+  responseId?: string;
+  buyerValue?: ItemAttributeValue[];
+  value?: ItemAttributeValue[];
 }
+
+// Backward compatibility alias
+export type AttributeResponseHistory = ItemAttributeChangeHistory;
 
 // =============================================================
 // 8. SPLIT AWARD DETAILS
