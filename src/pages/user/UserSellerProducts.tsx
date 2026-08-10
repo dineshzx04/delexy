@@ -167,8 +167,7 @@ const UserSellerProducts: React.FC = () => {
       .filter(sp =>
         sp.product_name.toLowerCase().includes(searchText.toLowerCase()) ||
         sp.id.toLowerCase().includes(searchText.toLowerCase()) ||
-        sp.part_number.toLowerCase().includes(searchText.toLowerCase()) ||
-        sp.brandName.toLowerCase().includes(searchText.toLowerCase())
+        sp.brandName?.toLowerCase().includes(searchText.toLowerCase())
       );
   }, [activeParty, dbSellerProducts, dbCategories, dbMasterProducts, dbParties, dbManufacturers, dbBrands, searchText]);
 
@@ -333,7 +332,7 @@ const UserSellerProducts: React.FC = () => {
               {record.product_name}
             </div>
             <div className="text-xs text-gray-500 font-mono mt-0.5">
-              Part No: <strong>{record.part_number}</strong>
+              ID: <strong>{record.id}</strong>
             </div>
           </div>
         </div>
@@ -673,90 +672,14 @@ const UserSellerProducts: React.FC = () => {
                   <span className="text-gray-400 block font-medium">Manufacturer</span>
                   <span className="font-semibold text-gray-900">{selectedProductRecord.manufacturerName}</span>
                 </div>
-                <div>
-                  <span className="text-gray-400 block font-medium">Country of Origin</span>
-                  <span className="font-mono text-gray-800">{selectedProductRecord.country_of_origin || 'US'}</span>
-                </div>
               </div>
             </div>
 
-            {/* SECTION 2: MANUFACTURING & PHYSICAL SPECS */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3 shadow-2xs">
-              <h4 className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
-                <Lucide.Factory size={15} className="text-emerald-600" />
-                2. Manufacturing & Physical Dimensions
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs font-mono">
-                <div>
-                  <span className="text-gray-400 block font-sans font-medium">Year of Manufacture</span>
-                  <span className="font-bold text-gray-800">{selectedProductRecord.year_of_manufacture || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block font-sans font-medium">Model Number</span>
-                  <span className="font-bold text-gray-800">{selectedProductRecord.model_number || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block font-sans font-medium">Part Number</span>
-                  <span className="font-bold text-gray-800">{selectedProductRecord.part_number}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block font-sans font-medium">Dimensions (H x W x L)</span>
-                  <span className="font-semibold text-gray-900">
-                    {selectedProductRecord.height || '-'} x {selectedProductRecord.width || '-'} x {selectedProductRecord.length || '-'} mm
-                  </span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block font-sans font-medium">Weight</span>
-                  <span className="font-semibold text-gray-900">{selectedProductRecord.weight ? `${selectedProductRecord.weight} kg` : 'N/A'}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION 3: OPERATIONAL & GOVERNANCE INSTRUCTIONS */}
-            <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3 shadow-2xs">
-              <h4 className="text-xs font-bold text-purple-700 uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
-                <Lucide.ShieldCheck size={15} className="text-purple-600" />
-                3. Operational & Governance Instructions
-              </h4>
-              <div className="space-y-2 text-xs">
-                {selectedProductRecord.operation_instructions && (
-                  <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                    <span className="font-bold text-slate-700 block">Operation Instructions:</span>
-                    <p className="text-slate-600 mt-0.5 mb-0">{selectedProductRecord.operation_instructions}</p>
-                  </div>
-                )}
-                {selectedProductRecord.safety_instructions && (
-                  <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                    <span className="font-bold text-slate-700 block">Safety Instructions:</span>
-                    <p className="text-slate-600 mt-0.5 mb-0">{selectedProductRecord.safety_instructions}</p>
-                  </div>
-                )}
-                {selectedProductRecord.handling_instructions && (
-                  <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                    <span className="font-bold text-slate-700 block">Handling & Storage:</span>
-                    <p className="text-slate-600 mt-0.5 mb-0">{selectedProductRecord.handling_instructions}</p>
-                  </div>
-                )}
-                {selectedProductRecord.maintenance_instructions && (
-                  <div className="bg-slate-50 p-2 rounded border border-slate-200">
-                    <span className="font-bold text-slate-700 block">Maintenance Instructions:</span>
-                    <p className="text-slate-600 mt-0.5 mb-0">{selectedProductRecord.maintenance_instructions}</p>
-                  </div>
-                )}
-                {selectedProductRecord.deviations && (
-                  <div className="bg-amber-50 p-2 rounded border border-amber-200 text-amber-900">
-                    <span className="font-bold block">Deviations Note:</span>
-                    <p className="mt-0.5 mb-0">{selectedProductRecord.deviations}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* SECTION 4: CATEGORY DYNAMIC TECHNICAL SPECIFICATIONS */}
+            {/* SECTION 2: CATEGORY DYNAMIC TECHNICAL SPECIFICATIONS */}
             <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3 shadow-2xs">
               <h4 className="text-xs font-bold text-indigo-700 uppercase tracking-wider flex items-center gap-1.5 border-b pb-2">
                 <Lucide.SlidersHorizontal size={15} className="text-indigo-600" />
-                4. Category Dynamic Technical Specifications
+                2. Category Dynamic Technical Specifications
               </h4>
               {selectedProductRecord.specifications && selectedProductRecord.specifications.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
@@ -772,13 +695,13 @@ const UserSellerProducts: React.FC = () => {
               )}
             </div>
 
-            {/* SECTION 5: SELLABLE PRODUCT VARIANTS DIRECTORY & PER-VARIANT AUDIT EDITOR */}
+            {/* SECTION 3: SELLABLE PRODUCT VARIANTS DIRECTORY & PER-VARIANT AUDIT EDITOR */}
             <div className="bg-white border border-purple-200 rounded-lg p-4 space-y-3 shadow-sm">
               <div className="flex items-center justify-between border-b border-purple-100 pb-3">
                 <div>
                   <h4 className="text-xs font-bold text-purple-900 uppercase tracking-wider flex items-center gap-1.5 mb-0">
                     <Lucide.Layers size={16} className="text-purple-600" />
-                    5. Sellable Product Variants Directory ({selectedProductRecord.variants ? selectedProductRecord.variants.length : 0})
+                    3. Sellable Product Variants Directory ({selectedProductRecord.variants ? selectedProductRecord.variants.length : 0})
                   </h4>
                   <p className="text-[11px] text-gray-500 mt-0.5 mb-0">
                     Directory of sellable SKU variants. Select <strong>"Update Specs & Audit"</strong> on any variant to manage unit pricing, stock levels, MOQ, and view audit history.

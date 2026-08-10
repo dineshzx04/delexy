@@ -11,26 +11,6 @@ export const mockSellerProducts: SellerProduct[] = [
     brand_id: 'brd-1',        // Samsung (brd-1)
     party_id: 'pty-1',       // Samsung India Business Party (pty-1)
 
-    year_of_manufacture: 2024,
-    country_of_origin: 'KR',
-    model_number: 'SM-S928B/DS',
-    part_number: 'GH90-15822A',
-
-    height: '162.3 mm',
-    width: '79.0 mm',
-    length: '8.6 mm',
-    weight: '232 g',
-
-    deviations: 'Includes pre-installed Samsung Knox E-FOTA corporate provisioning license.',
-    exclusions: 'Power adapter not included in eco retail box.',
-    assumptions: 'Compatible with standard USB Power Delivery 3.0 chargers.',
-    operation_instructions: 'Use S-Pen slot for integrated stylus operation.',
-    safety_instructions: 'IP68 water resistance rating applies up to 1.5m fresh water for 30 minutes.',
-    handling_instructions: 'Store in moisture-controlled warehouse environment.',
-    maintenance_instructions: 'Keep USB-C port dry and clean before charging.',
-    additional_requirements: 'Requires Knox Mobile Enrollment registration upon first boot.',
-    additional_information: 'Includes 3-year Knox Suite Enterprise warranty.',
-
     dynamic_attributes: [
       {
         group_id: 'grp-4',
@@ -133,26 +113,6 @@ export const mockSellerProducts: SellerProduct[] = [
     brand_id: 'brd-2',        // ASUS (brd-2)
     party_id: 'pty-6',       // John Doe Individual User Seller Party (pty-6)
 
-    year_of_manufacture: 2024,
-    country_of_origin: 'TW',
-    model_number: 'G634JZ-XS96',
-    part_number: '90NR0CC1-M001B0',
-
-    height: '22.6 mm',
-    width: '354 mm',
-    length: '264 mm',
-    weight: '2.65 kg',
-
-    deviations: 'Custom liquid metal cooling thermal paste factory applied.',
-    exclusions: 'Backpack excluded.',
-    assumptions: 'Power outlet requires 330W AC adapter compatibility.',
-    operation_instructions: 'Use Armoury Crate shortcut key for Turbo thermal profile.',
-    safety_instructions: 'Keep exhaust vents unobstructed during heavy load gaming.',
-    handling_instructions: 'Store horizontally in padded protective sleeve.',
-    maintenance_instructions: 'Clean intake vents with canned compressed air quarterly.',
-    additional_requirements: 'None.',
-    additional_information: 'Includes 1-year ASUS ROG International Warranty.',
-
     dynamic_attributes: [
       {
         group_id: 'grp-1',
@@ -242,20 +202,6 @@ export const mockSellerProducts: SellerProduct[] = [
     brand_id: 'brd-4',        // ASICS (brd-4)
     party_id: 'pty-6',       // John Doe Individual User Seller Party (pty-6)
 
-    year_of_manufacture: 2024,
-    country_of_origin: 'JP',
-    model_number: '1011B798-001',
-    part_number: 'AS-G26-PRO',
-
-    weight: '305 g',
-
-    deviations: 'Standard retail packaging with extra shoelaces.',
-    exclusions: 'Orthotic custom insoles not included.',
-    operation_instructions: 'Suitable for long-distance road running.',
-    safety_instructions: 'Ensure proper lace tension before marathon running.',
-    handling_instructions: 'Air dry away from direct heat sources after wet runs.',
-    maintenance_instructions: 'Wipe clean with mild soap damp cloth.',
-
     dynamic_attributes: [
       {
         group_id: 'grp-7',
@@ -336,23 +282,6 @@ export const mockSellerProducts: SellerProduct[] = [
     manufacturer_id: 'mfg-2', // Sony Corporation Manufacturing (pty-4)
     brand_id: 'brd-3',        // Sony (brd-3)
     party_id: 'pty-4',       // Sony Corporation Business Party (pty-4)
-
-    year_of_manufacture: 2024,
-    country_of_origin: 'JP',
-    model_number: 'ILCE-7M4/B',
-    part_number: 'SY-A7M4-BODY',
-
-    height: '96.4 mm',
-    width: '131.3 mm',
-    length: '79.8 mm',
-    weight: '658 g',
-
-    deviations: 'Official UK retail distribution stock with multi-language manual.',
-    exclusions: 'Lens sold separately.',
-    operation_instructions: 'Refer to Sony Alpha e-Mount manual for custom button mapping.',
-    safety_instructions: 'Keep body cap attached when no lens is mounted to protect sensor.',
-    handling_instructions: 'Store with silica gel moisture pack in camera bag.',
-    maintenance_instructions: 'Use blower bulb to clean dust from sensor glass.',
 
     dynamic_attributes: [
       {

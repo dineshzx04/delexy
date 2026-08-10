@@ -18,7 +18,14 @@ import {
   ClockCircleOutlined,
   UserOutlined,
 } from '@ant-design/icons';
-import { rfqDb, type TechnicalAttributeResponse, type ItemSupplierResponse, type AttributeCommentEntry } from '../../data/rfq';
+import {
+  rfqDb,
+  type SellerQuote,
+  type SellerAttributeResponse,
+  type AttributeComment,
+  type AttributeResponseHistory,
+  type ItemAttributeValue
+} from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -26,17 +33,14 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 interface AttributeResponseState {
   key: string;
   name: string;
-  category: 'DYNAMIC_ATTRIBUTE' | 'STATIC_DIMENSION' | 'MANUFACTURING_INPUT' | 'BRAND_MANUFACTURER';
-  groupId?: string;
+  groupId: string;
+  attributeId: string;
   groupName?: string;
-  requested: string;
-  offered: string;
+  requested: ItemAttributeValue[];
+  offered: ItemAttributeValue[];
   isDeviated: boolean;
   reason: string;
   options?: { value: string; label: string }[];
-  buyerStatus?: string;
-  buyerComment?: string;
-  commentHistory?: AttributeCommentEntry[];
 }
 
 export const SupplierItemRespond: React.FC = () => {
@@ -57,26 +61,42 @@ export const SupplierItemRespond: React.FC = () => {
 
   // Active supplier party resolution
   const activeParty = isBusinessContext
-    ? allParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId) || allParties[0]
-    : allParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || allParties.find((p) => p.id === 'pty-6') || allParties[0];
+    ? allParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId)
+    : allParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId);
 
   const activePartyId = activeParty?.id || 'pty-4';
   const activePartyName = activeParty?.display_name || 'Responding Supplier Party';
 
-  // Fetch responses for this item and filter strictly by active supplier party ID
-  const responsesForItem = useLiveQuery(
-    () => (itemId ? rfqDb.itemSupplierResponses.where('rfq_item_id').equals(itemId).toArray() : []),
-    [itemId]
-  ) || [];
+  // Fetch quotes for this item and seller party
+  const allQuotes = useLiveQuery(() => rfqDb.sellerQuote.toArray(), []) || [];
+  const activeQuote = useMemo(() => {
+    if (!itemId || !activePartyId) return undefined;
+    return allQuotes.find(q => q.itemId === itemId && q.sellerId === activePartyId);
+  }, [allQuotes, itemId, activePartyId]);
 
-  const response: ItemSupplierResponse | undefined = useMemo(() => {
-    if (!responsesForItem || responsesForItem.length === 0) return undefined;
-    return (
-      responsesForItem.find((r) => r.seller_party_id === activePartyId) ||
-      responsesForItem.find((r) => r.supplier_user_id === currentUserId) ||
-      responsesForItem[0]
-    );
-  }, [responsesForItem, activePartyId, currentUserId]);
+  const allAttributeResponses = useLiveQuery(() => rfqDb.sellerAttributeResponses.toArray(), []) || [];
+  const activeResponses = useMemo(() => {
+    if (!activeQuote) return [];
+    return allAttributeResponses.filter(r => r.quoteId === activeQuote.id);
+  }, [allAttributeResponses, activeQuote]);
+
+  const allComments = useLiveQuery(() => rfqDb.attributeComments.toArray(), []) || [];
+  const activeComments = useMemo(() => {
+    if (!activeQuote) return [];
+    return allComments.filter(c => c.quoteId === activeQuote.id);
+  }, [allComments, activeQuote]);
+
+  const allHistory = useLiveQuery(() => rfqDb.attributeResponseHistory.toArray(), []) || [];
+  const activeHistory = useMemo(() => {
+    if (!activeQuote) return [];
+    return allHistory.filter(h => h.quoteId === activeQuote.id);
+  }, [allHistory, activeQuote]);
+
+  const historicalRounds = useMemo(() => {
+    const roundsSet = new Set<number>();
+    activeHistory.forEach(h => roundsSet.add(h.round));
+    return Array.from(roundsSet).sort((a, b) => a - b);
+  }, [activeHistory]);
 
   const allCategories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const allAttributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
@@ -86,6 +106,16 @@ export const SupplierItemRespond: React.FC = () => {
   const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
   const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
 
+  const itemAttributes = useLiveQuery(
+    () => (itemId ? rfqDb.itemAttributes.where('itemId').equals(itemId).toArray() : []),
+    [itemId]
+  ) || [];
+
+  const sellerProduct = useLiveQuery(
+    () => (item?.seller_product_id ? catalogDb.sellerProducts.get(item.seller_product_id) : undefined),
+    [item?.seller_product_id]
+  );
+
   // Form state for technical specification responses
   const [offeredSpecs, setOfferedSpecs] = useState<Record<string, AttributeResponseState>>({});
   const [commercialTerms, setCommercialTerms] = useState({
@@ -94,19 +124,39 @@ export const SupplierItemRespond: React.FC = () => {
     lead_time_days: 5,
   });
 
-  // Technical Revision Rounds history
   const revisionRounds = useMemo(() => {
-    return response?.technical_revision_rounds || [];
-  }, [response]);
+    if (!activeQuote) return [];
+    const rounds: any[] = [];
+    for (let r = 1; r < activeQuote.round; r++) {
+      rounds.push({
+        round_number: r,
+        round_status: 'SUBMITTED',
+        buyer_review_notes: 'Reviewed in historical round',
+      });
+    }
+    return rounds;
+  }, [activeQuote]);
 
   const latestRound = useMemo(() => {
-    if (revisionRounds.length === 0) return null;
-    return revisionRounds[revisionRounds.length - 1];
-  }, [revisionRounds]);
+    if (!activeQuote) return null;
+    return {
+      round_number: activeQuote.round,
+      round_status: activeQuote.status === 'SUBMITTED' ? 'PENDING' : (activeQuote.status === 'FINALIZED' ? 'APPROVED' : 'REVISION_REQUESTED'),
+      buyer_review_notes: activeComments
+        .filter(c => c.round === activeQuote.round && c.senderType === 'BUYER')
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]?.comment || '',
+    };
+  }, [activeQuote, activeComments]);
 
-  const isRoundPending = latestRound?.round_status === 'PENDING';
-  const isRoundApproved = latestRound?.round_status === 'APPROVED' || response?.status === 'TECHNICAL_APPROVED';
-  const isRoundRevisionRequested = latestRound?.round_status === 'REVISION_REQUESTED';
+  const isRoundPending = activeQuote?.status === 'SUBMITTED';
+  const isRoundApproved = activeQuote?.status === 'FINALIZED';
+  const hasBuyerCommentsInCurrentRound = useMemo(() => {
+    if (!activeQuote) return false;
+    return activeComments.some(
+      (c) => c.round === activeQuote.round && c.senderType === 'BUYER'
+    );
+  }, [activeComments, activeQuote]);
+  const isRoundRevisionRequested = !isRoundPending && !isRoundApproved && hasBuyerCommentsInCurrentRound;
   const isViewingHistoricalRound = selectedRoundTab !== 'LATEST';
   const isInputDisabled = isViewingHistoricalRound || isRoundPending || isRoundApproved;
 
@@ -115,209 +165,239 @@ export const SupplierItemRespond: React.FC = () => {
     if (!item) return [];
     const list: AttributeResponseState[] = [];
 
-    // 1. Static Specs & Physical Dimensions (Exact Order from RfqCreateWizard.tsx)
+    // 1. Static Brand & Manufacturer as virtual dynamic attributes
     const brandOptions = allBrands.map((b) => ({ value: b.name, label: b.name }));
     const mfgOptions = allManufacturers.map((m) => ({ value: m.company_name, label: m.company_name }));
 
-    const requestedBrandName = Array.isArray(item.brand_id)
-      ? item.brand_id.map((bId) => allBrands.find((b) => b.id === bId)?.name || bId).join(', ')
-      : allBrands.find((b) => b.id === item.brand_id)?.name || item.brand_id || 'Unspecified';
+    // Resolve requested brand values
+    const brandIds = Array.isArray(item.brand_id) ? item.brand_id : (item.brand_id ? [item.brand_id] : []);
+    const requestedBrands: ItemAttributeValue[] = brandIds.map(bId => {
+      const brandObj = allBrands.find(b => b.id === bId);
+      return { valueId: bId, valueLabel: brandObj?.name || bId };
+    });
 
-    const requestedMfgName = Array.isArray(item.manufacturer_id)
-      ? item.manufacturer_id.map((mId) => allManufacturers.find((m) => m.id === mId)?.company_name || mId).join(', ')
-      : allManufacturers.find((m) => m.id === item.manufacturer_id)?.company_name || item.manufacturer_id || 'Unspecified';
+    // Resolve requested manufacturer values
+    const mfgIds = Array.isArray(item.manufacturer_id) ? item.manufacturer_id : (item.manufacturer_id ? [item.manufacturer_id] : []);
+    const requestedMfgs: ItemAttributeValue[] = mfgIds.map(mId => {
+      const mfgObj = allManufacturers.find(m => m.id === mId);
+      return { valueId: mId, valueLabel: mfgObj?.company_name || mId };
+    });
 
-    const modelInput = (item.manufacturing_inputs || []).find((i) => i.field_id === 'model_number');
-    const partInput = (item.manufacturing_inputs || []).find((i) => i.field_id === 'part_number');
-    const cooInput = (item.manufacturing_inputs || []).find((i) => i.field_id === 'country_of_origin');
+    if (requestedBrands.length > 0) {
+      const brandResp = activeResponses.find(r => r.groupId === 'static' && r.attributeId === 'brand');
+      const offeredBrands = brandResp ? brandResp.value : requestedBrands;
+      const isDev = brandResp ? brandResp.value.some((v: any) => !requestedBrands.some(r => r.valueId === v.valueId)) : false;
 
-    if (item.brand_id && (Array.isArray(item.brand_id) ? item.brand_id.length > 0 : true)) {
+      // Find comment/reason for this attribute
+      const commentObj = activeComments.find(c => c.groupId === 'static' && c.attributeId === 'brand' && c.senderType === 'SELLER');
+
       list.push({
         key: 'static-brand',
         name: 'Preferred Brand',
-        category: 'BRAND_MANUFACTURER',
-        requested: requestedBrandName,
-        offered: requestedBrandName,
-        isDeviated: false,
-        reason: '',
+        groupId: 'static',
+        attributeId: 'brand',
+        requested: requestedBrands,
+        offered: offeredBrands,
+        isDeviated: isDev,
+        reason: commentObj?.comment || '',
         options: brandOptions,
       });
     }
-    if (item.manufacturer_id && (Array.isArray(item.manufacturer_id) ? item.manufacturer_id.length > 0 : true)) {
+
+    if (requestedMfgs.length > 0) {
+      const mfgResp = activeResponses.find(r => r.groupId === 'static' && r.attributeId === 'manufacturer');
+      const offeredMfgs = mfgResp ? mfgResp.value : requestedMfgs;
+      const isDev = mfgResp ? mfgResp.value.some((v: any) => !requestedMfgs.some(r => r.valueId === v.valueId)) : false;
+
+      // Find comment/reason for this attribute
+      const commentObj = activeComments.find(c => c.groupId === 'static' && c.attributeId === 'manufacturer' && c.senderType === 'SELLER');
+
       list.push({
         key: 'static-mfg',
         name: 'Preferred Manufacturer',
-        category: 'BRAND_MANUFACTURER',
-        requested: requestedMfgName,
-        offered: requestedMfgName,
-        isDeviated: false,
-        reason: '',
+        groupId: 'static',
+        attributeId: 'manufacturer',
+        requested: requestedMfgs,
+        offered: offeredMfgs,
+        isDeviated: isDev,
+        reason: commentObj?.comment || '',
         options: mfgOptions,
       });
     }
-    if (modelInput) {
-      list.push({ key: 'static-model_number', name: 'Model Number', category: 'STATIC_DIMENSION', requested: String(modelInput.value), offered: String(modelInput.value), isDeviated: false, reason: '' });
-    }
-    if (partInput) {
-      list.push({ key: 'static-part_number', name: 'Part Number', category: 'STATIC_DIMENSION', requested: String(partInput.value), offered: String(partInput.value), isDeviated: false, reason: '' });
-    }
-    if (cooInput) {
-      list.push({ key: 'static-country_of_origin', name: 'Country of Origin', category: 'STATIC_DIMENSION', requested: String(cooInput.value), offered: String(cooInput.value), isDeviated: false, reason: '' });
-    }
-    if (item.height) {
-      list.push({ key: 'dim-height', name: 'Height', category: 'STATIC_DIMENSION', requested: item.height, offered: item.height, isDeviated: false, reason: '' });
-    }
-    if (item.width) {
-      list.push({ key: 'dim-width', name: 'Width', category: 'STATIC_DIMENSION', requested: item.width, offered: item.width, isDeviated: false, reason: '' });
-    }
-    if (item.length) {
-      list.push({ key: 'dim-length', name: 'Length', category: 'STATIC_DIMENSION', requested: item.length, offered: item.length, isDeviated: false, reason: '' });
-    }
-    if (item.weight) {
-      list.push({ key: 'dim-weight', name: 'Weight', category: 'STATIC_DIMENSION', requested: item.weight, offered: item.weight, isDeviated: false, reason: '' });
-    }
 
-    // 2. Category Dynamic Attributes (Sorted strictly by Category mappedGroupIds & Group attributeIds)
+    // 2. Category Dynamic Attributes
     const category = allCategories.find((c) => c.id === item.category_id);
     const mappedGroupIds = category?.mappedGroupIds || [];
 
     mappedGroupIds.forEach((gId) => {
       const group = allAttributeGroups.find((g) => g.id === gId);
       if (!group) return;
-
       const groupAttrIds = group.attributeIds || [];
       groupAttrIds.forEach((attrId) => {
         const da = (item.dynamic_attributes || []).find((d) => d.attribute_id === attrId && d.group_id === gId);
-        if (da) {
-          const attr = allAttributes.find((a) => a.id === da.attribute_id);
-          const valLabels = (da.selected_value_ids || [])
-            .map((vId) => {
+        const attr = allAttributes.find((a) => a.id === attrId);
+        if (!attr) return;
+
+        // Resolve requested values
+        let requestedVals: ItemAttributeValue[] = [];
+
+        // 1. Check itemAttributes (custom specs)
+        const itemAttr = itemAttributes.find((ia) => {
+          const cleanIa = ia.attributeId.replace('attr-', '').replace(/^0+/, '');
+          const cleanAttr = attrId.replace('attr-', '').replace(/^0+/, '');
+          return cleanIa === cleanAttr;
+        });
+
+        if (itemAttr) {
+          requestedVals = itemAttr.currentBuyerValues;
+        } else if (da) {
+          // 2. Check item.dynamic_attributes
+          requestedVals = (da.selected_value_ids || []).map((vId) => {
+            const vObj = allAttributeValues.find((v) => v.id === vId);
+            return { valueId: vId, valueLabel: vObj?.label || vId };
+          });
+        } else if (sellerProduct) {
+          // 3. Check sellerProduct specifications
+          const spDa = (sellerProduct.dynamic_attributes || []).find((d) => d.attribute_id === attrId);
+          if (spDa) {
+            requestedVals = (spDa.selected_value_ids || []).map((vId) => {
               const vObj = allAttributeValues.find((v) => v.id === vId);
-              return vObj?.label || vId;
-            })
-            .join(', ');
-
-          const mappedValues = allAttributeValues.filter(
-            (v) => v.attributeId === da.attribute_id || (attr?.valueIds && attr.valueIds.includes(v.id))
-          );
-          const valueOptions = mappedValues.map((v) => ({
-            value: v.label || v.value,
-            label: `${v.label || v.value}`,
-          }));
-
-          if (attr && valLabels) {
-            list.push({
-              key: `dyn-${da.attribute_id}`,
-              name: attr.name || attr.label || da.attribute_id,
-              category: 'DYNAMIC_ATTRIBUTE',
-              groupId: group.id,
-              groupName: group.name,
-              requested: valLabels,
-              offered: valLabels,
-              isDeviated: false,
-              reason: '',
-              options: valueOptions.length > 0 ? valueOptions : undefined,
+              return { valueId: vId, valueLabel: vObj?.label || vId };
             });
+          } else {
+            const spSpec = (sellerProduct.specifications || []).find((s) => s.attribute_id === attrId);
+            if (spSpec) {
+              requestedVals = (spSpec.values || []).map((v: any) => ({
+                valueId: v.id || v.label,
+                valueLabel: v.label || v.id,
+              }));
+            }
           }
         }
+
+        // Offered lookup
+        const resp = activeResponses.find((r) => r.groupId === gId && r.attributeId === attrId);
+        const offeredVals = resp ? resp.value : requestedVals;
+        const isDev = resp ? resp.value.some((v: any) => !requestedVals.some(r => r.valueId === v.valueId)) : false;
+
+        const commentObj = activeComments.find(c => c.groupId === gId && c.attributeId === attrId && c.senderType === 'SELLER');
+
+        const mappedValues = allAttributeValues.filter(
+          (v) => v.attributeId === attrId || (attr?.valueIds && attr.valueIds.includes(v.id))
+        );
+        const valueOptions = mappedValues.map((v) => ({
+          value: v.id || v.label || v.value,
+          label: `${v.label || v.value}`,
+        }));
+
+        list.push({
+          key: `dyn-${gId}-${attrId}`,
+          name: attr.name || attr.label || attrId,
+          groupId: gId,
+          attributeId: attrId,
+          groupName: group.name,
+          requested: requestedVals,
+          offered: offeredVals,
+          isDeviated: isDev,
+          reason: commentObj?.comment || '',
+          options: valueOptions.length > 0 ? valueOptions : undefined,
+        });
       });
     });
 
     // Catch any remaining dynamic attributes
     (item.dynamic_attributes || []).forEach((da) => {
-      const alreadyAdded = list.some((l) => l.key === `dyn-${da.attribute_id}`);
+      const alreadyAdded = list.some((l) => l.groupId === da.group_id && l.attributeId === da.attribute_id);
       if (!alreadyAdded) {
         const attr = allAttributes.find((a) => a.id === da.attribute_id);
         const group = allAttributeGroups.find((g) => g.id === da.group_id);
-        const valLabels = (da.selected_value_ids || [])
-          .map((vId) => {
+        if (!attr) return;
+
+        let requestedVals: ItemAttributeValue[] = [];
+
+        // Look up custom spec values first
+        const itemAttr = itemAttributes.find((ia) => {
+          const cleanIa = ia.attributeId.replace('attr-', '').replace(/^0+/, '');
+          const cleanAttr = da.attribute_id.replace('attr-', '').replace(/^0+/, '');
+          return cleanIa === cleanAttr;
+        });
+
+        if (itemAttr) {
+          requestedVals = itemAttr.currentBuyerValues;
+        } else {
+          requestedVals = (da.selected_value_ids || []).map((vId) => {
             const vObj = allAttributeValues.find((v) => v.id === vId);
-            return vObj?.label || vId;
-          })
-          .join(', ');
+            return { valueId: vId, valueLabel: vObj?.label || vId };
+          });
+        }
+
+        const resp = activeResponses.find((r) => r.groupId === da.group_id && r.attributeId === da.attribute_id);
+        const offeredVals = resp ? resp.value : requestedVals;
+        const isDev = resp ? resp.value.some((v: any) => !requestedVals.some(r => r.valueId === v.valueId)) : false;
+
+        const commentObj = activeComments.find(c => c.groupId === da.group_id && c.attributeId === da.attribute_id && c.senderType === 'SELLER');
 
         const mappedValues = allAttributeValues.filter(
           (v) => v.attributeId === da.attribute_id || (attr?.valueIds && attr.valueIds.includes(v.id))
         );
         const valueOptions = mappedValues.map((v) => ({
-          value: v.label || v.value,
+          value: v.id || v.label || v.value,
           label: `${v.label || v.value}`,
         }));
 
-        if (attr && valLabels) {
-          list.push({
-            key: `dyn-${da.attribute_id}`,
-            name: attr.name || attr.label || da.attribute_id,
-            category: 'DYNAMIC_ATTRIBUTE',
-            groupId: group?.id || da.group_id,
-            groupName: group?.name || 'Category Attributes',
-            requested: valLabels,
-            offered: valLabels,
-            isDeviated: false,
-            reason: '',
-            options: valueOptions.length > 0 ? valueOptions : undefined,
-          });
-        }
-      }
-    });
-
-    // 3. Other Manufacturing & Material Inputs
-    (item.manufacturing_inputs || []).forEach((mInput) => {
-      if (!['model_number', 'part_number', 'country_of_origin'].includes(mInput.field_id)) {
         list.push({
-          key: `mfg-${mInput.field_id}`,
-          name: mInput.field_name || mInput.field_id,
-          category: 'MANUFACTURING_INPUT',
-          requested: String(mInput.value),
-          offered: String(mInput.value),
-          isDeviated: false,
-          reason: '',
+          key: `dyn-${da.group_id}-${da.attribute_id}`,
+          name: attr.name || attr.label || da.attribute_id,
+          groupId: da.group_id,
+          attributeId: da.attribute_id,
+          groupName: group?.name || 'Category Attributes',
+          requested: requestedVals,
+          offered: offeredVals,
+          isDeviated: isDev,
+          reason: commentObj?.comment || '',
+          options: valueOptions.length > 0 ? valueOptions : undefined,
         });
       }
     });
 
     return list;
-  }, [item, allAttributes, allAttributeGroups, allAttributeValues, allBrands, allManufacturers, allCategories]);
+  }, [item, allAttributes, allAttributeGroups, allAttributeValues, allBrands, allManufacturers, allCategories, itemAttributes, sellerProduct, activeResponses, activeComments]);
 
   // Populate form state when item, party response, or selected round changes
   useEffect(() => {
     if (requestedAttributes.length > 0) {
-      const initialSpecs: Record<string, AttributeResponseState> = {};
+      const specs: Record<string, AttributeResponseState> = {};
 
       requestedAttributes.forEach((attr) => {
-        initialSpecs[attr.key] = { ...attr };
+        specs[attr.key] = { ...attr };
       });
 
-      // Load specific revision round snapshot based on tab selection
-      let roundToLoad = latestRound;
+      // If viewing a historical round, overwrite offered values with archived history snapshot
       if (selectedRoundTab !== 'LATEST' && selectedRoundTab.startsWith('ROUND_')) {
         const roundNum = parseInt(selectedRoundTab.replace('ROUND_', ''), 10);
-        roundToLoad = revisionRounds.find((r) => r.round_number === roundNum) || latestRound;
-      }
+        const historyForRound = activeHistory.filter((h) => h.round === roundNum);
 
-      if (roundToLoad && roundToLoad.supplier_response) {
-        (roundToLoad.supplier_response || []).forEach((resp) => {
-          if (initialSpecs[resp.attribute_key]) {
-            initialSpecs[resp.attribute_key] = {
-              ...initialSpecs[resp.attribute_key],
-              offered: String(resp.offered_value),
-              isDeviated: resp.is_deviated,
-              reason: resp.deviation_reason || '',
-              buyerStatus: resp.buyer_status,
-              buyerComment: resp.buyer_comment,
-              commentHistory: resp.comment_history,
+        historyForRound.forEach((hist) => {
+          const specKey = Object.keys(specs).find(
+            (k) => specs[k].groupId === hist.groupId && specs[k].attributeId === hist.attributeId
+          );
+          if (specKey) {
+            specs[specKey] = {
+              ...specs[specKey],
+              offered: hist.value,
+              isDeviated: hist.value.some((v) => !specs[specKey].requested.some((r) => r.valueId === v.valueId)),
             };
           }
         });
       }
 
-      setOfferedSpecs(initialSpecs);
-
-      if (response?.commercial_terms) {
+      setOfferedSpecs(specs);
+      console.log(specs)
+      if (activeQuote) {
         setCommercialTerms({
-          offered_unit_price: response.commercial_terms.offered_unit_price || item?.target_unit_price || 1000,
-          offered_quantity: response.awarded_quantity || item?.quantity || 60,
-          lead_time_days: response.commercial_terms.lead_time_days || 5,
+          offered_unit_price: activeQuote.unit_price || item?.target_unit_price || 1000,
+          offered_quantity: item?.quantity || 60,
+          lead_time_days: 5,
         });
       } else if (item) {
         setCommercialTerms({
@@ -327,7 +407,7 @@ export const SupplierItemRespond: React.FC = () => {
         });
       }
     }
-  }, [requestedAttributes, response, item, selectedRoundTab, latestRound, revisionRounds]);
+  }, [requestedAttributes, activeQuote, item, selectedRoundTab, activeHistory]);
 
   if (!rfq || !item) {
     return <div className="p-12 text-center text-slate-500">Loading Sourcing Request...</div>;
@@ -339,85 +419,77 @@ export const SupplierItemRespond: React.FC = () => {
   const handleSubmitResponse = async () => {
     setSubmitting(true);
     try {
-      const techResponses: TechnicalAttributeResponse[] = Object.values(offeredSpecs).map((spec) => ({
-        attribute_key: spec.key,
-        attribute_name: spec.name,
-        requested_value: spec.requested,
-        offered_value: spec.offered,
-        is_deviated: spec.isDeviated,
-        deviation_reason: spec.reason,
-      }));
+      const currentQuote = activeQuote;
+      const nextRoundNum = currentQuote ? currentQuote.round + 1 : 1;
+      const quoteId = currentQuote?.id || `q-${itemId}-${activePartyId}`;
 
-      const submitUserId = currentUserId || currentUser?.id || 'usr-3';
-      const nextRoundNum = (revisionRounds.length || 0) + 1;
+      if (currentQuote) {
+        // 1. Archive current responses to history table
+        const currentResponses = await rfqDb.sellerAttributeResponses.where('quoteId').equals(currentQuote.id).toArray();
+        const historyEntries = currentResponses.map((r) => ({
+          id: `hist-${r.id}-${currentQuote.round}`,
+          responseId: r.id,
+          quoteId: r.quoteId,
+          round: currentQuote.round,
+          groupId: r.groupId,
+          attributeId: r.attributeId,
+          buyerValue: r.buyerValue,
+          value: r.value,
+          archivedAt: new Date().toISOString(),
+        }));
+        if (historyEntries.length > 0) {
+          await rfqDb.attributeResponseHistory.bulkPut(historyEntries);
+        }
 
-      if (response) {
-        await rfqDb.itemSupplierResponses.update(response.id, {
-          status: 'TECHNICAL_SUBMITTED',
-          seller_party_id: response.seller_party_id || activePartyId,
-          seller_party_name: response.seller_party_name || activePartyName,
-          supplier_user_id: submitUserId,
-          current_technical_round: nextRoundNum,
-          technical_revision_rounds: [
-            ...revisionRounds,
-            {
-              round_number: nextRoundNum,
-              submitted_by_user_id: submitUserId,
-              submitted_at: new Date().toISOString(),
-              buyer_requirement_snapshot: techResponses,
-              supplier_response: techResponses,
-              round_status: 'PENDING',
-            },
-          ],
-          commercial_terms: {
-            offered_unit_price: commercialTerms.offered_unit_price,
-            lead_time_days: commercialTerms.lead_time_days,
-            moq: 1,
-            payment_terms: 'Net 30 Days',
-            freight_terms: 'FOB Destination',
-            warranty_terms: '2 Years Factory Warranty',
-            total_commercial_amount: commercialTerms.offered_unit_price * commercialTerms.offered_quantity,
-          },
-          updated_at: new Date().toISOString(),
+        // 2. Update existing quote
+        await rfqDb.sellerQuote.update(currentQuote.id, {
+          status: 'SUBMITTED',
+          round: nextRoundNum,
+          unit_price: commercialTerms.offered_unit_price,
         });
+
+        // 3. Clear old responses for active quote
+        await rfqDb.sellerAttributeResponses.where('quoteId').equals(currentQuote.id).delete();
       } else {
-        // Create new response record bound to current seller party
-        const newResponseId = `isr-${rfq.id}-${item.id}-${activePartyId}`;
-        await rfqDb.itemSupplierResponses.put({
-          id: newResponseId,
-          assignment_id: `sa-${rfq.id}-${item.id}`,
-          rfq_id: rfq.id,
-          rfq_item_id: item.id,
-          seller_party_id: activePartyId,
-          seller_party_name: activePartyName,
-          supplier_user_id: submitUserId,
-          status: 'TECHNICAL_SUBMITTED',
-          current_technical_round: 1,
-          technical_revision_rounds: [
-            {
-              round_number: 1,
-              submitted_by_user_id: submitUserId,
-              submitted_at: new Date().toISOString(),
-              buyer_requirement_snapshot: techResponses,
-              supplier_response: techResponses,
-              round_status: 'PENDING',
-            },
-          ],
-          commercial_terms: {
-            offered_unit_price: commercialTerms.offered_unit_price,
-            lead_time_days: commercialTerms.lead_time_days,
-            moq: 1,
-            payment_terms: 'Net 30 Days',
-            freight_terms: 'FOB Destination',
-            warranty_terms: '2 Years Factory Warranty',
-            total_commercial_amount: commercialTerms.offered_unit_price * commercialTerms.offered_quantity,
-          },
-          product_mapping: null,
-          commercial_negotiation_rounds: [],
-          is_awarded: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+        // Create new quote
+        await rfqDb.sellerQuote.put({
+          id: quoteId,
+          itemId: itemId!,
+          sellerId: activePartyId,
+          itemRevision: item?.itemRevision || 1,
+          round: 1,
+          unit_price: commercialTerms.offered_unit_price,
+          status: 'SUBMITTED',
         });
+      }
+
+      // 4. Save new attribute response records
+      const newResponses = Object.values(offeredSpecs).map((spec) => ({
+        id: `resp-${quoteId}-${spec.groupId}-${spec.attributeId}`,
+        quoteId: quoteId,
+        groupId: spec.groupId,
+        attributeId: spec.attributeId,
+        buyerValue: spec.requested,
+        value: spec.offered,
+      }));
+      await rfqDb.sellerAttributeResponses.bulkPut(newResponses);
+
+      // 5. Save deviation comments if any
+      const commentEntries = Object.values(offeredSpecs)
+        .filter((spec) => spec.isDeviated && spec.reason)
+        .map((spec) => ({
+          id: `c-${quoteId}-${spec.groupId}-${spec.attributeId}-${nextRoundNum}`,
+          quoteId: quoteId,
+          groupId: spec.groupId,
+          attributeId: spec.attributeId,
+          round: nextRoundNum,
+          senderType: 'SELLER' as const,
+          senderId: activePartyId,
+          comment: spec.reason,
+          createdAt: new Date().toISOString(),
+        }));
+      if (commentEntries.length > 0) {
+        await rfqDb.attributeComments.bulkPut(commentEntries);
       }
 
       antMessage.success(`Technical response (Round #${nextRoundNum}) submitted for ${activePartyName}!`);
@@ -431,7 +503,7 @@ export const SupplierItemRespond: React.FC = () => {
   };
 
   // Group dynamic attributes by groupName matching RfqCreateWizard.tsx
-  const dynamicSpecs = Object.values(offeredSpecs).filter((s) => s.category === 'DYNAMIC_ATTRIBUTE');
+  const dynamicSpecs = Object.values(offeredSpecs).filter((s) => s.groupId !== 'static');
   const groupedDynamicSpecs = dynamicSpecs.reduce((acc: Record<string, AttributeResponseState[]>, spec) => {
     const gName = spec.groupName || 'Category Attributes';
     if (!acc[gName]) acc[gName] = [];
@@ -439,9 +511,7 @@ export const SupplierItemRespond: React.FC = () => {
     return acc;
   }, {});
 
-  const brandMfgSpecs = Object.values(offeredSpecs).filter((s) => s.category === 'BRAND_MANUFACTURER');
-  const staticDimensionSpecs = Object.values(offeredSpecs).filter((s) => s.category === 'STATIC_DIMENSION');
-  const mfgSpecs = Object.values(offeredSpecs).filter((s) => s.category === 'MANUFACTURING_INPUT');
+  const brandMfgSpecs = Object.values(offeredSpecs).filter((s) => s.groupId === 'static');
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-5">
@@ -569,41 +639,60 @@ export const SupplierItemRespond: React.FC = () => {
           {brandMfgSpecs.length > 0 && (
             <div className="p-4 bg-blue-50/40 rounded-xl border border-blue-200 space-y-3">
               <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2 m-0">
-                <ShopOutlined className="text-blue-600" /> Brand & Manufacturer Specification Response
+                <ShopOutlined className="text-blue-600" /> Brand & Manufacturer
               </h4>
               <div className="space-y-2">
-                {brandMfgSpecs.map((spec) => (
-                  <div key={spec.key} className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between gap-3">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="min-w-[180px]">
-                        <span className="font-bold text-slate-800 text-xs">{spec.name}</span>
-                        <div className="text-xs text-slate-500">Requested: <strong className="text-slate-900">{spec.requested}</strong></div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="flex-1">
-                          <label className="text-[11px] font-semibold text-slate-600">Offered Value (Single Select)</label>
-                          {spec.options && spec.options.length > 0 ? (
-                            <Select
-                              disabled={isInputDisabled}
-                              size="small"
-                              className="w-full"
-                              placeholder="Select offered brand or manufacturer..."
-                              value={spec.offered}
-                              options={spec.options}
-                              onChange={(val: string) => {
-                                const isDev = val !== spec.requested;
-                                setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: val, isDeviated: isDev } });
-                              }}
-                            />
-                          ) : (
-                            <Input
-                              disabled={isInputDisabled}
-                              size="small"
-                              value={spec.offered}
-                              onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: e.target.value } })}
-                            />
-                          )}
+                {brandMfgSpecs.map((spec) => {
+                  const buyerCommentObj = activeComments
+                    .filter(c => c.groupId === spec.groupId && c.attributeId === spec.attributeId && c.senderType === 'BUYER')
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+                  return (
+                    <div key={spec.key} className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between gap-3">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div className="min-w-[180px]">
+                          <span className="font-bold text-slate-800 text-xs">{spec.name}</span>
+                          <div className="text-xs text-slate-500">
+                            Requested: <strong className="text-slate-900">{spec.requested.map(r => r.valueLabel || r.valueId).join(', ') || '-'}</strong>
+                          </div>
                         </div>
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="flex-1">
+                            <label className="text-[11px] font-semibold text-slate-600">Offered Value (Multiple Select)</label>
+                            {spec.options && spec.options.length > 0 ? (
+                              <Select
+                                disabled={isInputDisabled}
+                                mode="multiple"
+                                size="small"
+                                className="w-full"
+                                placeholder="Select offered brand or manufacturer..."
+                                value={spec.offered.map(o => o.valueId)}
+                                options={spec.options}
+                                onChange={(vals: string[]) => {
+                                  const offeredVals = vals.map(val => {
+                                    const opt = spec.options?.find(o => o.value === val);
+                                    return { valueId: val, valueLabel: opt?.label || val };
+                                  });
+                                  const isDev = offeredVals.some(v => !spec.requested.some(r => r.valueId === v.valueId)) ||
+                                                spec.requested.some(r => !offeredVals.some(v => v.valueId === r.valueId));
+                                  setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, isDeviated: isDev } });
+                                }}
+                              />
+                            ) : (
+                              <Input
+                                disabled={isInputDisabled}
+                                size="small"
+                                value={spec.offered.map(o => o.valueLabel || o.valueId).join(', ')}
+                                onChange={(e) => {
+                                  const valStr = e.target.value;
+                                  const offeredVals = valStr.split(',').map(s => s.trim()).filter(Boolean).map(v => ({ valueId: v, valueLabel: v }));
+                                  const isDev = offeredVals.some(v => !spec.requested.some(r => r.valueId === v.valueId)) ||
+                                                spec.requested.some(r => !offeredVals.some(v => v.valueId === r.valueId));
+                                  setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, isDeviated: isDev } });
+                                }}
+                              />
+                            )}
+                          </div>
                         <div className="flex items-center gap-1.5 flex-shrink-0">
                           <span className="text-[11px] font-semibold text-slate-600">Deviated?</span>
                           <Switch
@@ -628,90 +717,27 @@ export const SupplierItemRespond: React.FC = () => {
                         </div>
                       )}
                     </div>
-
-                    {spec.buyerComment && (
+                    {buyerCommentObj && (
                       <div className="mt-2 p-2 rounded border bg-red-50/90 border-red-200 text-red-900 text-xs space-y-0.5">
                         <div className="font-bold flex items-center gap-1.5">
                           <ExclamationCircleOutlined className="text-red-600" /> Buyer Revision Request Remark:
                         </div>
-                        <div>{spec.buyerComment}</div>
+                        <div>{buyerCommentObj.comment}</div>
                       </div>
                     )}
                   </div>
-                ))}
+                );
+              })}
               </div>
             </div>
           )}
 
-          {/* 4. SECTION 3: STATIC SPECS & PHYSICAL DIMENSIONS */}
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-            <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2 m-0">
-              <ToolOutlined className="text-indigo-600" /> Static Specs & Physical Dimensions
-            </h4>
-
-            {staticDimensionSpecs.length > 0 && (
-              <div className="space-y-2">
-                {staticDimensionSpecs.map((spec) => (
-                  <div key={spec.key} className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between gap-3">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="min-w-[180px]">
-                        <span className="font-bold text-slate-800 text-xs">{spec.name}</span>
-                        <div className="text-xs text-slate-500">Requested: <strong className="text-slate-900">{spec.requested}</strong></div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="flex-1">
-                          <label className="text-[11px] font-semibold text-slate-600">Offered Value</label>
-                          <Input
-                            disabled={isInputDisabled}
-                            size="small"
-                            value={spec.offered}
-                            onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: e.target.value } })}
-                          />
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <span className="text-[11px] font-semibold text-slate-600">Deviated?</span>
-                          <Switch
-                            disabled={isInputDisabled}
-                            size="small"
-                            checked={spec.isDeviated}
-                            onChange={(checked) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, isDeviated: checked } })}
-                          />
-                        </div>
-                      </div>
-                      {spec.isDeviated && (
-                        <div className="min-w-[200px]">
-                          <label className="text-[11px] font-semibold text-amber-700">Deviation Reason</label>
-                          <Input
-                            disabled={isInputDisabled}
-                            size="small"
-                            placeholder="Variance reason..."
-                            value={spec.reason}
-                            onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, reason: e.target.value } })}
-                            className="border-amber-300 bg-amber-50"
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {spec.buyerComment && (
-                      <div className="mt-2 p-2 rounded border bg-red-50/90 border-red-200 text-red-900 text-xs space-y-0.5">
-                        <div className="font-bold flex items-center gap-1.5">
-                          <ExclamationCircleOutlined className="text-red-600" /> Buyer Revision Request Remark:
-                        </div>
-                        <div>{spec.buyerComment}</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
           {/* 5. SECTION 4: CATEGORY MAPPED DYNAMIC ATTRIBUTES */}
           {Object.keys(groupedDynamicSpecs).length > 0 && (
             <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-200 space-y-3">
               <h4 className="font-bold text-purple-900 text-xs uppercase tracking-wider flex items-center gap-2 m-0">
-                <Tag color="purple">Master Taxonomy</Tag> Category Mapped Dynamic Attributes
+                Category Attributes
               </h4>
 
               {Object.entries(groupedDynamicSpecs).map(([groupName, specs]) => (
@@ -720,145 +746,103 @@ export const SupplierItemRespond: React.FC = () => {
                     {groupName}
                   </div>
                   <div className="space-y-2">
-                    {specs.map((spec) => (
-                      <div key={spec.key} className="p-2.5 bg-purple-50/30 rounded border border-purple-100 flex flex-col justify-between gap-3">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                          <div className="min-w-[180px]">
-                            <span className="font-bold text-slate-800 text-xs">{spec.name}</span>
-                            <div className="text-xs text-slate-600">
-                              Requested: <strong className="text-purple-900 bg-purple-100 px-1.5 py-0.5 rounded">{spec.requested}</strong>
+                    {specs.map((spec) => {
+                      const buyerCommentObj = activeComments
+                        .filter(c => c.groupId === spec.groupId && c.attributeId === spec.attributeId && c.senderType === 'BUYER')
+                        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+                      return (
+                        <div key={spec.key} className="p-2.5 bg-purple-50/30 rounded border border-purple-100 flex flex-col justify-between gap-3">
+                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div className="min-w-[180px]">
+                              <span className="font-bold text-slate-800 text-xs">{spec.name}</span>
+                              <div className="text-xs text-slate-600">
+                                Requested: <strong className="text-purple-900 bg-purple-100 px-1.5 py-0.5 rounded">
+                                  {spec.requested.map(r => r.valueLabel || r.valueId).join(', ') || '-'}
+                                </strong>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className="flex-1">
-                              <label className="text-[11px] font-semibold text-slate-600">Offered Value</label>
-                              {spec.options && spec.options.length > 0 ? (
-                                <Select
+                            <div className="flex items-center gap-3 flex-1">
+                              <div className="flex-1">
+                                <label className="text-[11px] font-semibold text-slate-600">Offered Value</label>
+                                {spec.options && spec.options.length > 0 ? (
+                                  <Select
+                                    disabled={isInputDisabled}
+                                    mode="multiple"
+                                    size="small"
+                                    className="w-full"
+                                    placeholder="Select offered attribute value(s)..."
+                                    value={spec.offered.map(o => o.valueId)}
+                                    options={spec.options}
+                                    onChange={(vals: string[]) => {
+                                      console.log(vals)
+                                      const offeredVals = vals.map(val => {
+                                        const opt = spec.options?.find(o => o.value === val);
+                                        return { valueId: val, valueLabel: opt?.label || val };
+                                      });
+                                      const isDev = offeredVals.some(v => !spec.requested.some(r => r.valueId === v.valueId)) ||
+                                                    spec.requested.some(r => !offeredVals.some(v => v.valueId === r.valueId));
+                                      setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, isDeviated: isDev } });
+                                    }}
+                                  />
+                                ) : (
+                                  <Input
+                                    disabled={isInputDisabled}
+                                    size="small"
+                                    value={spec.offered.map(o => o.valueLabel || o.valueId).join(', ')}
+                                    onChange={(e) => {
+                                      const valStr = e.target.value;
+                                      const offeredVals = valStr.split(',').map(s => s.trim()).filter(Boolean).map(v => ({ valueId: v, valueLabel: v }));
+                                      const isDev = offeredVals.some(v => !spec.requested.some(r => r.valueId === v.valueId)) ||
+                                                    spec.requested.some(r => !offeredVals.some(v => v.valueId === r.valueId));
+                                      setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, isDeviated: isDev } });
+                                    }}
+                                  />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <span className="text-[11px] font-semibold text-slate-600">Deviated?</span>
+                                <Switch
                                   disabled={isInputDisabled}
-                                  mode="multiple"
                                   size="small"
-                                  className="w-full"
-                                  placeholder="Select offered attribute value(s)..."
-                                  value={spec.offered ? spec.offered.split(', ').map((s) => s.trim()).filter(Boolean) : []}
-                                  options={spec.options}
-                                  onChange={(vals: string[]) => {
-                                    const offeredStr = vals.join(', ');
-                                    const isDev = offeredStr !== spec.requested;
-                                    setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredStr, isDeviated: isDev } });
-                                  }}
+                                  checked={spec.isDeviated}
+                                  onChange={(checked) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, isDeviated: checked } })}
                                 />
-                              ) : (
+                              </div>
+                            </div>
+                            {spec.isDeviated && (
+                              <div className="min-w-[200px]">
+                                <label className="text-[11px] font-semibold text-amber-700">Deviation Reason</label>
                                 <Input
                                   disabled={isInputDisabled}
                                   size="small"
-                                  value={spec.offered}
-                                  onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: e.target.value } })}
+                                  placeholder="Equivalent grade remarks..."
+                                  value={spec.reason}
+                                  onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, reason: e.target.value } })}
+                                  className="border-amber-300 bg-amber-50"
                                 />
-                              )}
-                            </div>
-                            <div className="flex items-center gap-1.5 flex-shrink-0">
-                              <span className="text-[11px] font-semibold text-slate-600">Deviated?</span>
-                              <Switch
-                                disabled={isInputDisabled}
-                                size="small"
-                                checked={spec.isDeviated}
-                                onChange={(checked) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, isDeviated: checked } })}
-                              />
-                            </div>
+                              </div>
+                            )}
                           </div>
-                          {spec.isDeviated && (
-                            <div className="min-w-[200px]">
-                              <label className="text-[11px] font-semibold text-amber-700">Deviation Reason</label>
-                              <Input
-                                disabled={isInputDisabled}
-                                size="small"
-                                placeholder="Equivalent grade remarks..."
-                                value={spec.reason}
-                                onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, reason: e.target.value } })}
-                                className="border-amber-300 bg-amber-50"
-                              />
+
+                          {buyerCommentObj && (
+                            <div className="mt-2 p-2 rounded border bg-red-50/90 border-red-200 text-red-900 text-xs space-y-0.5">
+                              <div className="font-bold flex items-center gap-1.5">
+                                <ExclamationCircleOutlined className="text-red-600" /> Buyer Revision Request Remark:
+                              </div>
+                              <div>{buyerCommentObj.comment}</div>
                             </div>
                           )}
                         </div>
-
-                        {spec.buyerComment && (
-                          <div className="mt-2 p-2 rounded border bg-red-50/90 border-red-200 text-red-900 text-xs space-y-0.5">
-                            <div className="font-bold flex items-center gap-1.5">
-                              <ExclamationCircleOutlined className="text-red-600" /> Buyer Revision Request Remark:
-                            </div>
-                            <div>{spec.buyerComment}</div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               ))}
             </div>
           )}
 
-          {/* 6. SECTION 5: MANUFACTURING & MATERIAL INPUTS */}
-          {mfgSpecs.length > 0 && (
-            <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-              <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2 m-0">
-                <TagOutlined className="text-slate-600" /> Manufacturing & Material Inputs
-              </h4>
-              <div className="space-y-2">
-                {mfgSpecs.map((spec) => (
-                  <div key={spec.key} className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between gap-3">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                      <div className="min-w-[180px]">
-                        <span className="font-bold text-slate-800 text-xs">{spec.name}</span>
-                        <div className="text-xs text-slate-500">Requested: <strong className="text-slate-900">{spec.requested}</strong></div>
-                      </div>
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className="flex-1">
-                          <label className="text-[11px] font-semibold text-slate-600">Offered Value</label>
-                          <Input
-                            disabled={isInputDisabled}
-                            size="small"
-                            value={spec.offered}
-                            onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: e.target.value } })}
-                          />
-                        </div>
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          <span className="text-[11px] font-semibold text-slate-600">Deviated?</span>
-                          <Switch
-                            disabled={isInputDisabled}
-                            size="small"
-                            checked={spec.isDeviated}
-                            onChange={(checked) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, isDeviated: checked } })}
-                          />
-                        </div>
-                      </div>
-                      {spec.isDeviated && (
-                        <div className="min-w-[200px]">
-                          <label className="text-[11px] font-semibold text-amber-700">Deviation Reason</label>
-                          <Input
-                            disabled={isInputDisabled}
-                            size="small"
-                            placeholder="Standard tolerance..."
-                            value={spec.reason}
-                            onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, reason: e.target.value } })}
-                            className="border-amber-300 bg-amber-50"
-                          />
-                        </div>
-                      )}
-                    </div>
 
-                    {spec.buyerComment && (
-                      <div className="mt-2 p-2 rounded border bg-red-50/90 border-red-200 text-red-900 text-xs space-y-0.5">
-                        <div className="font-bold flex items-center gap-1.5">
-                          <ExclamationCircleOutlined className="text-red-600" /> Buyer Revision Request Remark:
-                        </div>
-                        <div>{spec.buyerComment}</div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* 7. SECTION 6: COMMERCIAL QUOTE (INITIAL TERMS) */}
           <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">

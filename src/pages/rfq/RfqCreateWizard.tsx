@@ -38,7 +38,7 @@ import {
   DisconnectOutlined,
   AimOutlined,
 } from '@ant-design/icons';
-import { rfqDb, type Rfq, type RfqItem, type RfqItemDynamicAttribute, type RfqItemSource } from '../../data/rfq';
+import { rfqDb, type Rfq, type RfqItem, type RfqItemDynamicAttribute, type RfqItemSource, type SellerQuote } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -226,22 +226,13 @@ export const RfqCreateWizard: React.FC = () => {
     itemToUpdate.item_source = 'CATALOG_PRODUCT_VARIANT';
     itemToUpdate.seller_product_id = sellerProduct.id;
     itemToUpdate.variant_id = variant?.id || `${sellerProduct.id}-base`;
-    itemToUpdate.variant_sku = variant?.sku || sellerProduct.part_number || sellerProduct.id;
+    itemToUpdate.variant_sku = variant?.sku || sellerProduct.id;
 
     itemToUpdate.product_name = variant?.sku ? `${sellerProduct.product_name} (${variant.sku})` : sellerProduct.product_name;
     itemToUpdate.category_id = sellerProduct.category_id;
     itemToUpdate.master_product_id = sellerProduct.catalog_product_id;
-    itemToUpdate.brand_id = sellerProduct.brand_id;
-    itemToUpdate.manufacturer_id = sellerProduct.manufacturer_id;
-    itemToUpdate.country_of_origin = sellerProduct.country_of_origin || '';
-    itemToUpdate.model_number = sellerProduct.model_number || '';
-    itemToUpdate.part_number = sellerProduct.part_number || '';
-    itemToUpdate.dimensions = {
-      height: sellerProduct.height || '',
-      width: sellerProduct.width || '',
-      length: sellerProduct.length || '',
-      weight: sellerProduct.weight || '',
-    };
+    itemToUpdate.brand_id = sellerProduct.brand_id || '';
+    itemToUpdate.manufacturer_id = sellerProduct.manufacturer_id || '';
     if (variant?.price) {
       itemToUpdate.target_unit_price = variant.price;
     }
@@ -329,12 +320,7 @@ export const RfqCreateWizard: React.FC = () => {
         product_name: item.product_name,
         brand_id: item.brand_id,
         manufacturer_id: item.manufacturer_id,
-        manufacturing_inputs: [
-          ...(item.model_number ? [{ field_id: 'model_number', field_name: 'Model Number', value: item.model_number }] : []),
-          ...(item.part_number ? [{ field_id: 'part_number', field_name: 'Part Number', value: item.part_number }] : []),
-          ...(item.country_of_origin ? [{ field_id: 'country_of_origin', field_name: 'Country of Origin', value: item.country_of_origin }] : []),
-        ],
-        dimensions: item.dimensions || { height: '', width: '', length: '', weight: '' },
+        manufacturing_inputs: [],
         quantity: item.quantity || 1,
         unit_of_measure: item.unit_of_measure || 'Units',
         target_unit_price: item.target_unit_price,
@@ -354,44 +340,30 @@ export const RfqCreateWizard: React.FC = () => {
         updated_at: new Date().toISOString(),
       }));
 
-      const newResponses: any[] = [];
+      const newQuotes: SellerQuote[] = [];
 
       newRfqItems.forEach((item, itemIdx) => {
         const targetSellers = item.target_seller_party_ids && item.target_seller_party_ids.length > 0
           ? item.target_seller_party_ids
           : allParties.filter((p: any) => p.id !== activePartyId).map((p: any) => p.id);
 
-        targetSellers.forEach((sellerPartyId: string, sIdx: number) => {
-          const sellerParty = allParties.find((p: any) => p.id === sellerPartyId);
-          newResponses.push({
-            id: `isr-${newRfqId}-${itemIdx + 1}-${sIdx + 1}`,
-            assignment_id: `sa-${newRfqId}-${itemIdx + 1}-${sIdx + 1}`,
-            rfq_id: newRfqId,
-            rfq_item_id: item.id,
-            seller_party_id: sellerPartyId,
-            seller_party_name: sellerParty?.display_name || sellerPartyId,
-            supplier_user_id: '',
-            status: 'ASSIGNED',
-            current_technical_round: 1,
-            technical_revision_rounds: [],
-            product_mapping: item.seller_product_id ? {
-              seller_product_id: item.seller_product_id,
-              variant_id: item.variant_id || '',
-              mapped_at: new Date().toISOString(),
-              is_buyer_approved: true,
-            } : null,
-            commercial_negotiation_rounds: [],
-            is_awarded: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+        targetSellers.forEach((sellerPartyId: string) => {
+          newQuotes.push({
+            id: `q-${item.id}-${sellerPartyId}`,
+            itemId: item.id,
+            sellerId: sellerPartyId,
+            itemRevision: 1,
+            round: 1,
+            unit_price: item.target_unit_price || 0,
+            status: 'DRAFT',
           });
         });
       });
 
       await rfqDb.rfqs.put(newRfq);
       await rfqDb.rfqItems.bulkPut(newRfqItems);
-      if (newResponses.length > 0) {
-        await rfqDb.itemSupplierResponses.bulkPut(newResponses);
+      if (newQuotes.length > 0) {
+        await rfqDb.sellerQuote.bulkPut(newQuotes);
       }
 
       antMessage.success('RFQ Container issued successfully!');
@@ -1365,13 +1337,8 @@ export const RfqCreateWizard: React.FC = () => {
                 </h4>
                 <Descriptions bordered size="small" column={2} className="bg-slate-50">
                   <Descriptions.Item label="Master Product ID"><span className="font-mono text-xs">{sp.catalog_product_id}</span></Descriptions.Item>
-                  <Descriptions.Item label="Brand">{brand?.name || sp.brand_id}</Descriptions.Item>
-                  <Descriptions.Item label="Manufacturer">{mfg?.company_name || sp.manufacturer_id}</Descriptions.Item>
-                  <Descriptions.Item label="Model Number">{sp.model_number || 'N/A'}</Descriptions.Item>
-                  <Descriptions.Item label="Part Number">{sp.part_number || 'N/A'}</Descriptions.Item>
-                  <Descriptions.Item label="Country of Origin">{sp.country_of_origin || 'N/A'}</Descriptions.Item>
-                  <Descriptions.Item label="Dimensions">{sp.height || '?'} x {sp.width || '?'} x {sp.length || '?'}</Descriptions.Item>
-                  <Descriptions.Item label="Weight">{sp.weight || 'N/A'}</Descriptions.Item>
+                  <Descriptions.Item label="Brand">{brand?.name || sp.brand_id || 'N/A'}</Descriptions.Item>
+                  <Descriptions.Item label="Manufacturer" span={2}>{mfg?.company_name || sp.manufacturer_id || 'N/A'}</Descriptions.Item>
                 </Descriptions>
               </div>
 

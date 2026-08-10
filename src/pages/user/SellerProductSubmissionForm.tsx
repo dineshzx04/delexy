@@ -16,27 +16,8 @@ const sellerProductSubmissionSchema = z.object({
   product_name: z.string().min(1, 'Listing title is required.'),
   category_id: z.string().min(1, 'Please select a leaf category.'),
   catalog_product_id: z.string().min(1, 'Please select a master product template.'),
-  brand_id: z.string().min(1, 'Please select a brand.'),
-  manufacturer_id: z.string().min(1, 'Please select a manufacturer unit.'),
-
-  year_of_manufacture: z.number().min(1900, 'Year must be at least 1900').max(2030, 'Year cannot exceed 2030').optional().nullable(),
-  model_number: z.string().optional().nullable(),
-  part_number: z.string().min(1, 'Part number is required.'),
-
-  height: z.string().optional().nullable(),
-  width: z.string().optional().nullable(),
-  length: z.string().optional().nullable(),
-  weight: z.string().optional().nullable(),
-
-  operation_instructions: z.string().optional().nullable(),
-  safety_instructions: z.string().optional().nullable(),
-  handling_instructions: z.string().optional().nullable(),
-  maintenance_instructions: z.string().optional().nullable(),
-  deviations: z.string().optional().nullable(),
-  exclusions: z.string().optional().nullable(),
-  assumptions: z.string().optional().nullable(),
-  additional_requirements: z.string().optional().nullable(),
-  additional_information: z.string().optional().nullable(),
+  brand_id: z.string().optional().nullable(),
+  manufacturer_id: z.string().optional().nullable(),
 });
 
 type SubmissionFormValues = z.infer<typeof sellerProductSubmissionSchema>;
@@ -117,22 +98,6 @@ const SellerProductSubmissionForm: React.FC = () => {
       catalog_product_id: '',
       brand_id: '',
       manufacturer_id: '',
-      year_of_manufacture: 2024,
-      model_number: '',
-      part_number: 'PN-101',
-      height: '',
-      width: '',
-      length: '',
-      weight: '',
-      operation_instructions: '',
-      safety_instructions: '',
-      handling_instructions: '',
-      maintenance_instructions: '',
-      deviations: '',
-      exclusions: '',
-      assumptions: '',
-      additional_requirements: '',
-      additional_information: ''
     }
   });
 
@@ -657,22 +622,6 @@ const SellerProductSubmissionForm: React.FC = () => {
         product_name: { label: 'Listing Title', group: 'IDENTIFIERS' },
         manufacturer_id: { label: 'Manufacturer', group: 'IDENTIFIERS' },
         brand_id: { label: 'Brand', group: 'IDENTIFIERS' },
-        year_of_manufacture: { label: 'Year of Manufacture', group: 'MANUFACTURING' },
-        model_number: { label: 'Model Number', group: 'MANUFACTURING' },
-        part_number: { label: 'Part Number', group: 'MANUFACTURING' },
-        height: { label: 'Height', group: 'DIMENSIONS' },
-        width: { label: 'Width', group: 'DIMENSIONS' },
-        length: { label: 'Length', group: 'DIMENSIONS' },
-        weight: { label: 'Weight', group: 'DIMENSIONS' },
-        deviations: { label: 'Deviations', group: 'OPERATIONAL' },
-        exclusions: { label: 'Exclusions', group: 'OPERATIONAL' },
-        assumptions: { label: 'Assumptions', group: 'OPERATIONAL' },
-        operation_instructions: { label: 'Operation Instructions', group: 'OPERATIONAL' },
-        safety_instructions: { label: 'Safety Instructions', group: 'OPERATIONAL' },
-        handling_instructions: { label: 'Handling Instructions', group: 'OPERATIONAL' },
-        maintenance_instructions: { label: 'Maintenance Instructions', group: 'OPERATIONAL' },
-        additional_requirements: { label: 'Additional Requirements', group: 'OPERATIONAL' },
-        additional_information: { label: 'Additional Information', group: 'OPERATIONAL' },
         specifications: { label: 'Technical Specifications List', group: 'SPECS' },
         variants: { label: 'Sellable Product Variants', group: 'VARIANTS' }
       };
@@ -956,7 +905,7 @@ const SellerProductSubmissionForm: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Brand <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">Brand</label>
                     <Controller
                       name="brand_id"
                       control={control}
@@ -978,7 +927,7 @@ const SellerProductSubmissionForm: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Manufacturer Unit <span className="text-red-500">*</span></label>
+                    <label className="block text-sm font-semibold text-gray-800 mb-1">Manufacturer Unit</label>
                     <Controller
                       name="manufacturer_id"
                       control={control}
@@ -1002,239 +951,6 @@ const SellerProductSubmissionForm: React.FC = () => {
               </div>
             </AntCard>
 
-            {/* 2. MANUFACTURING & PHYSICAL SPECS */}
-            <AntCard
-              title={
-                <div className="flex items-center gap-2 text-gray-900 font-bold text-base">
-                  <Lucide.Factory size={18} className="text-emerald-600" />
-                  2. Manufacturing & Physical Specs
-                </div>
-              }
-              className="border border-gray-200 shadow-sm"
-            >
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Year of Manufacture</label>
-                    <Controller
-                      name="year_of_manufacture"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInputNumber
-                          {...field}
-                          value={field.value ?? undefined}
-                          onChange={(val) => field.onChange(val)}
-                          disabled={isReadOnly}
-                          className="w-full"
-                          min={1900}
-                          max={2030}
-                          status={errors.year_of_manufacture ? 'error' : ''}
-                        />
-                      )}
-                    />
-                    {errors.year_of_manufacture && <span className="text-xs text-red-500 mt-1 block">{errors.year_of_manufacture.message}</span>}
-                    {renderFieldStatusBadge('year_of_manufacture')}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Model Number</label>
-                    <Controller
-                      name="model_number"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput {...field} value={field.value || ''} disabled={isReadOnly} placeholder="Manufacturer Model Number" />
-                      )}
-                    />
-                    {renderFieldStatusBadge('model_number')}
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Part Number <span className="text-red-500">*</span></label>
-                    <Controller
-                      name="part_number"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput {...field} disabled={isReadOnly} placeholder="Manufacturer Part Number (MPN)" status={errors.part_number ? 'error' : ''} />
-                      )}
-                    />
-                    {errors.part_number && <span className="text-xs text-red-500 mt-1 block">{errors.part_number.message}</span>}
-                    {renderFieldStatusBadge('part_number')}
-                  </div>
-                </div>
-
-                <h3 className="font-semibold text-gray-900 text-sm pt-4 border-t border-gray-100 mb-2">Physical Dimensions & Weight</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Height</label>
-                    <Controller
-                      name="height"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput {...field} value={field.value || ''} disabled={isReadOnly} placeholder="Height (e.g. 162.3 mm)" />
-                      )}
-                    />
-                    {renderFieldStatusBadge('height')}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Width</label>
-                    <Controller
-                      name="width"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput {...field} value={field.value || ''} disabled={isReadOnly} placeholder="Width (e.g. 79.0 mm)" />
-                      )}
-                    />
-                    {renderFieldStatusBadge('width')}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Length</label>
-                    <Controller
-                      name="length"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput {...field} value={field.value || ''} disabled={isReadOnly} placeholder="Length (e.g. 8.6 mm)" />
-                      )}
-                    />
-                    {renderFieldStatusBadge('length')}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Weight</label>
-                    <Controller
-                      name="weight"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput {...field} value={field.value || ''} disabled={isReadOnly} placeholder="Net Weight (e.g. 232 g)" />
-                      )}
-                    />
-                    {renderFieldStatusBadge('weight')}
-                  </div>
-                </div>
-              </div>
-            </AntCard>
-
-            {/* 3. OPERATIONAL & GOVERNANCE INSTRUCTIONS */}
-            <AntCard
-              title={
-                <div className="flex items-center gap-2 text-gray-900 font-bold text-base">
-                  <Lucide.ShieldCheck size={18} className="text-purple-600" />
-                  3. Operational & Governance Instructions
-                </div>
-              }
-              className="border border-gray-200 shadow-sm"
-            >
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Operation Instructions</label>
-                    <Controller
-                      name="operation_instructions"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={3} placeholder="Operating guidelines..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('operation_instructions')}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Safety Instructions</label>
-                    <Controller
-                      name="safety_instructions"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={3} placeholder="Water resistance, thermal safety..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('safety_instructions')}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Handling Instructions</label>
-                    <Controller
-                      name="handling_instructions"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={3} placeholder="Storage environment..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('handling_instructions')}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Maintenance Instructions</label>
-                    <Controller
-                      name="maintenance_instructions"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={3} placeholder="Cleaning and port maintenance..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('maintenance_instructions')}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Deviations</label>
-                    <Controller
-                      name="deviations"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={2} placeholder="License inclusions..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('deviations')}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Exclusions</label>
-                    <Controller
-                      name="exclusions"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={2} placeholder="Adapter exclusions..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('exclusions')}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Assumptions</label>
-                    <Controller
-                      name="assumptions"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={2} placeholder="Charger compatibility..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('assumptions')}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Additional Requirements</label>
-                    <Controller
-                      name="additional_requirements"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={2} placeholder="e.g. Requires Knox Mobile Enrollment registration upon first boot..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('additional_requirements')}
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-800 mb-1">Additional Information</label>
-                    <Controller
-                      name="additional_information"
-                      control={control}
-                      render={({ field }) => (
-                        <AntInput.TextArea {...field} value={field.value || ''} disabled={isReadOnly} rows={2} placeholder="e.g. Includes 3-year Knox Suite Enterprise warranty..." />
-                      )}
-                    />
-                    {renderFieldStatusBadge('additional_information')}
-                  </div>
-                </div>
-              </div>
-            </AntCard>
 
             {/* 4. DYNAMIC ATTRIBUTES (COMPACT COLLAPSIBLE ACCORDION LAYOUT) */}
             <AntCard
@@ -1490,8 +1206,8 @@ const SellerProductSubmissionForm: React.FC = () => {
                         <span className="font-semibold text-gray-800 truncate block">{selectedBrandName}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500 block">Part #:</span>
-                        <span className="font-mono text-gray-800 truncate block">{formValues.part_number || 'N/A'}</span>
+                        <span className="text-gray-500 block">Manufacturer:</span>
+                        <span className="font-semibold text-gray-800 truncate block">{selectedMfrName}</span>
                       </div>
                     </div>
                   </div>

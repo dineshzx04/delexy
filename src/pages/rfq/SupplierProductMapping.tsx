@@ -6,11 +6,12 @@ import { CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { businessDb } from '../../data/business/business.db';
 
 export const SupplierProductMapping: React.FC = () => {
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
   const navigate = useNavigate();
-  const { activeWorkspace } = useWorkspace();
+  const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/supplier' : '/user/supplier';
   const { message: antMessage } = AntApp.useApp();
@@ -22,9 +23,21 @@ export const SupplierProductMapping: React.FC = () => {
   // Live query from catalogDb indexed database store
   const sellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []) || [];
   const item = useLiveQuery(() => (itemId ? rfqDb.rfqItems.get(itemId) : undefined), [itemId]);
-  const response = useLiveQuery(
-    () => (itemId ? rfqDb.itemSupplierResponses.where('rfq_item_id').equals(itemId).first() : undefined),
-    [itemId]
+  
+  // Active seller party resolution
+  const allParties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const activeParty = isBusinessContext
+    ? allParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId)
+    : allParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId);
+  const activePartyId = activeParty?.id || 'pty-4';
+
+  const quote = useLiveQuery(
+    async () => {
+      if (!itemId) return undefined;
+      const quotes = await rfqDb.sellerQuote.where('itemId').equals(itemId).toArray();
+      return quotes.find((q) => q.sellerId === activePartyId);
+    },
+    [itemId, activePartyId]
   );
 
   const selectedProduct = sellerProducts.find((p) => p.id === selectedProductId);
@@ -32,16 +45,14 @@ export const SupplierProductMapping: React.FC = () => {
   const handleSaveMapping = async () => {
     setSubmitting(true);
     try {
-      if (response) {
-        await rfqDb.itemSupplierResponses.update(response.id, {
-          status: 'PRODUCT_MAPPED',
-          product_mapping: {
+      if (quote) {
+        await rfqDb.sellerQuote.update(quote.id, {
+          sellerProductMapping: {
             seller_product_id: selectedProductId,
             variant_id: selectedVariantId,
             mapped_at: new Date().toISOString(),
             is_buyer_approved: false,
           },
-          updated_at: new Date().toISOString(),
         });
       }
 

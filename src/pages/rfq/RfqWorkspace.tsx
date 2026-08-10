@@ -10,6 +10,7 @@ import {
   FolderOpenOutlined,
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
+import { mockParties } from '../../data/business/parties';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqStatusBadge, RfqItemStatusBadge } from '../../components/rfq/RfqStatusBadge';
 
@@ -24,7 +25,6 @@ export const RfqWorkspace: React.FC = () => {
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const items = useLiveQuery(() => (rfqId ? rfqDb.rfqItems.where('rfq_id').equals(rfqId).toArray() : []), [rfqId]) || [];
-  const responses = useLiveQuery(() => (rfqId ? rfqDb.itemSupplierResponses.where('rfq_id').equals(rfqId).toArray() : []), [rfqId]) || [];
 
   if (!rfq) {
     return (
@@ -140,27 +140,27 @@ export const RfqWorkspace: React.FC = () => {
                 </div>
               ),
             },
-            {
-              key: 'suppliers',
-              label: (
-                <span className="font-bold flex items-center gap-2">
-                  <TeamOutlined /> Assigned Suppliers ({responses.length})
-                </span>
-              ),
-              children: (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {responses.map((resp) => (
-                    <Card key={resp.id} className="border-slate-200 shadow-sm bg-slate-50">
-                      <div className="font-bold text-slate-900 text-base">{resp.seller_party_name}</div>
-                      <div className="text-xs text-slate-500 mt-1">Status: <Tag color="blue">{resp.status}</Tag></div>
-                      <div className="text-xs text-slate-600 mt-2">
-                        Mapped Product: <span className="font-semibold">{resp.product_mapping?.seller_product_id ?? 'sprod-1'}</span> ({resp.product_mapping?.variant_id ?? 'v1'})
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ),
-            },
+            // {
+            //   key: 'suppliers',
+            //   label: (
+            //     <span className="font-bold flex items-center gap-2">
+            //       <TeamOutlined /> Assigned Suppliers ({responses.length})
+            //     </span>
+            //   ),
+            //   children: (
+            //     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            //       {responses.map((resp) => (
+            //         <Card key={resp.id} className="border-slate-200 shadow-sm bg-slate-50">
+            //           <div className="font-bold text-slate-900 text-base">{resp.seller_party_name}</div>
+            //           <div className="text-xs text-slate-500 mt-1">Status: <Tag color="blue">{resp.status}</Tag></div>
+            //           <div className="text-xs text-slate-600 mt-2">
+            //             Mapped Product: <span className="font-semibold">{resp.product_mapping?.seller_product_id ?? 'sprod-1'}</span> ({resp.product_mapping?.variant_id ?? 'v1'})
+            //           </div>
+            //         </Card>
+            //       ))}
+            //     </div>
+            //   ),
+            // },
             {
               key: 'timeline',
               label: (

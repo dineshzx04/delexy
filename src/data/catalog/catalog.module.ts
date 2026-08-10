@@ -88,29 +88,9 @@ export interface SellerProduct {
   category_id: string;                 // Leaf Category ID ('c-2-1-1')
   catalog_product_id: string;          // Master Catalog Product Template ID ('prod-1')
   product_name: string;                // Listing Title
-  manufacturer_id: string;             // Manufacturer Table ID ('mfg-1')
-  brand_id: string;                    // Brand ID ('brd-1')
+  manufacturer_id?: string;            // Manufacturer Table ID ('mfg-1')
+  brand_id?: string;                   // Brand ID ('brd-1')
   party_id: string;                    // Seller Party ID ('pty-1' or 'pty-6')
-
-  year_of_manufacture?: number;
-  country_of_origin?: string;
-  model_number?: string;
-  part_number: string;
-
-  height?: string;
-  width?: string;
-  length?: string;
-  weight?: string;
-
-  deviations?: string;
-  exclusions?: string;
-  assumptions?: string;
-  operation_instructions?: string;
-  safety_instructions?: string;
-  handling_instructions?: string;
-  maintenance_instructions?: string;
-  additional_requirements?: string;
-  additional_information?: string;
 
   dynamic_attributes: SellerProductAttributeSelection[];
   specifications: SellerProductSpecification[];

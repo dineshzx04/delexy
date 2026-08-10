@@ -53,19 +53,6 @@ export const TechnicalComparisonTable: React.FC<TechnicalComparisonTableProps> =
     ? [{ key: 'static-mfg', name: 'Preferred Manufacturer', requested: requestedMfgName }]
     : [];
 
-  const modelInput = (item.manufacturing_inputs || []).find((i) => i.field_id === 'model_number');
-  const partInput = (item.manufacturing_inputs || []).find((i) => i.field_id === 'part_number');
-  const cooInput = (item.manufacturing_inputs || []).find((i) => i.field_id === 'country_of_origin');
-
-  const modelRow = modelInput ? [{ key: 'static-model_number', name: 'Model Number', requested: String(modelInput.value) }] : [];
-  const partRow = partInput ? [{ key: 'static-part_number', name: 'Part Number', requested: String(partInput.value) }] : [];
-  const cooRow = cooInput ? [{ key: 'static-country_of_origin', name: 'Country of Origin', requested: String(cooInput.value) }] : [];
-
-  const heightRow = item.height ? [{ key: 'dim-height', name: 'Height', requested: item.height }] : [];
-  const widthRow = item.width ? [{ key: 'dim-width', name: 'Width', requested: item.width }] : [];
-  const lengthRow = item.length ? [{ key: 'dim-length', name: 'Length', requested: item.length }] : [];
-  const weightRow = item.weight ? [{ key: 'dim-weight', name: 'Weight', requested: item.weight }] : [];
-
   const dynamicRows = (item.dynamic_attributes || []).map((attr) => {
     const attrObj = allAttributes.find((a) => a.id === attr.attribute_id);
     const valLabels = (attr.selected_value_ids || [])
@@ -82,26 +69,10 @@ export const TechnicalComparisonTable: React.FC<TechnicalComparisonTableProps> =
     };
   });
 
-  const otherMfgRows = (item.manufacturing_inputs || [])
-    .filter((i) => !['model_number', 'part_number', 'country_of_origin'].includes(i.field_id))
-    .map((i) => ({
-      key: `mfg-${i.field_id}`,
-      name: i.field_name || i.field_id,
-      requested: String(i.value),
-    }));
-
   const comparisonData = [
     ...brandRow,
     ...mfgRow,
-    ...modelRow,
-    ...partRow,
-    ...cooRow,
-    ...heightRow,
-    ...widthRow,
-    ...lengthRow,
-    ...weightRow,
     ...dynamicRows,
-    ...otherMfgRows,
   ];
 
   const baseColumns: any[] = [

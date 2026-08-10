@@ -312,29 +312,9 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
         category_id: attrs.category_id?.value || 'c-3-1-1',
         catalog_product_id: attrs.catalog_product_id?.value || 'prod-2',
         product_name: attrs.product_name?.value || 'Untitled Seller Product',
-        manufacturer_id: attrs.manufacturer_id?.value || 'mfg-1',
-        brand_id: attrs.brand_id?.value || 'brd-1',
+        manufacturer_id: attrs.manufacturer_id?.value || undefined,
+        brand_id: attrs.brand_id?.value || undefined,
         party_id: submission.party_id,
-
-        year_of_manufacture: attrs.year_of_manufacture?.value,
-        country_of_origin: 'US',
-        model_number: attrs.model_number?.value,
-        part_number: attrs.part_number?.value || 'PN-101',
-
-        height: attrs.height?.value,
-        width: attrs.width?.value,
-        length: attrs.length?.value,
-        weight: attrs.weight?.value,
-
-        deviations: attrs.deviations?.value,
-        exclusions: attrs.exclusions?.value,
-        assumptions: attrs.assumptions?.value,
-        operation_instructions: attrs.operation_instructions?.value,
-        safety_instructions: attrs.safety_instructions?.value,
-        handling_instructions: attrs.handling_instructions?.value,
-        maintenance_instructions: attrs.maintenance_instructions?.value,
-        additional_requirements: attrs.additional_requirements?.value,
-        additional_information: attrs.additional_information?.value,
 
         dynamic_attributes: [],
         specifications: attrs.specifications?.value || [],
@@ -811,58 +791,12 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
           </div>
         </AntCard>
 
-        {/* SECTION 2: MANUFACTURING & PHYSICAL SPECS */}
-        <AntCard
-          title={
-            <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
-              <Lucide.Factory size={16} className="text-emerald-600" />
-              2. Manufacturing & Physical Specs
-            </div>
-          }
-          className="border border-gray-200 shadow-sm"
-          size="small"
-        >
-          <div className="space-y-3">
-            {renderAttributeCard('year_of_manufacture')}
-            {renderAttributeCard('model_number')}
-            {renderAttributeCard('part_number')}
-            {renderAttributeCard('height')}
-            {renderAttributeCard('width')}
-            {renderAttributeCard('length')}
-            {renderAttributeCard('weight')}
-          </div>
-        </AntCard>
-
-        {/* SECTION 3: OPERATIONAL & GOVERNANCE INSTRUCTIONS */}
-        <AntCard
-          title={
-            <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
-              <Lucide.ShieldCheck size={16} className="text-purple-600" />
-              3. Operational & Governance Instructions
-            </div>
-          }
-          className="border border-gray-200 shadow-sm"
-          size="small"
-        >
-          <div className="space-y-3">
-            {renderAttributeCard('operation_instructions')}
-            {renderAttributeCard('safety_instructions')}
-            {renderAttributeCard('handling_instructions')}
-            {renderAttributeCard('maintenance_instructions')}
-            {renderAttributeCard('deviations')}
-            {renderAttributeCard('exclusions')}
-            {renderAttributeCard('assumptions')}
-            {renderAttributeCard('additional_requirements')}
-            {renderAttributeCard('additional_information')}
-          </div>
-        </AntCard>
-
-        {/* SECTION 4: CATEGORY DYNAMIC SPECIFICATIONS */}
+        {/* SECTION 2: CATEGORY DYNAMIC SPECIFICATIONS */}
         <AntCard
           title={
             <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
               <Lucide.SlidersHorizontal size={16} className="text-indigo-600" />
-              4. Dynamic Technical Specifications
+              2. Dynamic Technical Specifications
             </div>
           }
           className="border border-gray-200 shadow-sm"
@@ -873,12 +807,12 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
           </div>
         </AntCard>
 
-        {/* SECTION 5: SELLABLE PRODUCT VARIANTS DIRECTORY */}
+        {/* SECTION 3: SELLABLE PRODUCT VARIANTS DIRECTORY */}
         <AntCard
           title={
             <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
               <Lucide.Layers3 size={16} className="text-purple-600" />
-              5. Sellable Product Variants Directory
+              3. Sellable Product Variants Directory
             </div>
           }
           className="border border-gray-200 shadow-sm"

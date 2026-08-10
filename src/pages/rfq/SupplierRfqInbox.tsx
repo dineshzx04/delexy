@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, Table, Button, Tag, Tabs, Input } from 'antd';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
@@ -24,57 +24,44 @@ export const SupplierRfqInbox: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('ALL');
   const [searchText, setSearchText] = useState<string>('');
 
-  // Live Query filtered by seller party ID
-  const sellerResponses = useLiveQuery(
-    () => rfqDb.itemSupplierResponses.where('seller_party_id').equals(activePartyId).toArray(),
+  // Fetch quotes from the new sellerQuote table
+  const quotes = useLiveQuery(
+    () => rfqDb.sellerQuote.where('sellerId').equals(activePartyId).toArray(),
     [activePartyId]
   ) || [];
 
   const items = useLiveQuery(() => rfqDb.rfqItems.toArray(), []) || [];
   const rfqs = useLiveQuery(() => rfqDb.rfqs.toArray(), []) || [];
+  const awards = useLiveQuery(() => rfqDb.rfqAwards.toArray(), []) || [];
 
-  // Also check for open RFQs where no explicit ItemSupplierResponse record exists yet for activePartyId
-  const openMarketplaceItems = items.filter((item) => {
-    const rfq = rfqs.find((r) => r.id === item.rfq_id);
-    if (!rfq || rfq.status === 'DRAFT' || rfq.status === 'CANCELLED') return false;
-    // Exclude if buyer party is current active party
-    if (rfq.requester_party_id === activePartyId) return false;
+  // Construct response records dynamically from quotes
+  const allResponses = useMemo(() => {
+    return quotes.map((q) => {
+      const item = items.find((i) => i.id === q.itemId);
+      
+      // Determine virtual status mapping
+      let status: ItemSupplierResponseStatus = 'ASSIGNED';
+      if (q.status === 'DRAFT') {
+        status = 'ASSIGNED';
+      } else if (q.status === 'SUBMITTED') {
+        status = 'TECHNICAL_SUBMITTED';
+      } else if (q.status === 'FINALIZED') {
+        const isAwarded = awards.some(a => a.itemId === q.itemId && a.sellerId === q.sellerId);
+        status = isAwarded ? 'AWARDED' : 'TECHNICAL_APPROVED';
+      }
 
-    const isOpenForMarketplace = !item.target_seller_party_ids || item.target_seller_party_ids.length === 0 || item.target_seller_party_ids.includes(activePartyId);
-    const alreadyHasResponse = sellerResponses.some((resp) => resp.rfq_item_id === item.id);
+      return {
+        id: q.id,
+        rfq_id: item?.rfq_id || '',
+        rfq_item_id: q.itemId,
+        seller_party_id: q.sellerId,
+        status: status,
+        product_mapping: (q as any).sellerProductMapping || null,
+      };
+    });
+  }, [quotes, items, rfqs, awards]);
 
-    return isOpenForMarketplace && !alreadyHasResponse;
-  });
-
-  // Synthesize virtual response records for open marketplace items
-  const virtualResponses = openMarketplaceItems.map((item) => {
-    return {
-      id: `isr-open-${item.id}-${activePartyId}`,
-      assignment_id: `sa-open-${item.id}-${activePartyId}`,
-      rfq_id: item.rfq_id,
-      rfq_item_id: item.id,
-      seller_party_id: activePartyId,
-      seller_party_name: activeParty.display_name,
-      supplier_user_id: currentUserId || 'usr-3',
-      status: 'ASSIGNED' as ItemSupplierResponseStatus,
-      current_technical_round: 1,
-      technical_revision_rounds: [],
-      product_mapping: item.seller_product_id ? {
-        seller_product_id: item.seller_product_id,
-        variant_id: item.variant_id || '',
-        mapped_at: new Date().toISOString(),
-        is_buyer_approved: true,
-      } : null,
-      commercial_negotiation_rounds: [],
-      is_awarded: false,
-      created_at: item.created_at,
-      updated_at: item.updated_at,
-    };
-  });
-
-  const allResponses = [...sellerResponses, ...virtualResponses];
-
-  const filteredResponses = allResponses.filter((resp) => {
+  const filteredResponses = allResponses.filter((resp: any) => {
     const item = items.find((i) => i.id === resp.rfq_item_id);
     const rfq = rfqs.find((r) => r.id === resp.rfq_id);
     const matchesTab = activeTab === 'ALL' || resp.status === activeTab;

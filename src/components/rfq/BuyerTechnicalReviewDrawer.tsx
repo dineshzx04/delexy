@@ -323,6 +323,45 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
 
       const newResponseStatus = action === 'APPROVE' ? 'TECHNICAL_APPROVED' : 'TECHNICAL_REVISION_REQUESTED';
 
+      // Update sellerQuote status
+      const nextQuoteStatus = action === 'APPROVE' ? 'FINALIZED' : 'DRAFT';
+      await rfqDb.sellerQuote.update(response.id, {
+        status: nextQuoteStatus,
+      });
+
+      // Save buyer rejection comments to attributeComments
+      const commentEntries = attrList
+        .filter((attr) => attr.rejection_comment)
+        .map((attr) => {
+          let groupId = 'static';
+          let attributeId = 'brand';
+          if (attr.attribute_key === 'static-brand') {
+            attributeId = 'brand';
+          } else if (attr.attribute_key === 'static-mfg') {
+            attributeId = 'manufacturer';
+          } else if (attr.attribute_key.startsWith('dyn-')) {
+            const parts = attr.attribute_key.replace('dyn-', '').split('-');
+            groupId = parts[0];
+            attributeId = parts[1];
+          }
+
+          return {
+            id: `c-${response.id}-${groupId}-${attributeId}-${latestRound?.round_number || 1}`,
+            quoteId: response.id,
+            groupId,
+            attributeId,
+            round: latestRound?.round_number || 1,
+            senderType: 'BUYER' as const,
+            senderId: currentUserId || 'usr-2',
+            comment: attr.rejection_comment || '',
+            createdAt: now,
+          };
+        });
+
+      if (commentEntries.length > 0) {
+        await rfqDb.attributeComments.bulkPut(commentEntries);
+      }
+
       await rfqDb.itemSupplierResponses.update(response.id, {
         status: newResponseStatus,
         technical_revision_rounds: updatedRounds,
