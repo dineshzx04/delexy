@@ -24,8 +24,6 @@ export interface Rfq {
   total_items_count?: number;
   total_estimated_budget?: number;
   currency?: string;
-  attachments?: RfqAttachment[];
-  timeline?: RfqTimelineEvent[];
 }
 
 export interface RfqItem {
@@ -40,17 +38,13 @@ export interface RfqItem {
   status: RfqItemStatus;
   item_source?: RfqItemSource;
   catalog_product_id?: string | null;
-  seller_product_id?: string | null;
   variant_id?: string | null;
-  variant_sku?: string | null;
   product_name?: string;
-  brand_id?: string | string[] | null;
-  manufacturer_id?: string | string[] | null;
+  brand_id?: string[] | null;
+  manufacturer_id?: string[] | null;
   target_unit_price?: number;
   awarded_quantity_total?: number;
   dynamic_attributes?: RfqItemDynamicAttribute[];
-  attachments?: RfqAttachment[];
-  target_seller_party_ids: string[];
   seller_assignments?: SellerAssignment[];
 }
 
@@ -145,55 +139,25 @@ export interface RfqAward {
   awarded_by_user_id?: string;
 }
 
-
 // ============================================================================
 // SECTION 2: NESTED SUB-STRUCTURES, LIFECYCLE ENUMS & VALUE OBJECTS
 // ============================================================================
 
-export interface RfqAttachment {
-  id: string;
-  file_name: string;
-  file_url: string;
-  file_type?: string;
-  file_size?: string;
-  uploaded_at: string;
-}
-
-export interface RfqTimelineEvent {
-  id: string;
-  rfq_id: string;
-  event_type:
-    | "CREATED"
-    | "ISSUED"
-    | "ITEM_ADDED"
-    | "SELLER_ASSIGNED"
-    | "TECHNICAL_RESPONSE_SUBMITTED"
-    | "REVISION_REQUESTED"
-    | "TECHNICAL_APPROVED"
-    | "PRODUCT_MAPPED"
-    | "COMMERCIAL_NEGOTIATED"
-    | "AWARDED"
-    | "PO_CREATED";
-  actor_name: string;
-  actor_id: string;
-  timestamp: string;
-  remarks?: string;
-}
+// export interface RfqAttachment {
+//   id: string;
+//   file_name: string;
+//   file_url: string;
+//   file_type?: string;
+//   file_size?: string;
+//   uploaded_at: string;
+// }
 
 export type RfqStatus =
-  | "DRAFT"
   | "ISSUED"
-  | "PUBLISHED"
-  | "UNDER_EVALUATION"
-  | "RESPONSES_RECEIVED"
-  | "NEGOTIATION"
-  | "AWARD_PENDING"
-  | "PARTIALLY_AWARDED"
-  | "FULLY_AWARDED"
-  | "CLOSED"
-  | "CANCELLED"
   | "IN_PROGRESS"
-  | "AWARDED";
+  | "AWARDED"
+  | "CANCELLED"
+  | "CLOSED";
 
 export type RfqItemStatus =
   | "OPEN"
@@ -204,7 +168,7 @@ export type RfqItemStatus =
 export interface RfqItemDynamicAttribute {
   group_id: string;
   attribute_id: string;
-  selected_value_ids: string[];
+  selected_value_ids: ItemAttributeValue[];
 }
 
 export interface SellerAssignment {
@@ -214,7 +178,6 @@ export interface SellerAssignment {
   assignment_type: "DIRECT_INVITATION" | "PUBLIC_MARKETPLACE";
   assigned_by_user_id: string;
   assigned_at: string;
-  status: "ASSIGNED" | "VIEWED" | "RESPONDED" | "DECLINED";
 }
 
 export type RfqItemSource = "CATALOG_PRODUCT_VARIANT" | "CUSTOM_REQUIREMENTS";
@@ -256,7 +219,6 @@ export type ItemSupplierResponseStatus =
   | "COMMERCIAL_FINALIZED"
   | "AWARDED"
   | "REJECTED";
-
 
 // ============================================================================
 // SECTION 3: UI / DERIVED / RESPONSE VIEW MODELS (API & Presentation Layer)
