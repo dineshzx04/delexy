@@ -430,17 +430,21 @@ const PlatformBrands: React.FC = () => {
       >
         <AntForm form={form} layout="vertical" onFinish={handleSaveStatus} className="mt-4">
           <AntForm.Item name="is_verified" label="Platform Verification" rules={[{ required: true }]}>
-            <AntSelect>
-              <AntSelect.Option value={true}>VERIFIED BRAND</AntSelect.Option>
-              <AntSelect.Option value={false}>UNVERIFIED</AntSelect.Option>
-            </AntSelect>
+            <AntSelect
+              options={[
+                { value: true, label: 'VERIFIED BRAND' },
+                { value: false, label: 'UNVERIFIED' },
+              ]}
+            />
           </AntForm.Item>
 
           <AntForm.Item name="is_active" label="Brand Status" rules={[{ required: true }]}>
-            <AntSelect>
-              <AntSelect.Option value={true}>ACTIVE</AntSelect.Option>
-              <AntSelect.Option value={false}>INACTIVE</AntSelect.Option>
-            </AntSelect>
+            <AntSelect
+              options={[
+                { value: true, label: 'ACTIVE' },
+                { value: false, label: 'INACTIVE' },
+              ]}
+            />
           </AntForm.Item>
         </AntForm>
       </AntModal>

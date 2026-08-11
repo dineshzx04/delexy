@@ -410,10 +410,12 @@ const PlatformManufacturers: React.FC = () => {
       >
         <AntForm form={form} layout="vertical" onFinish={handleSaveStatus} className="mt-4">
           <AntForm.Item name="status" label="Verification Status" rules={[{ required: true }]}>
-            <AntSelect>
-              <AntSelect.Option value="ACTIVE">ACTIVE</AntSelect.Option>
-              <AntSelect.Option value="PENDING_VERIFICATION">PENDING VERIFICATION</AntSelect.Option>
-            </AntSelect>
+            <AntSelect
+              options={[
+                { value: 'ACTIVE', label: 'ACTIVE' },
+                { value: 'PENDING_VERIFICATION', label: 'PENDING VERIFICATION' },
+              ]}
+            />
           </AntForm.Item>
         </AntForm>
       </AntModal>

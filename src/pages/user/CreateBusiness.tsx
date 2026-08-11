@@ -567,16 +567,16 @@ const CreateBusiness: React.FC = () => {
                     const match = unclaimedParties.find(p => p.id === val);
                     if (match) setToClaimPartyName(match.display_name);
                   }}
-                >
-                  {unclaimedParties.map(p => (
-                    <AntSelect.Option key={p.id} value={p.id}>
+                  options={unclaimedParties.map(p => ({
+                    value: p.id,
+                    label: (
                       <div className="flex justify-between items-center py-0.5">
                         <span className="font-semibold text-gray-900">{p.display_name}</span>
                         <span className="font-mono text-xs text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded">ID: {p.id}</span>
                       </div>
-                    </AntSelect.Option>
-                  ))}
-                </AntSelect>
+                    )
+                  }))}
+                />
                 {toClaimPartyId && (
                   <div className="bg-sky-50 border border-sky-200 rounded-lg p-2.5 text-xs text-sky-900 flex items-center justify-between">
                     <div>

@@ -276,10 +276,12 @@ const PlatformBusinesses: React.FC = () => {
       >
         <AntForm form={form} layout="vertical" onFinish={handleSaveStatus} className="mt-4">
           <AntForm.Item name="is_active" label="Account Status" rules={[{ required: true }]}>
-            <AntSelect>
-              <AntSelect.Option value={true}>ACTIVE</AntSelect.Option>
-              <AntSelect.Option value={false}>SUSPENDED</AntSelect.Option>
-            </AntSelect>
+            <AntSelect
+              options={[
+                { value: true, label: 'ACTIVE' },
+                { value: false, label: 'SUSPENDED' },
+              ]}
+            />
           </AntForm.Item>
 
           {/* <AntForm.Item name="is_claimed" label="Corporate Claim Status" rules={[{ required: true }]}>

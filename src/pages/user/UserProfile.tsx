@@ -22,7 +22,6 @@ import {
 } from '../../data/user';
 import { businessDb } from '../../data/business';
 
-const { Option } = AntSelect;
 
 export interface CompactEmailDisplay {
   id: string;
@@ -382,11 +381,15 @@ const UserProfile: React.FC = () => {
                     name="timezone"
                     control={profileControl}
                     render={({ field }) => (
-                      <AntSelect {...field} className="w-full">
-                        <Option value="utc">UTC (Universal Coordinated Time)</Option>
-                        <Option value="est">EST (Eastern Standard Time)</Option>
-                        <Option value="pst">PST (Pacific Standard Time)</Option>
-                      </AntSelect>
+                      <AntSelect
+                        {...field}
+                        className="w-full"
+                        options={[
+                          { value: 'utc', label: 'UTC (Universal Coordinated Time)' },
+                          { value: 'est', label: 'EST (Eastern Standard Time)' },
+                          { value: 'pst', label: 'PST (Pacific Standard Time)' },
+                        ]}
+                      />
                     )}
                   />
                 </FormItem>
