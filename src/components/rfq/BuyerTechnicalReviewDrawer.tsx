@@ -81,7 +81,7 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
     return Math.max(...quoteRevisions.map(r => r.revision_number));
   }, [quoteRevisions]);
 
-  const isFinalized = activeQuote?.status === 'FINALIZED';
+  const isFinalized = activeQuote?.status === 'NEGOTIATION' || activeQuote?.status === 'ACCEPTED' || activeQuote?.status === 'PARTIALLY_ACCEPTED';
   const isReadOnly = Boolean(forceReadOnly) || isFinalized;
 
   const attrList = useMemo(() => {
@@ -149,9 +149,9 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
         }));
 
       let initialStatus: 'APPROVED' | 'REJECTED' | 'PENDING' = 'PENDING';
-      if (activeQuote.status === 'FINALIZED') {
+      if (activeQuote.status === 'NEGOTIATION' || activeQuote?.status === 'ACCEPTED' || activeQuote?.status === 'PARTIALLY_ACCEPTED') {
         initialStatus = 'APPROVED';
-      } else if (buyerComment) {
+      } else if (buyerComment || activeQuote.status === 'REVISED') {
         initialStatus = 'REJECTED';
       }
 
@@ -261,7 +261,7 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
     try {
       const now = new Date().toISOString();
 
-      const nextQuoteStatus = action === 'APPROVE' ? 'FINALIZED' : 'DRAFT';
+      const nextQuoteStatus = action === 'APPROVE' ? 'NEGOTIATION' : 'REVISED';
       await rfqDb.seller_quotes.update(quoteId, {
         status: nextQuoteStatus,
         updated_at: now

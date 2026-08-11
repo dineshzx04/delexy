@@ -44,24 +44,18 @@ export const SupplierRfqInbox: React.FC = () => {
       const item = items.find((i) => i.id === q.rfq_item_id);
 
       let status: ItemSupplierResponseStatus = 'ASSIGNED';
-      if (q.status === 'FINALIZED') {
-        const isAwarded = awards.some(a => a.rfq_item_id === q.rfq_item_id && a.seller_party_id === q.seller_id);
-        status = isAwarded ? 'AWARDED' : 'TECHNICAL_APPROVED';
+      if (q.status === 'ACCEPTED' || q.status === 'PARTIALLY_ACCEPTED') {
+        status = 'AWARDED';
+      } else if (q.status === 'NEGOTIATION') {
+        status = 'COMMERCIAL_UNDER_NEGOTIATION';
+      } else if (q.status === 'REVISED') {
+        status = 'TECHNICAL_REVISION_REQUESTED';
       } else if (q.status === 'SUBMITTED') {
         status = 'TECHNICAL_SUBMITTED';
-      } else if (q.status === 'DRAFT') {
-        const revisionIds = quoteRevisions
-          .filter((r) => r.seller_quote_id === q.id)
-          .map((r) => r.id);
-        const hasResponseAttributes = quoteAttributes.some((a) => revisionIds.includes(a.quote_revision_id));
-        const hasBuyerRevisionFeedback = quoteComments.some(
-          (c) => c.seller_quote_id === q.id && c.sender === 'BUYER' && Boolean(c.quote_attribute_id)
-        );
-        if (hasBuyerRevisionFeedback && hasResponseAttributes) {
-          status = 'TECHNICAL_REVISION_REQUESTED';
-        } else {
-          status = 'ASSIGNED';
-        }
+      } else if (q.status === 'REJECTED') {
+        status = 'REJECTED';
+      } else {
+        status = 'ASSIGNED';
       }
 
       return {

@@ -115,42 +115,19 @@ export const ItemDetailWorkspace: React.FC = () => {
 
   const submittedResponses = React.useMemo(() => {
     const deriveQuoteStatus = (quoteId: string, quoteStatus: string): ItemSupplierResponseStatus => {
-      const revisionIds = quoteRevisions
-        .filter((r) => r.seller_quote_id === quoteId)
-        .map((r) => r.id);
-
-      const hasResponseAttributes = quoteAttributes.some((a) => revisionIds.includes(a.quote_revision_id));
-      const hasBuyerRevisionFeedback = quoteComments.some(
-        (c) => c.seller_quote_id === quoteId && c.sender === 'BUYER' && Boolean(c.quote_attribute_id)
-      );
-
-      if (quoteStatus === 'FINALIZED') return 'COMMERCIAL_FINALIZED';
+      if (quoteStatus === 'ACCEPTED' || quoteStatus === 'PARTIALLY_ACCEPTED') return 'AWARDED';
+      if (quoteStatus === 'NEGOTIATION') return 'TECHNICAL_APPROVED';
+      if (quoteStatus === 'REVISED') return 'TECHNICAL_REVISION_REQUESTED';
       if (quoteStatus === 'SUBMITTED') return 'TECHNICAL_SUBMITTED';
-
-      if (quoteStatus === 'DRAFT') {
-        if (hasBuyerRevisionFeedback && hasResponseAttributes) return 'TECHNICAL_REVISION_REQUESTED';
-        return hasResponseAttributes ? 'TECHNICAL_SUBMITTED' : 'VIEWED';
-      }
-
+      if (quoteStatus === 'REJECTED') return 'REJECTED';
       return 'ASSIGNED';
     };
 
     return quotes
       .filter((q) => {
-        if (q.status === 'SUBMITTED' || q.status === 'FINALIZED') return true;
-        if (q.status !== 'DRAFT') return false;
-
-        const revisionIds = quoteRevisions
-          .filter((r) => r.seller_quote_id === q.id)
-          .map((r) => r.id);
-
-        const hasResponseAttributes = quoteAttributes.some((a) => revisionIds.includes(a.quote_revision_id));
-        const hasBuyerRevisionFeedback = quoteComments.some(
-          (c) => c.seller_quote_id === q.id && c.sender === 'BUYER' && Boolean(c.quote_attribute_id)
-        );
-
-        // Show DRAFT in responses only if there is a revision cycle to review.
-        return hasResponseAttributes && hasBuyerRevisionFeedback;
+        if (q.status === 'SUBMITTED' || q.status === 'NEGOTIATION' || q.status === 'ACCEPTED' || q.status === 'PARTIALLY_ACCEPTED') return true;
+        if (q.status === 'REVISED') return true;
+        return false;
       })
       .map((q) => {
         const party = parties.find((p) => p.id === q.seller_id) || { display_name: `Seller ${q.seller_id}` };
@@ -183,10 +160,18 @@ export const ItemDetailWorkspace: React.FC = () => {
       const assignmentStatus = item.seller_assignments?.find((a) => a.seller_party_id === sellerId)?.status;
 
       let mappedStatus: ItemSupplierResponseStatus = mapAssignmentToSupplierStatus(assignmentStatus);
-      if (activeQuote?.status === 'FINALIZED') {
-        mappedStatus = 'COMMERCIAL_FINALIZED';
-      } else if (activeQuote?.status === 'SUBMITTED') {
-        mappedStatus = 'TECHNICAL_SUBMITTED';
+      if (activeQuote) {
+        if (activeQuote.status === 'ACCEPTED' || activeQuote.status === 'PARTIALLY_ACCEPTED') {
+          mappedStatus = 'AWARDED';
+        } else if (activeQuote.status === 'NEGOTIATION') {
+          mappedStatus = 'TECHNICAL_APPROVED';
+        } else if (activeQuote.status === 'REVISED') {
+          mappedStatus = 'TECHNICAL_REVISION_REQUESTED';
+        } else if (activeQuote.status === 'SUBMITTED') {
+          mappedStatus = 'TECHNICAL_SUBMITTED';
+        } else if (activeQuote.status === 'REJECTED') {
+          mappedStatus = 'REJECTED';
+        }
       }
 
       return {
@@ -229,12 +214,12 @@ export const ItemDetailWorkspace: React.FC = () => {
             currency: 'USD',
             awarded_by_user_id: 'usr-2',
             awarded_at: new Date().toISOString(),
-            status: 'PURCHASE_ORDER_GENERATED',
+            status: 'PO_CREATED',
             purchase_order_id: `po-2026-${Math.floor(100 + Math.random() * 900)}`,
           });
 
           await rfqDb.seller_quotes.update(alloc.quoteId, {
-            status: 'FINALIZED',
+            status: 'ACCEPTED',
             updated_at: new Date().toISOString()
           });
         }

@@ -140,19 +140,16 @@ export const SupplierItemRespond: React.FC = () => {
 
     return {
       round_number: activeRevNumber,
-      round_status: activeQuote.status === 'SUBMITTED' ? 'PENDING' : (activeQuote.status === 'FINALIZED' ? 'APPROVED' : 'REVISION_REQUESTED'),
+      round_status: activeQuote.status === 'SUBMITTED' ? 'PENDING' : 
+                   ((activeQuote.status === 'ACCEPTED' || activeQuote.status === 'PARTIALLY_ACCEPTED' || activeQuote.status === 'NEGOTIATION') ? 'APPROVED' : 'REVISION_REQUESTED'),
       buyer_review_notes: buyerCommentObj?.comment || '',
     };
   }, [activeQuote, activeComments, quoteRevisions]);
 
   const isRoundPending = activeQuote?.status === 'SUBMITTED';
-  const isRoundApproved = activeQuote?.status === 'FINALIZED';
+  const isRoundApproved = activeQuote?.status === 'ACCEPTED' || activeQuote?.status === 'PARTIALLY_ACCEPTED' || activeQuote?.status === 'NEGOTIATION';
 
-  const hasBuyerCommentsInCurrentRound = useMemo(() => {
-    return activeComments.some((c) => c.sender === 'BUYER');
-  }, [activeComments]);
-
-  const isRoundRevisionRequested = !isRoundPending && !isRoundApproved && hasBuyerCommentsInCurrentRound;
+  const isRoundRevisionRequested = activeQuote?.status === 'REVISED';
   const isViewingHistoricalRound = selectedRoundTab !== 'LATEST';
   const isInputDisabled = isViewingHistoricalRound || isRoundPending || isRoundApproved;
 

@@ -8,7 +8,8 @@ export const mockRfqAwards: RfqAward[] = [
     seller_party_id: "pty-3",
     awarded_quantity: 8,
     unit_price: 1080,
-    awarded_at: "2026-08-05T14:00:00Z"
+    awarded_at: "2026-08-05T14:00:00Z",
+    status: "PO_CREATED"
   },
   {
     id: "awd-02",
@@ -17,6 +18,7 @@ export const mockRfqAwards: RfqAward[] = [
     seller_party_id: "pty-6",
     awarded_quantity: 2,
     unit_price: 1120,
-    awarded_at: "2026-08-05T14:00:00Z"
+    awarded_at: "2026-08-05T14:00:00Z",
+    status: "PO_CREATED"
   }
 ];

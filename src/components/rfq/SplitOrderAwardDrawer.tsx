@@ -24,7 +24,7 @@ export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
 
   // Only quotes that are submitted/finalized are eligible for awards
   const eligibleQuotes = quotes.filter(
-    (q) => q.status === 'SUBMITTED' || q.status === 'FINALIZED'
+    (q) => q.status === 'SUBMITTED' || q.status === 'NEGOTIATION' || q.status === 'REVISED'
   );
 
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {

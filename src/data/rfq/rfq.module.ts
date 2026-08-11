@@ -1,45 +1,8 @@
 import type { PartyOwnerType } from "../business/business.module";
 
-export interface RfqAttachment {
-  id: string;
-  file_name: string;
-  file_url: string;
-  file_type?: string;
-  file_size?: string;
-  uploaded_at: string;
-}
-
-export interface RfqTimelineEvent {
-  id: string;
-  rfq_id: string;
-  event_type:
-    | "CREATED"
-    | "ISSUED"
-    | "ITEM_ADDED"
-    | "SELLER_ASSIGNED"
-    | "TECHNICAL_RESPONSE_SUBMITTED"
-    | "REVISION_REQUESTED"
-    | "TECHNICAL_APPROVED"
-    | "PRODUCT_MAPPED"
-    | "COMMERCIAL_NEGOTIATED"
-    | "AWARDED"
-    | "PO_CREATED";
-  actor_name: string;
-  actor_id: string;
-  timestamp: string;
-  remarks?: string;
-}
-
-export type RfqStatus =
-  | "DRAFT"
-  | "ISSUED"
-  | "UNDER_EVALUATION"
-  | "PARTIALLY_AWARDED"
-  | "FULLY_AWARDED"
-  | "CLOSED"
-  | "CANCELLED"
-  | "IN_PROGRESS"
-  | "AWARDED";
+// ============================================================================
+// SECTION 1: CORE DATABASE TABLES / ENTITIES (Persisted in Dexie DB)
+// ============================================================================
 
 export interface Rfq {
   id: string;
@@ -64,26 +27,6 @@ export interface Rfq {
   attachments?: RfqAttachment[];
   timeline?: RfqTimelineEvent[];
 }
-
-export type RfqItemStatus = "OPEN" | "PARTIALLY_AWARDED" | "FULLY_AWARDED" | "CANCELLED";
-
-export interface RfqItemDynamicAttribute {
-  group_id: string;
-  attribute_id: string;
-  selected_value_ids: string[];
-}
-
-export interface SellerAssignment {
-  id: string;
-  rfq_item_id: string;
-  seller_party_id: string;
-  assignment_type: "DIRECT_INVITATION" | "PUBLIC_MARKETPLACE";
-  assigned_by_user_id: string;
-  assigned_at: string;
-  status: "ASSIGNED" | "VIEWED" | "RESPONDED" | "DECLINED";
-}
-
-export type RfqItemSource = "CATALOG_PRODUCT_VARIANT" | "CUSTOM_REQUIREMENTS";
 
 export interface RfqItem {
   id: string;
@@ -111,11 +54,6 @@ export interface RfqItem {
   seller_assignments?: SellerAssignment[];
 }
 
-export interface ItemAttributeValue {
-  value_id: string;
-  value_label: string;
-}
-
 export interface RfqItemAttribute {
   id: string;
   rfq_item_id: string;
@@ -125,8 +63,6 @@ export interface RfqItemAttribute {
   description: string;
   values: ItemAttributeValue[];
 }
-
-export type SellerQuoteStatus = "DRAFT" | "SUBMITTED" | "FINALIZED";
 
 export interface SellerQuote {
   id: string;
@@ -202,12 +138,112 @@ export interface RfqAward {
   unit_price: number;
   awarded_at: string;
   currency?: string;
-  status?: "AWARDED" | "PURCHASE_ORDER_GENERATED";
+  status?: AwardItemStatus;
   purchase_order_id?: string;
   seller_product_id?: string;
   variant_id?: string;
   awarded_by_user_id?: string;
 }
+
+
+// ============================================================================
+// SECTION 2: NESTED SUB-STRUCTURES, LIFECYCLE ENUMS & VALUE OBJECTS
+// ============================================================================
+
+export interface RfqAttachment {
+  id: string;
+  file_name: string;
+  file_url: string;
+  file_type?: string;
+  file_size?: string;
+  uploaded_at: string;
+}
+
+export interface RfqTimelineEvent {
+  id: string;
+  rfq_id: string;
+  event_type:
+    | "CREATED"
+    | "ISSUED"
+    | "ITEM_ADDED"
+    | "SELLER_ASSIGNED"
+    | "TECHNICAL_RESPONSE_SUBMITTED"
+    | "REVISION_REQUESTED"
+    | "TECHNICAL_APPROVED"
+    | "PRODUCT_MAPPED"
+    | "COMMERCIAL_NEGOTIATED"
+    | "AWARDED"
+    | "PO_CREATED";
+  actor_name: string;
+  actor_id: string;
+  timestamp: string;
+  remarks?: string;
+}
+
+export type RfqStatus =
+  | "DRAFT"
+  | "ISSUED"
+  | "PUBLISHED"
+  | "UNDER_EVALUATION"
+  | "RESPONSES_RECEIVED"
+  | "NEGOTIATION"
+  | "AWARD_PENDING"
+  | "PARTIALLY_AWARDED"
+  | "FULLY_AWARDED"
+  | "CLOSED"
+  | "CANCELLED"
+  | "IN_PROGRESS"
+  | "AWARDED";
+
+export type RfqItemStatus =
+  | "OPEN"
+  | "PARTIALLY_AWARDED"
+  | "FULLY_AWARDED"
+  | "CANCELLED";
+
+export interface RfqItemDynamicAttribute {
+  group_id: string;
+  attribute_id: string;
+  selected_value_ids: string[];
+}
+
+export interface SellerAssignment {
+  id: string;
+  rfq_item_id: string;
+  seller_party_id: string;
+  assignment_type: "DIRECT_INVITATION" | "PUBLIC_MARKETPLACE";
+  assigned_by_user_id: string;
+  assigned_at: string;
+  status: "ASSIGNED" | "VIEWED" | "RESPONDED" | "DECLINED";
+}
+
+export type RfqItemSource = "CATALOG_PRODUCT_VARIANT" | "CUSTOM_REQUIREMENTS";
+
+export interface ItemAttributeValue {
+  value_id: string;
+  value_label: string;
+}
+
+export type SellerQuoteStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "NEGOTIATION"
+  | "REVISED"
+  | "ACCEPTED"
+  | "PARTIALLY_ACCEPTED"
+  | "REJECTED"
+  | "EXPIRED"
+  | "WITHDRAWN";
+
+export type AwardItemStatus =
+  | "PENDING"
+  | "AWARDED"
+  | "PRODUCT_PENDING"
+  | "PRODUCT_SUBMITTED"
+  | "PRODUCT_APPROVED"
+  | "BUYER_ACKNOWLEDGED"
+  | "PO_CREATED"
+  | "CANCELLED";
 
 export type ItemSupplierResponseStatus =
   | "ASSIGNED"
@@ -220,6 +256,11 @@ export type ItemSupplierResponseStatus =
   | "COMMERCIAL_FINALIZED"
   | "AWARDED"
   | "REJECTED";
+
+
+// ============================================================================
+// SECTION 3: UI / DERIVED / RESPONSE VIEW MODELS (API & Presentation Layer)
+// ============================================================================
 
 export interface AttributeCommentEntry {
   id: string;

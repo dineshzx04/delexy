@@ -32,7 +32,7 @@ export const TechnicalComparisonTable: React.FC<TechnicalComparisonTableProps> =
   const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
 
   const respondedQuotes = quotes.filter(
-    (q) => q.status === 'SUBMITTED' || q.status === 'FINALIZED'
+    (q) => q.status === 'SUBMITTED' || q.status === 'NEGOTIATION' || q.status === 'REVISED' || q.status === 'ACCEPTED' || q.status === 'PARTIALLY_ACCEPTED'
   );
 
   const requestedBrandName = Array.isArray(item.brand_id)
@@ -103,7 +103,7 @@ export const TechnicalComparisonTable: React.FC<TechnicalComparisonTableProps> =
 
   const sellerColumns: any[] = respondedQuotes.map((q) => {
     const party = parties.find((p) => p.id === q.seller_id) || { display_name: `Seller ${q.seller_id}` };
-    const statusText = q.status === 'FINALIZED' ? 'TECHNICAL_APPROVED' : 'TECHNICAL_SUBMITTED';
+    const statusText = (q.status === 'NEGOTIATION' || q.status === 'ACCEPTED' || q.status === 'PARTIALLY_ACCEPTED') ? 'TECHNICAL_APPROVED' : (q.status === 'REVISED' ? 'REVISION_REQUESTED' : 'TECHNICAL_SUBMITTED');
 
     return {
       title: (
