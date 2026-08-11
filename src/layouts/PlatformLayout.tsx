@@ -38,6 +38,14 @@ const PlatformLayout: React.FC = () => {
     }
   };
 
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/p/dashboard');
+  };
+
   const breadcrumbItems = customBreadcrumbs || [];
 
   const userMenuItems: MenuProps['items'] = [
@@ -336,6 +344,16 @@ const PlatformLayout: React.FC = () => {
 
         {/* Scrollable Content */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full">
+          <div className="mb-3">
+            <AntButton
+              type="default"
+              icon={<Lucide.ArrowLeft size={16} />}
+              onClick={handleGoBack}
+              className="h-9 px-3 rounded-md border-gray-300 text-gray-700 font-medium hover:border-gray-400 hover:text-gray-900"
+            >
+              Back to Previous Page
+            </AntButton>
+          </div>
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb

@@ -97,10 +97,10 @@ export const SupplierItemRespond: React.FC = () => {
 
   const itemAttributes = useLiveQuery(
     async () => {
-      if (!item?.current_revision_id) return [];
-      return rfqDb.rfq_item_attributes.where('rfq_item_revision_id').equals(item.current_revision_id).toArray();
+      if (!item?.id) return [];
+      return rfqDb.rfq_item_attributes.where('rfq_item_id').equals(item.id).toArray();
     },
-    [item?.current_revision_id]
+    [item?.id]
   ) || [];
 
   const sellerProduct = useLiveQuery(
@@ -132,7 +132,7 @@ export const SupplierItemRespond: React.FC = () => {
   const latestRound = useMemo(() => {
     if (!activeQuote) return null;
     const activeRevNumber = quoteRevisions.find(r => r.id === activeQuote.current_revision_id)?.revision_number || 1;
-    
+
     // Find the latest buyer comment on the quote revision
     const buyerCommentObj = activeComments
       .filter(c => c.sender === 'BUYER')
@@ -147,11 +147,11 @@ export const SupplierItemRespond: React.FC = () => {
 
   const isRoundPending = activeQuote?.status === 'SUBMITTED';
   const isRoundApproved = activeQuote?.status === 'FINALIZED';
-  
+
   const hasBuyerCommentsInCurrentRound = useMemo(() => {
     return activeComments.some((c) => c.sender === 'BUYER');
   }, [activeComments]);
-  
+
   const isRoundRevisionRequested = !isRoundPending && !isRoundApproved && hasBuyerCommentsInCurrentRound;
   const isViewingHistoricalRound = selectedRoundTab !== 'LATEST';
   const isInputDisabled = isViewingHistoricalRound || isRoundPending || isRoundApproved;
@@ -384,7 +384,7 @@ export const SupplierItemRespond: React.FC = () => {
       await rfqDb.seller_quote_revisions.put({
         id: quoteRevisionId,
         seller_quote_id: quoteId,
-        rfq_item_revision_id: item.current_revision_id || 'rev-item-01-1',
+        rfq_item_id: item.id,
         revision_number: nextRoundNum,
         created_by: currentUserId || 'usr-2',
         created_at: new Date().toISOString()
@@ -477,9 +477,6 @@ export const SupplierItemRespond: React.FC = () => {
               Technical response & deviation matrix for <strong>{activePartyName}</strong>.
             </p>
           </div>
-          <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(basePath)}>
-            Back to Inbox
-          </Button>
         </div>
 
         {revisionRounds.length > 0 && (
@@ -613,7 +610,7 @@ export const SupplierItemRespond: React.FC = () => {
                                     return { value_id: val, value_label: opt?.label || val };
                                   });
                                   const isDev = offeredVals.some(v => !spec.requested.some(r => r.value_id === v.value_id)) ||
-                                                spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
+                                    spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
                                   setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, is_deviated: isDev } });
                                 }}
                               />
@@ -626,7 +623,7 @@ export const SupplierItemRespond: React.FC = () => {
                                   const valStr = e.target.value;
                                   const offeredVals = valStr.split(',').map(s => s.trim()).filter(Boolean).map(v => ({ value_id: v, value_label: v }));
                                   const isDev = offeredVals.some(v => !spec.requested.some(r => r.value_id === v.value_id)) ||
-                                                spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
+                                    spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
                                   setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, is_deviated: isDev } });
                                 }}
                               />
@@ -720,7 +717,7 @@ export const SupplierItemRespond: React.FC = () => {
                                         return { value_id: val, value_label: opt?.label || val };
                                       });
                                       const isDev = offeredVals.some(v => !spec.requested.some(r => r.value_id === v.value_id)) ||
-                                                    spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
+                                        spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
                                       setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, is_deviated: isDev } });
                                     }}
                                   />
@@ -733,7 +730,7 @@ export const SupplierItemRespond: React.FC = () => {
                                       const valStr = e.target.value;
                                       const offeredVals = valStr.split(',').map(s => s.trim()).filter(Boolean).map(v => ({ value_id: v, value_label: v }));
                                       const isDev = offeredVals.some(v => !spec.requested.some(r => r.value_id === v.value_id)) ||
-                                                    spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
+                                        spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
                                       setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, is_deviated: isDev } });
                                     }}
                                   />

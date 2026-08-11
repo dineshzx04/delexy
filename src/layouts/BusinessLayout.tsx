@@ -77,6 +77,14 @@ const BusinessLayout: React.FC = () => {
     }
   };
 
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/b/dashboard');
+  };
+
   const breadcrumbItems = customBreadcrumbs || [];
 
   const userMenuItems: MenuProps['items'] = [
@@ -387,6 +395,16 @@ const BusinessLayout: React.FC = () => {
 
         {/* Content Body */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full">
+          <div className="mb-3">
+            <AntButton
+              type="default"
+              icon={<Lucide.ArrowLeft size={16} />}
+              onClick={handleGoBack}
+              className="h-9 px-3 rounded-md border-slate-300 text-slate-700 font-medium hover:border-slate-400 hover:text-slate-900"
+            >
+              Back to Previous Page
+            </AntButton>
+          </div>
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />

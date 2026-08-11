@@ -150,7 +150,7 @@ export const TechnicalComparisonTable: React.FC<TechnicalComparisonTableProps> =
           isDeviated = attrResp.offered_values.some((v: any) => !targetIds.includes(v.value_id)) ||
                        targetIds.some((id: string) => !attrResp.offered_values.some((v: any) => v.value_id === id));
         } else {
-          const buyerAttr = allItemAttributes.find(ia => ia.rfq_item_revision_id === item.current_revision_id && ia.group_id === record.group_id && ia.attribute_id === record.attribute_id);
+          const buyerAttr = allItemAttributes.find(ia => ia.rfq_item_id === item.id && ia.group_id === record.group_id && ia.attribute_id === record.attribute_id);
           isDeviated = buyerAttr ? (
             attrResp.offered_values.some((v: any) => !buyerAttr.values.some((r: any) => r.value_id === v.value_id)) ||
             buyerAttr.values.some((r: any) => !attrResp.offered_values.some((v: any) => v.value_id === r.value_id))

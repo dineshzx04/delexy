@@ -58,7 +58,7 @@ export const mockSellerQuoteAttributes: SellerQuoteAttribute[] = [
   {
     id: "qa-05-1-1",
     quote_revision_id: "qrev-005-1",
-    item_attribute_id: "ia-03-1-1",
+    item_attribute_id: "ia-03-2-1",
     group_id: "grp-7",
     attribute_id: "attr-13",
     attribute_name: "US Shoe Size",
@@ -76,10 +76,19 @@ export const mockSellerQuoteAttributes: SellerQuoteAttribute[] = [
   {
     id: "qa-06-1-1",
     quote_revision_id: "qrev-006-1",
-    item_attribute_id: "ia-03-1-1",
+    item_attribute_id: "ia-03-2-1",
     group_id: "grp-7",
     attribute_id: "attr-13",
     attribute_name: "US Shoe Size",
     offered_values: [{ value_id: "val-13-2", value_label: "US 11" }]
+  },
+  {
+    id: "qa-06-1-2",
+    quote_revision_id: "qrev-006-1",
+    item_attribute_id: "ia-03-2-2",
+    group_id: "grp-7",
+    attribute_id: "attr-14",
+    attribute_name: "Shoe Width",
+    offered_values: [{ value_id: "val-14-1", value_label: "Standard (D)" }]
   }
 ];

@@ -35,19 +35,33 @@ export const SupplierRfqInbox: React.FC = () => {
   const items = useLiveQuery(() => rfqDb.rfq_items.toArray(), []) || [];
   const rfqs = useLiveQuery(() => rfqDb.rfqs.toArray(), []) || [];
   const awards = useLiveQuery(() => rfqDb.rfq_awards.toArray(), []) || [];
+  const quoteRevisions = useLiveQuery(() => rfqDb.seller_quote_revisions.toArray(), []) || [];
+  const quoteAttributes = useLiveQuery(() => rfqDb.seller_quote_attributes.toArray(), []) || [];
+  const quoteComments = useLiveQuery(() => rfqDb.seller_quote_comments.toArray(), []) || [];
 
   const allResponses = useMemo(() => {
     return quotes.map((q) => {
       const item = items.find((i) => i.id === q.rfq_item_id);
-      
+
       let status: ItemSupplierResponseStatus = 'ASSIGNED';
-      if (q.status === 'DRAFT') {
-        status = 'ASSIGNED';
-      } else if (q.status === 'SUBMITTED') {
-        status = 'TECHNICAL_SUBMITTED';
-      } else if (q.status === 'FINALIZED') {
+      if (q.status === 'FINALIZED') {
         const isAwarded = awards.some(a => a.rfq_item_id === q.rfq_item_id && a.seller_party_id === q.seller_id);
         status = isAwarded ? 'AWARDED' : 'TECHNICAL_APPROVED';
+      } else if (q.status === 'SUBMITTED') {
+        status = 'TECHNICAL_SUBMITTED';
+      } else if (q.status === 'DRAFT') {
+        const revisionIds = quoteRevisions
+          .filter((r) => r.seller_quote_id === q.id)
+          .map((r) => r.id);
+        const hasResponseAttributes = quoteAttributes.some((a) => revisionIds.includes(a.quote_revision_id));
+        const hasBuyerRevisionFeedback = quoteComments.some(
+          (c) => c.seller_quote_id === q.id && c.sender === 'BUYER' && Boolean(c.quote_attribute_id)
+        );
+        if (hasBuyerRevisionFeedback && hasResponseAttributes) {
+          status = 'TECHNICAL_REVISION_REQUESTED';
+        } else {
+          status = 'ASSIGNED';
+        }
       }
 
       return {
@@ -59,7 +73,7 @@ export const SupplierRfqInbox: React.FC = () => {
         product_mapping: q.seller_product_mapping || null,
       };
     });
-  }, [quotes, items, rfqs, awards]);
+  }, [quotes, items, rfqs, awards, quoteRevisions, quoteAttributes, quoteComments]);
 
   const filteredResponses = allResponses.filter((resp: any) => {
     const item = items.find((i) => i.id === resp.rfq_item_id);
@@ -81,40 +95,40 @@ export const SupplierRfqInbox: React.FC = () => {
         const rfq = rfqs.find((r) => r.id === record.rfq_id);
         return (
           <div>
-            <div className="font-bold text-slate-900 text-base">{item?.product_name || 'Flagship Mobile Device'}</div>
-            <div className="text-xs text-slate-500">RFQ: <span className="font-semibold text-slate-700">{rfq?.rfq_number}</span> ({rfq?.title})</div>
+            <div className="font-bold text-slate-800 text-sm">{item?.product_name || 'Flagship Mobile Device'}</div>
+            <div className="text-[11px] text-slate-500">RFQ: <span className="font-semibold text-slate-600">{rfq?.rfq_number}</span> ({rfq?.title})</div>
           </div>
         );
       },
     },
     {
-      title: 'Requested Quantity',
+      title: 'Requested Qty',
       key: 'quantity',
-      width: 160,
+      width: 140,
       render: (_: any, record: any) => {
         const item = items.find((i) => i.id === record.rfq_item_id);
-        return <span className="font-bold text-slate-800">{item?.quantity || 100} {item?.unit || 'Units'}</span>;
+        return <span className="font-bold text-slate-700 text-xs">{item?.quantity || 100} {item?.unit || 'Units'}</span>;
       },
     },
     {
-      title: 'Response Status',
+      title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      width: 190,
+      width: 170,
       render: (status: ItemSupplierResponseStatus) => <ItemSupplierStatusBadge status={status} />,
     },
     {
       title: 'Catalog Product Mapping',
       key: 'product_mapping',
-      width: 220,
+      width: 200,
       render: (_: any, record: any) => {
         if (!record.product_mapping?.seller_product_id) {
-          return <Tag color="volcano">Product Not Mapped</Tag>;
+          return <Tag color="volcano" className="text-[10px] py-0 px-1.5">Product Not Mapped</Tag>;
         }
         return (
           <div>
-            <Tag color="purple">{record.product_mapping.seller_product_id}</Tag>
-            <div className="text-[10px] text-slate-500 font-mono">Variant: {record.product_mapping.variant_id}</div>
+            <Tag color="purple" className="text-[10px] py-0 px-1.5">{record.product_mapping.seller_product_id}</Tag>
+            <div className="text-[9px] text-slate-400 font-mono">Variant: {record.product_mapping.variant_id}</div>
           </div>
         );
       },
@@ -122,45 +136,49 @@ export const SupplierRfqInbox: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      width: 180,
+      width: 150,
       render: (_: any, record: any) => {
         const basePath = isBusinessContext ? '/b' : '/user';
         return (
           <Button
             type="primary"
-            onClick={() => navigate(`${basePath}/rfqs/${record.rfq_id}/items/${record.rfq_item_id}/respond`)}
+            size="small"
+            onClick={() => navigate(`${basePath}/supplier/rfqs/${record.rfq_id}/items/${record.rfq_item_id}/respond`)}
             icon={<SendOutlined />}
-            className="bg-emerald-600 hover:bg-emerald-700 font-semibold"
+            className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
           >
-            {record.status === 'ASSIGNED' ? 'Submit Response' : 'Update Response'}
+            {record.status === 'ASSIGNED' ? 'Submit' : 'Update'}
           </Button>
         );
       },
     },
   ];
-
+  
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 max-w-7xl mx-auto space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black text-slate-900">Supplier Sourcing Inbox</h1>
-            <Tag color="purple" icon={isBusinessContext ? <BankOutlined /> : <UserOutlined />} className="px-2.5 py-0.5 font-bold">
+            <h1 className="text-lg font-black text-slate-900 mb-0">Supplier Sourcing Inbox</h1>
+            <Tag color="purple" icon={isBusinessContext ? <BankOutlined /> : <UserOutlined />} className="px-2 py-0 font-bold text-[11px]">
               Seller Party: {activeParty?.display_name || ''} ({activePartyId})
             </Tag>
           </div>
-          <p className="text-sm text-slate-500">View assigned RFQ opportunities for seller party {activeParty?.display_name || ''}.</p>
+          <p className="text-xs text-slate-500 mt-0.5">View assigned RFQ opportunities for seller party {activeParty?.display_name || ''}.</p>
         </div>
       </div>
 
-      <Card className="shadow-sm border-slate-200">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <Card className="shadow-sm border-slate-200" size="small">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2.5">
           <Tabs
             activeKey={activeTab}
             onChange={setActiveTab}
+            size="small"
+            className="mb-0"
             items={[
-              { key: 'ALL', label: `All Requests (${allResponses.length})` },
+              { key: 'ALL', label: `All (${allResponses.length})` },
               { key: 'ASSIGNED', label: 'Assigned' },
+              { key: 'TECHNICAL_REVISION_REQUESTED', label: 'Revision Requests' },
               { key: 'TECHNICAL_SUBMITTED', label: 'Tech Submitted' },
               { key: 'TECHNICAL_APPROVED', label: 'Tech Approved' },
               { key: 'PRODUCT_MAPPED', label: 'Product Mapped' },
@@ -174,12 +192,19 @@ export const SupplierRfqInbox: React.FC = () => {
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="w-full md:w-64"
+            className="w-full md:w-56"
+            size="small"
             allowClear
           />
         </div>
 
-        <Table dataSource={filteredResponses} columns={columns} rowKey="id" pagination={{ pageSize: 8 }} />
+        <Table
+          dataSource={filteredResponses}
+          columns={columns}
+          rowKey="id"
+          size="small"
+          pagination={{ pageSize: 10, size: 'small' }}
+        />
       </Card>
     </div>
   );

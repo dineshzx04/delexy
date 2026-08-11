@@ -92,7 +92,6 @@ export interface RfqItem {
   quantity: number;
   unit: string;
   item_index?: number;
-  current_revision_id?: string | null;
   created_at: string;
   updated_at: string;
   status: RfqItemStatus;
@@ -112,14 +111,6 @@ export interface RfqItem {
   seller_assignments?: SellerAssignment[];
 }
 
-export interface RfqItemRevision {
-  id: string;
-  rfq_item_id: string;
-  revision_number: number;
-  created_by: string;
-  created_at: string;
-}
-
 export interface ItemAttributeValue {
   value_id: string;
   value_label: string;
@@ -127,7 +118,7 @@ export interface ItemAttributeValue {
 
 export interface RfqItemAttribute {
   id: string;
-  rfq_item_revision_id: string;
+  rfq_item_id: string;
   group_id: string;
   attribute_id: string;
   attribute_name: string;
@@ -157,7 +148,7 @@ export interface SellerQuote {
 export interface SellerQuoteRevision {
   id: string;
   seller_quote_id: string;
-  rfq_item_revision_id: string;
+  rfq_item_id: string;
   revision_number: number;
   created_by: string;
   created_at: string;

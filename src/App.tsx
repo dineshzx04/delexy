@@ -29,7 +29,6 @@ import BusinessMembers from './pages/business/BusinessMembers';
 import BusinessRoles from './pages/business/BusinessRoles';
 import BusinessEmailsPage from './pages/business/BusinessEmailsPage';
 import BusinessSettings from './pages/business/BusinessSettings';
-import BusinessRFQs from './pages/business/BusinessRFQs';
 import BusinessProfile from './pages/business/BusinessProfile';
 import BusinessPartyManufacturerBrands from './pages/business/BusinessPartyManufacturerBrands';
 

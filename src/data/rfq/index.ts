@@ -1,7 +1,6 @@
 export * from "./rfq.module";
 export * from "./rfqs";
 export * from "./rfqItems";
-export * from "./rfqItemRevisions";
 export * from "./rfqItemAttributes";
 export * from "./sellerQuotes";
 export * from "./sellerQuoteRevisions";

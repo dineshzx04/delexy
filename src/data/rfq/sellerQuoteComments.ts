@@ -40,7 +40,7 @@ export const mockSellerQuoteComments: SellerQuoteComment[] = [
   {
     id: "c-005",
     seller_quote_id: "q-005",
-    quote_attribute_id: "qa-05-2-1",
+    quote_attribute_id: "qa-05-1-1",
     comment: "We have requested a revision to size US 10. Can you confirm if backorder cleared?",
     sender: "BUYER",
     sender_id: "pty-1",

@@ -38,7 +38,61 @@ export const mockRfqs: Rfq[] = [
         actor_name: "John Doe",
         actor_id: "usr-2",
         timestamp: "2026-08-01T10:00:00Z",
-        remarks: "RFQ issued to suppliers."
+        remarks: "RFQ issued to assigned suppliers."
+      },
+      {
+        id: "ev-03",
+        rfq_id: "rfq-01",
+        event_type: "SELLER_ASSIGNED",
+        actor_name: "John Doe",
+        actor_id: "usr-2",
+        timestamp: "2026-08-01T10:05:00Z",
+        remarks: "Suppliers mapped to all three line items."
+      },
+      {
+        id: "ev-04",
+        rfq_id: "rfq-01",
+        event_type: "TECHNICAL_RESPONSE_SUBMITTED",
+        actor_name: "Supplier Parties",
+        actor_id: "system",
+        timestamp: "2026-08-02T12:05:00Z",
+        remarks: "Initial technical responses submitted for active items."
+      },
+      {
+        id: "ev-05",
+        rfq_id: "rfq-01",
+        event_type: "REVISION_REQUESTED",
+        actor_name: "John Doe",
+        actor_id: "usr-2",
+        timestamp: "2026-08-03T08:30:00Z",
+        remarks: "Buyer requested revision for item-03 shoe size requirement."
+      },
+      {
+        id: "ev-06",
+        rfq_id: "rfq-01",
+        event_type: "TECHNICAL_RESPONSE_SUBMITTED",
+        actor_name: "ASICS Seller Party",
+        actor_id: "pty-3",
+        timestamp: "2026-08-03T09:00:00Z",
+        remarks: "Round-2 technical response submitted for item-03."
+      },
+      {
+        id: "ev-07",
+        rfq_id: "rfq-01",
+        event_type: "TECHNICAL_APPROVED",
+        actor_name: "John Doe",
+        actor_id: "usr-2",
+        timestamp: "2026-08-05T14:00:00Z",
+        remarks: "Technical comparison finalized for item-01 suppliers."
+      },
+      {
+        id: "ev-08",
+        rfq_id: "rfq-01",
+        event_type: "AWARDED",
+        actor_name: "John Doe",
+        actor_id: "usr-2",
+        timestamp: "2026-08-05T14:00:00Z",
+        remarks: "Split award released for item-01 across two suppliers."
       }
     ]
   }

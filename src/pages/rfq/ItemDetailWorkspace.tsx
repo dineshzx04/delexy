@@ -17,6 +17,7 @@ import { TechnicalComparisonTable } from '../../components/rfq/TechnicalComparis
 import { BuyerTechnicalReviewDrawer } from '../../components/rfq/BuyerTechnicalReviewDrawer';
 import { SplitOrderAwardDrawer } from '../../components/rfq/SplitOrderAwardDrawer';
 import { businessDb } from '../../data/business/business.db';
+import type { ItemSupplierResponseStatus } from '../../data/rfq';
 
 export const ItemDetailWorkspace: React.FC = () => {
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
@@ -26,8 +27,9 @@ export const ItemDetailWorkspace: React.FC = () => {
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
   const { message: antMessage } = AntApp.useApp();
 
-  const [activeTab, setActiveTab] = useState('responses');
+  const [activeTab, setActiveTab] = useState('item-attributes');
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
+  const [isTechReviewReadOnly, setIsTechReviewReadOnly] = useState(false);
   const [techReviewDrawerOpen, setTechReviewDrawerOpen] = useState(false);
   const [awardDrawerOpen, setAwardDrawerOpen] = useState(false);
 
@@ -35,20 +37,125 @@ export const ItemDetailWorkspace: React.FC = () => {
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
   const quotes = useLiveQuery(() => (itemId ? rfqDb.seller_quotes.where('rfq_item_id').equals(itemId).toArray() : []), [itemId]) || [];
   const quoteRevisions = useLiveQuery(() => rfqDb.seller_quote_revisions.toArray(), []) || [];
+  const quoteAttributes = useLiveQuery(() => rfqDb.seller_quote_attributes.toArray(), []) || [];
+  const quoteComments = useLiveQuery(() => rfqDb.seller_quote_comments.toArray(), []) || [];
+  const allItemAttributes = useLiveQuery(() => rfqDb.rfq_item_attributes.toArray(), []) || [];
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
+  const allAttributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
   const categoryName = categories.find((c) => c.id === item?.category_id)?.name;
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
+  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+
+  const currentItemAttributes = React.useMemo(() => {
+    if (!itemId) return [];
+    return allItemAttributes.filter((attr) => attr.rfq_item_id === itemId);
+  }, [allItemAttributes, itemId]);
+
+  const itemAttributeGroups = React.useMemo(() => {
+    const groupedMap: Record<string, { groupName: string; rows: any[] }> = {};
+
+    currentItemAttributes.forEach((attr) => {
+      const groupId = attr.group_id || 'ungrouped';
+      const groupName = allAttributeGroups.find((g) => g.id === attr.group_id)?.name || 'Ungrouped Attributes';
+
+      if (!groupedMap[groupId]) {
+        groupedMap[groupId] = { groupName, rows: [] };
+      }
+
+      groupedMap[groupId].rows.push({
+        key: attr.id,
+        attribute_name: attr.attribute_name,
+        description: attr.description || '-',
+        requested_values: (attr.values || []).map((v: any) => v.value_label || v.value_id).join(', ') || '-',
+        value_count: (attr.values || []).length,
+      });
+    });
+
+    return Object.entries(groupedMap).sort((a, b) => a[1].groupName.localeCompare(b[1].groupName));
+  }, [currentItemAttributes, allAttributeGroups]);
+
+  const brandLookup = React.useMemo(() => {
+    const map = new Map<string, string>();
+    allBrands.forEach((brand: any) => {
+      map.set(brand.id, brand.name || brand.brand_name || brand.id);
+    });
+    return map;
+  }, [allBrands]);
+
+  const manufacturerLookup = React.useMemo(() => {
+    const map = new Map<string, string>();
+    allManufacturers.forEach((mfg: any) => {
+      map.set(mfg.id, mfg.name || mfg.manufacturer_name || mfg.id);
+    });
+    return map;
+  }, [allManufacturers]);
+
+  const normalizeToArray = (value: string | string[] | null | undefined): string[] => {
+    if (!value) return [];
+    return Array.isArray(value) ? value : [value];
+  };
+
+  const staticItemDetails = React.useMemo(() => {
+    const brandIds = normalizeToArray(item?.brand_id);
+    const manufacturerIds = normalizeToArray(item?.manufacturer_id);
+
+    const brandNames = brandIds.map((id) => brandLookup.get(id) || id).join(', ') || '-';
+    const manufacturerNames = manufacturerIds.map((id) => manufacturerLookup.get(id) || id).join(', ') || '-';
+
+    return [
+      { key: 'category', detail: 'Category', value: categoryName || '-' },
+      { key: 'qty', detail: 'Required Quantity', value: `${item?.quantity || '-'} ${item?.unit || ''}`.trim() },
+      { key: 'target', detail: 'Target Unit Price', value: item?.target_unit_price ? `$${item.target_unit_price}` : '-' },
+      { key: 'brand', detail: 'Preferred Brand', value: brandNames },
+      { key: 'manufacturer', detail: 'Preferred Manufacturer', value: manufacturerNames },
+      { key: 'source', detail: 'Item Source', value: item?.item_source || '-' },
+    ];
+  }, [categoryName, item, brandLookup, manufacturerLookup]);
 
   const submittedResponses = React.useMemo(() => {
+    const deriveQuoteStatus = (quoteId: string, quoteStatus: string): ItemSupplierResponseStatus => {
+      const revisionIds = quoteRevisions
+        .filter((r) => r.seller_quote_id === quoteId)
+        .map((r) => r.id);
+
+      const hasResponseAttributes = quoteAttributes.some((a) => revisionIds.includes(a.quote_revision_id));
+      const hasBuyerRevisionFeedback = quoteComments.some(
+        (c) => c.seller_quote_id === quoteId && c.sender === 'BUYER' && Boolean(c.quote_attribute_id)
+      );
+
+      if (quoteStatus === 'FINALIZED') return 'COMMERCIAL_FINALIZED';
+      if (quoteStatus === 'SUBMITTED') return 'TECHNICAL_SUBMITTED';
+
+      if (quoteStatus === 'DRAFT') {
+        if (hasBuyerRevisionFeedback && hasResponseAttributes) return 'TECHNICAL_REVISION_REQUESTED';
+        return hasResponseAttributes ? 'TECHNICAL_SUBMITTED' : 'VIEWED';
+      }
+
+      return 'ASSIGNED';
+    };
+
     return quotes
-      .filter((q) => q.status === 'SUBMITTED' || q.status === 'FINALIZED')
+      .filter((q) => {
+        if (q.status === 'SUBMITTED' || q.status === 'FINALIZED') return true;
+        if (q.status !== 'DRAFT') return false;
+
+        const revisionIds = quoteRevisions
+          .filter((r) => r.seller_quote_id === q.id)
+          .map((r) => r.id);
+
+        const hasResponseAttributes = quoteAttributes.some((a) => revisionIds.includes(a.quote_revision_id));
+        const hasBuyerRevisionFeedback = quoteComments.some(
+          (c) => c.seller_quote_id === q.id && c.sender === 'BUYER' && Boolean(c.quote_attribute_id)
+        );
+
+        // Show DRAFT in responses only if there is a revision cycle to review.
+        return hasResponseAttributes && hasBuyerRevisionFeedback;
+      })
       .map((q) => {
         const party = parties.find((p) => p.id === q.seller_id) || { display_name: `Seller ${q.seller_id}` };
-        
-        let mappedStatus = 'TECHNICAL_SUBMITTED';
-        if (q.status === 'FINALIZED') {
-          mappedStatus = 'COMMERCIAL_FINALIZED';
-        }
+
+        const mappedStatus = deriveQuoteStatus(q.id, q.status);
 
         return {
           ...q,
@@ -56,23 +163,30 @@ export const ItemDetailWorkspace: React.FC = () => {
           mapped_status: mappedStatus,
         };
       });
-  }, [quotes, parties]);
+  }, [quotes, parties, quoteRevisions, quoteAttributes, quoteComments]);
 
   const assignedSuppliers = React.useMemo(() => {
     if (!item) return [];
+
+    const mapAssignmentToSupplierStatus = (
+      assignmentStatus?: 'ASSIGNED' | 'VIEWED' | 'RESPONDED' | 'DECLINED'
+    ): ItemSupplierResponseStatus => {
+      if (assignmentStatus === 'VIEWED') return 'VIEWED';
+      if (assignmentStatus === 'RESPONDED') return 'TECHNICAL_SUBMITTED';
+      if (assignmentStatus === 'DECLINED') return 'REJECTED';
+      return 'ASSIGNED';
+    };
+
     return (item.target_seller_party_ids || []).map((sellerId: string) => {
       const activeQuote = quotes.find((q) => q.seller_id === sellerId);
       const party = parties.find((p) => p.id === sellerId) || { display_name: `Seller ${sellerId}` };
+      const assignmentStatus = item.seller_assignments?.find((a) => a.seller_party_id === sellerId)?.status;
 
-      let mappedStatus = 'ASSIGNED';
-      if (activeQuote) {
-        if (activeQuote.status === 'FINALIZED') {
-          mappedStatus = 'COMMERCIAL_FINALIZED';
-        } else if (activeQuote.status === 'SUBMITTED') {
-          mappedStatus = 'TECHNICAL_SUBMITTED';
-        } else if (activeQuote.status === 'DRAFT') {
-          mappedStatus = 'VIEWED';
-        }
+      let mappedStatus: ItemSupplierResponseStatus = mapAssignmentToSupplierStatus(assignmentStatus);
+      if (activeQuote?.status === 'FINALIZED') {
+        mappedStatus = 'COMMERCIAL_FINALIZED';
+      } else if (activeQuote?.status === 'SUBMITTED') {
+        mappedStatus = 'TECHNICAL_SUBMITTED';
       }
 
       return {
@@ -137,78 +251,7 @@ export const ItemDetailWorkspace: React.FC = () => {
       antMessage.error('Failed to process split order awards');
     }
   };
-
-  const responseColumns = [
-    {
-      title: 'Supplier Party',
-      dataIndex: 'seller_party_name',
-      key: 'seller_party_name',
-      render: (text: string) => <span className="font-bold text-slate-900">{text}</span>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'mapped_status',
-      key: 'status',
-      width: 220,
-      render: (status: any) => <ItemSupplierStatusBadge status={status} />,
-    },
-    {
-      title: 'Technical Round',
-      key: 'round',
-      width: 140,
-      render: (_: any, record: any) => {
-        const revisions = quoteRevisions.filter((r) => r.seller_quote_id === record.id);
-        const maxRound = revisions.length > 0 ? Math.max(...revisions.map((r) => r.revision_number)) : 1;
-        return <Tag color="cyan">Round #{maxRound}</Tag>;
-      },
-    },
-    {
-      title: 'Offered Price ($)',
-      dataIndex: 'unit_price',
-      key: 'price',
-      width: 140,
-      render: (price: number) => {
-        return <span className="font-bold text-emerald-600">${price || '-'}</span>;
-      },
-    },
-    {
-      title: 'Actions',
-      key: 'actions',
-      width: 160,
-      render: (_: any, record: any) => (
-        <Space size="small">
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => {
-              setSelectedQuoteId(record.id);
-              setTechReviewDrawerOpen(true);
-            }}
-            icon={<CheckCircleOutlined />}
-          >
-            Review Tech
-          </Button>
-        </Space>
-      ),
-    },
-  ];
-
-  const supplierColumns = [
-    {
-      title: 'Supplier Party',
-      dataIndex: 'seller_party_name',
-      key: 'seller_party_name',
-      render: (text: string) => <span className="font-bold text-slate-900">{text}</span>,
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 220,
-      render: (status: any) => <ItemSupplierStatusBadge status={status} />,
-    },
-  ];
-
+ 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
       <Breadcrumb
@@ -236,7 +279,7 @@ export const ItemDetailWorkspace: React.FC = () => {
             </div>
           </div>
 
-          <Button
+          {/* <Button
             type="primary"
             size="large"
             onClick={() => setAwardDrawerOpen(true)}
@@ -244,7 +287,7 @@ export const ItemDetailWorkspace: React.FC = () => {
             className="bg-emerald-600 hover:bg-emerald-700 h-11 px-5 font-bold shadow-md"
           >
             Split Award Hub
-          </Button>
+          </Button> */}
         </div>
       </Card>
 
@@ -254,13 +297,161 @@ export const ItemDetailWorkspace: React.FC = () => {
           onChange={setActiveTab}
           items={[
             {
+              key: 'item-attributes',
+              label: (
+                <span className="font-bold flex items-center gap-2">
+                  <ToolOutlined /> Item Attributes ({currentItemAttributes.length})
+                </span>
+              ),
+              children: (
+                <div className="space-y-4">
+                  <Table
+                    dataSource={staticItemDetails}
+                    rowKey="key"
+                    pagination={false}
+                    size="small"
+                    columns={[
+                      {
+                        title: 'Detail',
+                        dataIndex: 'detail',
+                        key: 'detail',
+                        width: 260,
+                        render: (text: string) => <span className="font-semibold text-slate-700">{text}</span>,
+                      },
+                      {
+                        title: 'Value',
+                        dataIndex: 'value',
+                        key: 'value',
+                        render: (text: string) => <span className="text-slate-900">{text || '-'}</span>,
+                      },
+                    ]}
+                  />
+
+                  {itemAttributeGroups.length === 0 ? (
+                    <div className="text-sm text-slate-500 bg-slate-50 border border-slate-200 rounded-lg p-4">
+                      No item attributes found for current item revision.
+                    </div>
+                  ) : (
+                    itemAttributeGroups.map(([groupId, group]) => (
+                      <Card
+                        key={groupId}
+                        size="small"
+                        title={
+                          <span className="inline-flex items-center px-3 py-1 rounded-md bg-indigo-100 text-indigo-800 font-extrabold tracking-wide shadow-sm">
+                            {group.groupName}
+                          </span>
+                        }
+                        className="border-slate-200"
+                      >
+                        <Table
+                          dataSource={group.rows}
+                          rowKey="key"
+                          pagination={false}
+                          size="small"
+                          tableLayout="fixed"
+                          scroll={{ x: 980 }}
+                          columns={[
+                            {
+                              title: 'Attribute',
+                              dataIndex: 'attribute_name',
+                              key: 'attribute_name',
+                              width: 240,
+                              render: (text: string) => <span className="font-semibold text-slate-800">{text}</span>,
+                            },
+                            {
+                              title: 'Description',
+                              dataIndex: 'description',
+                              key: 'description',
+                              width: 280,
+                              render: (text: string) => <span className="text-slate-600">{text || '-'}</span>,
+                            },
+                            {
+                              title: 'Requested Values',
+                              dataIndex: 'requested_values',
+                              key: 'requested_values',
+                              width: 460,
+                              render: (text: string) => <span className="text-slate-900">{text || '-'}</span>,
+                            }
+                          ]}
+                        />
+                      </Card>
+                    ))
+                  )}
+                </div>
+              ),
+            },
+            {
               key: 'responses',
               label: (
                 <span className="font-bold flex items-center gap-2">
                   <MessageOutlined /> Responses ({submittedResponses.length})
                 </span>
               ),
-              children: <Table dataSource={submittedResponses} columns={responseColumns} rowKey="id" pagination={false} />,
+              children: <Table
+                dataSource={submittedResponses}
+                rowKey="id" pagination={false}
+                columns={
+                  [
+                    {
+                      title: 'Supplier Party',
+                      dataIndex: 'seller_party_name',
+                      key: 'seller_party_name',
+                      render: (text: string) => <span className="font-bold text-slate-900">{text}</span>,
+                    },
+                    {
+                      title: 'Status',
+                      dataIndex: 'mapped_status',
+                      key: 'status',
+                      width: 220,
+                      render: (status: any) => <ItemSupplierStatusBadge status={status} />,
+                    },
+                    {
+                      title: 'Technical Round',
+                      key: 'round',
+                      width: 140,
+                      render: (_: any, record: any) => {
+                        const revisions = quoteRevisions.filter((r) => r.seller_quote_id === record.id);
+                        const maxRound = revisions.length > 0 ? Math.max(...revisions.map((r) => r.revision_number)) : 1;
+                        return <Tag color="cyan">Round #{maxRound}</Tag>;
+                      },
+                    },
+                    {
+                      title: 'Offered Price ($)',
+                      dataIndex: 'unit_price',
+                      key: 'price',
+                      width: 140,
+                      render: (price: number) => {
+                        return <span className="font-bold text-emerald-600">${price || '-'}</span>;
+                      },
+                    },
+                    {
+                      title: 'Actions',
+                      key: 'actions',
+                      width: 160,
+                      render: (_: any, record: any) => {
+                        const canEdit = record.status === 'SUBMITTED';
+
+                        return (
+                          <Space size="small">
+                            <Button
+                              type={canEdit ? 'primary' : 'default'}
+                              size="small"
+                              onClick={() => {
+                                setSelectedQuoteId(record.id);
+                                setIsTechReviewReadOnly(!canEdit);
+                                setTechReviewDrawerOpen(true);
+                              }}
+                              icon={<CheckCircleOutlined />}
+                            >
+                              {canEdit ? 'Review Tech' : 'View Tech'}
+                            </Button>
+                          </Space>
+                        );
+                      },
+                    },
+                  ]
+                }
+              />,
             },
             {
               key: 'suppliers',
@@ -269,34 +460,58 @@ export const ItemDetailWorkspace: React.FC = () => {
                   <SafetyCertificateOutlined /> Assigned Suppliers ({assignedSuppliers.length})
                 </span>
               ),
-              children: <Table dataSource={assignedSuppliers} columns={supplierColumns} rowKey="id" pagination={false} />,
+              children: <Table
+                dataSource={assignedSuppliers}
+                rowKey="id"
+                pagination={false}
+                columns={[
+                  {
+                    title: 'Supplier Party',
+                    dataIndex: 'seller_party_name',
+                    key: 'seller_party_name',
+                    render: (text: string) => <span className="font-bold text-slate-900">{text}</span>,
+                  },
+                  {
+                    title: 'Status',
+                    dataIndex: 'status',
+                    key: 'status',
+                    width: 220,
+                    render: (status: any) => <ItemSupplierStatusBadge status={status} />,
+                  },
+                ]}
+              />,
             },
-            {
-              key: 'comparison',
-              label: (
-                <span className="font-bold flex items-center gap-2">
-                  <ToolOutlined /> Technical Comparison
-                </span>
-              ),
-              children: (
-                <TechnicalComparisonTable
-                  item={item}
-                  onReviewTechnical={(quoteId) => {
-                    setSelectedQuoteId(quoteId);
-                    setTechReviewDrawerOpen(true);
-                  }}
-                />
-              ),
-            },
+            // {
+            //   key: 'comparison',
+            //   label: (
+            //     <span className="font-bold flex items-center gap-2">
+            //       <ToolOutlined /> Technical Comparison
+            //     </span>
+            //   ),
+            //   children: (
+            //     <TechnicalComparisonTable
+            //       item={item}
+            //       onReviewTechnical={(quoteId) => {
+            //         setIsTechReviewReadOnly(false);
+            //         setSelectedQuoteId(quoteId);
+            //         setTechReviewDrawerOpen(true);
+            //       }}
+            //     />
+            //   ),
+            // },
           ]}
         />
       </Card>
 
       <BuyerTechnicalReviewDrawer
         open={techReviewDrawerOpen}
-        onClose={() => setTechReviewDrawerOpen(false)}
+        onClose={() => {
+          setTechReviewDrawerOpen(false);
+          setIsTechReviewReadOnly(false);
+        }}
         quoteId={selectedQuoteId}
         itemTitle={item.product_name}
+        forceReadOnly={isTechReviewReadOnly}
       />
 
       <SplitOrderAwardDrawer
