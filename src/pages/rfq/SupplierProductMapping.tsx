@@ -22,7 +22,7 @@ export const SupplierProductMapping: React.FC = () => {
 
   // Live query from catalogDb indexed database store
   const sellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []) || [];
-  const item = useLiveQuery(() => (itemId ? rfqDb.rfqItems.get(itemId) : undefined), [itemId]);
+  const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
   
   // Active seller party resolution
   const allParties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
@@ -34,8 +34,8 @@ export const SupplierProductMapping: React.FC = () => {
   const quote = useLiveQuery(
     async () => {
       if (!itemId) return undefined;
-      const quotes = await rfqDb.sellerQuote.where('itemId').equals(itemId).toArray();
-      return quotes.find((q) => q.sellerId === activePartyId);
+      const quotes = await rfqDb.seller_quotes.where('rfq_item_id').equals(itemId).toArray();
+      return quotes.find((q) => q.seller_id === activePartyId);
     },
     [itemId, activePartyId]
   );
@@ -46,8 +46,8 @@ export const SupplierProductMapping: React.FC = () => {
     setSubmitting(true);
     try {
       if (quote) {
-        await rfqDb.sellerQuote.update(quote.id, {
-          sellerProductMapping: {
+        await rfqDb.seller_quotes.update(quote.id, {
+          seller_product_mapping: {
             seller_product_id: selectedProductId,
             variant_id: selectedVariantId,
             mapped_at: new Date().toISOString(),

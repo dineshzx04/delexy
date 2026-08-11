@@ -1,9 +1,5 @@
 import type { PartyOwnerType } from "../business/business.module";
 
-// =============================================================
-// 1. ATTACHMENT & TIMELINE ENTITIES
-// =============================================================
-
 export interface RfqAttachment {
   id: string;
   file_name: string;
@@ -34,34 +30,29 @@ export interface RfqTimelineEvent {
   remarks?: string;
 }
 
-// =============================================================
-// 2. RFQ HEADER CONTAINER
-// =============================================================
-
 export type RfqStatus =
   | "DRAFT"
-  | "ISSUED" // Active sourcing container published to suppliers
-  | "UNDER_EVALUATION" // Items are actively under technical or commercial evaluation
-  | "PARTIALLY_AWARDED" // Some items awarded, others still under negotiation/open
-  | "FULLY_AWARDED" // All items in the container 100% awarded
+  | "ISSUED"
+  | "UNDER_EVALUATION"
+  | "PARTIALLY_AWARDED"
+  | "FULLY_AWARDED"
   | "CLOSED"
   | "CANCELLED"
-  | "IN_PROGRESS" // Added for agent flow
-  | "AWARDED"; // Added for agent flow
+  | "IN_PROGRESS"
+  | "AWARDED";
 
 export interface Rfq {
-  id: string; // e.g. 'rfq-01' or 'rfq-2026-1001'
+  id: string;
   status: RfqStatus;
-  createdAt?: string; // ISO Date String
-  created_at?: string; // compatibility
-
-  // Optional fields from legacy Rfq for compatibility
+  requester_id: string;
+  requester_name: string;
+  requester_party_id?: string;
+  created_at: string;
+  updated_at: string;
   rfq_number: string;
   title: string;
   description?: string;
-  requester_party_id?: string;
   requester_party_type?: PartyOwnerType;
-  requester_name: string;
   created_by_user_id?: string;
   contact_email?: string;
   contact_phone?: string;
@@ -72,18 +63,9 @@ export interface Rfq {
   currency?: string;
   attachments?: RfqAttachment[];
   timeline?: RfqTimelineEvent[];
-  updated_at?: string;
 }
 
-// =============================================================
-// 3. RFQ LINE ITEM & SELLER ASSIGNMENT
-// =============================================================
-
-export type RfqItemStatus =
-  | "OPEN" // Item issued & accepting/evaluating supplier responses
-  | "PARTIALLY_AWARDED" // Partial split quantity awarded
-  | "FULLY_AWARDED" // 100% requested quantity awarded
-  | "CANCELLED";
+export type RfqItemStatus = "OPEN" | "PARTIALLY_AWARDED" | "FULLY_AWARDED" | "CANCELLED";
 
 export interface RfqItemDynamicAttribute {
   group_id: string;
@@ -104,16 +86,15 @@ export interface SellerAssignment {
 export type RfqItemSource = "CATALOG_PRODUCT_VARIANT" | "CUSTOM_REQUIREMENTS";
 
 export interface RfqItem {
-  id: string; // e.g. 'item-01' or 'rfqi-101'
-  rfq_id?: string; // compatibility
-  itemRevision?: number; // Buyer-led item revision/version
-  category_id?: string; // compatibility
+  id: string;
+  rfq_id: string;
+  category_id: string;
   quantity: number;
-  unit_price?: number;
-  unit?: string; // new
-
-  // Optional/Required fields from legacy RfqItem for compatibility
+  unit: string;
   item_index?: number;
+  current_revision_id?: string | null;
+  created_at: string;
+  updated_at: string;
   status: RfqItemStatus;
   item_source?: RfqItemSource;
   catalog_product_id?: string | null;
@@ -123,51 +104,49 @@ export interface RfqItem {
   product_name?: string;
   brand_id?: string | string[] | null;
   manufacturer_id?: string | string[] | null;
-  unit_of_measure?: string;
   target_unit_price?: number;
   awarded_quantity_total?: number;
   dynamic_attributes?: RfqItemDynamicAttribute[];
   attachments?: RfqAttachment[];
   target_seller_party_ids: string[];
   seller_assignments?: SellerAssignment[];
-  created_at?: string;
-  updated_at?: string;
 }
 
-// =============================================================
-// 4. ITEM SPECIFICATIONS / ATTRIBUTES
-// =============================================================
+export interface RfqItemRevision {
+  id: string;
+  rfq_item_id: string;
+  revision_number: number;
+  created_by: string;
+  created_at: string;
+}
 
 export interface ItemAttributeValue {
-  valueId: string;
-  valueLabel: string;
+  value_id: string;
+  value_label: string;
 }
 
-export interface ItemAttribute {
-  id: string; // Unique attribute config ID (e.g. 'ia-01')
-  itemId: string;
-  groupId: string;
-  attributeId: string;
-  attributeName: string;
+export interface RfqItemAttribute {
+  id: string;
+  rfq_item_revision_id: string;
+  group_id: string;
+  attribute_id: string;
+  attribute_name: string;
   description: string;
-  currentBuyerValues: ItemAttributeValue[];
+  values: ItemAttributeValue[];
 }
-
-// =============================================================
-// 5. SELLER QUOTATION & ACTIVE RESPONSES
-// =============================================================
 
 export type SellerQuoteStatus = "DRAFT" | "SUBMITTED" | "FINALIZED";
 
 export interface SellerQuote {
-  id: string; // Quote ID (e.g. 'q-001')
-  itemId: string;
-  sellerId: string;
-  itemRevision: number;
-  round: number;
-  unit_price: number;
+  id: string;
+  rfq_item_id: string;
+  seller_id: string;
   status: SellerQuoteStatus;
-  sellerProductMapping?: {
+  current_revision_id?: string | null;
+  created_at: string;
+  updated_at: string;
+  unit_price: number;
+  seller_product_mapping?: {
     seller_product_id: string;
     variant_id: string;
     mapped_at: string;
@@ -175,107 +154,69 @@ export interface SellerQuote {
   } | null;
 }
 
-export interface SellerAttributeResponse {
-  id: string; // Response ID (e.g. 'resp-001')
-  quoteId: string;
-  groupId: string;
-  attributeId: string;
-  buyerValue: ItemAttributeValue[];
-  value: ItemAttributeValue[];
+export interface SellerQuoteRevision {
+  id: string;
+  seller_quote_id: string;
+  rfq_item_revision_id: string;
+  revision_number: number;
+  created_by: string;
+  created_at: string;
 }
 
-// =============================================================
-// 6. ITEM ATTRIBUTE COMMENTS
-// =============================================================
+export interface SellerQuoteAttribute {
+  id: string;
+  quote_revision_id: string;
+  item_attribute_id: string;
+  group_id: string;
+  attribute_id: string;
+  attribute_name: string;
+  offered_values: ItemAttributeValue[];
+}
 
-export interface ItemAttributeComment {
-  id: string; // Comment ID (e.g. 'c-001')
-  itemId: string; // RFQ Item ID (Mandatory)
-  groupId?: string; // Optional Attribute Group ID
-  attributeId: string;
-  itemRevision?: number;
-  quoteId?: string | null; // Optional Seller Quote ID (null for buyer spec comments)
-  round?: number | null; // Optional Negotiation Round
-  senderType: "BUYER" | "SELLER";
-  senderId: string;
-  senderName?: string;
+export interface SellerQuoteComment {
+  id: string;
+  seller_quote_id: string;
+  quote_attribute_id?: string | null;
   comment: string;
-  createdAt: string;
+  sender: "BUYER" | "SELLER";
+  sender_id: string;
+  created_at: string;
 }
-
-// Backward compatibility alias
-export type AttributeComment = ItemAttributeComment;
-
-// =============================================================
-// 7. ITEM ATTRIBUTE CHANGE HISTORY (AUDIT LOG)
-// =============================================================
-
-export type AttributeValuePayload =
-  | ItemAttributeValue[]
-  | string
-  | number
-  | boolean
-  | { min?: number; max?: number; unit?: string }
-  | Record<string, any>
-  | any;
 
 export interface ItemAttributeChangeHistory {
-  id: string; // History ID (e.g. 'hist-001')
-  itemId: string; // RFQ Item ID (Mandatory)
-  itemRevision?: number;
-  quoteId?: string | null; // Optional Seller Quote ID
-  round?: number | null; // Optional Negotiation Round
-  groupId?: string; // Optional Attribute Group ID
-  attributeId: string;
-  attributeName?: string;
-  valueType?: string; // e.g. 'SELECT', 'TEXT', 'NUMBER', 'RANGE'
-  actorType: "BUYER" | "SELLER" | "SYSTEM";
-  actorId: string;
-  oldValue?: AttributeValuePayload | null;
-  newValue?: AttributeValuePayload | null;
-  changeReason?: string;
+  id: string;
+  rfq_item_id: string;
+  item_revision?: number;
+  seller_quote_id?: string | null;
+  round?: number | null;
+  group_id?: string;
+  attribute_id: string;
+  attribute_name?: string;
+  value_type?: string;
+  actor_type: "BUYER" | "SELLER" | "SYSTEM";
+  actor_id: string;
+  old_value?: ItemAttributeValue[] | null;
+  new_value?: ItemAttributeValue[] | null;
+  change_reason?: string;
   timestamp?: string;
-  archivedAt?: string; // ISO Date string for audit timestamp
-  // Backward compatibility fields
-  responseId?: string;
-  buyerValue?: ItemAttributeValue[];
-  value?: ItemAttributeValue[];
+  archived_at?: string;
 }
 
-// Backward compatibility alias
-export type AttributeResponseHistory = ItemAttributeChangeHistory;
-
-// =============================================================
-// 8. SPLIT AWARD DETAILS
-// =============================================================
-
 export interface RfqAward {
-  id: string; // Award ID (e.g. 'awd-01')
-  rfqId?: string;
-  rfq_id?: string; // compatibility
-  itemId?: string;
-  rfq_item_id?: string; // compatibility
-  sellerId?: string;
-  seller_party_id?: string; // compatibility
-  awardedQuantity?: number;
-  awarded_quantity?: number; // compatibility
-  unitPrice?: number;
-  awarded_unit_price?: number; // compatibility
-  awarded_total_amount?: number; // compatibility
-  awardedAt?: string;
-  awarded_at?: string; // compatibility
+  id: string;
+  rfq_id: string;
+  rfq_item_id: string;
+  seller_party_id: string;
+  awarded_quantity: number;
+  unit_price: number;
+  awarded_at: string;
   currency?: string;
   status?: "AWARDED" | "PURCHASE_ORDER_GENERATED";
   purchase_order_id?: string;
-  item_supplier_response_id?: string; // compatibility
-  seller_product_id?: string; // compatibility
-  variant_id?: string; // compatibility
-  awarded_by_user_id?: string; // compatibility
+  seller_product_id?: string;
+  variant_id?: string;
+  awarded_by_user_id?: string;
 }
-
-// =============================================================
-// 9. LEGACY TYPES FOR BACKWARD COMPATIBILITY
-// =============================================================
 
 export type ItemSupplierResponseStatus =
   | "ASSIGNED"
@@ -386,5 +327,3 @@ export interface ItemSupplierResponse {
   created_at: string;
   updated_at: string;
 }
-
-export type RfqItemAward = RfqAward; // Alias for backward compatibility

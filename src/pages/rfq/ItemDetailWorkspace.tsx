@@ -32,20 +32,23 @@ export const ItemDetailWorkspace: React.FC = () => {
   const [awardDrawerOpen, setAwardDrawerOpen] = useState(false);
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
-  const item = useLiveQuery(() => (itemId ? rfqDb.rfqItems.get(itemId) : undefined), [itemId]);
-  const quotes = useLiveQuery(() => (itemId ? rfqDb.sellerQuote.where('itemId').equals(itemId).toArray() : []), [itemId]) || [];
-  const allResponses = useLiveQuery(() => rfqDb.sellerAttributeResponses.toArray(), []) || [];
-  const allComments = useLiveQuery(() => (itemId ? rfqDb.itemAttributeComments.where('itemId').equals(itemId).toArray() : rfqDb.itemAttributeComments.toArray()), [itemId]) || [];
-  const allHistory = useLiveQuery(() => (itemId ? rfqDb.itemAttributeChangeHistory.where('itemId').equals(itemId).toArray() : rfqDb.itemAttributeChangeHistory.toArray()), [itemId]) || [];
+  const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
+  const quotes = useLiveQuery(() => (itemId ? rfqDb.seller_quotes.where('rfq_item_id').equals(itemId).toArray() : []), [itemId]) || [];
+  const allResponses = useLiveQuery(() => rfqDb.seller_quote_attributes.toArray(), []) || [];
+  const allComments = useLiveQuery(() => rfqDb.seller_quote_comments.toArray(), []) || [];
+  const allHistory = useLiveQuery(() => rfqDb.item_attribute_change_history.toArray(), []) || [];
   const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const categoryName = categories.find((c) => c.id === item?.category_id)?.name;
+
+  const allItemAttributes = useLiveQuery(() => rfqDb.rfq_item_attributes.toArray(), []) || [];
+  const quoteRevisions = useLiveQuery(() => rfqDb.seller_quote_revisions.toArray(), []) || [];
 
   const responses = React.useMemo(() => {
     if (!item) return [];
     const sellerIds = item.target_seller_party_ids || [];
     return sellerIds.map((sellerId: string) => {
-      const activeQuote = quotes.find((q) => q.sellerId === sellerId);
+      const activeQuote = quotes.find((q) => q.seller_id === sellerId);
       const party = mockParties.find((p) => p.id === sellerId) || { display_name: `Seller ${sellerId}` };
 
       if (activeQuote) {
@@ -56,41 +59,46 @@ export const ItemDetailWorkspace: React.FC = () => {
           mappedStatus = 'VIEWED';
         }
 
-        // Fetch active offered specs and comments
-        const quoteResponses = allResponses.filter(r => r.quoteId === activeQuote.id);
-        const quoteComments = allComments.filter(c => c.quoteId === activeQuote.id);
+        const activeQuoteRevision = quoteRevisions.find(r => r.id === activeQuote.current_revision_id);
+        const quoteResponses = allResponses.filter(r => r.quote_revision_id === activeQuote.current_revision_id);
+        const quoteComments = allComments.filter(c => c.seller_quote_id === activeQuote.id);
+
+        const buyerItemAttributes = allItemAttributes.filter(ia => ia.rfq_item_revision_id === activeQuoteRevision?.rfq_item_revision_id || ia.rfq_item_revision_id === item.current_revision_id);
 
         const supplierResponse: TechnicalAttributeResponse[] = quoteResponses.map(resp => {
           let attributeName = '';
           let key = '';
 
-          if (resp.groupId === 'static') {
-            attributeName = resp.attributeId === 'brand' ? 'Preferred Brand' : 'Preferred Manufacturer';
-            key = `static-${resp.attributeId === 'brand' ? 'brand' : 'mfg'}`;
+          if (resp.group_id === 'static') {
+            attributeName = resp.attribute_id === 'brand' ? 'Preferred Brand' : 'Preferred Manufacturer';
+            key = `static-${resp.attribute_id === 'brand' ? 'brand' : 'mfg'}`;
           } else {
-            const attr = allAttributes.find(a => a.id === resp.attributeId);
-            attributeName = attr?.name || attr?.label || resp.attributeId;
-            key = `dyn-${resp.groupId}-${resp.attributeId}`;
+            const attr = allAttributes.find(a => a.id === resp.attribute_id);
+            attributeName = attr?.name || attr?.label || resp.attribute_id || '';
+            key = `dyn-${resp.group_id || ''}-${resp.attribute_id || ''}`;
           }
 
-          const reqLabel = resp.buyerValue.map(v => v.valueLabel || v.valueId).join(', ') || '-';
-          const offLabel = resp.value.map(v => v.valueLabel || v.valueId).join(', ') || '-';
-          const isDev = resp.value.some((v) => !resp.buyerValue.some((r) => r.valueId === v.valueId)) ||
-            resp.buyerValue.some((r) => !resp.value.some((v) => v.valueId === r.valueId));
+          const buyerAttr = buyerItemAttributes.find(ia => ia.group_id === resp.group_id && ia.attribute_id === resp.attribute_id);
 
-          const sellerComment = quoteComments.find(c => c.groupId === resp.groupId && c.attributeId === resp.attributeId && c.senderType === 'SELLER' && c.round === activeQuote.round);
-          const buyerComment = quoteComments.find(c => c.groupId === resp.groupId && c.attributeId === resp.attributeId && c.senderType === 'BUYER' && c.round === activeQuote.round);
+          const reqLabel = buyerAttr ? buyerAttr.values.map((v: any) => v.value_label || v.value_id).join(', ') : '-';
+          const offLabel = resp.offered_values.map((v: any) => v.value_label || v.value_id).join(', ') || '-';
+          
+          const isDev = buyerAttr ? (resp.offered_values.some((v: any) => !buyerAttr.values.some((r: any) => r.value_id === v.value_id)) ||
+            buyerAttr.values.some((r: any) => !resp.offered_values.some((v: any) => v.value_id === r.value_id))) : false;
+
+          const sellerComment = quoteComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER');
+          const buyerComment = quoteComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'BUYER');
 
           const commentsHistory = quoteComments
-            .filter(c => c.groupId === resp.groupId && c.attributeId === resp.attributeId)
-            .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+            .filter(c => c.quote_attribute_id === resp.id)
+            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
             .map(c => ({
               id: c.id,
-              sender_role: c.senderType,
-              sender_name: c.senderType === 'BUYER' ? 'Buyer' : 'Supplier',
-              sender_user_id: c.senderId,
+              sender_role: c.sender || 'SELLER',
+              sender_name: c.sender === 'BUYER' ? 'Buyer' : 'Supplier',
+              sender_user_id: c.sender_id || '',
               comment: c.comment,
-              timestamp: c.createdAt
+              timestamp: c.created_at
             }));
 
           return {
@@ -106,61 +114,64 @@ export const ItemDetailWorkspace: React.FC = () => {
           };
         });
 
-        // Reconstruct historical rounds
-        const quoteHistory = allHistory.filter(h => h.quoteId === activeQuote.id);
-        const historyRoundsSet = new Set<number>();
-        quoteHistory.forEach(h => historyRoundsSet.add(h.round));
-        const historyRounds = Array.from(historyRoundsSet).sort((a, b) => a - b);
+        const sortedRevisions = quoteRevisions
+          .filter(r => r.seller_quote_id === activeQuote.id)
+          .sort((a, b) => a.revision_number - b.revision_number);
 
-        const revisionRounds = historyRounds.map(rNum => {
-          const roundHistories = quoteHistory.filter(h => h.round === rNum);
-          const roundComments = quoteComments.filter(c => c.round === rNum);
+        const activeRevNumber = activeQuoteRevision?.revision_number || 1;
 
-          const roundSpecs: TechnicalAttributeResponse[] = roundHistories.map(h => {
-            let attributeName = '';
-            if (h.groupId === 'static') {
-              attributeName = h.attributeId === 'brand' ? 'Preferred Brand' : 'Preferred Manufacturer';
-            } else {
-              const attr = allAttributes.find(a => a.id === h.attributeId);
-              attributeName = attr?.name || attr?.label || h.attributeId;
-            }
+        const revisionRounds = sortedRevisions
+          .filter(rev => rev.revision_number < activeRevNumber)
+          .map(rev => {
+            const roundResponses = allResponses.filter(r => r.quote_revision_id === rev.id);
+            const roundComments = quoteComments.filter(c => c.quote_attribute_id && c.quote_attribute_id.startsWith(`resp-${rev.id}-`));
 
-            const reqLabel = h.buyerValue.map(v => v.valueLabel || v.valueId).join(', ') || '-';
-            const offLabel = h.value.map(v => v.valueLabel || v.valueId).join(', ') || '-';
-            const isDev = h.value.some((v) => !h.buyerValue.some((r) => r.valueId === v.valueId)) ||
-              h.buyerValue.some((r) => !h.value.some((v) => v.valueId === r.valueId));
+            const roundSpecs: TechnicalAttributeResponse[] = roundResponses.map(resp => {
+              let attributeName = '';
+              if (resp.group_id === 'static') {
+                attributeName = resp.attribute_id === 'brand' ? 'Preferred Brand' : 'Preferred Manufacturer';
+              } else {
+                const attr = allAttributes.find(a => a.id === resp.attribute_id);
+                attributeName = attr?.name || attr?.label || resp.attribute_id;
+              }
 
-            const sellerComment = roundComments.find(c => c.groupId === h.groupId && c.attributeId === h.attributeId && c.senderType === 'SELLER');
-            const buyerComment = roundComments.find(c => c.groupId === h.groupId && c.attributeId === h.attributeId && c.senderType === 'BUYER');
+              const buyerAttr = allItemAttributes.find(ia => ia.rfq_item_revision_id === rev.rfq_item_revision_id && ia.group_id === resp.group_id && ia.attribute_id === resp.attribute_id);
+
+              const reqLabel = buyerAttr ? buyerAttr.values.map((v: any) => v.value_label || v.value_id).join(', ') : '-';
+              const offLabel = resp.offered_values.map((v: any) => v.value_label || v.value_id).join(', ') || '-';
+              const isDev = buyerAttr ? (resp.offered_values.some((v: any) => !buyerAttr.values.some((r: any) => r.value_id === v.value_id)) ||
+                buyerAttr.values.some((r: any) => !resp.offered_values.some((v: any) => v.value_id === r.value_id))) : false;
+
+              const sellerComment = roundComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER');
+              const buyerComment = roundComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'BUYER');
+
+              return {
+                attribute_key: resp.group_id === 'static' ? `static-${resp.attribute_id === 'brand' ? 'brand' : 'mfg'}` : `dyn-${resp.group_id}-${resp.attribute_id}`,
+                attribute_name: attributeName,
+                requested_value: reqLabel,
+                offered_value: offLabel,
+                is_deviated: isDev,
+                deviation_reason: sellerComment?.comment || '',
+                buyer_status: buyerComment ? 'REVISION_REQUESTED' as const : 'APPROVED' as const,
+                buyer_comment: buyerComment?.comment || '',
+              };
+            });
 
             return {
-              attribute_key: h.groupId === 'static' ? `static-${h.attributeId === 'brand' ? 'brand' : 'mfg'}` : `dyn-${h.groupId}-${h.attributeId}`,
-              attribute_name: attributeName,
-              requested_value: reqLabel,
-              offered_value: offLabel,
-              is_deviated: isDev,
-              deviation_reason: sellerComment?.comment || '',
-              buyer_status: buyerComment ? 'REVISION_REQUESTED' as const : 'APPROVED' as const,
-              buyer_comment: buyerComment?.comment || '',
+              round_number: rev.revision_number,
+              submitted_by_user_id: `usr-${sellerId}`,
+              submitted_at: rev.created_at,
+              buyer_requirement_snapshot: roundSpecs,
+              supplier_response: roundSpecs,
+              round_status: 'APPROVED' as any
             };
           });
 
-          return {
-            round_number: rNum,
-            submitted_by_user_id: `usr-${sellerId}`,
-            submitted_at: roundHistories[0]?.archivedAt || new Date().toISOString(),
-            buyer_requirement_snapshot: roundSpecs,
-            supplier_response: roundSpecs,
-            round_status: 'APPROVED' as any
-          };
-        });
-
-        // Add the active current round
         const mappedRoundStatus = activeQuote.status === 'FINALIZED' ? 'APPROVED' as any : (activeQuote.status === 'SUBMITTED' ? 'PENDING' as any : 'REVISION_REQUESTED' as any);
         revisionRounds.push({
-          round_number: activeQuote.round,
+          round_number: activeRevNumber,
           submitted_by_user_id: `usr-${sellerId}`,
-          submitted_at: new Date().toISOString(),
+          submitted_at: activeQuote.updated_at || new Date().toISOString(),
           buyer_requirement_snapshot: supplierResponse,
           supplier_response: supplierResponse,
           round_status: mappedRoundStatus
@@ -175,13 +186,13 @@ export const ItemDetailWorkspace: React.FC = () => {
           seller_party_name: party.display_name,
           supplier_user_id: `usr-${sellerId}`,
           status: mappedStatus,
-          current_technical_round: activeQuote.round,
+          current_technical_round: activeRevNumber,
           technical_revision_rounds: revisionRounds,
-          product_mapping: activeQuote.sellerProductMapping ? {
-            seller_product_id: activeQuote.sellerProductMapping.seller_product_id,
-            variant_id: activeQuote.sellerProductMapping.variant_id,
-            mapped_at: activeQuote.sellerProductMapping.mapped_at,
-            is_buyer_approved: activeQuote.sellerProductMapping.is_buyer_approved
+          product_mapping: activeQuote.seller_product_mapping ? {
+            seller_product_id: activeQuote.seller_product_mapping.seller_product_id,
+            variant_id: activeQuote.seller_product_mapping.variant_id,
+            mapped_at: activeQuote.seller_product_mapping.mapped_at,
+            is_buyer_approved: activeQuote.seller_product_mapping.is_buyer_approved
           } : null,
           commercial_terms: {
             offered_unit_price: activeQuote.unit_price,
@@ -194,7 +205,7 @@ export const ItemDetailWorkspace: React.FC = () => {
           },
           commercial_negotiation_rounds: [
             {
-              round_number: activeQuote.round,
+              round_number: activeRevNumber,
               sender_party_id: sellerId,
               sender_user_id: `usr-${sellerId}`,
               sender_name: party.display_name,
@@ -204,11 +215,10 @@ export const ItemDetailWorkspace: React.FC = () => {
             }
           ],
           is_awarded: activeQuote.status === 'FINALIZED',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          created_at: activeQuote.created_at,
+          updated_at: activeQuote.updated_at
         } as ItemSupplierResponse;
-      }
-      else {
+      } else {
         return {
           id: `no-quote-${item.id}-${sellerId}`,
           assignment_id: `sa-${item.id}-${sellerId}`,
@@ -228,7 +238,7 @@ export const ItemDetailWorkspace: React.FC = () => {
         } as ItemSupplierResponse;
       }
     });
-  }, [item, quotes, allResponses, allComments, allHistory, allAttributes]);
+  }, [item, quotes, allResponses, allComments, allHistory, allAttributes, allItemAttributes, quoteRevisions]);
 
   const submittedResponses = React.useMemo(() => {
     return responses.filter((r: ItemSupplierResponse) => r.status !== 'ASSIGNED' && r.status !== 'VIEWED');
@@ -256,19 +266,16 @@ export const ItemDetailWorkspace: React.FC = () => {
         if (alloc.awardedQty > 0) {
           totalQty += alloc.awardedQty;
           const awardId = `award-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          const subtotal = alloc.awardedQty * alloc.unitPrice;
 
-          await rfqDb.rfqAwards.put({
+          await rfqDb.rfq_awards.put({
             id: awardId,
             rfq_id: rfq.id,
             rfq_item_id: item.id,
-            item_supplier_response_id: alloc.responseId,
             seller_party_id: responses.find((r) => r.id === alloc.responseId)?.seller_party_id || 'pty-4',
             seller_product_id: 'sprod-1',
             variant_id: 'sprod-1-v1',
             awarded_quantity: alloc.awardedQty,
-            awarded_unit_price: alloc.unitPrice,
-            awarded_total_amount: subtotal,
+            unit_price: alloc.unitPrice,
             currency: 'USD',
             awarded_by_user_id: 'usr-2',
             awarded_at: new Date().toISOString(),
@@ -277,21 +284,14 @@ export const ItemDetailWorkspace: React.FC = () => {
           });
 
           if (!alloc.responseId.startsWith('no-quote-')) {
-            await rfqDb.sellerQuote.update(alloc.responseId, {
+            await rfqDb.seller_quotes.update(alloc.responseId, {
               status: 'FINALIZED',
-            });
-            await rfqDb.itemSupplierResponses.update(alloc.responseId, {
-              status: 'AWARDED',
-              is_awarded: true,
-              awarded_quantity: alloc.awardedQty,
-              awarded_unit_price: alloc.unitPrice,
-              awarded_total_amount: subtotal,
             });
           }
         }
       }
 
-      await rfqDb.rfqItems.update(item.id, {
+      await rfqDb.rfq_items.update(item.id, {
         status: totalQty >= item.quantity ? 'FULLY_AWARDED' : 'PARTIALLY_AWARDED',
         awarded_quantity_total: totalQty,
       });
@@ -395,7 +395,7 @@ export const ItemDetailWorkspace: React.FC = () => {
             </div>
             <div className="flex items-center gap-6 mt-3 text-xs text-slate-600 font-medium">
               <div>Category: <Tag color="purple">{categoryName}</Tag></div>
-              <div>Required Qty: <strong className="text-blue-600  font-bold">{item.quantity} {item.unit_of_measure}</strong></div>
+              <div>Required Qty: <strong className="text-blue-600  font-bold">{item.quantity} {item.unit}</strong></div>
               <div>Target Unit Price: <strong className="text-emerald-600  font-bold">${item.target_unit_price}</strong></div>
             </div>
           </div>

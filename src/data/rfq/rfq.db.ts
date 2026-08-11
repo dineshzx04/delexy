@@ -2,49 +2,43 @@ import Dexie, { type Table } from "dexie";
 import type {
   Rfq,
   RfqItem,
-  ItemAttribute,
+  RfqItemRevision,
+  RfqItemAttribute,
   SellerQuote,
-  SellerAttributeResponse,
-  ItemAttributeComment,
+  SellerQuoteRevision,
+  SellerQuoteAttribute,
+  SellerQuoteComment,
   ItemAttributeChangeHistory,
   RfqAward,
 } from "./rfq.module";
 
 export class RfqDatabase extends Dexie {
   rfqs!: Table<Rfq, string>;
-  rfqItems!: Table<RfqItem, string>;
-  itemAttributes!: Table<ItemAttribute, string>;
-  sellerQuote!: Table<SellerQuote, string>;
-  sellerAttributeResponses!: Table<SellerAttributeResponse, string>;
-  itemAttributeComments!: Table<ItemAttributeComment, string>;
-  itemAttributeChangeHistory!: Table<ItemAttributeChangeHistory, string>;
-  rfqAwards!: Table<RfqAward, string>;
-
-  // Backward compatibility getters for existing callers
-  get attributeComments(): Table<ItemAttributeComment, string> {
-    return this.itemAttributeComments;
-  }
-
-  get attributeResponseHistory(): Table<ItemAttributeChangeHistory, string> {
-    return this.itemAttributeChangeHistory;
-  }
-
-  // Kept for legacy compatibility so type checks in code referencing db.ts don't instantly break
-  itemSupplierResponses!: Table<any, string>;
+  rfq_items!: Table<RfqItem, string>;
+  rfq_item_revisions!: Table<RfqItemRevision, string>;
+  rfq_item_attributes!: Table<RfqItemAttribute, string>;
+  seller_quotes!: Table<SellerQuote, string>;
+  seller_quote_revisions!: Table<SellerQuoteRevision, string>;
+  seller_quote_attributes!: Table<SellerQuoteAttribute, string>;
+  seller_quote_comments!: Table<SellerQuoteComment, string>;
+  item_attribute_change_history!: Table<ItemAttributeChangeHistory, string>;
+  rfq_awards!: Table<RfqAward, string>;
+  item_supplier_responses!: Table<any, string>;
 
   constructor() {
     super("delexy_rfq_db");
-    this.version(5).stores({
-      rfqs: "id, status, requester_party_id",
-      rfqItems: "id, rfq_id, categoryId, itemRevision",
-      itemAttributes: "id, itemId, groupId, attributeId",
-      sellerQuote: "id, itemId, sellerId, itemRevision, status",
-      sellerAttributeResponses: "id, quoteId, groupId, attributeId",
-      itemAttributeComments: "id, itemId, quoteId, groupId, attributeId, round",
-      itemAttributeChangeHistory:
-        "id, itemId, quoteId, round, groupId, attributeId, actorType",
-      rfqAwards: "id, rfqId, itemId, sellerId",
-      itemSupplierResponses: "id, rfq_id, rfq_item_id, seller_party_id, status",
+    this.version(7).stores({
+      rfqs: "id, status, requester_id",
+      rfq_items: "id, rfq_id, category_id, current_revision_id",
+      rfq_item_revisions: "id, rfq_item_id, revision_number",
+      rfq_item_attributes: "id, rfq_item_revision_id, group_id, attribute_id",
+      seller_quotes: "id, rfq_item_id, seller_id, current_revision_id, status",
+      seller_quote_revisions: "id, seller_quote_id, rfq_item_revision_id, revision_number",
+      seller_quote_attributes: "id, quote_revision_id, item_attribute_id, group_id, attribute_id",
+      seller_quote_comments: "id, seller_quote_id, quote_attribute_id, sender_id",
+      item_attribute_change_history: "id, rfq_item_id, seller_quote_id, round, group_id, attribute_id, actor_type",
+      rfq_awards: "id, rfq_id, rfq_item_id, seller_party_id",
+      item_supplier_responses: "id, rfq_id, rfq_item_id, seller_party_id, status",
     });
   }
 }

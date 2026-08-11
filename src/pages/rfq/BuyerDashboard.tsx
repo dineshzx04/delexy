@@ -1,21 +1,20 @@
 import React from 'react';
-import { Card, Row, Col, Table, Button, Tag, Statistic } from 'antd';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { Card, Button, Table, Tag, Row, Col, Statistic } from 'antd';
 import {
-  FileTextOutlined,
-  SyncOutlined,
-  TrophyOutlined,
   PlusOutlined,
   ArrowRightOutlined,
-  ClockCircleOutlined,
+  FileTextOutlined,
+  SyncOutlined,
   SafetyCertificateOutlined,
+  ClockCircleOutlined,
   BankOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
-import { mockParties } from '../../data/business/parties';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { mockParties } from '../../data/business/parties';
 import { RfqStatusBadge } from '../../components/rfq/RfqStatusBadge';
 
 export const BuyerDashboard: React.FC = () => {
@@ -33,19 +32,19 @@ export const BuyerDashboard: React.FC = () => {
 
   // Party-centric live queries
   const partyRfqs = useLiveQuery(
-    () => rfqDb.rfqs.where('requester_party_id').equals(activePartyId).toArray(),
+    () => rfqDb.rfqs.where('requester_id').equals(activePartyId).toArray(),
     [activePartyId]
   ) || [];
 
-  const responses = useLiveQuery(() => rfqDb.sellerQuote.toArray(), []) || [];
-  const awards = useLiveQuery(() => rfqDb.rfqAwards.toArray(), []) || [];
+  const responses = useLiveQuery(() => rfqDb.seller_quotes.toArray(), []) || [];
+  const awards = useLiveQuery(() => rfqDb.rfq_awards.toArray(), []) || [];
 
   const activeRfqs = partyRfqs.filter((r) => r.status === 'ISSUED' || r.status === 'UNDER_EVALUATION' || r.status === 'IN_PROGRESS');
   const totalAwardedAmount = awards.reduce(
-    (acc, a) => acc + ((a.awardedQuantity || 0) * (a.unitPrice || 0) || a.awarded_total_amount || 0),
+    (acc: number, a: any) => acc + ((a.awarded_quantity || 0) * (a.unit_price || 0)),
     0
   );
-  const pendingReviewsCount = responses.filter((r) => r.status === 'SUBMITTED').length;
+  const pendingReviewsCount = responses.filter((r: any) => r.status === 'SUBMITTED').length;
 
   const columns = [
     {
@@ -55,7 +54,7 @@ export const BuyerDashboard: React.FC = () => {
       render: (text: string, record: any) => (
         <div>
           <div className="font-bold text-slate-900">{record.rfq_number} - {text}</div>
-          <div className="text-xs text-slate-500">Requester: {record.requester_name} ({record.requester_party_id})</div>
+          <div className="text-xs text-slate-500">Requester: {record.requester_name} ({record.requester_id})</div>
         </div>
       ),
     },

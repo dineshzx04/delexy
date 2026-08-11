@@ -26,7 +26,7 @@ export const RfqWorkspace: React.FC = () => {
   const [activeTab, setActiveTab] = useState('items');
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
-  const items = useLiveQuery(() => (rfqId ? rfqDb.rfqItems.where('rfq_id').equals(rfqId).toArray() : []), [rfqId]) || [];
+  const items = useLiveQuery(() => (rfqId ? rfqDb.rfq_items.where('rfq_id').equals(rfqId).toArray() : []), [rfqId]) || [];
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
 
   if (!rfq) {

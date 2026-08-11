@@ -244,19 +244,6 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
         comment_history: attr.comment_history,
       }));
 
-      const updatedRounds = [...(response.technical_revision_rounds || [])];
-      const targetIdx = updatedRounds.length - 1;
-      updatedRounds[targetIdx] = {
-        ...updatedRounds[targetIdx],
-        buyer_review_notes: overallNotes,
-        supplier_response: updatedSupplierResponse,
-      };
-
-      await rfqDb.itemSupplierResponses.update(response.id, {
-        technical_revision_rounds: updatedRounds,
-        updated_at: new Date().toISOString(),
-      });
-
       antMessage.success('Review progress saved successfully.');
     } catch (err) {
       console.error(err);
@@ -280,56 +267,21 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
     setSubmitting(true);
     try {
       const now = new Date().toISOString();
-      const updatedSupplierResponse: TechnicalAttributeResponse[] = attrList.map((attr) => {
-        const existingHistory = attr.comment_history || [];
-        const newHistory = attr.rejection_comment
-          ? [
-              ...existingHistory,
-              {
-                id: `comm-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-                sender_role: 'BUYER' as const,
-                sender_name: reviewerName,
-                sender_user_id: currentUserId || 'usr-2',
-                comment: attr.rejection_comment,
-                timestamp: now,
-              },
-            ]
-          : existingHistory;
-
-        return {
-          attribute_key: attr.attribute_key,
-          attribute_name: attr.attribute_name,
-          requested_value: attr.requested_value,
-          offered_value: attr.offered_value,
-          is_deviated: attr.is_deviated,
-          deviation_reason: attr.deviation_reason,
-          buyer_status: action === 'APPROVE' ? 'APPROVED' : attr.status === 'REJECTED' ? 'REVISION_REQUESTED' : 'APPROVED',
-          buyer_comment: attr.rejection_comment || '',
-          comment_history: newHistory,
-        };
-      });
-
-      const updatedRounds = [...(response.technical_revision_rounds || [])];
-      const targetIdx = updatedRounds.length - 1;
-
-      updatedRounds[targetIdx] = {
-        ...updatedRounds[targetIdx],
-        round_status: action === 'APPROVE' ? 'APPROVED' : 'REVISION_REQUESTED',
-        buyer_review_notes: overallNotes,
-        buyer_reviewed_at: now,
-        buyer_reviewed_by_user_id: currentUserId || 'usr-2',
-        supplier_response: updatedSupplierResponse,
-      };
-
-      const newResponseStatus = action === 'APPROVE' ? 'TECHNICAL_APPROVED' : 'TECHNICAL_REVISION_REQUESTED';
+      const activeQuote = await rfqDb.seller_quotes.get(response.id);
+      const quoteRevisionId = activeQuote?.current_revision_id || '';
+      
+      const quoteAttributes = quoteRevisionId 
+        ? await rfqDb.seller_quote_attributes.where('quote_revision_id').equals(quoteRevisionId).toArray()
+        : [];
 
       // Update sellerQuote status
       const nextQuoteStatus = action === 'APPROVE' ? 'FINALIZED' : 'DRAFT';
-      await rfqDb.sellerQuote.update(response.id, {
+      await rfqDb.seller_quotes.update(response.id, {
         status: nextQuoteStatus,
+        updated_at: now
       });
 
-      // Save buyer rejection comments to attributeComments
+      // Save buyer rejection comments to seller_quote_comments
       const commentEntries = attrList
         .filter((attr) => attr.rejection_comment)
         .map((attr) => {
@@ -345,29 +297,22 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
             attributeId = parts[1];
           }
 
+          const matchingAttr = quoteAttributes.find(qa => qa.group_id === groupId && qa.attribute_id === attributeId);
+
           return {
             id: `c-${response.id}-${groupId}-${attributeId}-${latestRound?.round_number || 1}`,
-            itemId: response.rfq_item_id,
-            quoteId: response.id,
-            groupId,
-            attributeId,
-            round: latestRound?.round_number || 1,
-            senderType: 'BUYER' as const,
-            senderId: currentUserId || 'usr-2',
+            seller_quote_id: response.id,
+            quote_attribute_id: matchingAttr?.id || null,
             comment: attr.rejection_comment || '',
-            createdAt: now,
+            sender: 'BUYER' as const,
+            sender_id: currentUserId || 'usr-2',
+            created_at: now,
           };
         });
 
       if (commentEntries.length > 0) {
-        await rfqDb.itemAttributeComments.bulkPut(commentEntries);
+        await rfqDb.seller_quote_comments.bulkPut(commentEntries);
       }
-
-      await rfqDb.itemSupplierResponses.update(response.id, {
-        status: newResponseStatus,
-        technical_revision_rounds: updatedRounds,
-        updated_at: now,
-      });
 
       if (action === 'APPROVE') {
         antMessage.success(`Technical Specification Approved (Round #${latestRound.round_number}) for ${response.seller_party_name}! Unlocked Commercial Negotiation.`);

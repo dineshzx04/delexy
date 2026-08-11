@@ -278,6 +278,7 @@ export const RfqCreateWizard: React.FC = () => {
         rfq_number: `RFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
         title: globalDetails.title,
         description: globalDetails.description,
+        requester_id: activePartyId,
         requester_party_id: activePartyId,
         requester_party_type: isBusinessContext ? 'BUSINESS' : 'USER',
         requester_name: activePartyName,
@@ -320,9 +321,8 @@ export const RfqCreateWizard: React.FC = () => {
         product_name: item.product_name,
         brand_id: item.brand_id,
         manufacturer_id: item.manufacturer_id,
-        manufacturing_inputs: [],
         quantity: item.quantity || 1,
-        unit_of_measure: item.unit_of_measure || 'Units',
+        unit: item.unit_of_measure || item.unit || 'Units',
         target_unit_price: item.target_unit_price,
         dynamic_attributes: item.selected_dynamic_attributes || [],
         attachments: [],
@@ -350,20 +350,20 @@ export const RfqCreateWizard: React.FC = () => {
         targetSellers.forEach((sellerPartyId: string) => {
           newQuotes.push({
             id: `q-${item.id}-${sellerPartyId}`,
-            itemId: item.id,
-            sellerId: sellerPartyId,
-            itemRevision: 1,
-            round: 1,
-            unit_price: item.target_unit_price || 0,
+            rfq_item_id: item.id,
+            seller_id: sellerPartyId,
             status: 'DRAFT',
+            unit_price: item.target_unit_price || 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           });
         });
       });
 
       await rfqDb.rfqs.put(newRfq);
-      await rfqDb.rfqItems.bulkPut(newRfqItems);
+      await rfqDb.rfq_items.bulkPut(newRfqItems);
       if (newQuotes.length > 0) {
-        await rfqDb.sellerQuote.bulkPut(newQuotes);
+        await rfqDb.seller_quotes.bulkPut(newQuotes);
       }
 
       antMessage.success('RFQ Container issued successfully!');

@@ -1,22 +1,21 @@
 import React, { useState, useMemo } from 'react';
-import { Card, Table, Button, Tag, Tabs, Input } from 'antd';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate } from 'react-router-dom';
+import { Card, Table, Tabs, Input, Button, Tag } from 'antd';
 import { SearchOutlined, SendOutlined, BankOutlined, UserOutlined } from '@ant-design/icons';
+import { useNavigate, useOutletContext } from 'react-router-dom';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { rfqDb, type ItemSupplierResponseStatus } from '../../data/rfq';
 import { mockParties } from '../../data/business/parties';
-import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { ItemSupplierStatusBadge } from '../../components/rfq/RfqStatusBadge';
 
 export const SupplierRfqInbox: React.FC = () => {
   const navigate = useNavigate();
-  const { activeWorkspace, currentUserId } = useWorkspace();
-  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
-  const basePath = isBusinessContext ? '/b/supplier' : '/user/supplier';
+  const outletContext = useOutletContext() as any;
+  const isBusinessContext = outletContext?.workspaceContext?.isBusinessContext || false;
+  const activePartyIdFromContext = outletContext?.workspaceContext?.activePartyId;
+  const currentUserId = outletContext?.workspaceContext?.currentUser?.id || 'usr-2';
 
-  // Active seller party resolution
   const activeParty = isBusinessContext
-    ? mockParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId) || mockParties[0]
+    ? mockParties.find((p) => p.id === activePartyIdFromContext) || mockParties[0]
     : mockParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || mockParties.find((p) => p.id === 'pty-6') || mockParties[0];
 
   const activePartyId = activeParty.id;
@@ -24,39 +23,36 @@ export const SupplierRfqInbox: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('ALL');
   const [searchText, setSearchText] = useState<string>('');
 
-  // Fetch quotes from the new sellerQuote table
   const quotes = useLiveQuery(
-    () => rfqDb.sellerQuote.where('sellerId').equals(activePartyId).toArray(),
+    () => rfqDb.seller_quotes.where('seller_id').equals(activePartyId).toArray(),
     [activePartyId]
   ) || [];
 
-  const items = useLiveQuery(() => rfqDb.rfqItems.toArray(), []) || [];
+  const items = useLiveQuery(() => rfqDb.rfq_items.toArray(), []) || [];
   const rfqs = useLiveQuery(() => rfqDb.rfqs.toArray(), []) || [];
-  const awards = useLiveQuery(() => rfqDb.rfqAwards.toArray(), []) || [];
+  const awards = useLiveQuery(() => rfqDb.rfq_awards.toArray(), []) || [];
 
-  // Construct response records dynamically from quotes
   const allResponses = useMemo(() => {
     return quotes.map((q) => {
-      const item = items.find((i) => i.id === q.itemId);
+      const item = items.find((i) => i.id === q.rfq_item_id);
       
-      // Determine virtual status mapping
       let status: ItemSupplierResponseStatus = 'ASSIGNED';
       if (q.status === 'DRAFT') {
         status = 'ASSIGNED';
       } else if (q.status === 'SUBMITTED') {
         status = 'TECHNICAL_SUBMITTED';
       } else if (q.status === 'FINALIZED') {
-        const isAwarded = awards.some(a => a.itemId === q.itemId && a.sellerId === q.sellerId);
+        const isAwarded = awards.some(a => a.rfq_item_id === q.rfq_item_id && a.seller_party_id === q.seller_id);
         status = isAwarded ? 'AWARDED' : 'TECHNICAL_APPROVED';
       }
 
       return {
         id: q.id,
         rfq_id: item?.rfq_id || '',
-        rfq_item_id: q.itemId,
-        seller_party_id: q.sellerId,
+        rfq_item_id: q.rfq_item_id,
+        seller_party_id: q.seller_id,
         status: status,
-        product_mapping: (q as any).sellerProductMapping || null,
+        product_mapping: q.seller_product_mapping || null,
       };
     });
   }, [quotes, items, rfqs, awards]);
@@ -93,7 +89,7 @@ export const SupplierRfqInbox: React.FC = () => {
       width: 160,
       render: (_: any, record: any) => {
         const item = items.find((i) => i.id === record.rfq_item_id);
-        return <span className="font-bold text-slate-800">{item?.quantity || 100} {item?.unit_of_measure || 'Units'}</span>;
+        return <span className="font-bold text-slate-800">{item?.quantity || 100} {item?.unit || 'Units'}</span>;
       },
     },
     {
@@ -123,16 +119,19 @@ export const SupplierRfqInbox: React.FC = () => {
       title: 'Actions',
       key: 'actions',
       width: 180,
-      render: (_: any, record: any) => (
-        <Button
-          type="primary"
-          onClick={() => navigate(`${basePath}/rfqs/${record.rfq_id}/items/${record.rfq_item_id}/respond`)}
-          icon={<SendOutlined />}
-          className="bg-emerald-600 hover:bg-emerald-700 font-semibold"
-        >
-          {record.status === 'ASSIGNED' ? 'Submit Response' : 'Update Response'}
-        </Button>
-      ),
+      render: (_: any, record: any) => {
+        const basePath = isBusinessContext ? '/b' : '/user';
+        return (
+          <Button
+            type="primary"
+            onClick={() => navigate(`${basePath}/rfqs/${record.rfq_id}/items/${record.rfq_item_id}/respond`)}
+            icon={<SendOutlined />}
+            className="bg-emerald-600 hover:bg-emerald-700 font-semibold"
+          >
+            {record.status === 'ASSIGNED' ? 'Submit Response' : 'Update Response'}
+          </Button>
+        );
+      },
     },
   ];
 
