@@ -189,7 +189,7 @@ export interface ItemAttributeChangeHistory {
   item_revision?: number;
   seller_quote_id?: string | null;
   round?: number | null;
-  group_id?: string;
+  group_id: string;
   attribute_id: string;
   attribute_name?: string;
   value_type?: string;

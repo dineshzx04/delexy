@@ -23,8 +23,7 @@ export class RfqDatabase extends Dexie {
   seller_quote_comments!: Table<SellerQuoteComment, string>;
   item_attribute_change_history!: Table<ItemAttributeChangeHistory, string>;
   rfq_awards!: Table<RfqAward, string>;
-  item_supplier_responses!: Table<any, string>;
-
+ 
   constructor() {
     super("delexy_rfq_db");
     this.version(7).stores({
@@ -38,8 +37,7 @@ export class RfqDatabase extends Dexie {
       seller_quote_comments: "id, seller_quote_id, quote_attribute_id, sender_id",
       item_attribute_change_history: "id, rfq_item_id, seller_quote_id, round, group_id, attribute_id, actor_type",
       rfq_awards: "id, rfq_id, rfq_item_id, seller_party_id",
-      item_supplier_responses: "id, rfq_id, rfq_item_id, seller_party_id, status",
-    });
+     });
   }
 }
 

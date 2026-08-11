@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Input, InputNumber, Select, Button, Switch, Alert, App as AntApp, Divider, Breadcrumb, Tag, Descriptions, Segmented } from 'antd';
+import { Card, Input, InputNumber, Select, Button, Switch, Alert, App as AntApp, Breadcrumb, Tag, Descriptions, Segmented } from 'antd';
 import {
   SendOutlined,
   ArrowLeftOutlined,
@@ -15,10 +15,6 @@ import {
 } from '@ant-design/icons';
 import {
   rfqDb,
-  type SellerQuote,
-  type SellerQuoteAttribute,
-  type SellerQuoteComment,
-  type ItemAttributeChangeHistory,
   type ItemAttributeValue
 } from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
@@ -41,7 +37,7 @@ interface AttributeResponseState {
 export const SupplierItemRespond: React.FC = () => {
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
   const navigate = useNavigate();
-  const { activeWorkspace, currentUser, currentUserId } = useWorkspace();
+  const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/supplier' : '/user/supplier';
   const { message: antMessage } = AntApp.useApp();
@@ -90,14 +86,6 @@ export const SupplierItemRespond: React.FC = () => {
     if (!activeQuote) return [];
     return allHistory.filter(h => h.seller_quote_id === activeQuote.id);
   }, [allHistory, activeQuote]);
-
-  const historicalRounds = useMemo(() => {
-    const roundsSet = new Set<number>();
-    activeHistory.forEach(h => {
-      if (h.round) roundsSet.add(h.round);
-    });
-    return Array.from(roundsSet).sort((a, b) => a - b);
-  }, [activeHistory]);
 
   const allCategories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const allAttributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
@@ -225,6 +213,70 @@ export const SupplierItemRespond: React.FC = () => {
       });
     }
 
+    const getAttributeResponseState = (
+      gId: string,
+      attrId: string,
+      groupName: string,
+      da: any | undefined
+    ): AttributeResponseState | null => {
+      const attr = allAttributes.find((a) => a.id === attrId);
+      if (!attr) return null;
+
+      let requestedVals: ItemAttributeValue[] = [];
+      const itemAttr = itemAttributes.find((ia) => ia.attribute_id === attrId && ia.group_id === gId);
+
+      if (itemAttr) {
+        requestedVals = itemAttr.values;
+      } else if (da) {
+        requestedVals = (da.selected_value_ids || []).map((vId: string) => {
+          const vObj = allAttributeValues.find((v) => v.id === vId);
+          return { value_id: vId, value_label: vObj?.label || vId };
+        });
+      } else if (sellerProduct) {
+        const spDa = (sellerProduct.dynamic_attributes || []).find((d: any) => d.attribute_id === attrId);
+        if (spDa) {
+          requestedVals = (spDa.selected_value_ids || []).map((vId: string) => {
+            const vObj = allAttributeValues.find((v) => v.id === vId);
+            return { value_id: vId, value_label: vObj?.label || vId };
+          });
+        } else {
+          const spSpec = (sellerProduct.specifications || []).find((s: any) => s.attribute_id === attrId);
+          if (spSpec) {
+            requestedVals = (spSpec.values || []).map((v: any) => ({
+              value_id: v.id || v.label,
+              value_label: v.label || v.id,
+            }));
+          }
+        }
+      }
+
+      const resp = activeResponses.find((r) => r.group_id === gId && r.attribute_id === attrId);
+      const offeredVals = resp ? resp.offered_values : requestedVals;
+      const isDev = resp ? resp.offered_values.some((v: any) => !requestedVals.some(r => r.value_id === v.value_id)) : false;
+      const commentObj = resp ? activeComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER') : null;
+
+      const mappedValues = allAttributeValues.filter(
+        (v) => v.attributeId === attrId || (attr?.valueIds && attr.valueIds.includes(v.id))
+      );
+      const valueOptions = mappedValues.map((v) => ({
+        value: v.id || v.label || v.value,
+        label: `${v.label || v.value}`,
+      }));
+
+      return {
+        key: `dyn-${gId}-${attrId}`,
+        name: attr.name || attr.label || attrId,
+        group_id: gId,
+        attribute_id: attrId,
+        group_name: groupName,
+        requested: requestedVals,
+        offered: offeredVals,
+        is_deviated: isDev,
+        reason: commentObj?.comment || '',
+        options: valueOptions.length > 0 ? valueOptions : undefined,
+      };
+    };
+
     const category = allCategories.find((c) => c.id === item.category_id);
     const mappedGroupIds = category?.mappedGroupIds || [];
 
@@ -234,111 +286,17 @@ export const SupplierItemRespond: React.FC = () => {
       const groupAttrIds = group.attributeIds || [];
       groupAttrIds.forEach((attrId) => {
         const da = (item.dynamic_attributes || []).find((d) => d.attribute_id === attrId && d.group_id === gId);
-        const attr = allAttributes.find((a) => a.id === attrId);
-        if (!attr) return;
-
-        let requestedVals: ItemAttributeValue[] = [];
-
-        const itemAttr = itemAttributes.find((ia) => ia.attribute_id === attrId && ia.group_id === gId);
-
-        if (itemAttr) {
-          requestedVals = itemAttr.values;
-        } else if (da) {
-          requestedVals = (da.selected_value_ids || []).map((vId) => {
-            const vObj = allAttributeValues.find((v) => v.id === vId);
-            return { value_id: vId, value_label: vObj?.label || vId };
-          });
-        } else if (sellerProduct) {
-          const spDa = (sellerProduct.dynamic_attributes || []).find((d) => d.attribute_id === attrId);
-          if (spDa) {
-            requestedVals = (spDa.selected_value_ids || []).map((vId) => {
-              const vObj = allAttributeValues.find((v) => v.id === vId);
-              return { value_id: vId, value_label: vObj?.label || vId };
-            });
-          } else {
-            const spSpec = (sellerProduct.specifications || []).find((s) => s.attribute_id === attrId);
-            if (spSpec) {
-              requestedVals = (spSpec.values || []).map((v: any) => ({
-                value_id: v.id || v.label,
-                value_label: v.label || v.id,
-              }));
-            }
-          }
-        }
-
-        const resp = activeResponses.find((r) => r.group_id === gId && r.attribute_id === attrId);
-        const offeredVals = resp ? resp.offered_values : requestedVals;
-        const isDev = resp ? resp.offered_values.some((v: any) => !requestedVals.some(r => r.value_id === v.value_id)) : false;
-        const commentObj = resp ? activeComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER') : null;
-
-        const mappedValues = allAttributeValues.filter(
-          (v) => v.attributeId === attrId || (attr?.valueIds && attr.valueIds.includes(v.id))
-        );
-        const valueOptions = mappedValues.map((v) => ({
-          value: v.id || v.label || v.value,
-          label: `${v.label || v.value}`,
-        }));
-
-        list.push({
-          key: `dyn-${gId}-${attrId}`,
-          name: attr.name || attr.label || attrId,
-          group_id: gId,
-          attribute_id: attrId,
-          group_name: group.name,
-          requested: requestedVals,
-          offered: offeredVals,
-          is_deviated: isDev,
-          reason: commentObj?.comment || '',
-          options: valueOptions.length > 0 ? valueOptions : undefined,
-        });
+        const state = getAttributeResponseState(gId, attrId, group.name, da);
+        if (state) list.push(state);
       });
     });
 
     (item.dynamic_attributes || []).forEach((da) => {
       const alreadyAdded = list.some((l) => l.group_id === da.group_id && l.attribute_id === da.attribute_id);
       if (!alreadyAdded) {
-        const attr = allAttributes.find((a) => a.id === da.attribute_id);
         const group = allAttributeGroups.find((g) => g.id === da.group_id);
-        if (!attr) return;
-
-        let requestedVals: ItemAttributeValue[] = [];
-
-        const itemAttr = itemAttributes.find((ia) => ia.attribute_id === da.attribute_id && ia.group_id === da.group_id);
-
-        if (itemAttr) {
-          requestedVals = itemAttr.values;
-        } else {
-          requestedVals = (da.selected_value_ids || []).map((vId) => {
-            const vObj = allAttributeValues.find((v) => v.id === vId);
-            return { value_id: vId, value_label: vObj?.label || vId };
-          });
-        }
-
-        const resp = activeResponses.find((r) => r.group_id === da.group_id && r.attribute_id === da.attribute_id);
-        const offeredVals = resp ? resp.offered_values : requestedVals;
-        const isDev = resp ? resp.offered_values.some((v: any) => !requestedVals.some(r => r.value_id === v.value_id)) : false;
-        const commentObj = resp ? activeComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER') : null;
-
-        const mappedValues = allAttributeValues.filter(
-          (v) => v.attributeId === da.attribute_id || (attr?.valueIds && attr.valueIds.includes(v.id))
-        );
-        const valueOptions = mappedValues.map((v) => ({
-          value: v.id || v.label || v.value,
-          label: `${v.label || v.value}`,
-        }));
-
-        list.push({
-          key: `dyn-${da.group_id}-${da.attribute_id}`,
-          name: attr.name || attr.label || da.attribute_id,
-          group_id: da.group_id,
-          attribute_id: da.attribute_id,
-          group_name: group?.name || 'Category Attributes',
-          requested: requestedVals,
-          offered: offeredVals,
-          is_deviated: isDev,
-          reason: commentObj?.comment || '',
-          options: valueOptions.length > 0 ? valueOptions : undefined,
-        });
+        const state = getAttributeResponseState(da.group_id, da.attribute_id, group?.name || 'Category Attributes', da);
+        if (state) list.push(state);
       }
     });
 
@@ -477,7 +435,7 @@ export const SupplierItemRespond: React.FC = () => {
       }));
       await rfqDb.item_attribute_change_history.bulkPut(historyEntries);
 
-      antMessage.success(`Technical response (Round #${nextRoundNum}) submitted for {activePartyName}!`);
+      antMessage.success(`Technical response (Round #${nextRoundNum}) submitted for ${activePartyName}!`);
       navigate(basePath);
     } catch (err) {
       console.error(err);

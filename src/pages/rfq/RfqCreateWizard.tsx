@@ -8,14 +8,12 @@ import {
   Table,
   Tag,
   App as AntApp,
-  Divider,
   Drawer,
   Popconfirm,
   Checkbox,
   Pagination,
   Modal,
   Descriptions,
-  Tooltip,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -342,7 +340,7 @@ export const RfqCreateWizard: React.FC = () => {
 
       const newQuotes: SellerQuote[] = [];
 
-      newRfqItems.forEach((item, itemIdx) => {
+      newRfqItems.forEach((item) => {
         const targetSellers = item.target_seller_party_ids && item.target_seller_party_ids.length > 0
           ? item.target_seller_party_ids
           : allParties.filter((p: any) => p.id !== activePartyId).map((p: any) => p.id);
@@ -768,7 +766,7 @@ export const RfqCreateWizard: React.FC = () => {
                 const comboEntry = (v.combination_values || []).find(
                   (cv: any) =>
                     cv.attribute_id === filter.attribute_id &&
-                    (!filter.group_id || cv.group_id === filter.group_id)
+                    cv.group_id === filter.group_id
                 );
 
                 let attributeMatches = false;
@@ -781,14 +779,14 @@ export const RfqCreateWizard: React.FC = () => {
                   const parentDynamicMatch = (sp.dynamic_attributes || []).some(
                     (da: any) =>
                       da.attribute_id === filter.attribute_id &&
-                      (!filter.group_id || da.group_id === filter.group_id) &&
+                      da.group_id === filter.group_id &&
                       (da.selected_value_ids || []).some((valId: string) => isValueMatched(valId, undefined, filter.selected_value_ids))
                   );
 
                   const parentSpecMatch = (sp.specifications || []).some(
                     (spec: any) =>
                       spec.attribute_id === filter.attribute_id &&
-                      (!filter.group_id || spec.group_id === filter.group_id) &&
+                      spec.group_id === filter.group_id &&
                       (spec.values || []).some((val: any) => isValueMatched(val.id, val.label, filter.selected_value_ids))
                   );
 
@@ -1209,8 +1207,6 @@ export const RfqCreateWizard: React.FC = () => {
                     ) : (
                       <div className="space-y-3">
                         {paginatedVariants.map(({ sellerProduct: sp, variant: v }) => {
-                          const brand = allBrands.find((b: any) => b.id === sp.brand_id);
-                          const mfg = allManufacturers.find((m: any) => m.id === sp.manufacturer_id);
                           const isBoundVariant = item.variant_id === v.id || item.variant_id === `${sp.id}-base`;
 
                           const party = allParties.find((p: any) => p.id === sp.party_id);

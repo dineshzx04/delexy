@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Tabs, Tag, Button, Table, Timeline, Breadcrumb } from 'antd';
+import { Card, Tabs, Tag, Button, Table, Breadcrumb } from 'antd';
 import {
   AppstoreOutlined,
-  TeamOutlined,
-  HistoryOutlined,
-  TrophyOutlined,
   FolderOpenOutlined,
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
@@ -145,48 +142,6 @@ export const RfqWorkspace: React.FC = () => {
                 </div>
               ),
             },
-            // {
-            //   key: 'suppliers',
-            //   label: (
-            //     <span className="font-bold flex items-center gap-2">
-            //       <TeamOutlined /> Assigned Suppliers ({responses.length})
-            //     </span>
-            //   ),
-            //   children: (
-            //     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            //       {responses.map((resp) => (
-            //         <Card key={resp.id} className="border-slate-200 shadow-sm bg-slate-50">
-            //           <div className="font-bold text-slate-900 text-base">{resp.seller_party_name}</div>
-            //           <div className="text-xs text-slate-500 mt-1">Status: <Tag color="blue">{resp.status}</Tag></div>
-            //           <div className="text-xs text-slate-600 mt-2">
-            //             Mapped Product: <span className="font-semibold">{resp.product_mapping?.seller_product_id ?? 'sprod-1'}</span> ({resp.product_mapping?.variant_id ?? 'v1'})
-            //           </div>
-            //         </Card>
-            //       ))}
-            //     </div>
-            //   ),
-            // },
-            // {
-            //   key: 'timeline',
-            //   label: (
-            //     <span className="font-bold flex items-center gap-2">
-            //       <HistoryOutlined /> Audit Timeline
-            //     </span>
-            //   ),
-            //   children: (
-            //     <Timeline
-            //       items={(rfq.timeline || []).map((t) => ({
-            //         children: (
-            //           <div>
-            //             <div className="font-bold text-slate-800">{t.event_type} - {t.actor_name}</div>
-            //             <div className="text-xs text-slate-500">{t.remarks}</div>
-            //             <div className="text-[10px] text-slate-400 mt-1">{new Date(t.timestamp).toLocaleString()}</div>
-            //           </div>
-            //         ),
-            //       }))}
-            //     />
-            //   ),
-            // },
           ]}
         />
       </Card>
