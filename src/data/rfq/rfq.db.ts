@@ -28,7 +28,7 @@ export class RfqDatabase extends Dexie {
   constructor() {
     super("delexy_rfq_db");
     this.version(7).stores({
-      rfqs: "id, status, requester_id",
+      rfqs: "id, status, requester_id, requester_party_id ",
       rfq_items: "id, rfq_id, category_id, current_revision_id",
       rfq_item_revisions: "id, rfq_item_id, revision_number",
       rfq_item_attributes: "id, rfq_item_revision_id, group_id, attribute_id",

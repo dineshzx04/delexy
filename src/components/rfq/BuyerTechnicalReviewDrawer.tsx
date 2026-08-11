@@ -6,40 +6,31 @@ import {
   Tag,
   Input,
   Progress,
-  Alert,
   Modal,
   Space,
-  Descriptions,
   Tooltip,
   App as AntApp,
 } from 'antd';
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
-  CloseCircleOutlined,
-  SendOutlined,
   WarningFilled,
   CheckCircleFilled,
-  ShopOutlined,
   MessageOutlined,
   CheckOutlined,
   RotateLeftOutlined,
-  LockOutlined,
   SaveOutlined,
 } from '@ant-design/icons';
-import {
-  rfqDb,
-  type ItemSupplierResponse,
-  type TechnicalAttributeResponse,
-  type TechnicalRevisionRound,
-  type AttributeCommentEntry,
-} from '../../data/rfq';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { rfqDb, type SellerQuote } from '../../data/rfq';
+import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { businessDb } from '../../data/business/business.db';
 
 interface BuyerTechnicalReviewDrawerProps {
   open: boolean;
   onClose: () => void;
-  response: ItemSupplierResponse | null;
+  quoteId: string | null;
   itemTitle?: string;
 }
 
@@ -52,15 +43,13 @@ interface AttributeAuditItem {
   deviation_reason?: string;
   status: 'APPROVED' | 'REJECTED' | 'PENDING';
   rejection_comment?: string;
-  comment_history?: AttributeCommentEntry[];
-  reviewed_by_user_name?: string;
-  reviewed_at?: string;
+  comment_history?: any[];
 }
 
 export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProps> = ({
   open,
   onClose,
-  response,
+  quoteId,
   itemTitle,
 }) => {
   const { currentUserId, currentUser } = useWorkspace();
@@ -73,68 +62,131 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
   const [commentInput, setCommentInput] = useState('');
   const [overallNotes, setOverallNotes] = useState('');
 
-  const latestRound: TechnicalRevisionRound | null = useMemo(() => {
-    if (!response?.technical_revision_rounds || response.technical_revision_rounds.length === 0) return null;
-    return response.technical_revision_rounds[response.technical_revision_rounds.length - 1];
-  }, [response]);
+  const activeQuote = useLiveQuery(() => quoteId ? rfqDb.seller_quotes.get(quoteId) : undefined, [quoteId]);
+  const quoteRevisions = useLiveQuery(() => quoteId ? rfqDb.seller_quote_revisions.where('seller_quote_id').equals(quoteId).toArray() : [], [quoteId]) || [];
+  const activeQuoteRevision = quoteRevisions.find(r => r.id === activeQuote?.current_revision_id);
+  const quoteResponses = useLiveQuery(() => activeQuote?.current_revision_id ? rfqDb.seller_quote_attributes.where('quote_revision_id').equals(activeQuote.current_revision_id).toArray() : [], [activeQuote?.current_revision_id]) || [];
+  const quoteComments = useLiveQuery(() => quoteId ? rfqDb.seller_quote_comments.where('seller_quote_id').equals(quoteId).toArray() : [], [quoteId]) || [];
+  const rfqItem = useLiveQuery(() => activeQuote?.rfq_item_id ? rfqDb.rfq_items.get(activeQuote.rfq_item_id) : undefined, [activeQuote?.rfq_item_id]);
+  const allItemAttributes = useLiveQuery(() => rfqDb.rfq_item_attributes.toArray(), []) || [];
+  const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
 
-  // Read-only mode enforcement: Editing is only active when round status is PENDING
-  const isReadOnly = useMemo(() => {
-    if (!latestRound) return false;
-    return latestRound.round_status === 'APPROVED' || latestRound.round_status === 'REJECTED';
-  }, [latestRound]);
+  const sellerParty = useMemo(() => {
+    if (!activeQuote) return null;
+    return parties.find(p => p.id === activeQuote.seller_id) || { display_name: `Seller ${activeQuote.seller_id}` };
+  }, [activeQuote, parties]);
 
-  // Initialize attribute audit state when response or round changes
+  const latestRoundNumber = useMemo(() => {
+    if (quoteRevisions.length === 0) return 1;
+    return Math.max(...quoteRevisions.map(r => r.revision_number));
+  }, [quoteRevisions]);
+
+  const isReadOnly = activeQuote?.status === 'FINALIZED';
+
+  const attrList = useMemo(() => {
+    if (!activeQuote || !activeQuoteRevision) return [];
+    
+    const buyerItemAttributes = allItemAttributes.filter(ia => ia.rfq_item_revision_id === activeQuoteRevision.rfq_item_revision_id || ia.rfq_item_revision_id === rfqItem?.current_revision_id);
+
+    return quoteResponses.map(resp => {
+      let attributeName = '';
+      let key = '';
+
+      if (resp.group_id === 'static') {
+        attributeName = resp.attribute_id === 'brand' ? 'Preferred Brand' : 'Preferred Manufacturer';
+        key = `static-${resp.attribute_id === 'brand' ? 'brand' : 'mfg'}`;
+      } else {
+        const attr = allAttributes.find(a => a.id === resp.attribute_id);
+        attributeName = attr?.name || attr?.label || resp.attribute_id || '';
+        key = `dyn-${resp.group_id || ''}-${resp.attribute_id || ''}`;
+      }
+
+      const buyerAttr = buyerItemAttributes.find(ia => ia.group_id === resp.group_id && ia.attribute_id === resp.attribute_id);
+
+      const reqLabel = buyerAttr ? buyerAttr.values.map((v: any) => v.value_label || v.value_id).join(', ') : '-';
+      const offLabel = resp.offered_values.map((v: any) => v.value_label || v.value_id).join(', ') || '-';
+      
+      let isDev = false;
+      if (resp.group_id === 'static') {
+        const reqIds = Array.isArray(rfqItem?.brand_id) ? rfqItem.brand_id : (rfqItem?.brand_id ? [rfqItem.brand_id] : []);
+        const mfgIds = Array.isArray(rfqItem?.manufacturer_id) ? rfqItem.manufacturer_id : (rfqItem?.manufacturer_id ? [rfqItem.manufacturer_id] : []);
+        const targetIds = resp.attribute_id === 'brand' ? reqIds : mfgIds;
+
+        isDev = resp.offered_values.some((v: any) => !targetIds.includes(v.value_id)) ||
+                targetIds.some((id: string) => !resp.offered_values.some((v: any) => v.value_id === id));
+      } else {
+        isDev = buyerAttr ? (
+          resp.offered_values.some((v: any) => !buyerAttr.values.some((r: any) => r.value_id === v.value_id)) ||
+          buyerAttr.values.some((r: any) => !resp.offered_values.some((v: any) => v.value_id === r.value_id))
+        ) : false;
+      }
+
+      const sellerComment = quoteComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER');
+      const buyerComment = quoteComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'BUYER');
+
+      const commentsHistory = quoteComments
+        .filter(c => c.quote_attribute_id === resp.id)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+        .map(c => ({
+          id: c.id,
+          sender_role: c.sender || 'SELLER',
+          sender_name: c.sender === 'BUYER' ? 'Buyer' : 'Supplier',
+          sender_user_id: c.sender_id || '',
+          comment: c.comment,
+          timestamp: c.created_at
+        }));
+
+      let initialStatus: 'APPROVED' | 'REJECTED' | 'PENDING' = 'PENDING';
+      if (activeQuote.status === 'FINALIZED') {
+        initialStatus = 'APPROVED';
+      } else if (buyerComment) {
+        initialStatus = 'REJECTED';
+      }
+
+      return {
+        attribute_key: key,
+        attribute_name: attributeName,
+        requested_value: reqLabel,
+        offered_value: offLabel,
+        is_deviated: isDev,
+        deviation_reason: sellerComment?.comment || '',
+        status: initialStatus,
+        rejection_comment: buyerComment?.comment || '',
+        comment_history: commentsHistory
+      } as AttributeAuditItem;
+    });
+  }, [activeQuote, activeQuoteRevision, quoteResponses, quoteComments, rfqItem, allItemAttributes, allAttributes]);
+
   useEffect(() => {
-    if (latestRound && latestRound.supplier_response) {
-      setOverallNotes(latestRound.buyer_review_notes || '');
+    if (attrList.length > 0) {
       const stateMap: Record<string, AttributeAuditItem> = {};
-
-      latestRound.supplier_response.forEach((attr) => {
-        let initialStatus: 'APPROVED' | 'REJECTED' | 'PENDING' = 'PENDING';
-        if (attr.buyer_status === 'APPROVED') initialStatus = 'APPROVED';
-        else if (attr.buyer_status === 'REJECTED' || attr.buyer_status === 'REVISION_REQUESTED') initialStatus = 'REJECTED';
-
-        stateMap[attr.attribute_key] = {
-          attribute_key: attr.attribute_key,
-          attribute_name: attr.attribute_name,
-          requested_value: attr.requested_value,
-          offered_value: attr.offered_value,
-          is_deviated: attr.is_deviated,
-          deviation_reason: attr.deviation_reason,
-          status: initialStatus,
-          rejection_comment: attr.buyer_comment || '',
-          comment_history: attr.comment_history || [],
-        };
+      attrList.forEach((attr) => {
+        stateMap[attr.attribute_key] = attr;
       });
-
       setAttributesState(stateMap);
+      
+      const buyerOverallComment = quoteComments.find(c => c.sender === 'BUYER' && !c.quote_attribute_id);
+      setOverallNotes(buyerOverallComment?.comment || '');
+    } else {
+      setAttributesState({});
+      setOverallNotes('');
     }
-  }, [latestRound]);
+  }, [attrList, quoteComments]);
 
-  const attrList = useMemo(() => Object.values(attributesState), [attributesState]);
-  const totalCount = attrList.length;
-  const approvedCount = attrList.filter((a) => a.status === 'APPROVED').length;
-  const rejectedCount = attrList.filter((a) => a.status === 'REJECTED').length;
-  const pendingCount = attrList.filter((a) => a.status === 'PENDING').length;
+  const auditList = Object.values(attributesState);
+  const totalCount = auditList.length;
+  const approvedCount = auditList.filter((a) => a.status === 'APPROVED').length;
+  const rejectedCount = auditList.filter((a) => a.status === 'REJECTED').length;
+  const pendingCount = totalCount - (approvedCount + rejectedCount);
   const percentApproved = totalCount > 0 ? Math.round((approvedCount / totalCount) * 100) : 0;
-  const is100PercentApproved = totalCount > 0 && approvedCount === totalCount;
+  const is100PercentApproved = approvedCount === totalCount && totalCount > 0;
 
-  if (!response || !latestRound) return null;
-
-  // Single Attribute Review Actions
   const handleApproveField = (key: string) => {
     setAttributesState((prev) => ({
       ...prev,
-      [key]: {
-        ...prev[key],
-        status: 'APPROVED',
-        rejection_comment: undefined,
-        reviewed_by_user_name: reviewerName,
-        reviewed_at: new Date().toISOString(),
-      },
+      [key]: { ...prev[key], status: 'APPROVED', rejection_comment: '' },
     }));
-    antMessage.success(`Attribute "${attributesState[key]?.attribute_name || key}" approved.`);
   };
 
   const handleOpenRejectModal = (key: string) => {
@@ -143,106 +195,97 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
   };
 
   const handleConfirmRejection = () => {
-    if (!rejectingFieldKey) return;
-    if (!commentInput.trim()) {
-      antMessage.error('Please enter a reviewer comment explaining the required technical adjustment.');
-      return;
+    if (rejectingFieldKey) {
+      setAttributesState((prev) => ({
+        ...prev,
+        [rejectingFieldKey]: {
+          ...prev[rejectingFieldKey],
+          status: 'REJECTED',
+          rejection_comment: commentInput,
+        },
+      }));
+      setRejectingFieldKey(null);
+      setCommentInput('');
     }
-
-    setAttributesState((prev) => ({
-      ...prev,
-      [rejectingFieldKey]: {
-        ...prev[rejectingFieldKey],
-        status: 'REJECTED',
-        rejection_comment: commentInput.trim(),
-        reviewed_by_user_name: reviewerName,
-        reviewed_at: new Date().toISOString(),
-      },
-    }));
-
-    antMessage.warning(`Attribute "${attributesState[rejectingFieldKey]?.attribute_name || rejectingFieldKey}" marked for revision.`);
-    setRejectingFieldKey(null);
-    setCommentInput('');
   };
 
   const handleResetField = (key: string) => {
     setAttributesState((prev) => ({
       ...prev,
-      [key]: {
-        ...prev[key],
-        status: 'PENDING',
-        rejection_comment: undefined,
-      },
+      [key]: { ...prev[key], status: 'PENDING', rejection_comment: '' },
     }));
   };
 
-  // Bulk Review Action Handlers (Matching PlatformSellerProductReviewDetail.tsx)
   const handleBulkApproveAllPending = () => {
     setAttributesState((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((k) => {
-        if (next[k].status === 'PENDING') {
-          next[k] = {
-            ...next[k],
-            status: 'APPROVED',
-            rejection_comment: undefined,
-            reviewed_by_user_name: reviewerName,
-            reviewed_at: new Date().toISOString(),
-          };
+      const copy = { ...prev };
+      Object.keys(copy).forEach((key) => {
+        if (copy[key].status === 'PENDING') {
+          copy[key] = { ...copy[key], status: 'APPROVED', rejection_comment: '' };
         }
       });
-      return next;
+      return copy;
     });
-    antMessage.success('Marked all pending attributes as APPROVED.');
   };
 
   const handleBulkApproveAll = () => {
     setAttributesState((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((k) => {
-        next[k] = {
-          ...next[k],
-          status: 'APPROVED',
-          rejection_comment: undefined,
-          reviewed_by_user_name: reviewerName,
-          reviewed_at: new Date().toISOString(),
-        };
+      const copy = { ...prev };
+      Object.keys(copy).forEach((key) => {
+        copy[key] = { ...copy[key], status: 'APPROVED', rejection_comment: '' };
       });
-      return next;
+      return copy;
     });
-    antMessage.success('Marked all attributes as APPROVED.');
   };
 
   const handleBulkResetAll = () => {
     setAttributesState((prev) => {
-      const next = { ...prev };
-      Object.keys(next).forEach((k) => {
-        next[k] = {
-          ...next[k],
-          status: 'PENDING',
-          rejection_comment: undefined,
-        };
+      const copy = { ...prev };
+      Object.keys(copy).forEach(key => {
+        copy[key] = { ...copy[key], status: 'PENDING', rejection_comment: '' };
       });
-      return next;
+      return copy;
     });
-    antMessage.info('Reset all attributes to PENDING review.');
   };
 
-  // Save Progress without finalizing round status
   const handleSaveProgress = async () => {
+    if (!quoteId) return;
     setSubmitting(true);
     try {
-      const updatedSupplierResponse: TechnicalAttributeResponse[] = attrList.map((attr) => ({
-        attribute_key: attr.attribute_key,
-        attribute_name: attr.attribute_name,
-        requested_value: attr.requested_value,
-        offered_value: attr.offered_value,
-        is_deviated: attr.is_deviated,
-        deviation_reason: attr.deviation_reason,
-        buyer_status: attr.status === 'APPROVED' ? 'APPROVED' : attr.status === 'REJECTED' ? 'REVISION_REQUESTED' : undefined,
-        buyer_comment: attr.rejection_comment,
-        comment_history: attr.comment_history,
-      }));
+      const now = new Date().toISOString();
+      const commentEntries: any[] = [];
+      
+      auditList.forEach((attr) => {
+        if (attr.rejection_comment) {
+          let groupId = 'static';
+          let attributeId = 'brand';
+          if (attr.attribute_key === 'static-brand') {
+            attributeId = 'brand';
+          } else if (attr.attribute_key === 'static-mfg') {
+            attributeId = 'manufacturer';
+          } else if (attr.attribute_key.startsWith('dyn-')) {
+            const parts = attr.attribute_key.replace('dyn-', '').split('-');
+            groupId = parts[0];
+            attributeId = parts[1];
+          }
+
+          const matchingAttr = quoteResponses.find(qa => qa.group_id === groupId && qa.attribute_id === attributeId);
+
+          commentEntries.push({
+            id: `c-${quoteId}-${groupId}-${attributeId}-${latestRoundNumber}`,
+            seller_quote_id: quoteId,
+            quote_attribute_id: matchingAttr?.id || null,
+            comment: attr.rejection_comment,
+            sender: 'BUYER' as const,
+            sender_id: currentUserId || 'usr-2',
+            created_at: now,
+          });
+        }
+      });
+
+      if (commentEntries.length > 0) {
+        await rfqDb.seller_quote_comments.bulkPut(commentEntries);
+      }
 
       antMessage.success('Review progress saved successfully.');
     } catch (err) {
@@ -253,8 +296,8 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
     }
   };
 
-  // Final Decision Handler: Request Revision OR Approve Technical Response
   const handleFinalizeDecision = async (action: 'APPROVE' | 'REQUEST_REVISION') => {
+    if (!quoteId) return;
     if (action === 'REQUEST_REVISION' && rejectedCount === 0) {
       antMessage.error('Please reject at least 1 attribute with feedback before requesting technical revision.');
       return;
@@ -267,22 +310,15 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
     setSubmitting(true);
     try {
       const now = new Date().toISOString();
-      const activeQuote = await rfqDb.seller_quotes.get(response.id);
-      const quoteRevisionId = activeQuote?.current_revision_id || '';
-      
-      const quoteAttributes = quoteRevisionId 
-        ? await rfqDb.seller_quote_attributes.where('quote_revision_id').equals(quoteRevisionId).toArray()
-        : [];
 
-      // Update sellerQuote status
       const nextQuoteStatus = action === 'APPROVE' ? 'FINALIZED' : 'DRAFT';
-      await rfqDb.seller_quotes.update(response.id, {
+      await rfqDb.seller_quotes.update(quoteId, {
         status: nextQuoteStatus,
         updated_at: now
       });
 
-      // Save buyer rejection comments to seller_quote_comments
-      const commentEntries = attrList
+      const commentEntries: any[] = [];
+      auditList
         .filter((attr) => attr.rejection_comment)
         .map((attr) => {
           let groupId = 'static';
@@ -297,27 +333,39 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
             attributeId = parts[1];
           }
 
-          const matchingAttr = quoteAttributes.find(qa => qa.group_id === groupId && qa.attribute_id === attributeId);
+          const matchingAttr = quoteResponses.find(qa => qa.group_id === groupId && qa.attribute_id === attributeId);
 
-          return {
-            id: `c-${response.id}-${groupId}-${attributeId}-${latestRound?.round_number || 1}`,
-            seller_quote_id: response.id,
+          commentEntries.push({
+            id: `c-${quoteId}-${groupId}-${attributeId}-${latestRoundNumber}`,
+            seller_quote_id: quoteId,
             quote_attribute_id: matchingAttr?.id || null,
             comment: attr.rejection_comment || '',
             sender: 'BUYER' as const,
             sender_id: currentUserId || 'usr-2',
             created_at: now,
-          };
+          });
         });
+
+      if (overallNotes.trim()) {
+        commentEntries.push({
+          id: `c-overall-${quoteId}-${latestRoundNumber}`,
+          seller_quote_id: quoteId,
+          quote_attribute_id: null,
+          comment: overallNotes.trim(),
+          sender: 'BUYER' as const,
+          sender_id: currentUserId || 'usr-2',
+          created_at: now,
+        });
+      }
 
       if (commentEntries.length > 0) {
         await rfqDb.seller_quote_comments.bulkPut(commentEntries);
       }
 
       if (action === 'APPROVE') {
-        antMessage.success(`Technical Specification Approved (Round #${latestRound.round_number}) for ${response.seller_party_name}! Unlocked Commercial Negotiation.`);
+        antMessage.success(`Technical Specification Approved for ${sellerParty?.display_name}! Unlocked Commercial Negotiation.`);
       } else {
-        antMessage.warning(`Technical Revision Request (Round #${latestRound.round_number}) sent to ${response.seller_party_name}.`);
+        antMessage.warning(`Technical Revision Request sent to ${sellerParty?.display_name}.`);
       }
 
       onClose();
@@ -332,117 +380,48 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
   return (
     <Drawer
       title={
-        <div className="flex items-center justify-between pr-6">
+        <div className="flex items-center justify-between w-full pr-8">
           <div className="flex items-center gap-2">
-            <Tag color="blue" className="font-bold">Attribute Audit</Tag>
-            <span className="font-bold text-slate-900">
-              Technical Evaluation #{response.id} (Round #{latestRound.round_number})
+            <Tag color="blue" className="font-bold">SPEC AUDIT</Tag>
+            <span className="font-black text-slate-800 text-base">
+              Evaluate Sourcing Specifications: {sellerParty?.display_name}
             </span>
           </div>
-          <Tag color="purple" icon={<ShopOutlined />}>
-            {response.seller_party_name}
-          </Tag>
+          <span className="text-xs text-slate-500 font-mono">Quote ID: {quoteId}</span>
         </div>
       }
-      width={920}
-      open={open}
+      placement="right"
+      width={780}
       onClose={onClose}
+      open={open}
       destroyOnClose
+      bodyStyle={{ backgroundColor: '#f8fafc', padding: '16px' }}
     >
-      <div className="space-y-5 p-1">
-        {/* READ-ONLY BANNER */}
-        {isReadOnly && (
-          <Alert
-            type="info"
-            showIcon
-            icon={<LockOutlined />}
-            message={`Technical Review Completed (Round #${latestRound.round_number})`}
-            description={`This technical revision round is finalized (${latestRound.round_status}). Attribute reviewing is read-only.`}
-            className="mb-3"
-          />
-        )}
-
-        {/* HEADER SUMMARY CARD */}
-        <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-          <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }} bordered className="bg-white">
-            <Descriptions.Item label="Line Item"><strong>{itemTitle || response.rfq_item_id}</strong></Descriptions.Item>
-            <Descriptions.Item label="Supplier Party">{response.seller_party_name}</Descriptions.Item>
-            <Descriptions.Item label="Revision Round"><Tag color="cyan">Round #{latestRound.round_number}</Tag></Descriptions.Item>
-            <Descriptions.Item label="Submitted At">{new Date(latestRound.submitted_at).toLocaleString()}</Descriptions.Item>
-            <Descriptions.Item label="Round Status">
-              <Tag color={latestRound.round_status === 'APPROVED' ? 'green' : latestRound.round_status === 'REVISION_REQUESTED' ? 'warning' : 'blue'}>
-                {latestRound.round_status}
-              </Tag>
-            </Descriptions.Item>
-          </Descriptions>
-        </div>
-
-        {/* ATTRIBUTE AUDIT PROGRESS & BULK ACTIONS BAR (Matching PlatformSellerProductReviewDetail.tsx) */}
-        <Card className="border border-sky-200 bg-sky-50/50 shadow-sm p-2">
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="space-y-1 flex-1">
-                <div className="flex justify-between items-center text-xs font-bold text-slate-900">
-                  <span>Attribute Audit Approval Progress</span>
-                  <span className="text-sky-700">{approvedCount} / {totalCount} Approved ({percentApproved}%)</span>
+      <div className="space-y-4">
+        {/* SUMMARY HEADER BOX */}
+        <Card className="shadow-2xs border-sky-100 bg-sky-50/40">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex-1 space-y-1">
+              <span className="text-[10px] font-bold text-sky-800 uppercase tracking-wider">Evaluation Item Context</span>
+              <h2 className="text-lg font-black text-slate-900 leading-tight m-0">{itemTitle || rfqItem?.product_name}</h2>
+              <div className="flex items-center gap-1.5 mt-2">
+                <div className="text-xs text-sky-950 font-bold">
+                  <span>Technical Round Audit Progress</span>
+                  <span className="text-sky-700 ml-2">{approvedCount} / {totalCount} Approved ({percentApproved}%)</span>
                 </div>
                 <Progress percent={percentApproved} strokeColor="#0284c7" size="small" />
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-semibold shrink-0">
+              <div className="flex items-center gap-2 text-xs font-semibold shrink-0 pt-1">
                 <span className="text-emerald-700 bg-emerald-100/80 px-2.5 py-1 rounded text-xs">{approvedCount} Approved</span>
                 <span className="text-red-700 bg-red-100/80 px-2.5 py-1 rounded text-xs">{rejectedCount} Rejected</span>
                 <span className="text-amber-700 bg-amber-100/80 px-2.5 py-1 rounded text-xs">{pendingCount} Pending</span>
               </div>
             </div>
-
-            {/* BULK REVIEW CONTROLS */}
-            {!isReadOnly && (
-              <div className="pt-2 border-t border-sky-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                  <CheckCircleOutlined className="text-sky-600" /> Bulk Review Controls:
-                </span>
-
-                <Space size="small" className="flex-wrap">
-                  {pendingCount > 0 && (
-                    <Button
-                      size="small"
-                      type="primary"
-                      className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
-                      icon={<CheckCircleOutlined />}
-                      onClick={handleBulkApproveAllPending}
-                    >
-                      Approve All Pending ({pendingCount})
-                    </Button>
-                  )}
-                  {approvedCount < totalCount && (
-                    <Button
-                      size="small"
-                      className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 text-xs font-semibold"
-                      icon={<CheckOutlined />}
-                      onClick={handleBulkApproveAll}
-                    >
-                      Approve Entire List ({totalCount})
-                    </Button>
-                  )}
-                  {(approvedCount > 0 || rejectedCount > 0) && (
-                    <Button
-                      size="small"
-                      type="text"
-                      className="text-slate-500 hover:text-slate-700 text-xs"
-                      icon={<RotateLeftOutlined />}
-                      onClick={handleBulkResetAll}
-                    >
-                      Reset All to Pending
-                    </Button>
-                  )}
-                </Space>
-              </div>
-            )}
           </div>
         </Card>
 
-        {/* OVERALL REVIEW COMMENTS / REVISION NOTES */}
+        {/* OVERALL REVIEW COMMENTS */}
         <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 space-y-2">
           <label className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
             <MessageOutlined className="text-amber-700" /> Overall Technical Review Comments / Revision Notes
@@ -457,7 +436,7 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
           />
         </div>
 
-        {/* GRANULAR ATTRIBUTE CARDS MATRIX (Matching PlatformSellerProductReviewDetail.tsx) */}
+        {/* Granular Attribute Audit Matrix */}
         <Card
           title={
             <span className="font-bold text-slate-900 text-sm">
@@ -467,7 +446,7 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
           className="shadow-sm border-slate-200"
         >
           <div className="space-y-3">
-            {attrList.map((attr) => (
+            {auditList.map((attr) => (
               <div
                 key={attr.attribute_key}
                 className={`p-3.5 rounded-lg border transition-all ${
@@ -487,10 +466,10 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
                   <div className="flex items-center gap-2">
                     {attr.is_deviated ? (
                       <Tooltip title={attr.deviation_reason || 'Deviated spec'}>
-                        <Tag icon={<WarningFilled />} color="warning" className="text-[11px] py-0 px-1.5">Deviated</Tag>
+                        <Tag color="warning" className="text-[11px] py-0 px-1.5">Deviated</Tag>
                       </Tooltip>
                     ) : (
-                      <Tag icon={<CheckCircleFilled />} color="success" className="text-[11px] py-0 px-1.5">Exact Match</Tag>
+                      <Tag color="success" className="text-[11px] py-0 px-1.5">Exact Match</Tag>
                     )}
 
                     {attr.status === 'APPROVED' && (
@@ -540,7 +519,6 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
                   </div>
                 </div>
 
-                {/* Values Comparison Display */}
                 <div className="bg-slate-50 p-2.5 rounded border border-slate-200 text-xs text-slate-800 flex flex-wrap gap-4 items-center">
                   <div>Buyer Target: <strong className="text-slate-900">{String(attr.requested_value)}</strong></div>
                   <span className="text-slate-300">|</span>
@@ -554,7 +532,6 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
                   </div>
                 )}
 
-                {/* Attribute Review Rejection Comment Display */}
                 {attr.rejection_comment && (
                   <div className="mt-2 text-xs p-2 rounded border bg-red-50/90 border-red-200 text-red-900 space-y-0.5">
                     <div className="font-bold flex items-center gap-1.5">
@@ -564,7 +541,6 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
                   </div>
                 )}
 
-                {/* Comment History Log Across Rounds */}
                 {attr.comment_history && attr.comment_history.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-slate-200 space-y-1.5 text-xs">
                     <span className="font-semibold text-slate-500 text-[11px]">Conversation Log ({attr.comment_history.length}):</span>
@@ -588,20 +564,14 @@ export const BuyerTechnicalReviewDrawer: React.FC<BuyerTechnicalReviewDrawerProp
           </div>
         </Card>
 
-        {/* BOTTOM STICKY ACTION BAR DEPENDING ON AUDIT STATE */}
+        {/* BOTTOM ACTION BAR */}
         <div className="pt-4 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           {isReadOnly ? (
             <div className="w-full flex items-center justify-between">
               <span className="text-xs text-slate-500 font-semibold">Technical Evaluation Status:</span>
-              {latestRound.round_status === 'APPROVED' ? (
-                <Tag color="green" icon={<CheckCircleFilled />} className="py-1.5 px-4 font-bold text-sm">
-                  Technical Specification Approved
-                </Tag>
-              ) : (
-                <Tag color="warning" icon={<WarningFilled />} className="py-1.5 px-4 font-bold text-sm">
-                  Awaiting Supplier Technical Revision (Round #{latestRound.round_number})
-                </Tag>
-              )}
+              <Tag color="green" icon={<CheckCircleFilled />} className="py-1.5 px-4 font-bold text-sm">
+                Technical Specification Approved
+              </Tag>
             </div>
           ) : (
             <>

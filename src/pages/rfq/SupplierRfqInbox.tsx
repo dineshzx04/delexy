@@ -4,7 +4,7 @@ import { SearchOutlined, SendOutlined, BankOutlined, UserOutlined } from '@ant-d
 import { useNavigate, useOutletContext } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { rfqDb, type ItemSupplierResponseStatus } from '../../data/rfq';
-import { mockParties } from '../../data/business/parties';
+import { businessDb } from '../../data/business/business.db';
 import { ItemSupplierStatusBadge } from '../../components/rfq/RfqStatusBadge';
 
 export const SupplierRfqInbox: React.FC = () => {
@@ -14,17 +14,21 @@ export const SupplierRfqInbox: React.FC = () => {
   const activePartyIdFromContext = outletContext?.workspaceContext?.activePartyId;
   const currentUserId = outletContext?.workspaceContext?.currentUser?.id || 'usr-2';
 
-  const activeParty = isBusinessContext
-    ? mockParties.find((p) => p.id === activePartyIdFromContext) || mockParties[0]
-    : mockParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || mockParties.find((p) => p.id === 'pty-6') || mockParties[0];
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const activeParty = useMemo(() => {
+    if (parties.length === 0) return null;
+    return isBusinessContext
+      ? parties.find((p) => p.id === activePartyIdFromContext) || parties[0]
+      : parties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || parties.find((p) => p.id === 'pty-6') || parties[0];
+  }, [parties, isBusinessContext, activePartyIdFromContext, currentUserId]);
 
-  const activePartyId = activeParty.id;
+  const activePartyId = activeParty?.id || '';
 
   const [activeTab, setActiveTab] = useState<string>('ALL');
   const [searchText, setSearchText] = useState<string>('');
 
   const quotes = useLiveQuery(
-    () => rfqDb.seller_quotes.where('seller_id').equals(activePartyId).toArray(),
+    () => activePartyId ? rfqDb.seller_quotes.where('seller_id').equals(activePartyId).toArray() : [],
     [activePartyId]
   ) || [];
 
@@ -142,10 +146,10 @@ export const SupplierRfqInbox: React.FC = () => {
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black text-slate-900">Supplier Sourcing Inbox</h1>
             <Tag color="purple" icon={isBusinessContext ? <BankOutlined /> : <UserOutlined />} className="px-2.5 py-0.5 font-bold">
-              Seller Party: {activeParty.display_name} ({activePartyId})
+              Seller Party: {activeParty?.display_name || ''} ({activePartyId})
             </Tag>
           </div>
-          <p className="text-sm text-slate-500">View assigned RFQ opportunities for seller party {activeParty.display_name}.</p>
+          <p className="text-sm text-slate-500">View assigned RFQ opportunities for seller party {activeParty?.display_name || ''}.</p>
         </div>
       </div>
 

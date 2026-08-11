@@ -14,7 +14,7 @@ import {
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { mockParties } from '../../data/business/parties';
+import { businessDb } from '../../data/business/business.db';
 import { RfqStatusBadge } from '../../components/rfq/RfqStatusBadge';
 
 export const BuyerDashboard: React.FC = () => {
@@ -23,16 +23,19 @@ export const BuyerDashboard: React.FC = () => {
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
 
-  // Active party resolution
-  const activeParty = isBusinessContext
-    ? mockParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId) || mockParties[0]
-    : mockParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || mockParties.find((p) => p.id === 'pty-6') || mockParties[0];
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const activeParty = React.useMemo(() => {
+    if (parties.length === 0) return null;
+    return isBusinessContext
+      ? parties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId) || parties[0]
+      : parties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || parties.find((p) => p.id === 'pty-6') || parties[0];
+  }, [parties, isBusinessContext, activeWorkspace, currentUserId]);
 
-  const activePartyId = activeParty.id;
+  const activePartyId = activeParty?.id || '';
 
   // Party-centric live queries
   const partyRfqs = useLiveQuery(
-    () => rfqDb.rfqs.where('requester_id').equals(activePartyId).toArray(),
+    () => activePartyId ? rfqDb.rfqs.where('requester_id').equals(activePartyId).toArray() : [],
     [activePartyId]
   ) || [];
 
@@ -119,12 +122,12 @@ export const BuyerDashboard: React.FC = () => {
               Enterprise Sourcing Portal
             </span>
             <Tag color="purple" icon={isBusinessContext ? <BankOutlined /> : <UserOutlined />} className="px-2 py-0.5 font-bold">
-              Party: {activeParty.display_name} ({activePartyId})
+              Party: {activeParty?.display_name || ''} ({activePartyId})
             </Tag>
           </div>
           <h1 className="text-2xl font-black text-white">Strategic Procurement Dashboard</h1>
           <p className="text-sm text-slate-300 mt-1 max-w-xl">
-            Managing party-based RFQs, technical evaluation rounds, product mapping, and multi-supplier split order awards for {activeParty.display_name}.
+            Managing party-based RFQs, technical evaluation rounds, product mapping, and multi-supplier split order awards for {activeParty?.display_name || ''}.
           </p>
         </div>
         <Button
@@ -167,7 +170,7 @@ export const BuyerDashboard: React.FC = () => {
       <Card
         title={
           <div className="flex items-center justify-between">
-            <span className="font-bold text-slate-900 text-lg">Active Sourcing Containers ({activeParty.display_name})</span>
+            <span className="font-bold text-slate-900 text-lg">Active Sourcing Containers ({activeParty?.display_name || ''})</span>
             <Button type="link" onClick={() => navigate(basePath)}>
               View All RFQs →
             </Button>

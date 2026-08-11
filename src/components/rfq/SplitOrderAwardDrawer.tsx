@@ -1,34 +1,36 @@
 import React, { useState } from 'react';
 import { Drawer, Button, InputNumber, Card, Tag, Table, Alert, App as AntApp } from 'antd';
-import { TrophyOutlined, CheckCircleOutlined, InfoCircleOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
-import type { RfqItem, ItemSupplierResponse } from '../../data/rfq';
+import { TrophyOutlined, CheckCircleOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { useLiveQuery } from 'dexie-react-hooks';
+import type { RfqItem, SellerQuote } from '../../data/rfq';
+import { businessDb } from '../../data/business/business.db';
 
 interface SplitOrderAwardDrawerProps {
   visible: boolean;
   onClose: () => void;
   item: RfqItem;
-  responses: ItemSupplierResponse[];
-  onGrantSplitAwards: (allocations: { responseId: string; awardedQty: number; unitPrice: number }[]) => void;
+  quotes: SellerQuote[];
+  onGrantSplitAwards: (allocations: { quoteId: string; awardedQty: number; unitPrice: number }[]) => void;
 }
 
 export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
   visible,
   onClose,
   item,
-  responses,
+  quotes,
   onGrantSplitAwards,
 }) => {
-  const eligibleResponses = responses.filter(
-    (r) => r.status === 'COMMERCIAL_FINALIZED' || r.status === 'COMMERCIAL_UNDER_NEGOTIATION' || r.status === 'AWARDED' || r.status === 'PRODUCT_MAPPED'
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+
+  // Only quotes that are submitted/finalized are eligible for awards
+  const eligibleQuotes = quotes.filter(
+    (q) => q.status === 'SUBMITTED' || q.status === 'FINALIZED'
   );
 
   const [quantities, setQuantities] = useState<Record<string, number>>(() => {
     const initial: Record<string, number> = {};
-    if (eligibleResponses.length > 0) {
-      initial[eligibleResponses[0].id] = eligibleResponses[0].awarded_quantity ?? 60;
-      if (eligibleResponses.length > 1) {
-        initial[eligibleResponses[1].id] = eligibleResponses[1].awarded_quantity ?? 40;
-      }
+    if (eligibleQuotes.length > 0) {
+      initial[eligibleQuotes[0].id] = item.quantity;
     }
     return initial;
   });
@@ -40,10 +42,10 @@ export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
   const remainingQty = item.quantity - totalAllocatedQty;
   const isAllocationValid = totalAllocatedQty === item.quantity;
 
-  const handleQtyChange = (responseId: string, value: number | null) => {
+  const handleQtyChange = (quoteId: string, value: number | null) => {
     setQuantities((prev) => ({
       ...prev,
-      [responseId]: value || 0,
+      [quoteId]: value || 0,
     }));
   };
 
@@ -55,12 +57,11 @@ export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
 
     setSubmitting(true);
     try {
-      const allocations = eligibleResponses.map((resp) => {
-        const lastOffer = resp.commercial_negotiation_rounds?.[resp.commercial_negotiation_rounds.length - 1];
-        const unitPrice = lastOffer?.unit_price ?? resp.commercial_terms?.offered_unit_price ?? 1000;
+      const allocations = eligibleQuotes.map((q) => {
+        const unitPrice = q.unit_price || 0;
         return {
-          responseId: resp.id,
-          awardedQty: quantities[resp.id] || 0,
+          quoteId: q.id,
+          awardedQty: quantities[q.id] || 0,
           unitPrice,
         };
       });
@@ -78,53 +79,54 @@ export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
   const columns = [
     {
       title: 'Supplier Party',
-      dataIndex: 'seller_party_name',
-      key: 'seller_party_name',
-      render: (text: string, record: ItemSupplierResponse) => (
-        <div>
-          <div className="font-bold text-slate-900">{text}</div>
-          <div className="text-xs text-slate-500">
-            Mapped Product: <span className="font-semibold text-purple-700">{record.product_mapping?.seller_product_id ?? 'sprod-1'}</span> (Variant: {record.product_mapping?.variant_id ?? 'sprod-1-v1'})
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: 'Final Unit Price',
-      key: 'unit_price',
-      width: 140,
-      render: (_: any, record: ItemSupplierResponse) => {
-        const lastOffer = record.commercial_negotiation_rounds?.[record.commercial_negotiation_rounds.length - 1];
-        const price = lastOffer?.unit_price ?? record.commercial_terms?.offered_unit_price ?? 1000;
-        return <span className="font-bold text-emerald-600 text-base">${price}</span>;
-      },
-    },
-    {
-      title: 'Award Quantity Split',
-      key: 'award_qty',
-      width: 180,
-      render: (_: any, record: ItemSupplierResponse) => {
+      dataIndex: 'seller_id',
+      key: 'seller_id',
+      render: (sellerId: string, record: SellerQuote) => {
+        const party = parties.find((p) => p.id === sellerId) || { display_name: `Seller ${sellerId}` };
         return (
-          <InputNumber
-            min={0}
-            max={item.quantity}
-            value={quantities[record.id] || 0}
-            onChange={(val) => handleQtyChange(record.id, val)}
-            className="w-full"
-            addonAfter="Units"
-          />
+          <div>
+            <div className="font-bold text-slate-900">{party.display_name}</div>
+            {record.seller_product_mapping && (
+              <div className="text-xs text-slate-500">
+                Mapped Product: <span className="font-semibold text-purple-700">{record.seller_product_mapping.seller_product_id}</span> (Variant: {record.seller_product_mapping.variant_id})
+              </div>
+            )}
+          </div>
         );
       },
     },
     {
-      title: 'Split Subtotal ($)',
+      title: 'Final Unit Price',
+      dataIndex: 'unit_price',
+      key: 'unit_price',
+      width: 140,
+      render: (price: number) => {
+        return <span className="font-bold text-emerald-600 text-base">${price}</span>;
+      },
+    },
+    {
+      title: 'Allocated Award Qty',
+      key: 'allocated_qty',
+      width: 180,
+      render: (_: any, record: SellerQuote) => (
+        <InputNumber
+          min={0}
+          max={item.quantity}
+          value={quantities[record.id] || 0}
+          onChange={(val) => handleQtyChange(record.id, val)}
+          className="w-full"
+          placeholder="Enter quantity"
+        />
+      ),
+    },
+    {
+      title: 'Subtotal Amount',
       key: 'subtotal',
       width: 150,
-      render: (_: any, record: ItemSupplierResponse) => {
-        const lastOffer = record.commercial_negotiation_rounds?.[record.commercial_negotiation_rounds.length - 1];
-        const price = lastOffer?.unit_price ?? record.commercial_terms?.offered_unit_price ?? 1000;
+      render: (_: any, record: SellerQuote) => {
         const qty = quantities[record.id] || 0;
-        return <span className="font-bold text-slate-900">${(price * qty).toLocaleString()}</span>;
+        const price = record.unit_price || 0;
+        return <span className="font-semibold text-slate-700">${(qty * price).toLocaleString()}</span>;
       },
     },
   ];
@@ -133,79 +135,73 @@ export const SplitOrderAwardDrawer: React.FC<SplitOrderAwardDrawerProps> = ({
     <Drawer
       title={
         <div className="flex items-center gap-2">
-          <TrophyOutlined className="text-amber-500 text-2xl" />
-          <div>
-            <div className="font-bold text-slate-900 text-lg">Multi-Supplier Split Order Award Hub</div>
-            <div className="text-xs text-slate-500 font-normal">
-              Item: <span className="font-semibold text-slate-800">{item.product_name}</span> | Required Qty: <span className="font-bold text-blue-600">{item.quantity} Units</span>
-            </div>
-          </div>
+          <TrophyOutlined className="text-amber-500" />
+          <span className="font-black text-slate-800 text-base">Grant Split Order Awards</span>
         </div>
       }
+      placement="right"
       width={720}
-      open={visible}
       onClose={onClose}
-      bodyStyle={{ backgroundColor: '#f8fafc', padding: 24 }}
+      open={visible}
+      destroyOnClose
+      bodyStyle={{ backgroundColor: '#f8fafc', padding: '20px' }}
     >
-      <Alert
-        type={isAllocationValid ? 'success' : 'warning'}
-        showIcon
-        icon={isAllocationValid ? <CheckCircleOutlined /> : <InfoCircleOutlined />}
-        message={
-          <div className="flex items-center justify-between font-medium">
-            <span>
-              Total Allocated: <strong className="text-slate-900">{totalAllocatedQty}</strong> / {item.quantity} Units
-            </span>
-            {remainingQty !== 0 && (
-              <Tag color={remainingQty > 0 ? 'volcano' : 'error'}>
-                {remainingQty > 0 ? `${remainingQty} Units Unallocated` : `${Math.abs(remainingQty)} Units Over-allocated`}
-              </Tag>
-            )}
-          </div>
-        }
-        className="mb-6 shadow-sm border-slate-200"
-      />
-
-      <Card className="mb-6 border-slate-200 shadow-sm bg-white" title={<span className="font-bold text-slate-900">Technically Approved & Commercially Finalized Suppliers</span>}>
-        <Table
-          dataSource={eligibleResponses}
-          columns={columns}
-          pagination={false}
-          rowKey="id"
-          bordered
-        />
-      </Card>
-
-      <Card className="mb-6 border-slate-200 bg-slate-900 text-white shadow-md">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs uppercase tracking-wider text-slate-400 font-semibold">Award Grand Total</div>
-            <div className="text-2xl font-black text-emerald-400">
-              ${eligibleResponses.reduce((acc, resp) => {
-                const lastOffer = resp.commercial_negotiation_rounds?.[resp.commercial_negotiation_rounds.length - 1];
-                const price = lastOffer?.unit_price ?? resp.commercial_terms?.offered_unit_price ?? 1000;
-                return acc + (price * (quantities[resp.id] || 0));
-              }, 0).toLocaleString()}
+      <div className="space-y-4">
+        <Card className="shadow-2xs border-amber-100 bg-amber-50/50">
+          <div className="space-y-1">
+            <span className="text-[10px] font-bold text-amber-800 uppercase tracking-wider">Line Item Summary</span>
+            <h3 className="text-lg font-black text-slate-900 leading-tight m-0">{item.product_name}</h3>
+            <div className="flex items-center gap-6 mt-2 text-xs font-semibold text-slate-600">
+              <div>Total Quantity Required: <span className="text-blue-600 font-bold text-sm">{item.quantity} {item.unit}</span></div>
+              <div>Target Unit Price: <span className="text-emerald-600 font-bold text-sm">${item.target_unit_price}</span></div>
             </div>
           </div>
-          <Tag color="green" icon={<SafetyCertificateOutlined className="text-lg" />} className="px-3 py-1 text-sm font-bold">
-            Split Award Ready
-          </Tag>
-        </div>
-      </Card>
+        </Card>
 
-      <Button
-        type="primary"
-        size="large"
-        block
-        disabled={!isAllocationValid}
-        loading={submitting}
-        onClick={handleAwardClick}
-        icon={<TrophyOutlined />}
-        className="bg-emerald-600 hover:bg-emerald-700 h-12 text-base font-bold shadow-md"
-      >
-        Grant Split Order Awards & Issue Purchase Orders
-      </Button>
+        {eligibleQuotes.length === 0 ? (
+          <Alert
+            type="warning"
+            showIcon
+            icon={<InfoCircleOutlined />}
+            message="No Eligible Quotes Found"
+            description="Only quotes that have been submitted can be awarded."
+          />
+        ) : (
+          <>
+            <Card title={<span className="font-bold text-sm text-slate-900">Configure Supplier Allocations</span>} className="shadow-sm">
+              <Table
+                dataSource={eligibleQuotes}
+                columns={columns}
+                rowKey="id"
+                pagination={false}
+                bordered
+              />
+            </Card>
+
+            {/* ALLOCATION AUDIT BAR */}
+            <Card className={`shadow-sm border-l-4 ${isAllocationValid ? 'border-l-emerald-500 bg-emerald-50/20' : 'border-l-red-500 bg-red-50/20'}`}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-bold text-slate-700">
+                <div className="space-y-0.5">
+                  <div>Allocated Qty: <span className={isAllocationValid ? 'text-emerald-600 text-sm' : 'text-red-600 text-sm'}>{totalAllocatedQty} / {item.quantity} {item.unit}</span></div>
+                  <div>Remaining Qty: <span className={remainingQty === 0 ? 'text-slate-600' : 'text-amber-600'}>{remainingQty} {item.unit}</span></div>
+                </div>
+
+                <Button
+                  type="primary"
+                  size="large"
+                  disabled={!isAllocationValid}
+                  loading={submitting}
+                  icon={<CheckCircleOutlined />}
+                  onClick={handleAwardClick}
+                  className="bg-slate-900 hover:bg-slate-800 font-bold"
+                >
+                  Finalize Awards
+                </Button>
+              </div>
+            </Card>
+          </>
+        )}
+      </div>
     </Drawer>
   );
 };

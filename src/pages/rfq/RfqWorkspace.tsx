@@ -10,7 +10,6 @@ import {
   FolderOpenOutlined,
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
-import { mockParties } from '../../data/business/parties';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqStatusBadge, RfqItemStatusBadge } from '../../components/rfq/RfqStatusBadge';
 

@@ -30,10 +30,10 @@ export const RfqList: React.FC = () => {
 
   // Live Query filtered strictly by active Party ID
   const partyRfqs = useLiveQuery(
-    () => rfqDb.rfqs.where('requester_party_id').equals(activePartyId).toArray(),
+    () => rfqDb.rfqs.where('requester_id').equals(activePartyId).toArray(),
     [activePartyId]
   ) || [];
-  console.log(partyRfqs);
+  console.log(activePartyId);
 
   const filteredRfqs = partyRfqs.filter((r) => {
     const matchesTab = activeTab === 'ALL' || r.status === activeTab;

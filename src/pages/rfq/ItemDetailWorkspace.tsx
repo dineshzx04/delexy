@@ -9,14 +9,14 @@ import {
   CheckCircleOutlined,
   MessageOutlined,
 } from '@ant-design/icons';
-import { rfqDb, type ItemSupplierResponse, type ItemSupplierResponseStatus, type TechnicalAttributeResponse } from '../../data/rfq';
+import { rfqDb } from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqItemStatusBadge, ItemSupplierStatusBadge } from '../../components/rfq/RfqStatusBadge';
 import { TechnicalComparisonTable } from '../../components/rfq/TechnicalComparisonTable';
 import { BuyerTechnicalReviewDrawer } from '../../components/rfq/BuyerTechnicalReviewDrawer';
 import { SplitOrderAwardDrawer } from '../../components/rfq/SplitOrderAwardDrawer';
-import { mockParties } from '../../data/business/parties';
+import { businessDb } from '../../data/business/business.db';
 
 export const ItemDetailWorkspace: React.FC = () => {
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
@@ -27,226 +27,61 @@ export const ItemDetailWorkspace: React.FC = () => {
   const { message: antMessage } = AntApp.useApp();
 
   const [activeTab, setActiveTab] = useState('responses');
-  const [selectedResponse, setSelectedResponse] = useState<ItemSupplierResponse | null>(null);
+  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
   const [techReviewDrawerOpen, setTechReviewDrawerOpen] = useState(false);
   const [awardDrawerOpen, setAwardDrawerOpen] = useState(false);
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
   const quotes = useLiveQuery(() => (itemId ? rfqDb.seller_quotes.where('rfq_item_id').equals(itemId).toArray() : []), [itemId]) || [];
-  const allResponses = useLiveQuery(() => rfqDb.seller_quote_attributes.toArray(), []) || [];
-  const allComments = useLiveQuery(() => rfqDb.seller_quote_comments.toArray(), []) || [];
-  const allHistory = useLiveQuery(() => rfqDb.item_attribute_change_history.toArray(), []) || [];
-  const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
+  const quoteRevisions = useLiveQuery(() => rfqDb.seller_quote_revisions.toArray(), []) || [];
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const categoryName = categories.find((c) => c.id === item?.category_id)?.name;
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
 
-  const allItemAttributes = useLiveQuery(() => rfqDb.rfq_item_attributes.toArray(), []) || [];
-  const quoteRevisions = useLiveQuery(() => rfqDb.seller_quote_revisions.toArray(), []) || [];
+  const submittedResponses = React.useMemo(() => {
+    return quotes
+      .filter((q) => q.status === 'SUBMITTED' || q.status === 'FINALIZED')
+      .map((q) => {
+        const party = parties.find((p) => p.id === q.seller_id) || { display_name: `Seller ${q.seller_id}` };
+        
+        let mappedStatus = 'TECHNICAL_SUBMITTED';
+        if (q.status === 'FINALIZED') {
+          mappedStatus = 'COMMERCIAL_FINALIZED';
+        }
 
-  const responses = React.useMemo(() => {
+        return {
+          ...q,
+          seller_party_name: party.display_name,
+          mapped_status: mappedStatus,
+        };
+      });
+  }, [quotes, parties]);
+
+  const assignedSuppliers = React.useMemo(() => {
     if (!item) return [];
-    const sellerIds = item.target_seller_party_ids || [];
-    return sellerIds.map((sellerId: string) => {
+    return (item.target_seller_party_ids || []).map((sellerId: string) => {
       const activeQuote = quotes.find((q) => q.seller_id === sellerId);
-      const party = mockParties.find((p) => p.id === sellerId) || { display_name: `Seller ${sellerId}` };
+      const party = parties.find((p) => p.id === sellerId) || { display_name: `Seller ${sellerId}` };
 
+      let mappedStatus = 'ASSIGNED';
       if (activeQuote) {
-        let mappedStatus: ItemSupplierResponseStatus = 'TECHNICAL_SUBMITTED';
         if (activeQuote.status === 'FINALIZED') {
           mappedStatus = 'COMMERCIAL_FINALIZED';
+        } else if (activeQuote.status === 'SUBMITTED') {
+          mappedStatus = 'TECHNICAL_SUBMITTED';
         } else if (activeQuote.status === 'DRAFT') {
           mappedStatus = 'VIEWED';
         }
-
-        const activeQuoteRevision = quoteRevisions.find(r => r.id === activeQuote.current_revision_id);
-        const quoteResponses = allResponses.filter(r => r.quote_revision_id === activeQuote.current_revision_id);
-        const quoteComments = allComments.filter(c => c.seller_quote_id === activeQuote.id);
-
-        const buyerItemAttributes = allItemAttributes.filter(ia => ia.rfq_item_revision_id === activeQuoteRevision?.rfq_item_revision_id || ia.rfq_item_revision_id === item.current_revision_id);
-
-        const supplierResponse: TechnicalAttributeResponse[] = quoteResponses.map(resp => {
-          let attributeName = '';
-          let key = '';
-
-          if (resp.group_id === 'static') {
-            attributeName = resp.attribute_id === 'brand' ? 'Preferred Brand' : 'Preferred Manufacturer';
-            key = `static-${resp.attribute_id === 'brand' ? 'brand' : 'mfg'}`;
-          } else {
-            const attr = allAttributes.find(a => a.id === resp.attribute_id);
-            attributeName = attr?.name || attr?.label || resp.attribute_id || '';
-            key = `dyn-${resp.group_id || ''}-${resp.attribute_id || ''}`;
-          }
-
-          const buyerAttr = buyerItemAttributes.find(ia => ia.group_id === resp.group_id && ia.attribute_id === resp.attribute_id);
-
-          const reqLabel = buyerAttr ? buyerAttr.values.map((v: any) => v.value_label || v.value_id).join(', ') : '-';
-          const offLabel = resp.offered_values.map((v: any) => v.value_label || v.value_id).join(', ') || '-';
-          
-          const isDev = buyerAttr ? (resp.offered_values.some((v: any) => !buyerAttr.values.some((r: any) => r.value_id === v.value_id)) ||
-            buyerAttr.values.some((r: any) => !resp.offered_values.some((v: any) => v.value_id === r.value_id))) : false;
-
-          const sellerComment = quoteComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER');
-          const buyerComment = quoteComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'BUYER');
-
-          const commentsHistory = quoteComments
-            .filter(c => c.quote_attribute_id === resp.id)
-            .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
-            .map(c => ({
-              id: c.id,
-              sender_role: c.sender || 'SELLER',
-              sender_name: c.sender === 'BUYER' ? 'Buyer' : 'Supplier',
-              sender_user_id: c.sender_id || '',
-              comment: c.comment,
-              timestamp: c.created_at
-            }));
-
-          return {
-            attribute_key: key,
-            attribute_name: attributeName,
-            requested_value: reqLabel,
-            offered_value: offLabel,
-            is_deviated: isDev,
-            deviation_reason: sellerComment?.comment || '',
-            buyer_status: buyerComment ? 'REVISION_REQUESTED' as const : (activeQuote.status === 'FINALIZED' ? 'APPROVED' as const : undefined),
-            buyer_comment: buyerComment?.comment || '',
-            comment_history: commentsHistory
-          };
-        });
-
-        const sortedRevisions = quoteRevisions
-          .filter(r => r.seller_quote_id === activeQuote.id)
-          .sort((a, b) => a.revision_number - b.revision_number);
-
-        const activeRevNumber = activeQuoteRevision?.revision_number || 1;
-
-        const revisionRounds = sortedRevisions
-          .filter(rev => rev.revision_number < activeRevNumber)
-          .map(rev => {
-            const roundResponses = allResponses.filter(r => r.quote_revision_id === rev.id);
-            const roundComments = quoteComments.filter(c => c.quote_attribute_id && c.quote_attribute_id.startsWith(`resp-${rev.id}-`));
-
-            const roundSpecs: TechnicalAttributeResponse[] = roundResponses.map(resp => {
-              let attributeName = '';
-              if (resp.group_id === 'static') {
-                attributeName = resp.attribute_id === 'brand' ? 'Preferred Brand' : 'Preferred Manufacturer';
-              } else {
-                const attr = allAttributes.find(a => a.id === resp.attribute_id);
-                attributeName = attr?.name || attr?.label || resp.attribute_id;
-              }
-
-              const buyerAttr = allItemAttributes.find(ia => ia.rfq_item_revision_id === rev.rfq_item_revision_id && ia.group_id === resp.group_id && ia.attribute_id === resp.attribute_id);
-
-              const reqLabel = buyerAttr ? buyerAttr.values.map((v: any) => v.value_label || v.value_id).join(', ') : '-';
-              const offLabel = resp.offered_values.map((v: any) => v.value_label || v.value_id).join(', ') || '-';
-              const isDev = buyerAttr ? (resp.offered_values.some((v: any) => !buyerAttr.values.some((r: any) => r.value_id === v.value_id)) ||
-                buyerAttr.values.some((r: any) => !resp.offered_values.some((v: any) => v.value_id === r.value_id))) : false;
-
-              const sellerComment = roundComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER');
-              const buyerComment = roundComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'BUYER');
-
-              return {
-                attribute_key: resp.group_id === 'static' ? `static-${resp.attribute_id === 'brand' ? 'brand' : 'mfg'}` : `dyn-${resp.group_id}-${resp.attribute_id}`,
-                attribute_name: attributeName,
-                requested_value: reqLabel,
-                offered_value: offLabel,
-                is_deviated: isDev,
-                deviation_reason: sellerComment?.comment || '',
-                buyer_status: buyerComment ? 'REVISION_REQUESTED' as const : 'APPROVED' as const,
-                buyer_comment: buyerComment?.comment || '',
-              };
-            });
-
-            return {
-              round_number: rev.revision_number,
-              submitted_by_user_id: `usr-${sellerId}`,
-              submitted_at: rev.created_at,
-              buyer_requirement_snapshot: roundSpecs,
-              supplier_response: roundSpecs,
-              round_status: 'APPROVED' as any
-            };
-          });
-
-        const mappedRoundStatus = activeQuote.status === 'FINALIZED' ? 'APPROVED' as any : (activeQuote.status === 'SUBMITTED' ? 'PENDING' as any : 'REVISION_REQUESTED' as any);
-        revisionRounds.push({
-          round_number: activeRevNumber,
-          submitted_by_user_id: `usr-${sellerId}`,
-          submitted_at: activeQuote.updated_at || new Date().toISOString(),
-          buyer_requirement_snapshot: supplierResponse,
-          supplier_response: supplierResponse,
-          round_status: mappedRoundStatus
-        });
-
-        return {
-          id: activeQuote.id,
-          assignment_id: `sa-${item.id}-${sellerId}`,
-          rfq_id: item.rfq_id || '',
-          rfq_item_id: item.id,
-          seller_party_id: sellerId,
-          seller_party_name: party.display_name,
-          supplier_user_id: `usr-${sellerId}`,
-          status: mappedStatus,
-          current_technical_round: activeRevNumber,
-          technical_revision_rounds: revisionRounds,
-          product_mapping: activeQuote.seller_product_mapping ? {
-            seller_product_id: activeQuote.seller_product_mapping.seller_product_id,
-            variant_id: activeQuote.seller_product_mapping.variant_id,
-            mapped_at: activeQuote.seller_product_mapping.mapped_at,
-            is_buyer_approved: activeQuote.seller_product_mapping.is_buyer_approved
-          } : null,
-          commercial_terms: {
-            offered_unit_price: activeQuote.unit_price,
-            moq: 1,
-            lead_time_days: 7,
-            payment_terms: 'Net 30',
-            freight_terms: 'FOB',
-            warranty_terms: '1 Year',
-            total_commercial_amount: activeQuote.unit_price * item.quantity
-          },
-          commercial_negotiation_rounds: [
-            {
-              round_number: activeRevNumber,
-              sender_party_id: sellerId,
-              sender_user_id: `usr-${sellerId}`,
-              sender_name: party.display_name,
-              unit_price: activeQuote.unit_price,
-              quantity: item.quantity,
-              timestamp: new Date().toISOString()
-            }
-          ],
-          is_awarded: activeQuote.status === 'FINALIZED',
-          created_at: activeQuote.created_at,
-          updated_at: activeQuote.updated_at
-        } as ItemSupplierResponse;
-      } else {
-        return {
-          id: `no-quote-${item.id}-${sellerId}`,
-          assignment_id: `sa-${item.id}-${sellerId}`,
-          rfq_id: item.rfq_id || '',
-          rfq_item_id: item.id,
-          seller_party_id: sellerId,
-          seller_party_name: party.display_name,
-          supplier_user_id: `usr-${sellerId}`,
-          status: 'ASSIGNED' as ItemSupplierResponseStatus,
-          current_technical_round: 0,
-          technical_revision_rounds: [],
-          product_mapping: null,
-          commercial_negotiation_rounds: [],
-          is_awarded: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        } as ItemSupplierResponse;
       }
+
+      return {
+        id: activeQuote?.id || `no-quote-${item.id}-${sellerId}`,
+        seller_party_name: party.display_name,
+        status: mappedStatus,
+      };
     });
-  }, [item, quotes, allResponses, allComments, allHistory, allAttributes, allItemAttributes, quoteRevisions]);
-
-  const submittedResponses = React.useMemo(() => {
-    return responses.filter((r: ItemSupplierResponse) => r.status !== 'ASSIGNED' && r.status !== 'VIEWED');
-  }, [responses]);
-
-  const assignedSuppliers = React.useMemo(() => {
-    return responses.filter((r: ItemSupplierResponse) => r.status === 'ASSIGNED' || r.status === 'VIEWED');
-  }, [responses]);
+  }, [item, quotes, parties]);
 
   if (!rfq || !item) {
     return (
@@ -259,19 +94,20 @@ export const ItemDetailWorkspace: React.FC = () => {
     );
   }
 
-  const handleGrantSplitAwards = async (allocations: { responseId: string; awardedQty: number; unitPrice: number }[]) => {
+  const handleGrantSplitAwards = async (allocations: { quoteId: string; awardedQty: number; unitPrice: number }[]) => {
     try {
       let totalQty = 0;
       for (const alloc of allocations) {
         if (alloc.awardedQty > 0) {
           totalQty += alloc.awardedQty;
           const awardId = `award-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          const activeQuote = quotes.find((q) => q.id === alloc.quoteId);
 
           await rfqDb.rfq_awards.put({
             id: awardId,
             rfq_id: rfq.id,
             rfq_item_id: item.id,
-            seller_party_id: responses.find((r) => r.id === alloc.responseId)?.seller_party_id || 'pty-4',
+            seller_party_id: activeQuote?.seller_id || 'pty-4',
             seller_product_id: 'sprod-1',
             variant_id: 'sprod-1-v1',
             awarded_quantity: alloc.awardedQty,
@@ -283,11 +119,10 @@ export const ItemDetailWorkspace: React.FC = () => {
             purchase_order_id: `po-2026-${Math.floor(100 + Math.random() * 900)}`,
           });
 
-          if (!alloc.responseId.startsWith('no-quote-')) {
-            await rfqDb.seller_quotes.update(alloc.responseId, {
-              status: 'FINALIZED',
-            });
-          }
+          await rfqDb.seller_quotes.update(alloc.quoteId, {
+            status: 'FINALIZED',
+            updated_at: new Date().toISOString()
+          });
         }
       }
 
@@ -312,7 +147,7 @@ export const ItemDetailWorkspace: React.FC = () => {
     },
     {
       title: 'Status',
-      dataIndex: 'status',
+      dataIndex: 'mapped_status',
       key: 'status',
       width: 220,
       render: (status: any) => <ItemSupplierStatusBadge status={status} />,
@@ -321,31 +156,32 @@ export const ItemDetailWorkspace: React.FC = () => {
       title: 'Technical Round',
       key: 'round',
       width: 140,
-      render: (_: any, record: ItemSupplierResponse) => (
-        <Tag color="cyan">Round #{record.current_technical_round || 1}</Tag>
-      ),
+      render: (_: any, record: any) => {
+        const revisions = quoteRevisions.filter((r) => r.seller_quote_id === record.id);
+        const maxRound = revisions.length > 0 ? Math.max(...revisions.map((r) => r.revision_number)) : 1;
+        return <Tag color="cyan">Round #{maxRound}</Tag>;
+      },
     },
     {
       title: 'Offered Price ($)',
+      dataIndex: 'unit_price',
       key: 'price',
       width: 140,
-      render: (_: any, record: ItemSupplierResponse) => {
-        const lastOffer = record.commercial_negotiation_rounds?.[record.commercial_negotiation_rounds.length - 1];
-        const price = lastOffer?.unit_price ?? record.commercial_terms?.offered_unit_price ?? '-';
-        return <span className="font-bold text-emerald-600">${price}</span>;
+      render: (price: number) => {
+        return <span className="font-bold text-emerald-600">${price || '-'}</span>;
       },
     },
     {
       title: 'Actions',
       key: 'actions',
       width: 160,
-      render: (_: any, record: ItemSupplierResponse) => (
+      render: (_: any, record: any) => (
         <Space size="small">
           <Button
             type="primary"
             size="small"
             onClick={() => {
-              setSelectedResponse(record);
+              setSelectedQuoteId(record.id);
               setTechReviewDrawerOpen(true);
             }}
             icon={<CheckCircleOutlined />}
@@ -395,8 +231,8 @@ export const ItemDetailWorkspace: React.FC = () => {
             </div>
             <div className="flex items-center gap-6 mt-3 text-xs text-slate-600 font-medium">
               <div>Category: <Tag color="purple">{categoryName}</Tag></div>
-              <div>Required Qty: <strong className="text-blue-600  font-bold">{item.quantity} {item.unit}</strong></div>
-              <div>Target Unit Price: <strong className="text-emerald-600  font-bold">${item.target_unit_price}</strong></div>
+              <div>Required Qty: <strong className="text-blue-600 font-bold">{item.quantity} {item.unit}</strong></div>
+              <div>Target Unit Price: <strong className="text-emerald-600 font-bold">${item.target_unit_price}</strong></div>
             </div>
           </div>
 
@@ -445,9 +281,8 @@ export const ItemDetailWorkspace: React.FC = () => {
               children: (
                 <TechnicalComparisonTable
                   item={item}
-                  responses={responses}
-                  onReviewTechnical={(resp) => {
-                    setSelectedResponse(resp);
+                  onReviewTechnical={(quoteId) => {
+                    setSelectedQuoteId(quoteId);
                     setTechReviewDrawerOpen(true);
                   }}
                 />
@@ -460,7 +295,7 @@ export const ItemDetailWorkspace: React.FC = () => {
       <BuyerTechnicalReviewDrawer
         open={techReviewDrawerOpen}
         onClose={() => setTechReviewDrawerOpen(false)}
-        response={selectedResponse}
+        quoteId={selectedQuoteId}
         itemTitle={item.product_name}
       />
 
@@ -468,7 +303,7 @@ export const ItemDetailWorkspace: React.FC = () => {
         visible={awardDrawerOpen}
         onClose={() => setAwardDrawerOpen(false)}
         item={item}
-        responses={responses}
+        quotes={quotes}
         onGrantSplitAwards={handleGrantSplitAwards}
       />
     </div>
