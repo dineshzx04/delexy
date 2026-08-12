@@ -454,9 +454,9 @@ export const SupplierItemRespond: React.FC = () => {
         className="shadow-md border-slate-200"
         title={
           <div className="flex items-center gap-3">
-             <div className="flex flex-col">
+            <div className="flex flex-col">
               <span className="font-extrabold text-slate-900 leading-tight">Configure Sourcing Proposal</span>
-              <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; {item.product_name}</span>
+              <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; From: {rfq.requester_name || 'N/A'} </span>
             </div>
           </div>
         }
@@ -483,10 +483,6 @@ export const SupplierItemRespond: React.FC = () => {
               <ReloadOutlined className="text-blue-500 text-xs" />
               <span className="font-bold text-slate-800 text-sm">Round {existingQuote?.round ?? 1}</span>
             </div>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Seller Party</span>
-            <span className="font-mono text-slate-700 text-xs mt-0.5 bg-white border border-slate-200 rounded px-2 py-0.5">{activePartyId}</span>
           </div>
           {existingQuote?.created_at && (
             <div className="flex flex-col gap-0.5">
@@ -701,10 +697,10 @@ export const SupplierItemRespond: React.FC = () => {
           })}
         </div>
 
-        <div className="pt-6 flex justify-end gap-3 mt-6">
-          {/* <Button onClick={() => navigate(basePath)}>Back to Inbox</Button> */}
-          {!isViewOnly && (
+        {!isViewOnly && (
+          <div className="pt-6 flex justify-end gap-3 mt-6">
             <>
+              <Button onClick={() => navigate(basePath)}>Cancel</Button>
               <Button
                 icon={<SaveOutlined />}
                 onClick={() => handleSave('DRAFT')}
@@ -722,8 +718,8 @@ export const SupplierItemRespond: React.FC = () => {
                 Submit Proposal
               </Button>
             </>
-          )}
-        </div>
+          </div>
+        )}
       </Card>
     </div>
   );
