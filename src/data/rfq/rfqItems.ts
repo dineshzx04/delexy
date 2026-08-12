@@ -15,7 +15,7 @@ export const mockRfqItems: RfqItem[] = [
     catalog_product_id: "prod-2",
     product_name: "Galaxy S24 Ultra Platform Base",
     brand_id: ["brd-1"],
-    manufacturer_id: ["pty-1"],
+    manufacturer_id: ["mfg-1"],
     target_unit_price: 1000,
     awarded_quantity_total: 0,
     seller_assignments: []
@@ -34,7 +34,7 @@ export const mockRfqItems: RfqItem[] = [
     catalog_product_id: "prod-1",
     product_name: "ROG Strix SCAR 16 Platform Series",
     brand_id: ["brd-2"],
-    manufacturer_id: ["pty-5"],
+    manufacturer_id: ["mfg-4"],
     target_unit_price: 2000,
     awarded_quantity_total: 0,
     seller_assignments: [
@@ -62,7 +62,7 @@ export const mockRfqItems: RfqItem[] = [
     catalog_product_id: "prod-3",
     product_name: "Gel-Nimbus 26 Master Template",
     brand_id: ["brd-4"],
-    manufacturer_id: ["pty-3"],
+    manufacturer_id: ["mfg-3"],
     target_unit_price: 160,
     awarded_quantity_total: 0,
     seller_assignments: [
@@ -90,7 +90,7 @@ export const mockRfqItems: RfqItem[] = [
     catalog_product_id: "prod-2",
     product_name: "Galaxy S24 Ultra Platform Base",
     brand_id: ["brd-1"],
-    manufacturer_id: ["pty-1"],
+    manufacturer_id: ["mfg-1"],
     target_unit_price: 1100,
     awarded_quantity_total: 20,
     seller_assignments: [
@@ -118,7 +118,7 @@ export const mockRfqItems: RfqItem[] = [
     catalog_product_id: "prod-4",
     product_name: "Alpha 7 IV Mirrorless Platform",
     brand_id: ["brd-3"],
-    manufacturer_id: ["pty-4"],
+    manufacturer_id: ["mfg-2"],
     target_unit_price: 2500,
     awarded_quantity_total: 0,
     seller_assignments: [

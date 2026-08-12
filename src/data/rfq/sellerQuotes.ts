@@ -11,7 +11,7 @@ export const mockSellerQuotes: SellerQuote[] = [
     round: 1,
     status: "REVISION_REQUIRED",
     brand_id: ["brd-4"],
-    manufacturer_id: ["pty-3"],
+    manufacturer_id: ["mfg-3"],
     created_at: "2026-08-02T10:00:00Z",
     updated_at: "2026-08-03T08:30:00Z",
     seller_product_mapping: null
@@ -25,7 +25,7 @@ export const mockSellerQuotes: SellerQuote[] = [
     round: 2,
     status: "SUBMITTED",
     brand_id: ["brd-4"],
-    manufacturer_id: ["pty-3"],
+    manufacturer_id: ["mfg-3"],
     created_at: "2026-08-03T09:00:00Z",
     updated_at: "2026-08-03T09:00:00Z",
     seller_product_mapping: null
@@ -40,7 +40,7 @@ export const mockSellerQuotes: SellerQuote[] = [
     round: 1,
     status: "ACCEPTED",
     brand_id: ["brd-1"],
-    manufacturer_id: ["pty-1"],
+    manufacturer_id: ["mfg-1"],
     created_at: "2026-08-02T11:00:00Z",
     updated_at: "2026-08-05T14:00:00Z",
     seller_product_mapping: {
@@ -60,7 +60,7 @@ export const mockSellerQuotes: SellerQuote[] = [
     round: 1,
     status: "REJECTED",
     brand_id: ["brd-3"],
-    manufacturer_id: ["pty-4"],
+    manufacturer_id: ["mfg-2"],
     created_at: "2026-08-02T12:00:00Z",
     updated_at: "2026-08-02T12:00:00Z",
     seller_product_mapping: null

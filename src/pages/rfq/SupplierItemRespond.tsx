@@ -1,877 +1,727 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Input, InputNumber, Select, Button, Switch, Alert, App as AntApp, Breadcrumb, Tag, Descriptions, Segmented } from 'antd';
-import {
-  SendOutlined,
-  ArrowLeftOutlined,
-  AppstoreOutlined,
-  AimOutlined,
-  ShopOutlined,
-  HistoryOutlined,
-  CheckCircleFilled,
-  ExclamationCircleOutlined,
-  ClockCircleOutlined
-} from '@ant-design/icons';
-import {
-  rfqDb,
-  type ItemAttributeValue
-} from '../../data/rfq';
-import { catalogDb } from '../../data/catalog/catalog.db';
+import { Card, Input, InputNumber, Button, Select, Breadcrumb, Tag, Table, Descriptions, App as AntApp, Alert } from 'antd';
+import { SendOutlined, ArrowLeftOutlined, SaveOutlined, ReloadOutlined } from '@ant-design/icons';
+import { rfqDb, type ItemAttributeValue } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
+import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-
-interface AttributeResponseState {
-  key: string;
-  name: string;
-  group_id: string;
-  attribute_id: string;
-  group_name?: string;
-  requested: ItemAttributeValue[];
-  offered: ItemAttributeValue[];
-  is_deviated: boolean;
-  reason: string;
-  options?: { value: string; label: string }[];
-}
 
 export const SupplierItemRespond: React.FC = () => {
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
   const navigate = useNavigate();
   const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
-  const basePath = isBusinessContext ? '/b/supplier' : '/user/supplier';
+  const basePath = isBusinessContext ? '/b/supplier/rfqs' : '/user/supplier/rfqs';
   const { message: antMessage } = AntApp.useApp();
 
   const [submitting, setSubmitting] = useState(false);
-  const [selectedRoundTab, setSelectedRoundTab] = useState<string>('LATEST');
+  const [unitPrice, setUnitPrice] = useState<number | null>(null);
 
-  const allParties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  // Sourcing selections
+  const [offeredBrands, setOfferedBrands] = useState<string[]>([]);
+  const [offeredManufacturers, setOfferedManufacturers] = useState<string[]>([]);
+
+  // Custom specifications offered values (key: group_id_attribute_id, value: array of values)
+  const [offeredAttrValues, setOfferedAttrValues] = useState<Record<string, ItemAttributeValue[]>>({});
+  // Per-attribute supplier comments (key: group_id_attribute_id, value: comment string)
+  const [offeredComments, setOfferedComments] = useState<Record<string, string>>({});
+
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const activeParty = React.useMemo(() => {
+    if (parties.length === 0) return null;
+    return isBusinessContext
+      ? parties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId) || parties[0]
+      : parties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || parties.find((p) => p.id === 'pty-6') || parties[0];
+  }, [parties, isBusinessContext, activeWorkspace, currentUserId]);
+
+  const activePartyId = activeParty?.id || '';
+
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
-
-  const activeParty = isBusinessContext
-    ? allParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId)
-    : allParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId);
-
-  const activePartyId = activeParty?.id || 'pty-4';
-  const activePartyName = activeParty?.display_name || 'Responding Supplier Party';
-
-  const allQuotes = useLiveQuery(() => rfqDb.seller_quotes.toArray(), []) || [];
-  const activeQuote = useMemo(() => {
-    if (!itemId || !activePartyId) return undefined;
-    return allQuotes.find(q => q.rfq_item_id === itemId && q.seller_id === activePartyId);
-  }, [allQuotes, itemId, activePartyId]);
-
-  const quoteRevisions = useLiveQuery(
-    () => activeQuote ? rfqDb.seller_quote_revisions.where('seller_quote_id').equals(activeQuote.id).toArray() : [],
-    [activeQuote]
-  ) || [];
-
-  const activeQuoteRevisionId = activeQuote?.current_revision_id;
-
-  const allAttributeResponses = useLiveQuery(() => rfqDb.seller_quote_attributes.toArray(), []) || [];
-  const activeResponses = useMemo(() => {
-    if (!activeQuoteRevisionId) return [];
-    return allAttributeResponses.filter(r => r.quote_revision_id === activeQuoteRevisionId);
-  }, [allAttributeResponses, activeQuoteRevisionId]);
-
-  const allComments = useLiveQuery(() => rfqDb.seller_quote_comments.toArray(), []) || [];
-  const activeComments = useMemo(() => {
-    if (!activeQuote) return [];
-    return allComments.filter(c => c.seller_quote_id === activeQuote.id);
-  }, [allComments, activeQuote]);
-
-  const allHistory = useLiveQuery(() => rfqDb.item_attribute_change_history.toArray(), []) || [];
-  const activeHistory = useMemo(() => {
-    if (!activeQuote) return [];
-    return allHistory.filter(h => h.seller_quote_id === activeQuote.id);
-  }, [allHistory, activeQuote]);
-
-  const allCategories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
-  const allAttributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
-  const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
-  const allAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
-  const allMasterProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
-  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
-  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
+  const catalogBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
+  const catalogManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+  const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
+  const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
+  const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
+  const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
 
   const itemAttributes = useLiveQuery(
-    async () => {
-      if (!item?.id) return [];
-      return rfqDb.rfq_item_attributes.where('rfq_item_id').equals(item.id).toArray();
-    },
-    [item?.id]
+    () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray() : []),
+    [itemId]
   ) || [];
 
-  const sellerProduct = useLiveQuery(
-    () => (item?.seller_product_id ? catalogDb.sellerProducts.get(item.seller_product_id) : undefined),
-    [item?.seller_product_id]
+  const existingQuote = useLiveQuery(
+    () => (itemId && activePartyId ? rfqDb.seller_quotes.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first() : undefined),
+    [itemId, activePartyId]
   );
 
-  const [offeredSpecs, setOfferedSpecs] = useState<Record<string, AttributeResponseState>>({});
-  const [commercialTerms, setCommercialTerms] = useState({
-    offered_unit_price: 1000,
-    offered_quantity: 60,
-    lead_time_days: 5,
-  });
+  const existingQuoteAttributes = useLiveQuery(
+    () => (existingQuote ? rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray() : []),
+    [existingQuote]
+  ) || [];
 
-  const revisionRounds = useMemo(() => {
-    if (!activeQuote) return [];
-    const rounds: any[] = [];
-    const activeRevNumber = quoteRevisions.find(r => r.id === activeQuote.current_revision_id)?.revision_number || 1;
-    for (let r = 1; r < activeRevNumber; r++) {
-      rounds.push({
-        round_number: r,
-        round_status: 'SUBMITTED',
-        buyer_review_notes: 'Reviewed in historical round',
-      });
-    }
-    return rounds;
-  }, [activeQuote, quoteRevisions]);
+  const existingQuoteComments = useLiveQuery(
+    () => (existingQuote ? rfqDb.seller_quote_comments.where('seller_quote_id').equals(existingQuote.id).toArray() : []),
+    [existingQuote]
+  ) || [];
 
-  const latestRound = useMemo(() => {
-    if (!activeQuote) return null;
-    const activeRevNumber = quoteRevisions.find(r => r.id === activeQuote.current_revision_id)?.revision_number || 1;
+  // Auto-generate or load the quote number
+  const quoteNumber = React.useMemo(() => {
+    return existingQuote?.seller_quote_number || `SQ-${itemId?.replace('item-', '') || 'NEW'}-${activePartyId?.replace('pty-', '') || 'UNK'}`;
+  }, [existingQuote, itemId, activePartyId]);
 
-    // Find the latest buyer comment on the quote revision
-    const buyerCommentObj = activeComments
-      .filter(c => c.sender === 'BUYER')
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-
-    return {
-      round_number: activeRevNumber,
-      round_status: activeQuote.status === 'SUBMITTED' ? 'PENDING' : 
-                   ((activeQuote.status === 'ACCEPTED' || activeQuote.status === 'PARTIALLY_ACCEPTED' || activeQuote.status === 'NEGOTIATION') ? 'APPROVED' : 'REVISION_REQUESTED'),
-      buyer_review_notes: buyerCommentObj?.comment || '',
-    };
-  }, [activeQuote, activeComments, quoteRevisions]);
-
-  const isRoundPending = activeQuote?.status === 'SUBMITTED';
-  const isRoundApproved = activeQuote?.status === 'ACCEPTED' || activeQuote?.status === 'PARTIALLY_ACCEPTED' || activeQuote?.status === 'NEGOTIATION';
-
-  const isRoundRevisionRequested = activeQuote?.status === 'REVISED';
-  const isViewingHistoricalRound = selectedRoundTab !== 'LATEST';
-  const isInputDisabled = isViewingHistoricalRound || isRoundPending || isRoundApproved;
-
-  const requestedAttributes = useMemo(() => {
-    if (!item) return [];
-    const list: AttributeResponseState[] = [];
-
-    const brandOptions = allBrands.map((b) => ({ value: b.name, label: b.name }));
-    const mfgOptions = allManufacturers.map((m) => ({ value: m.company_name, label: m.company_name }));
-
-    const brandIds = Array.isArray(item.brand_id) ? item.brand_id : (item.brand_id ? [item.brand_id] : []);
-    const requestedBrands: ItemAttributeValue[] = brandIds.map(bId => {
-      const brandObj = allBrands.find(b => b.id === bId);
-      return { value_id: bId, value_label: brandObj?.name || bId };
-    });
-
-    const mfgIds = Array.isArray(item.manufacturer_id) ? item.manufacturer_id : (item.manufacturer_id ? [item.manufacturer_id] : []);
-    const requestedMfgs: ItemAttributeValue[] = mfgIds.map(mId => {
-      const mfgObj = allManufacturers.find(m => m.id === mId);
-      return { value_id: mId, value_label: mfgObj?.company_name || mId };
-    });
-
-    if (requestedBrands.length > 0) {
-      const brandResp = activeResponses.find(r => r.group_id === 'static' && r.attribute_id === 'brand');
-      const offeredBrands = brandResp ? brandResp.offered_values : requestedBrands;
-      const isDev = brandResp ? brandResp.offered_values.some((v: any) => !requestedBrands.some(r => r.value_id === v.value_id)) : false;
-      const commentObj = brandResp ? activeComments.find(c => c.quote_attribute_id === brandResp.id && c.sender === 'SELLER') : null;
-
-      list.push({
-        key: 'static-brand',
-        name: 'Preferred Brand',
-        group_id: 'static',
-        attribute_id: 'brand',
-        requested: requestedBrands,
-        offered: offeredBrands,
-        is_deviated: isDev,
-        reason: commentObj?.comment || '',
-        options: brandOptions,
-      });
-    }
-
-    if (requestedMfgs.length > 0) {
-      const mfgResp = activeResponses.find(r => r.group_id === 'static' && r.attribute_id === 'manufacturer');
-      const offeredMfgs = mfgResp ? mfgResp.offered_values : requestedMfgs;
-      const isDev = mfgResp ? mfgResp.offered_values.some((v: any) => !requestedMfgs.some(r => r.value_id === v.value_id)) : false;
-      const commentObj = mfgResp ? activeComments.find(c => c.quote_attribute_id === mfgResp.id && c.sender === 'SELLER') : null;
-
-      list.push({
-        key: 'static-mfg',
-        name: 'Preferred Manufacturer',
-        group_id: 'static',
-        attribute_id: 'manufacturer',
-        requested: requestedMfgs,
-        offered: offeredMfgs,
-        is_deviated: isDev,
-        reason: commentObj?.comment || '',
-        options: mfgOptions,
-      });
-    }
-
-    const getAttributeResponseState = (
-      gId: string,
-      attrId: string,
-      groupName: string,
-      da: any | undefined
-    ): AttributeResponseState | null => {
-      const attr = allAttributes.find((a) => a.id === attrId);
-      if (!attr) return null;
-
-      let requestedVals: ItemAttributeValue[] = [];
-      const itemAttr = itemAttributes.find((ia) => ia.attribute_id === attrId && ia.group_id === gId);
-
-      if (itemAttr) {
-        requestedVals = itemAttr.values;
-      } else if (da) {
-        requestedVals = (da.selected_value_ids || []).map((vId: string) => {
-          const vObj = allAttributeValues.find((v) => v.id === vId);
-          return { value_id: vId, value_label: vObj?.label || vId };
-        });
-      } else if (sellerProduct) {
-        const spDa = (sellerProduct.dynamic_attributes || []).find((d: any) => d.attribute_id === attrId);
-        if (spDa) {
-          requestedVals = (spDa.selected_value_ids || []).map((vId: string) => {
-            const vObj = allAttributeValues.find((v) => v.id === vId);
-            return { value_id: vId, value_label: vObj?.label || vId };
-          });
-        } else {
-          const spSpec = (sellerProduct.specifications || []).find((s: any) => s.attribute_id === attrId);
-          if (spSpec) {
-            requestedVals = (spSpec.values || []).map((v: any) => ({
-              value_id: v.id || v.label,
-              value_label: v.label || v.id,
-            }));
-          }
+  React.useEffect(() => {
+    if (existingQuote) {
+      if (existingQuote.status === 'DRAFT' && existingQuote.draft_snapshot) {
+        try {
+          const snapshot = JSON.parse(existingQuote.draft_snapshot);
+          if (snapshot.unitPrice !== undefined) setUnitPrice(snapshot.unitPrice);
+          if (snapshot.offeredBrands) setOfferedBrands(snapshot.offeredBrands);
+          if (snapshot.offeredManufacturers) setOfferedManufacturers(snapshot.offeredManufacturers);
+          if (snapshot.offeredAttrValues) setOfferedAttrValues(snapshot.offeredAttrValues);
+          if (snapshot.offeredComments) setOfferedComments(snapshot.offeredComments);
+        } catch (e) {
+          console.error("Error parsing draft snapshot:", e);
         }
-      }
-
-      const resp = activeResponses.find((r) => r.group_id === gId && r.attribute_id === attrId);
-      const offeredVals = resp ? resp.offered_values : requestedVals;
-      const isDev = resp ? resp.offered_values.some((v: any) => !requestedVals.some(r => r.value_id === v.value_id)) : false;
-      const commentObj = resp ? activeComments.find(c => c.quote_attribute_id === resp.id && c.sender === 'SELLER') : null;
-
-      const mappedValues = allAttributeValues.filter(
-        (v) => v.attributeId === attrId || (attr?.valueIds && attr.valueIds.includes(v.id))
-      );
-      const valueOptions = mappedValues.map((v) => ({
-        value: v.id || v.label || v.value,
-        label: `${v.label || v.value}`,
-      }));
-
-      return {
-        key: `dyn-${gId}-${attrId}`,
-        name: attr.name || attr.label || attrId,
-        group_id: gId,
-        attribute_id: attrId,
-        group_name: groupName,
-        requested: requestedVals,
-        offered: offeredVals,
-        is_deviated: isDev,
-        reason: commentObj?.comment || '',
-        options: valueOptions.length > 0 ? valueOptions : undefined,
-      };
-    };
-
-    const category = allCategories.find((c) => c.id === item.category_id);
-    const mappedGroupIds = category?.mappedGroupIds || [];
-
-    mappedGroupIds.forEach((gId) => {
-      const group = allAttributeGroups.find((g) => g.id === gId);
-      if (!group) return;
-      const groupAttrIds = group.attributeIds || [];
-      groupAttrIds.forEach((attrId) => {
-        const da = (item.dynamic_attributes || []).find((d) => d.attribute_id === attrId && d.group_id === gId);
-        const state = getAttributeResponseState(gId, attrId, group.name, da);
-        if (state) list.push(state);
-      });
-    });
-
-    (item.dynamic_attributes || []).forEach((da) => {
-      const alreadyAdded = list.some((l) => l.group_id === da.group_id && l.attribute_id === da.attribute_id);
-      if (!alreadyAdded) {
-        const group = allAttributeGroups.find((g) => g.id === da.group_id);
-        const state = getAttributeResponseState(da.group_id, da.attribute_id, group?.name || 'Category Attributes', da);
-        if (state) list.push(state);
-      }
-    });
-
-    return list;
-  }, [item, allAttributes, allAttributeGroups, allAttributeValues, allBrands, allManufacturers, allCategories, itemAttributes, sellerProduct, activeResponses, activeComments]);
-
-  useEffect(() => {
-    if (requestedAttributes.length > 0) {
-      const specs: Record<string, AttributeResponseState> = {};
-      requestedAttributes.forEach((spec) => {
-        specs[spec.key] = spec;
-      });
-
-      if (selectedRoundTab !== 'LATEST' && selectedRoundTab.startsWith('ROUND_')) {
-        const roundNum = parseInt(selectedRoundTab.replace('ROUND_', ''), 10);
-        const historyForRound = activeHistory.filter((h) => h.round === roundNum);
-
-        historyForRound.forEach((hist) => {
-          const specKey = Object.keys(specs).find(
-            (k) => specs[k].group_id === hist.group_id && specs[k].attribute_id === hist.attribute_id
-          );
-          if (specKey) {
-            specs[specKey] = {
-              ...specs[specKey],
-              offered: hist.new_value || [],
-              is_deviated: (hist.new_value || []).some((v) => !specs[specKey].requested.some((r) => r.value_id === v.value_id)),
-            };
-          }
-        });
-      }
-
-      setOfferedSpecs(specs);
-      if (activeQuote) {
-        setCommercialTerms({
-          offered_unit_price: activeQuote.unit_price || item?.target_unit_price || 1000,
-          offered_quantity: item?.quantity || 60,
-          lead_time_days: 5,
-        });
-      } else if (item) {
-        setCommercialTerms({
-          offered_unit_price: item.target_unit_price || 1000,
-          offered_quantity: item.quantity || 1,
-          lead_time_days: 5,
-        });
+      } else {
+        setUnitPrice(existingQuote.unit_price);
+        setOfferedBrands(existingQuote.brand_id || []);
+        setOfferedManufacturers(existingQuote.manufacturer_id || []);
       }
     }
-  }, [requestedAttributes, activeQuote, item, selectedRoundTab, activeHistory]);
+  }, [existingQuote]);
 
-  if (!rfq || !item) {
-    return <div className="p-12 text-center text-slate-500">Loading Sourcing Request...</div>;
+  React.useEffect(() => {
+    if (existingQuote && existingQuote.status !== 'DRAFT' && existingQuoteAttributes.length > 0) {
+      const initialAttrs: Record<string, ItemAttributeValue[]> = {};
+      existingQuoteAttributes.forEach((qa) => {
+        const key = `${qa.group_id}_${qa.attribute_id}`;
+        initialAttrs[key] = qa.offered_values || [];
+      });
+      setOfferedAttrValues(initialAttrs);
+    }
+  }, [existingQuoteAttributes, existingQuote]);
+
+  React.useEffect(() => {
+    if (existingQuote && existingQuote.status !== 'DRAFT' && existingQuoteComments.length > 0) {
+      const initialComments: Record<string, string> = {};
+      existingQuoteComments.forEach((qc) => {
+        // group_id stored as 'SYSTEM' for SYSTEM attrs, group_id otherwise
+        const key = qc.group_id === 'SYSTEM'
+          ? `SYSTEM_${qc.attribute_id}`
+          : `${qc.group_id}_${qc.attribute_id}`;
+        initialComments[key] = qc.comment || '';
+      });
+      setOfferedComments(initialComments);
+    }
+  }, [existingQuoteComments, existingQuote]);
+
+  const attributeGroupsMap = React.useMemo(() => {
+    const map: Record<string, { name: string; items: typeof itemAttributes }> = {};
+    const customAttributes = itemAttributes.filter((ia) => ia.attribute_type !== 'SYSTEM');
+    customAttributes.forEach((ia) => {
+      const groupId = ia.group_id || 'ungrouped';
+      if (!map[groupId]) {
+        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
+        map[groupId] = { name: groupName, items: [] };
+      }
+      map[groupId].items.push(ia);
+    });
+    return Object.entries(map);
+  }, [itemAttributes, attributeGroups]);
+
+  // Normalize comment key: SYSTEM attrs use 'SYSTEM_<id>', custom use '<group_id>_<attr_id>'
+  const getCommentKey = (attributeType: string | undefined, groupId: string, attributeId: string) =>
+    attributeType === 'SYSTEM' ? `SYSTEM_${attributeId}` : `${groupId}_${attributeId}`;
+
+
+  if (rfq === undefined || item === undefined || parties.length === 0) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <h2 className="text-xl font-bold text-slate-800 font-sans animate-pulse">Loading Sourcing Workspace...</h2>
+      </div>
+    );
   }
 
-  const categoryObj = allCategories.find((c) => c.id === item.category_id);
-  const masterProductObj = allMasterProducts.find((p) => p.id === item.catalog_product_id);
+  if (!rfq || !item || !item.seller_assignments?.some((a) => a.seller_party_id === activePartyId)) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <h2 className="text-xl font-bold text-slate-800">Sourcing response container not found or unauthorized</h2>
+        <Button className="mt-4" onClick={() => navigate(basePath)}>
+          Back to Sourcing Inbox
+        </Button>
+      </div>
+    );
+  }
 
-  const handleSubmitResponse = async () => {
+  const categoryName = categories.find((c) => c.id === item.category_id)?.name || 'Unknown';
+
+  // Mode: SUBMITTED, ACCEPTED, REJECTED → view-only (locked)
+  // NEW, DRAFT, REVISION_REQUIRED → actionable (editable)
+  const isViewOnly = ['SUBMITTED', 'ACCEPTED', 'REJECTED'].includes(existingQuote?.status ?? '');
+
+  const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
+    if (submitMode === 'SUBMITTED' && (!unitPrice || unitPrice <= 0)) {
+      antMessage.error('Please enter a valid offered unit price.');
+      return;
+    }
+    if (!quoteNumber.trim()) {
+      antMessage.error('Please enter a quote reference/number.');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const currentQuote = activeQuote;
-      const activeRevNumber = currentQuote ? (quoteRevisions.find(r => r.id === currentQuote.current_revision_id)?.revision_number || 1) : 0;
-      const nextRoundNum = activeRevNumber + 1;
-      const quoteId = currentQuote?.id || `q-${itemId}-${activePartyId}`;
-      const quoteRevisionId = `qrev-${quoteId}-${nextRoundNum}`;
+      const quoteId = existingQuote?.id || `q-${itemId}-${activePartyId}`;
+      // For DRAFT mode: serialize everything to JSON and skip writing to seller_quote_attributes
+      const draftSnapshot = submitMode === 'DRAFT' ? JSON.stringify({ unitPrice, offeredBrands, offeredManufacturers, offeredAttrValues, offeredComments }) : null;
 
-      if (currentQuote) {
-        await rfqDb.seller_quotes.update(currentQuote.id, {
-          status: 'SUBMITTED',
-          current_revision_id: quoteRevisionId,
-          unit_price: commercialTerms.offered_unit_price,
-          updated_at: new Date().toISOString()
-        });
-      } else {
-        await rfqDb.seller_quotes.put({
-          id: quoteId,
-          rfq_item_id: itemId!,
-          seller_id: activePartyId,
-          status: 'SUBMITTED',
-          current_revision_id: quoteRevisionId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          unit_price: commercialTerms.offered_unit_price
-        });
-      }
-
-      await rfqDb.seller_quote_revisions.put({
-        id: quoteRevisionId,
-        seller_quote_id: quoteId,
-        rfq_item_id: item.id,
-        revision_number: nextRoundNum,
-        created_by: currentUserId || 'usr-2',
-        created_at: new Date().toISOString()
-      });
-
-      const newResponses = Object.values(offeredSpecs).map((spec) => {
-        const itemAttr = itemAttributes.find(ia => ia.group_id === spec.group_id && ia.attribute_id === spec.attribute_id);
-        return {
-          id: `resp-${quoteRevisionId}-${spec.group_id}-${spec.attribute_id}`,
-          quote_revision_id: quoteRevisionId,
-          item_attribute_id: itemAttr?.id || '',
-          group_id: spec.group_id,
-          attribute_id: spec.attribute_id,
-          attribute_name: spec.name,
-          offered_values: spec.offered
-        };
-      });
-      await rfqDb.seller_quote_attributes.bulkPut(newResponses);
-
-      const commentEntries = Object.values(offeredSpecs)
-        .filter((spec) => spec.is_deviated && spec.reason)
-        .map((spec) => ({
-          id: `c-${quoteRevisionId}-${spec.group_id}-${spec.attribute_id}`,
-          seller_quote_id: quoteId,
-          quote_attribute_id: `resp-${quoteRevisionId}-${spec.group_id}-${spec.attribute_id}`,
-          comment: spec.reason,
-          sender: 'SELLER' as const,
-          sender_id: activePartyId,
-          created_at: new Date().toISOString()
-        }));
-      if (commentEntries.length > 0) {
-        await rfqDb.seller_quote_comments.bulkPut(commentEntries);
-      }
-
-      const historyEntries = Object.values(offeredSpecs).map((spec) => ({
-        id: `hist-${quoteRevisionId}-${spec.group_id}-${spec.attribute_id}`,
+      const quotePayload = {
+        id: quoteId,
         rfq_item_id: itemId!,
-        seller_quote_id: quoteId,
-        round: nextRoundNum,
-        group_id: spec.group_id,
-        attribute_id: spec.attribute_id,
-        attribute_name: spec.name,
-        actor_type: 'SELLER' as const,
-        actor_id: activePartyId,
-        old_value: spec.requested,
-        new_value: spec.offered,
-        timestamp: new Date().toISOString(),
-      }));
-      await rfqDb.item_attribute_change_history.bulkPut(historyEntries);
+        seller_party_id: activePartyId,
+        seller_quote_number: quoteNumber.trim(),
+        unit_price: unitPrice || 0,
+        round: existingQuote ? existingQuote.round : 1,
+        status: submitMode,
+        brand_id: offeredBrands,
+        manufacturer_id: offeredManufacturers,
+        created_at: existingQuote ? existingQuote.created_at : new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        draft_snapshot: draftSnapshot
+      };
 
-      antMessage.success(`Technical response (Round #${nextRoundNum}) submitted for ${activePartyName}!`);
+      // Put Seller Quote
+      await rfqDb.seller_quotes.put(quotePayload);
+
+      // For SUBMITTED mode: write individual attribute records to seller_quote_attributes
+      if (submitMode === 'SUBMITTED') {
+        const qaPromises = itemAttributes.map((ia) => {
+          const key = `${ia.group_id}_${ia.attribute_id}`;
+          let offered = offeredAttrValues[key] || [];
+          if (ia.attribute_type === 'SYSTEM') {
+            if (ia.attribute_id === 'brand') {
+              offered = offeredBrands.map((id) => ({
+                value_id: id,
+                value_label: catalogBrands.find((b) => b.id === id)?.name || id
+              }));
+            } else if (ia.attribute_id === 'manufacturer') {
+              offered = offeredManufacturers.map((id) => ({
+                value_id: id,
+                value_label: catalogManufacturers.find((m) => m.id === id)?.company_name || id
+              }));
+            } else if (ia.attribute_id === 'unit_price') {
+              offered = [{
+                value_id: 'price-offer',
+                value_label: String(unitPrice || 0)
+              }];
+            }
+          }
+          const qaPayload = {
+            id: `qa-${quoteId}-${ia.attribute_id}`,
+            seller_quote_id: quoteId,
+            group_id: ia.group_id,
+            attribute_id: ia.attribute_id,
+            offered_values: offered,
+            attribute_type: ia.attribute_type
+          };
+          return rfqDb.seller_quote_attributes.put(qaPayload);
+        });
+        await Promise.all(qaPromises);
+
+        // Write seller_quote_comments for each attribute that has a comment (SYSTEM + custom)
+        const commentPromises = itemAttributes
+          .filter((ia) => {
+            const key = getCommentKey(ia.attribute_type, ia.group_id, ia.attribute_id);
+            return !!offeredComments[key]?.trim();
+          })
+          .map((ia) => {
+            const key = getCommentKey(ia.attribute_type, ia.group_id, ia.attribute_id);
+            // Store group_id as 'SYSTEM' for SYSTEM attrs so the load effect can reconstruct the correct key
+            const storedGroupId = ia.attribute_type === 'SYSTEM' ? 'SYSTEM' : ia.group_id;
+            return rfqDb.seller_quote_comments.put({
+              id: `qc-${quoteId}-${storedGroupId}-${ia.attribute_id}`,
+              seller_quote_id: quoteId,
+              group_id: storedGroupId,
+              attribute_id: ia.attribute_id,
+              comment: offeredComments[key].trim(),
+              actor_type: 'SELLER',
+              actor_id: activePartyId,
+              created_at: new Date().toISOString(),
+              attribute_type: ia.attribute_type
+            });
+          });
+        await Promise.all(commentPromises);
+      }
+
+      antMessage.success(submitMode === 'DRAFT' ? 'Draft saved successfully!' : 'Quotation proposal submitted successfully!');
       navigate(basePath);
-    } catch (err) {
-      console.error(err);
-      antMessage.error('Failed to submit response');
+    } catch (error: any) {
+      console.error('Error saving proposal:', error);
+      antMessage.error('Failed to save sourcing proposal.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const dynamicSpecs = Object.values(offeredSpecs).filter((s) => s.group_id !== 'static');
-  const groupedDynamicSpecs = dynamicSpecs.reduce((acc: Record<string, AttributeResponseState[]>, spec) => {
-    const gName = spec.group_name || 'Category Attributes';
-    if (!acc[gName]) acc[gName] = [];
-    acc[gName].push(spec);
-    return acc;
-  }, {});
+  const getBrandNames = (ids: string[] | null | undefined): string => {
+    if (!ids || ids.length === 0) return 'Any Brand';
+    return ids.map((id) => catalogBrands.find((b) => b.id === id)?.name || id).join(', ');
+  };
 
-  const brandMfgSpecs = Object.values(offeredSpecs).filter((s) => s.group_id === 'static');
+  const getManufacturerNames = (ids: string[] | null | undefined): string => {
+    if (!ids || ids.length === 0) return 'Any Manufacturer';
+    return ids.map((id) => catalogManufacturers.find((m) => m.id === id)?.company_name || id).join(', ');
+  };
+  // Build general preference rows
+  const generalPreferencesData = [
+    {
+      key: 'brand',
+      specification: 'Brand Preference',
+      buyerAsked: getBrandNames(item.brand_id),
+      renderOffers: () => (
+        <Select
+          mode="multiple"
+          placeholder="Select proposed brands"
+          className="w-full"
+          value={offeredBrands}
+          onChange={setOfferedBrands}
+          options={catalogBrands.map((b) => ({ value: b.id, label: b.name }))}
+        />
+      ),
+      renderViewOffers: () => (
+        <span className="text-slate-700">
+          {offeredBrands.length > 0 ? getBrandNames(offeredBrands) : <span className="text-slate-400 italic">Not specified</span>}
+        </span>
+      ),
+      renderComment: () => {
+        const key = 'SYSTEM_brand';
+        return (
+          <Input.TextArea
+            rows={2}
+            placeholder="Optional remark about brand offer..."
+            value={offeredComments[key] || ''}
+            onChange={(e) => setOfferedComments((prev) => ({ ...prev, [key]: e.target.value }))}
+          />
+        );
+      },
+      renderViewComment: () => (
+        <span className="text-slate-600 text-sm">{offeredComments['SYSTEM_brand'] || <span className="text-slate-300">—</span>}</span>
+      )
+    },
+    {
+      key: 'manufacturer',
+      specification: 'Manufacturer Preference',
+      buyerAsked: getManufacturerNames(item.manufacturer_id),
+      renderOffers: () => (
+        <Select
+          mode="multiple"
+          placeholder="Select proposed manufacturers"
+          className="w-full"
+          value={offeredManufacturers}
+          onChange={setOfferedManufacturers}
+          options={catalogManufacturers.map((m) => ({ value: m.id, label: m.company_name }))}
+        />
+      ),
+      renderViewOffers: () => (
+        <span className="text-slate-700">
+          {offeredManufacturers.length > 0 ? getManufacturerNames(offeredManufacturers) : <span className="text-slate-400 italic">Not specified</span>}
+        </span>
+      ),
+      renderComment: () => {
+        const key = 'SYSTEM_manufacturer';
+        return (
+          <Input.TextArea
+            rows={2}
+            placeholder="Optional remark about manufacturer offer..."
+            value={offeredComments[key] || ''}
+            onChange={(e) => setOfferedComments((prev) => ({ ...prev, [key]: e.target.value }))}
+          />
+        );
+      },
+      renderViewComment: () => (
+        <span className="text-slate-600 text-sm">{offeredComments['SYSTEM_manufacturer'] || <span className="text-slate-300">—</span>}</span>
+      )
+    },
+    {
+      key: 'unit_price',
+      specification: 'Offered Unit Price ($)',
+      buyerAsked: item.target_unit_price ? `$${item.target_unit_price}` : 'N/A',
+      renderOffers: () => (
+        <InputNumber
+          value={unitPrice}
+          onChange={(val) => setUnitPrice(val)}
+          min={0.01}
+          precision={2}
+          placeholder="e.g. 1050.00"
+          className="w-full"
+        />
+      ),
+      renderViewOffers: () => (
+        <span className="font-bold text-emerald-600">
+          {unitPrice ? `$${unitPrice.toFixed(2)}` : <span className="text-slate-400 italic">Not specified</span>}
+        </span>
+      ),
+      renderComment: () => {
+        const key = 'SYSTEM_unit_price';
+        return (
+          <Input.TextArea
+            rows={2}
+            placeholder="Optional remark about pricing..."
+            value={offeredComments[key] || ''}
+            onChange={(e) => setOfferedComments((prev) => ({ ...prev, [key]: e.target.value }))}
+          />
+        );
+      },
+      renderViewComment: () => (
+        <span className="text-slate-600 text-sm">{offeredComments['SYSTEM_unit_price'] || <span className="text-slate-300">—</span>}</span>
+      )
+    }
+  ];
+
+  const specAttrColumn = {
+    title: 'Specification / Attribute',
+    dataIndex: 'specification',
+    key: 'specification',
+    width: 200,
+    render: (text: string, record: any) => (
+      <div className="flex flex-col gap-0.5">
+        <span className="font-bold text-slate-800 leading-tight">{text}</span>
+        {record.description && (
+          <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
+        )}
+      </div>
+    )
+  };
+
+  const buyerAskedColumn = {
+    title: 'What Buyer Asked',
+    dataIndex: 'buyerAsked',
+    key: 'buyerAsked',
+    width: 260,
+    render: (text: string) => <span className="text-slate-600 font-medium">{text}</span>
+  };
+
+  // Actionable columns (interactive inputs)
+  const editableColumns = [
+    specAttrColumn,
+    buyerAskedColumn,
+    {
+      title: 'Your Offer',
+      key: 'supplierOffer',
+      width: 260,
+      render: (_: any, record: any) => record.renderOffers()
+    },
+    {
+      title: 'Supplier Comment (Optional)',
+      key: 'supplierComment',
+      render: (_: any, record: any) => record.renderComment ? record.renderComment() : null
+    }
+  ];
+
+  // Read-only columns (static display)
+  const readOnlyColumns = [
+    specAttrColumn,
+    buyerAskedColumn,
+    {
+      title: 'Offered',
+      key: 'supplierOffer',
+      width: 260,
+      render: (_: any, record: any) => record.renderViewOffers ? record.renderViewOffers() : record.renderOffers()
+    },
+    {
+      title: 'Supplier Comment',
+      key: 'supplierComment',
+      render: (_: any, record: any) => record.renderViewComment ? record.renderViewComment() : null
+    }
+  ];
+
+  const activeColumns = isViewOnly ? readOnlyColumns : editableColumns;
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-5">
+    <div className="max-w-7xl mx-auto space-y-6">
       <Breadcrumb
         items={[
-          { title: <a onClick={() => navigate(basePath)}>Supplier Inbox</a> },
-          { title: `${rfq.rfq_number} - Item Technical Response` },
+          { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
+          { title: `${rfq.rfq_number} - Sourcing Offer` }
         ]}
       />
 
-      <Card className="shadow-sm border-slate-200 p-2">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <Tag color="blue" className="font-bold">Phase 3: Technical Response</Tag>
-              <Tag color="purple" icon={<ShopOutlined />}>Party: {activePartyName} ({activePartyId})</Tag>
-              {item.variant_id && <Tag color="green" icon={<AimOutlined />}>Targeted Variant SKU</Tag>}
+      <Card
+        className="shadow-md border-slate-200"
+        title={
+          <div className="flex items-center gap-3">
+             <div className="flex flex-col">
+              <span className="font-extrabold text-slate-900 leading-tight">Configure Sourcing Proposal</span>
+              <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; {item.product_name}</span>
             </div>
-            <h1 className="text-xl font-bold text-slate-900 mt-1 m-0">{item.product_name}</h1>
-            <p className="text-xs text-slate-500 m-0">
-              Technical response & deviation matrix for <strong>{activePartyName}</strong>.
-            </p>
           </div>
+        }
+      >
+
+        {/* Proposal Status Banner */}
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 mb-5 flex flex-wrap gap-6 items-start">
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Reference</span>
+            <Tag color="purple" className="font-mono font-bold text-sm mt-0.5">{quoteNumber}</Tag>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Status</span>
+            <Tag
+              color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'ACCEPTED' ? 'green' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
+              className="mt-0.5 font-bold"
+            >
+              {existingQuote?.status || 'NEW'}
+            </Tag>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Round</span>
+            <div className="flex items-center gap-1 mt-0.5">
+              <ReloadOutlined className="text-blue-500 text-xs" />
+              <span className="font-bold text-slate-800 text-sm">Round {existingQuote?.round ?? 1}</span>
+            </div>
+          </div>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Seller Party</span>
+            <span className="font-mono text-slate-700 text-xs mt-0.5 bg-white border border-slate-200 rounded px-2 py-0.5">{activePartyId}</span>
+          </div>
+          {existingQuote?.created_at && (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Created</span>
+              <span className="text-xs text-slate-600 mt-0.5">{new Date(existingQuote.created_at).toLocaleString()}</span>
+            </div>
+          )}
+          {existingQuote?.updated_at && (
+            <div className="flex flex-col gap-0.5">
+              <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Last Updated</span>
+              <span className="text-xs text-slate-600 mt-0.5">{new Date(existingQuote.updated_at).toLocaleString()}</span>
+            </div>
+          )}
         </div>
 
-        {revisionRounds.length > 0 && (
-          <div className="my-4 p-3 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <HistoryOutlined className="text-blue-600 text-base" />
-              <div>
-                <div className="text-xs font-bold text-slate-800">Technical Revision Rounds History</div>
-                <div className="text-[11px] text-slate-500">
-                  {revisionRounds.length} round(s) submitted for this seller party. Select a round to inspect snapshots.
-                </div>
-              </div>
-            </div>
-            <Segmented
-              value={selectedRoundTab}
-              onChange={(val) => setSelectedRoundTab(val as string)}
-              options={[
-                { label: 'Current / New Response', value: 'LATEST' },
-                ...revisionRounds.map((r) => ({
-                  label: `Round #${r.round_number} (${r.round_status})`,
-                  value: `ROUND_${r.round_number}`,
-                })),
-              ]}
+        {/* Requested Item Details */}
+        <Descriptions title="Requested Item Details" bordered size="small" column={2} className="mb-6">
+          <Descriptions.Item label="Product / Service" span={2}>
+            <strong className="text-slate-800">{item.product_name}</strong>
+          </Descriptions.Item>
+          <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
+          <Descriptions.Item label="Requested Quantity">
+            <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Target Unit Price">
+            {item.target_unit_price ? <span className="text-emerald-600 font-bold">${item.target_unit_price}</span> : 'N/A'}
+          </Descriptions.Item>
+          <Descriptions.Item label="Item Source">
+            <Tag>{item.item_source || 'N/A'}</Tag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Catalog Product">
+            {item.catalog_product_id
+              ? catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id
+              : 'N/A'}
+          </Descriptions.Item>
+          <Descriptions.Item label="RFQ Number">
+            <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
+          </Descriptions.Item>
+        </Descriptions>
+
+        <div className="space-y-6">
+
+          {/* Status Notice Banners */}
+          {existingQuote?.status === 'REVISION_REQUIRED' && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Revision Requested"
+              description="The buyer has reviewed your quote and requested changes. Please update your proposal and re-submit."
+              className="rounded-xl"
             />
-          </div>
-        )}
-
-        {isRoundApproved ? (
-          <Alert
-            type="success"
-            showIcon
-            icon={<CheckCircleFilled />}
-            message={`Technical Specification Approved (Round #${latestRound?.round_number})`}
-            description="The buyer has approved 100% of your technical specification response. Your item has moved to the Commercial Negotiation phase."
-            className="my-4"
-          />
-        ) : isRoundPending ? (
-          <Alert
-            type="info"
-            showIcon
-            icon={<ClockCircleOutlined />}
-            message={`Technical Response (Round #${latestRound?.round_number}) Submitted - Under Buyer Review`}
-            description="Your technical response has been submitted to the buyer. Inputs are locked in read-only mode while the buyer evaluates your specifications."
-            className="my-4"
-          />
-        ) : isRoundRevisionRequested ? (
-          <Alert
-            type="warning"
-            showIcon
-            icon={<ExclamationCircleOutlined />}
-            message={`Buyer Technical Revision Requested (Round #${latestRound?.round_number})`}
-            description={
-              latestRound?.buyer_review_notes ||
-              'The buyer requested adjustments to technical attributes or offered specifications. Review buyer comments below and resubmit updated specs.'
-            }
-            className="my-4"
-          />
-        ) : null}
-
-        {item.variant_id && (
-          <div className="my-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center justify-between">
-            <div>
-              <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                <AimOutlined className="text-emerald-600" /> Targeted Catalog Variant Bound
-              </div>
-              <div className="text-xs text-emerald-700 font-mono mt-0.5">
-                SKU: <strong>{item.variant_sku || item.variant_id}</strong> | Product ID: {item.seller_product_id}
-              </div>
-            </div>
-            <Tag color="green" className="font-bold">Targeted SKU</Tag>
-          </div>
-        )}
-
-        <div className="space-y-5 mt-4">
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-            <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2 m-0">
-              <AppstoreOutlined className="text-blue-600" /> Basic Parameters & RFQ Container Context
-            </h4>
-
-            <Descriptions size="small" column={{ xs: 1, sm: 2, md: 3 }} bordered className="bg-white">
-              <Descriptions.Item label="RFQ Number"><span className="font-bold text-slate-800">{rfq.rfq_number}</span></Descriptions.Item>
-              <Descriptions.Item label="RFQ Title">{rfq.title}</Descriptions.Item>
-              <Descriptions.Item label="Requester">{rfq.requester_name}</Descriptions.Item>
-              <Descriptions.Item label="Leaf Category"><Tag color="purple">{categoryObj?.name || item.category_id}</Tag></Descriptions.Item>
-              <Descriptions.Item label="Master Product">{masterProductObj?.name || '-'}</Descriptions.Item>
-              <Descriptions.Item label="Requested Qty"><strong className="text-slate-900">{item.quantity} {item.unit}</strong></Descriptions.Item>
-              <Descriptions.Item label="Target Price">{item.target_unit_price ? `$${item.target_unit_price}` : 'Open Quote'}</Descriptions.Item>
-              <Descriptions.Item label="Deadline">{new Date(rfq.submission_deadline).toLocaleDateString()}</Descriptions.Item>
-              <Descriptions.Item label="Shipping Destination">{rfq.shipping_destination}</Descriptions.Item>
-            </Descriptions>
-          </div>
-
-          {brandMfgSpecs.length > 0 && (
-            <div className="p-4 bg-blue-50/40 rounded-xl border border-blue-200 space-y-3">
-              <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider flex items-center gap-2 m-0">
-                <ShopOutlined className="text-blue-600" /> Brand & Manufacturer
-              </h4>
-              <div className="space-y-2">
-                {brandMfgSpecs.map((spec) => {
-                  const buyerCommentObj = activeComments
-                    .filter(c => {
-                      const specResp = activeResponses.find(r => r.group_id === spec.group_id && r.attribute_id === spec.attribute_id);
-                      return specResp && c.quote_attribute_id === specResp.id && c.sender === 'BUYER';
-                    })
-                    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-
-                  return (
-                    <div key={spec.key} className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm flex flex-col justify-between gap-3">
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div className="min-w-[180px]">
-                          <span className="font-bold text-slate-800 text-xs">{spec.name}</span>
-                          <div className="text-xs text-slate-500">
-                            Requested: <strong className="text-slate-900">{spec.requested.map(r => r.value_label || r.value_id).join(', ') || '-'}</strong>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 flex-1">
-                          <div className="flex-1">
-                            <label className="text-[11px] font-semibold text-slate-600">Offered Value (Multiple Select)</label>
-                            {spec.options && spec.options.length > 0 ? (
-                              <Select
-                                disabled={isInputDisabled}
-                                mode="multiple"
-                                size="small"
-                                className="w-full"
-                                placeholder="Select offered brand or manufacturer..."
-                                value={spec.offered.map(o => o.value_id)}
-                                options={spec.options}
-                                onChange={(vals: string[]) => {
-                                  const offeredVals = vals.map(val => {
-                                    const opt = spec.options?.find(o => o.value === val);
-                                    return { value_id: val, value_label: opt?.label || val };
-                                  });
-                                  const isDev = offeredVals.some(v => !spec.requested.some(r => r.value_id === v.value_id)) ||
-                                    spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
-                                  setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, is_deviated: isDev } });
-                                }}
-                              />
-                            ) : (
-                              <Input
-                                disabled={isInputDisabled}
-                                size="small"
-                                value={spec.offered.map(o => o.value_label || o.value_id).join(', ')}
-                                onChange={(e) => {
-                                  const valStr = e.target.value;
-                                  const offeredVals = valStr.split(',').map(s => s.trim()).filter(Boolean).map(v => ({ value_id: v, value_label: v }));
-                                  const isDev = offeredVals.some(v => !spec.requested.some(r => r.value_id === v.value_id)) ||
-                                    spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
-                                  setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, is_deviated: isDev } });
-                                }}
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1.5 flex-shrink-0">
-                            <span className="text-[11px] font-semibold text-slate-600">Deviated?</span>
-                            <Switch
-                              disabled={isInputDisabled}
-                              size="small"
-                              checked={spec.is_deviated}
-                              onChange={(checked) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, is_deviated: checked } })}
-                            />
-                          </div>
-                        </div>
-                        {spec.is_deviated && (
-                          <div className="min-w-[200px]">
-                            <label className="text-[11px] font-semibold text-amber-700">Deviation Reason</label>
-                            <Input
-                              disabled={isInputDisabled}
-                              size="small"
-                              placeholder="Brand/mfg variance reason..."
-                              value={spec.reason}
-                              onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, reason: e.target.value } })}
-                              className="border-amber-300 bg-amber-50"
-                            />
-                          </div>
-                        )}
-                      </div>
-                      {buyerCommentObj && (
-                        <div className="mt-2 p-2 rounded border bg-red-50/90 border-red-200 text-red-900 text-xs space-y-0.5">
-                          <div className="font-bold flex items-center gap-1.5">
-                            <ExclamationCircleOutlined className="text-red-600" /> Buyer Revision Request Remark:
-                          </div>
-                          <div>{buyerCommentObj.comment}</div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          )}
+          {existingQuote?.status === 'SUBMITTED' && (
+            <Alert
+              type="info"
+              showIcon
+              message="Quote Under Review"
+              description="Your quote has been submitted and is currently under buyer review. No further edits are allowed."
+              className="rounded-xl"
+            />
+          )}
+          {existingQuote?.status === 'ACCEPTED' && (
+            <Alert
+              type="success"
+              showIcon
+              message="Quote Accepted"
+              description="Congratulations! Your quote has been accepted by the buyer. Await further instructions."
+              className="rounded-xl"
+            />
+          )}
+          {existingQuote?.status === 'REJECTED' && (
+            <Alert
+              type="error"
+              showIcon
+              message="Quote Rejected"
+              description="This quote has been rejected by the buyer. No further action is available for this submission."
+              className="rounded-xl"
+            />
           )}
 
-          {Object.keys(groupedDynamicSpecs).length > 0 && (
-            <div className="p-4 bg-purple-50/50 rounded-xl border border-purple-200 space-y-3">
-              <h4 className="font-bold text-purple-900 text-xs uppercase tracking-wider flex items-center gap-2 m-0">
-                Category Attributes
-              </h4>
+          <h3 className="text-base font-bold text-slate-900 pt-3">Side-by-Side Sourcing Configuration</h3>
 
-              {Object.entries(groupedDynamicSpecs).map(([groupName, specs]) => (
-                <div key={groupName} className="p-3 bg-white rounded-lg border border-purple-100 shadow-sm space-y-2">
-                  <div className="text-xs font-bold uppercase tracking-wider text-purple-800 border-b border-purple-50 pb-1">
-                    {groupName}
+          {/* 1. General Sourcing Preferences Card */}
+
+          <div
+            className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+            style={{ borderLeft: `4px solid #2563eb` }}
+          >
+            <div
+              className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
+              style={{ backgroundColor: `#2563eb14` }}
+            >
+              <div className="flex items-center gap-3">
+                <span
+                  className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white bg-blue-600"
+                >
+                  1
+                </span>
+                <h4 className="text-md font-bold text-slate-800">General Sourcing Preferences</h4>
+              </div>
+              <Tag color="default" style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 700 }}>
+                {generalPreferencesData.length} attributes
+              </Tag>
+            </div>
+            <div className="p-3">
+              <Table
+                dataSource={generalPreferencesData}
+                columns={activeColumns}
+                pagination={false}
+                size="small"
+                bordered
+              />
+            </div>
+          </div>
+
+          {/* 2. Custom Specifications (Groups) */}
+          {attributeGroupsMap.map(([groupId, group], idx) => {
+            const groupRows = group.items.map((ia) => {
+              const attrName = catalogAttributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id;
+              const requestedVals = (ia.values || []).map((v) => v.value_label).join(', ') || 'N/A';
+              const valueOptions = catalogAttributeValues
+                .filter((val) => val.attributeId === ia.attribute_id)
+                .map((val) => ({ value: val.id, label: val.label }));
+              const key = `${ia.group_id}_${ia.attribute_id}`;
+              const currentValIds = (offeredAttrValues[key] || []).map((v) => v.value_id);
+
+              return {
+                key: ia.id,
+                specification: attrName,
+                description: ia.description || null,
+                buyerAsked: requestedVals,
+                renderOffers: () => (
+                  <Select
+                    mode="multiple"
+                    placeholder={`Select proposed ${attrName}`}
+                    className="w-full"
+                    value={currentValIds}
+                    onChange={(selectedIds: string[]) => {
+                      const updatedVals: ItemAttributeValue[] = selectedIds.map((id) => {
+                        const foundVal = catalogAttributeValues.find((cav) => cav.id === id);
+                        return {
+                          value_id: id,
+                          value_label: foundVal?.label || id
+                        };
+                      });
+                      setOfferedAttrValues((prev) => ({
+                        ...prev,
+                        [key]: updatedVals
+                      }));
+                    }}
+                    options={valueOptions}
+                  />
+                ),
+                renderViewOffers: () => (
+                  <span className="text-slate-700">
+                    {(offeredAttrValues[key] || []).length > 0
+                      ? (offeredAttrValues[key] || []).map((v) => v.value_label).join(', ')
+                      : <span className="text-slate-400 italic">Not specified</span>}
+                  </span>
+                ),
+                renderComment: () => (
+                  <Input.TextArea
+                    rows={2}
+                    placeholder={`Optional remark about ${attrName}...`}
+                    value={offeredComments[key] || ''}
+                    onChange={(e) => setOfferedComments((prev) => ({ ...prev, [key]: e.target.value }))}
+                  />
+                ),
+                renderViewComment: () => (
+                  <span className="text-slate-600 text-sm">{offeredComments[key] || <span className="text-slate-300">—</span>}</span>
+                )
+              };
+            });
+
+
+            const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
+
+            return (
+              <div
+                key={groupId}
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+                style={{ borderLeft: `4px solid ${accentColor}` }}
+              >
+                <div
+                  className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
+                  style={{ backgroundColor: `${accentColor}14` }}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
+                      style={{ backgroundColor: accentColor }}
+                    >
+                      {idx + 2}
+                    </span>
+                    <h4 className="text-md font-bold text-slate-800">{group.name}</h4>
                   </div>
-                  <div className="space-y-2">
-                    {specs.map((spec) => {
-                      const buyerCommentObj = activeComments
-                        .filter(c => {
-                          const specResp = activeResponses.find(r => r.group_id === spec.group_id && r.attribute_id === spec.attribute_id);
-                          return specResp && c.quote_attribute_id === specResp.id && c.sender === 'BUYER';
-                        })
-                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
-
-                      return (
-                        <div key={spec.key} className="p-2.5 bg-purple-50/30 rounded border border-purple-100 flex flex-col justify-between gap-3">
-                          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div className="min-w-[180px]">
-                              <span className="font-bold text-slate-800 text-xs">{spec.name}</span>
-                              <div className="text-xs text-slate-600">
-                                Requested: <strong className="text-purple-900 bg-purple-100 px-1.5 py-0.5 rounded">
-                                  {spec.requested.map(r => r.value_label || r.value_id).join(', ') || '-'}
-                                </strong>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 flex-1">
-                              <div className="flex-1">
-                                <label className="text-[11px] font-semibold text-slate-600">Offered Value</label>
-                                {spec.options && spec.options.length > 0 ? (
-                                  <Select
-                                    disabled={isInputDisabled}
-                                    mode="multiple"
-                                    size="small"
-                                    className="w-full"
-                                    placeholder="Select offered attribute value(s)..."
-                                    value={spec.offered.map(o => o.value_id)}
-                                    options={spec.options}
-                                    onChange={(vals: string[]) => {
-                                      const offeredVals = vals.map(val => {
-                                        const opt = spec.options?.find(o => o.value === val);
-                                        return { value_id: val, value_label: opt?.label || val };
-                                      });
-                                      const isDev = offeredVals.some(v => !spec.requested.some(r => r.value_id === v.value_id)) ||
-                                        spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
-                                      setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, is_deviated: isDev } });
-                                    }}
-                                  />
-                                ) : (
-                                  <Input
-                                    disabled={isInputDisabled}
-                                    size="small"
-                                    value={spec.offered.map(o => o.value_label || o.value_id).join(', ')}
-                                    onChange={(e) => {
-                                      const valStr = e.target.value;
-                                      const offeredVals = valStr.split(',').map(s => s.trim()).filter(Boolean).map(v => ({ value_id: v, value_label: v }));
-                                      const isDev = offeredVals.some(v => !spec.requested.some(r => r.value_id === v.value_id)) ||
-                                        spec.requested.some(r => !offeredVals.some(v => v.value_id === r.value_id));
-                                      setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, offered: offeredVals, is_deviated: isDev } });
-                                    }}
-                                  />
-                                )}
-                              </div>
-                              <div className="flex items-center gap-1.5 flex-shrink-0">
-                                <span className="text-[11px] font-semibold text-slate-600">Deviated?</span>
-                                <Switch
-                                  disabled={isInputDisabled}
-                                  size="small"
-                                  checked={spec.is_deviated}
-                                  onChange={(checked) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, is_deviated: checked } })}
-                                />
-                              </div>
-                            </div>
-                            {spec.is_deviated && (
-                              <div className="min-w-[200px]">
-                                <label className="text-[11px] font-semibold text-amber-700">Deviation Reason</label>
-                                <Input
-                                  disabled={isInputDisabled}
-                                  size="small"
-                                  placeholder="Equivalent grade remarks..."
-                                  value={spec.reason}
-                                  onChange={(e) => setOfferedSpecs({ ...offeredSpecs, [spec.key]: { ...spec, reason: e.target.value } })}
-                                  className="border-amber-300 bg-amber-50"
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          {buyerCommentObj && (
-                            <div className="mt-2 p-2 rounded border bg-red-50/90 border-red-200 text-red-900 text-xs space-y-0.5">
-                              <div className="font-bold flex items-center gap-1.5">
-                                <ExclamationCircleOutlined className="text-red-600" /> Buyer Revision Request Remark:
-                              </div>
-                              <div>{buyerCommentObj.comment}</div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <Tag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
+                    {groupRows.length} attributes
+                  </Tag>
                 </div>
-              ))}
-            </div>
-          )}
-
-          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-            <h4 className="font-bold text-slate-800 text-xs uppercase tracking-wider m-0">
-              Commercial Quote (Initial Terms)
-            </h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-700">Offered Unit Price ($) *</label>
-                <InputNumber
-                  disabled={isInputDisabled}
-                  min={1}
-                  value={commercialTerms.offered_unit_price}
-                  onChange={(val) => setCommercialTerms({ ...commercialTerms, offered_unit_price: val || 0 })}
-                  className="w-full mt-1"
-                  prefix="$"
-                />
+                <div className="p-3">
+                  <Table
+                    dataSource={groupRows}
+                    columns={activeColumns}
+                    pagination={false}
+                    size="small"
+                    bordered
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-700">Offered Quantity *</label>
-                <InputNumber
-                  disabled={isInputDisabled}
-                  min={1}
-                  value={commercialTerms.offered_quantity}
-                  onChange={(val) => setCommercialTerms({ ...commercialTerms, offered_quantity: val || 0 })}
-                  className="w-full mt-1"
-                  suffix={item.unit || 'Units'}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-slate-700">Lead Time (Days) *</label>
-                <InputNumber
-                  disabled={isInputDisabled}
-                  min={1}
-                  value={commercialTerms.lead_time_days}
-                  onChange={(val) => setCommercialTerms({ ...commercialTerms, lead_time_days: val || 0 })}
-                  className="w-full mt-1"
-                  suffix="Days"
-                />
-              </div>
-            </div>
-            <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm">
-              <span className="text-slate-600">Total Commercial Amount:</span>
-              <strong className="text-emerald-600 text-lg">
-                ${(commercialTerms.offered_unit_price * commercialTerms.offered_quantity).toLocaleString()}
-              </strong>
-            </div>
-          </div>
+            );
+          })}
         </div>
 
-        <div className="mt-6">
-          {isRoundApproved ? (
-            <Button
-              type="primary"
-              size="large"
-              block
-              onClick={() => navigate(basePath)}
-              icon={<CheckCircleFilled />}
-              className="bg-emerald-600 hover:bg-emerald-700 h-12 font-bold text-base shadow-md"
-            >
-              Technical Specification Approved (100%) - Return to Inbox
-            </Button>
-          ) : isRoundPending ? (
-            <Button
-              type="primary"
-              size="large"
-              block
-              disabled
-              icon={<ClockCircleOutlined />}
-              className="h-12 font-bold text-base shadow-md disabled:bg-slate-300"
-            >
-              Technical Response Round #{latestRound?.round_number} Submitted - Awaiting Buyer Review
-            </Button>
-          ) : isRoundRevisionRequested ? (
-            <Button
-              danger
-              type="primary"
-              size="large"
-              block
-              loading={submitting}
-              onClick={handleSubmitResponse}
-              icon={<SendOutlined />}
-              className="h-12 font-bold text-base shadow-md"
-            >
-              Submit Technical Revision Round #{revisionRounds.length + 1} for {activePartyName}
-            </Button>
-          ) : (
-            <Button
-              type="primary"
-              size="large"
-              block
-              disabled={isViewingHistoricalRound}
-              loading={submitting}
-              onClick={handleSubmitResponse}
-              icon={<SendOutlined />}
-              className="bg-emerald-600 hover:bg-emerald-700 h-12 font-bold text-base shadow-md disabled:bg-slate-300"
-            >
-              Submit Initial Technical Response for {activePartyName}
-            </Button>
+        <div className="pt-6 flex justify-end gap-3 mt-6">
+          {/* <Button onClick={() => navigate(basePath)}>Back to Inbox</Button> */}
+          {!isViewOnly && (
+            <>
+              <Button
+                icon={<SaveOutlined />}
+                onClick={() => handleSave('DRAFT')}
+                loading={submitting}
+              >
+                Save as Draft
+              </Button>
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                onClick={() => handleSave('SUBMITTED')}
+                loading={submitting}
+                className="bg-blue-600"
+              >
+                Submit Proposal
+              </Button>
+            </>
           )}
         </div>
       </Card>

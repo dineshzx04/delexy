@@ -1,192 +1,188 @@
-import React, { useState, useMemo } from 'react';
-import { Card, Table, Tabs, Input, Button, Tag } from 'antd';
-import { SearchOutlined, SendOutlined, BankOutlined, UserOutlined } from '@ant-design/icons';
-import { useNavigate, useOutletContext } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Card, Table, Select, Input, Button, Tag } from 'antd';
+import { SearchOutlined, ArrowRightOutlined } from '@ant-design/icons';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { rfqDb, type ItemSupplierResponseStatus } from '../../data/rfq';
+import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
-import { ItemSupplierStatusBadge } from '../../components/rfq/RfqStatusBadge';
+import { useWorkspace } from '../../contexts/WorkspaceContext';
 
 export const SupplierRfqInbox: React.FC = () => {
   const navigate = useNavigate();
-  const outletContext = useOutletContext() as any;
-  const isBusinessContext = outletContext?.workspaceContext?.isBusinessContext || false;
-  const activePartyIdFromContext = outletContext?.workspaceContext?.activePartyId;
-  const currentUserId = outletContext?.workspaceContext?.currentUser?.id || 'usr-2';
+  const { activeWorkspace, currentUserId } = useWorkspace();
+  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  const basePath = isBusinessContext ? '/b/supplier/rfqs' : '/user/supplier/rfqs';
+
+  const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [searchText, setSearchText] = useState<string>('');
 
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
-  const activeParty = useMemo(() => {
+  const activeParty = React.useMemo(() => {
     if (parties.length === 0) return null;
     return isBusinessContext
-      ? parties.find((p) => p.id === activePartyIdFromContext) || parties[0]
+      ? parties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId) || parties[0]
       : parties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || parties.find((p) => p.id === 'pty-6') || parties[0];
-  }, [parties, isBusinessContext, activePartyIdFromContext, currentUserId]);
+  }, [parties, isBusinessContext, activeWorkspace, currentUserId]);
 
   const activePartyId = activeParty?.id || '';
 
-  const [activeTab, setActiveTab] = useState<string>('ALL');
-  const [searchText, setSearchText] = useState<string>('');
-
   const quotes = useLiveQuery(
-    () => activePartyId ? rfqDb.seller_quotes.where('seller_id').equals(activePartyId).toArray() : [],
+    () => activePartyId ? rfqDb.seller_quotes.where('seller_party_id').equals(activePartyId).toArray() : [],
     [activePartyId]
   ) || [];
 
   const items = useLiveQuery(() => rfqDb.rfq_items.toArray(), []) || [];
   const rfqs = useLiveQuery(() => rfqDb.rfqs.toArray(), []) || [];
-  const awards = useLiveQuery(() => rfqDb.rfq_awards.toArray(), []) || [];
-  const quoteRevisions = useLiveQuery(() => rfqDb.seller_quote_revisions.toArray(), []) || [];
-  const quoteAttributes = useLiveQuery(() => rfqDb.seller_quote_attributes.toArray(), []) || [];
-  const quoteComments = useLiveQuery(() => rfqDb.seller_quote_comments.toArray(), []) || [];
 
-  const allResponses = useMemo(() => {
-    return quotes.map((q) => {
-      const item = items.find((i) => i.id === q.rfq_item_id);
+  // Filter items assigned to this seller
+  const assignedItems = React.useMemo(() => {
+    if (!activePartyId) return [];
+    return items.filter((item) =>
+      item.seller_assignments?.some((a) => a.seller_party_id === activePartyId)
+    );
+  }, [items, activePartyId]);
 
-      let status: ItemSupplierResponseStatus = 'ASSIGNED';
-      if (q.status === 'ACCEPTED' || q.status === 'PARTIALLY_ACCEPTED') {
-        status = 'AWARDED';
-      } else if (q.status === 'NEGOTIATION') {
-        status = 'COMMERCIAL_UNDER_NEGOTIATION';
-      } else if (q.status === 'REVISED') {
-        status = 'TECHNICAL_REVISION_REQUESTED';
-      } else if (q.status === 'SUBMITTED') {
-        status = 'TECHNICAL_SUBMITTED';
-      } else if (q.status === 'REJECTED') {
-        status = 'REJECTED';
-      } else {
-        status = 'ASSIGNED';
-      }
+  const allResponses = React.useMemo(() => {
+    return assignedItems.map((item) => {
+      const rfq = rfqs.find((r) => r.id === item.rfq_id);
+      const quote = quotes.find((q) => q.rfq_item_id === item.id);
 
       return {
-        id: q.id,
-        rfq_id: item?.rfq_id || '',
-        rfq_item_id: q.rfq_item_id,
-        seller_party_id: q.seller_id,
-        status: status,
-        product_mapping: q.seller_product_mapping || null,
+        key: item.id,
+        rfq_id: item.rfq_id,
+        rfq_number: rfq?.rfq_number || 'N/A',
+        rfq_title: rfq?.title || 'Unknown RFQ',
+        item_id: item.id,
+        product_name: item.product_name || 'Custom Specifications',
+        quantity: item.quantity,
+        unit: item.unit,
+        target_unit_price: item.target_unit_price,
+        quote_status: quote ? quote.status : 'NOT_SUBMITTED',
+        offered_price: quote ? quote.unit_price : undefined,
+        quote_number: quote ? quote.seller_quote_number : undefined,
+        round: quote ? quote.round : undefined
       };
     });
-  }, [quotes, items, rfqs, awards, quoteRevisions, quoteAttributes, quoteComments]);
+  }, [assignedItems, rfqs, quotes]);
 
-  const filteredResponses = allResponses.filter((resp: any) => {
-    const item = items.find((i) => i.id === resp.rfq_item_id);
-    const rfq = rfqs.find((r) => r.id === resp.rfq_id);
-    const matchesTab = activeTab === 'ALL' || resp.status === activeTab;
+  const filteredResponses = allResponses.filter((res) => {
+    const matchesTab = selectedStatus === 'ALL' || res.quote_status === selectedStatus;
     const matchesSearch =
-      (item?.product_name || '').toLowerCase().includes(searchText.toLowerCase()) ||
-      (rfq?.title || '').toLowerCase().includes(searchText.toLowerCase()) ||
-      (rfq?.rfq_number || '').toLowerCase().includes(searchText.toLowerCase());
+      res.rfq_number.toLowerCase().includes(searchText.toLowerCase()) ||
+      res.product_name.toLowerCase().includes(searchText.toLowerCase()) ||
+      res.rfq_title.toLowerCase().includes(searchText.toLowerCase());
     return matchesTab && matchesSearch;
   });
 
   const columns = [
     {
-      title: 'RFQ Item & Sourcing Title',
-      key: 'item_title',
-      render: (_: any, record: any) => {
-        const item = items.find((i) => i.id === record.rfq_item_id);
-        const rfq = rfqs.find((r) => r.id === record.rfq_id);
-        return (
-          <div>
-            <div className="font-bold text-slate-800 text-sm">{item?.product_name || 'Flagship Mobile Device'}</div>
-            <div className="text-[11px] text-slate-500">RFQ: <span className="font-semibold text-slate-600">{rfq?.rfq_number}</span> ({rfq?.title})</div>
-          </div>
-        );
-      },
+      title: 'RFQ & Sourcing Line Item',
+      key: 'rfq_item',
+      render: (_: any, record: any) => (
+        <div>
+          <div className="font-bold text-slate-900">{record.rfq_number} - {record.rfq_title}</div>
+          <div className="text-xs text-slate-500">Product: <span className="font-medium text-slate-700">{record.product_name}</span></div>
+        </div>
+      )
     },
     {
       title: 'Requested Qty',
-      key: 'quantity',
+      key: 'qty',
       width: 140,
-      render: (_: any, record: any) => {
-        const item = items.find((i) => i.id === record.rfq_item_id);
-        return <span className="font-bold text-slate-700 text-xs">{item?.quantity || 100} {item?.unit || 'Units'}</span>;
-      },
+      render: (_: any, record: any) => (
+        <span className="font-semibold text-slate-700">{record.quantity} {record.unit}</span>
+      )
     },
     {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-      width: 170,
-      render: (status: ItemSupplierResponseStatus) => <ItemSupplierStatusBadge status={status} />,
+      title: 'Target Price',
+      dataIndex: 'target_unit_price',
+      key: 'target_unit_price',
+      width: 120,
+      render: (val: number) => val ? <span className="font-bold text-slate-600">${val}</span> : 'N/A'
     },
     {
-      title: 'Catalog Product Mapping',
-      key: 'product_mapping',
-      width: 200,
-      render: (_: any, record: any) => {
-        if (!record.product_mapping?.seller_product_id) {
-          return <Tag color="volcano" className="text-[10px] py-0 px-1.5">Product Not Mapped</Tag>;
-        }
-        return (
-          <div>
-            <Tag color="purple" className="text-[10px] py-0 px-1.5">{record.product_mapping.seller_product_id}</Tag>
-            <div className="text-[9px] text-slate-400 font-mono">Variant: {record.product_mapping.variant_id}</div>
+      title: 'Your Offer Price',
+      dataIndex: 'offered_price',
+      key: 'offered_price',
+      width: 140,
+      render: (val: number, record: any) => (
+        val ? (
+          <div className="space-y-0.5">
+            <span className="font-bold text-emerald-600">${val}</span>
+            <div className="text-[10px] text-slate-400">Ref: {record.quote_number} (Rd {record.round})</div>
           </div>
-        );
-      },
+        ) : <span className="text-slate-400">No Offer Yet</span>
+      )
     },
     {
-      title: 'Actions',
-      key: 'actions',
+      title: 'Quote Status',
+      dataIndex: 'quote_status',
+      key: 'quote_status',
+      width: 160,
+      render: (status: string) => {
+        let color = 'default';
+        if (status === 'SUBMITTED') color = 'blue';
+        if (status === 'ACCEPTED') color = 'success';
+        if (status === 'REVISION_REQUIRED') color = 'warning';
+        if (status === 'REJECTED') color = 'error';
+        return <Tag color={color}>{status}</Tag>;
+      }
+    },
+    {
+      title: 'Action',
+      key: 'action',
       width: 150,
-      render: (_: any, record: any) => {
-        const basePath = isBusinessContext ? '/b' : '/user';
-        return (
-          <Button
-            type="primary"
-            size="small"
-            onClick={() => navigate(`${basePath}/supplier/rfqs/${record.rfq_id}/items/${record.rfq_item_id}/respond`)}
-            icon={<SendOutlined />}
-            className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
-          >
-            {record.status === 'ASSIGNED' ? 'Submit' : 'Update'}
-          </Button>
-        );
-      },
-    },
+      align: 'right' as const,
+      render: (_: any, record: any) => (
+        <Button
+          type="primary"
+          ghost
+          size="small"
+          onClick={() => navigate(`${basePath}/${record.rfq_id}/items/${record.item_id}/respond`)}
+          icon={<ArrowRightOutlined />}
+        >
+          {record.offered_price ? 'Update Offer' : 'Submit Offer'}
+        </Button>
+      )
+    }
   ];
-  
+
   return (
-    <div className="p-4 max-w-7xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="max-w-7xl mx-auto space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-black text-slate-900 mb-0">Supplier Sourcing Inbox</h1>
-            <Tag color="purple" icon={isBusinessContext ? <BankOutlined /> : <UserOutlined />} className="px-2 py-0 font-bold text-[11px]">
-              Seller Party: {activeParty?.display_name || ''} ({activePartyId})
-            </Tag>
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5">View assigned RFQ opportunities for seller party {activeParty?.display_name || ''}.</p>
+          <h1 className="text-xl font-bold text-slate-900">Supplier Sourcing Inbox</h1>
+          <p className="text-xs text-slate-500">RFQ Sourcing items assigned to {activeParty?.display_name || 'your party'}.</p>
         </div>
       </div>
 
-      <Card className="shadow-sm border-slate-200" size="small">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2.5">
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            size="small"
-            className="mb-0"
-            items={[
-              { key: 'ALL', label: `All (${allResponses.length})` },
-              { key: 'ASSIGNED', label: 'Assigned' },
-              { key: 'TECHNICAL_REVISION_REQUESTED', label: 'Revision Requests' },
-              { key: 'TECHNICAL_SUBMITTED', label: 'Tech Submitted' },
-              { key: 'TECHNICAL_APPROVED', label: 'Tech Approved' },
-              { key: 'PRODUCT_MAPPED', label: 'Product Mapped' },
-              { key: 'COMMERCIAL_UNDER_NEGOTIATION', label: 'Negotiating' },
-              { key: 'AWARDED', label: 'Awarded' },
-            ]}
-          />
+      <Card className="shadow-sm border-slate-200" bodyStyle={{ padding: '12px 16px' }}>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-500">Filter Status:</span>
+            <Select
+              value={selectedStatus}
+              onChange={setSelectedStatus}
+              size="small"
+              className="w-48"
+              options={[
+                { value: 'ALL', label: `All Assigned (${allResponses.length})` },
+                { value: 'NOT_SUBMITTED', label: 'Not Submitted' },
+                { value: 'DRAFT', label: 'Draft' },
+                { value: 'SUBMITTED', label: 'Submitted' },
+                { value: 'REVISION_REQUIRED', label: 'Revision Required' },
+                { value: 'ACCEPTED', label: 'Accepted' },
+                { value: 'REJECTED', label: 'Rejected' }
+              ]}
+            />
+          </div>
 
           <Input
-            placeholder="Search responses..."
+            placeholder="Search assigned RFQs..."
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="w-full md:w-56"
+            className="w-full md:w-64"
             size="small"
             allowClear
           />
@@ -195,7 +191,7 @@ export const SupplierRfqInbox: React.FC = () => {
         <Table
           dataSource={filteredResponses}
           columns={columns}
-          rowKey="id"
+          rowKey="key"
           size="small"
           pagination={{ pageSize: 10, size: 'small' }}
         />

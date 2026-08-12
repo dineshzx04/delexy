@@ -5,7 +5,6 @@ import { Card, Tabs, Tag, Button, Table, Breadcrumb } from 'antd';
 import {
   AppstoreOutlined,
   FileTextOutlined,
-  MessageOutlined,
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
@@ -40,7 +39,6 @@ export const ItemDetailWorkspace: React.FC = () => {
     [itemId]
   ) || [];
 
-  const allComments = useLiveQuery(() => rfqDb.seller_quote_comments.toArray(), []) || [];
   const itemAttributes = useLiveQuery(
     () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray() : []),
     [itemId]
@@ -48,6 +46,7 @@ export const ItemDetailWorkspace: React.FC = () => {
 
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
+  const attributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
 
   if (!rfq || rfq.requester_id !== activePartyId || !item) {
     return (
@@ -87,11 +86,14 @@ export const ItemDetailWorkspace: React.FC = () => {
       }
     },
     {
-      title: 'Attribute Key',
+      title: 'Attribute',
       dataIndex: 'attribute_id',
       key: 'attribute_id',
       width: 200,
-      render: (attrId: string) => <span className="font-bold text-slate-800">{attrId}</span>
+      render: (attrId: string) => {
+        const attrName = attributes.find((a) => a.id === attrId)?.name || attrId;
+        return <span className="font-bold text-slate-800">{attrName}</span>;
+      }
     },
     {
       title: 'Description',
@@ -141,37 +143,6 @@ export const ItemDetailWorkspace: React.FC = () => {
       render: (status: string) => <Tag color={status === 'ACCEPTED' ? 'success' : 'default'}>{status}</Tag>
     }
   ];
-
-  const commentsColumns = [
-    {
-      title: 'Timestamp',
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 180,
-      render: (date: string) => new Date(date).toLocaleString()
-    },
-    {
-      title: 'Actor',
-      key: 'actor',
-      width: 200,
-      render: (_: any, record: any) => {
-        const p = parties.find((party) => party.id === record.actor_id);
-        return (
-          <span>
-            <Tag color={record.actor_type === 'BUYER' ? 'blue' : 'orange'}>{record.actor_type}</Tag>
-            {p?.display_name || record.actor_id}
-          </span>
-        );
-      }
-    },
-    {
-      title: 'Comment',
-      dataIndex: 'comment',
-      key: 'comment'
-    }
-  ];
-
-  const activeComments = allComments.filter((c) => quotes.some((q) => q.id === c.seller_quote_id));
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -223,15 +194,6 @@ export const ItemDetailWorkspace: React.FC = () => {
                 </span>
               ),
               children: <Table dataSource={quotes} columns={quotesColumns} rowKey="id" pagination={false} size="small" />
-            },
-            {
-              key: 'comments',
-              label: (
-                <span className="font-bold flex items-center gap-2">
-                  <MessageOutlined /> Negotiation Comments ({activeComments.length})
-                </span>
-              ),
-              children: <Table dataSource={activeComments} columns={commentsColumns} rowKey="id" pagination={false} size="small" />
             }
           ]}
         />

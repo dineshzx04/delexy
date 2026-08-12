@@ -1,5 +1,7 @@
 import type { PartyOwnerType } from "../business/business.module";
 
+export type AttributeType = "SYSTEM" | "CUSTOM";
+
 // ============================================================================
 // SECTION 1: CORE DATABASE TABLES / ENTITIES (Persisted in Dexie DB)
 // ============================================================================
@@ -56,6 +58,7 @@ export interface RfqItemAttribute {
   values: ItemAttributeValue[];
   created_at: string;
   updated_at: string;
+  attribute_type?: AttributeType;
 }
 
 export interface SellerQuote {
@@ -76,6 +79,7 @@ export interface SellerQuote {
     mapped_at: string;
     is_buyer_approved: boolean;
   } | null;
+  draft_snapshot?: string | null;
 }
 
 export interface SellerQuoteAttribute {
@@ -84,6 +88,7 @@ export interface SellerQuoteAttribute {
   group_id: string;
   attribute_id: string;
   offered_values: ItemAttributeValue[];
+  attribute_type?: AttributeType;
 }
 
 export interface SellerQuoteComment {
@@ -96,6 +101,7 @@ export interface SellerQuoteComment {
   actor_type: "BUYER" | "SELLER";
   actor_id: string;
   created_at: string;
+  attribute_type?: AttributeType;
 }
 
 // export interface ItemAttributeChangeHistory {
