@@ -42,7 +42,7 @@ export const BuyerDashboard: React.FC = () => {
   const responses = useLiveQuery(() => rfqDb.seller_quotes.toArray(), []) || [];
   const awards = useLiveQuery(() => rfqDb.rfq_awards.toArray(), []) || [];
 
-  const activeRfqs = partyRfqs.filter((r) => r.status === 'ISSUED' || r.status === 'UNDER_EVALUATION' || r.status === 'IN_PROGRESS');
+  const activeRfqs = partyRfqs.filter((r) => r.status === 'ISSUED' || r.status === 'IN_PROGRESS');
   const totalAwardedAmount = awards.reduce(
     (acc: number, a: any) => acc + ((a.awarded_quantity || 0) * (a.unit_price || 0)),
     0
@@ -183,3 +183,5 @@ export const BuyerDashboard: React.FC = () => {
     </div>
   );
 };
+
+

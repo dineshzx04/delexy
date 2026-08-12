@@ -7,6 +7,7 @@ import {
   FolderOpenOutlined,
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
+import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqStatusBadge, RfqItemStatusBadge } from '../../components/rfq/RfqStatusBadge';
 
@@ -15,17 +16,27 @@ import { catalogDb } from '../../data/catalog/catalog.db';
 export const RfqWorkspace: React.FC = () => {
   const { rfqId } = useParams<{ rfqId: string }>();
   const navigate = useNavigate();
-  const { activeWorkspace } = useWorkspace();
+  const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
 
   const [activeTab, setActiveTab] = useState('items');
 
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const activeParty = React.useMemo(() => {
+    if (parties.length === 0) return null;
+    return isBusinessContext
+      ? parties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId) || parties[0]
+      : parties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || parties.find((p) => p.id === 'pty-6') || parties[0];
+  }, [parties, isBusinessContext, activeWorkspace, currentUserId]);
+
+  const activePartyId = activeParty?.id || '';
+
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const items = useLiveQuery(() => (rfqId ? rfqDb.rfq_items.where('rfq_id').equals(rfqId).toArray() : []), [rfqId]) || [];
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
 
-  if (!rfq) {
+  if (!rfq || rfq.requester_id !== activePartyId) {
     return (
       <div className="p-12 text-center text-slate-500">
         <h2 className="text-xl font-bold text-slate-800">RFQ Container Not Found</h2>
@@ -35,6 +46,7 @@ export const RfqWorkspace: React.FC = () => {
       </div>
     );
   }
+
 
   const itemColumns = [
     {
@@ -64,7 +76,7 @@ export const RfqWorkspace: React.FC = () => {
       key: 'quantity',
       width: 160,
       render: (val: number, record: any) => (
-        <span className="font-semibold text-slate-800">{val} {record.unit_of_measure}</span>
+        <span className="font-semibold text-slate-800">{val} {record.unit}</span>
       ),
     },
     {
@@ -148,3 +160,4 @@ export const RfqWorkspace: React.FC = () => {
     </div>
   );
 };
+

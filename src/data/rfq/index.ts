@@ -3,10 +3,9 @@ export * from "./rfqs";
 export * from "./rfqItems";
 export * from "./rfqItemAttributes";
 export * from "./sellerQuotes";
-export * from "./sellerQuoteRevisions";
 export * from "./sellerQuoteAttributes";
 export * from "./rfqAwards";
 export * from "./sellerQuoteComments";
-export * from "./itemAttributeChangeHistory";
 export * from "./rfq.db";
 export * from "./rfq.seed";
+

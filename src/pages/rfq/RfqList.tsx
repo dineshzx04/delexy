@@ -3,7 +3,7 @@ import { Card, Table, Button, Input, Tabs, Tag } from 'antd';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
 import { PlusOutlined, SearchOutlined, FolderOpenOutlined, ClockCircleOutlined, BankOutlined, UserOutlined } from '@ant-design/icons';
-import { rfqDb, type RfqStatus } from '../../data/rfq';
+import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqStatusBadge } from '../../components/rfq/RfqStatusBadge';
@@ -30,10 +30,9 @@ export const RfqList: React.FC = () => {
 
   // Live Query filtered strictly by active Party ID
   const partyRfqs = useLiveQuery(
-    () => rfqDb.rfqs.where('requester_id').equals(activePartyId).toArray(),
+    () => activePartyId ? rfqDb.rfqs.where('requester_id').equals(activePartyId).toArray() : [],
     [activePartyId]
   ) || [];
-  console.log(activePartyId);
 
   const filteredRfqs = partyRfqs.filter((r) => {
     const matchesTab = activeTab === 'ALL' || r.status === activeTab;
@@ -122,7 +121,6 @@ export const RfqList: React.FC = () => {
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl font-bold text-slate-900">RFQ Sourcing Containers</h1>
-
           </div>
           <p className="text-xs text-slate-500">Party-centric sourcing view for {activePartyName}.</p>
         </div>
@@ -144,11 +142,11 @@ export const RfqList: React.FC = () => {
             size="small"
             items={[
               { key: 'ALL', label: `All (${partyRfqs.length})` },
+              { key: 'DRAFT', label: 'Draft' },
               { key: 'ISSUED', label: 'Issued' },
-              { key: 'UNDER_EVALUATION', label: 'Under Evaluation' },
-              { key: 'PARTIALLY_AWARDED', label: 'Partially Awarded' },
-              { key: 'FULLY_AWARDED', label: 'Fully Awarded' },
+              { key: 'IN_PROGRESS', label: 'In Progress' },
               { key: 'CLOSED', label: 'Closed' },
+              { key: 'CANCELLED', label: 'Cancelled' },
             ]}
           />
 
@@ -174,3 +172,5 @@ export const RfqList: React.FC = () => {
     </div>
   );
 };
+
+

@@ -1,64 +1,68 @@
 import type { SellerQuote } from "./rfq.module";
 
 export const mockSellerQuotes: SellerQuote[] = [
+  // Quotes for item-03 (IN_PROGRESS lifecycle)
   {
-    id: "q-001",
-    rfq_item_id: "item-01",
-    seller_id: "pty-3",
-    status: "ACCEPTED",
-    current_revision_id: "qrev-001-1",
+    id: "q-03-1",
+    rfq_item_id: "item-03",
+    seller_party_id: "pty-3",
+    seller_quote_number: "SQ-003-R1",
+    unit_price: 160,
+    round: 1,
+    status: "REVISION_REQUIRED",
+    brand_id: ["brd-4"],
+    manufacturer_id: ["pty-3"],
     created_at: "2026-08-02T10:00:00Z",
-    updated_at: "2026-08-05T14:00:00Z",
-    unit_price: 1080
+    updated_at: "2026-08-03T08:30:00Z",
+    seller_product_mapping: null
   },
   {
-    id: "q-002",
-    rfq_item_id: "item-01",
-    seller_id: "pty-6",
+    id: "q-03-2",
+    rfq_item_id: "item-03",
+    seller_party_id: "pty-3",
+    seller_quote_number: "SQ-003-R2",
+    unit_price: 150,
+    round: 2,
+    status: "SUBMITTED",
+    brand_id: ["brd-4"],
+    manufacturer_id: ["pty-3"],
+    created_at: "2026-08-03T09:00:00Z",
+    updated_at: "2026-08-03T09:00:00Z",
+    seller_product_mapping: null
+  },
+  // Accepted Quote for item-04 (CLOSED lifecycle)
+  {
+    id: "q-04-1",
+    rfq_item_id: "item-04",
+    seller_party_id: "pty-6",
+    seller_quote_number: "SQ-004-R1",
+    unit_price: 1080,
+    round: 1,
     status: "ACCEPTED",
-    current_revision_id: "qrev-002-1",
+    brand_id: ["brd-1"],
+    manufacturer_id: ["pty-1"],
     created_at: "2026-08-02T11:00:00Z",
     updated_at: "2026-08-05T14:00:00Z",
-    unit_price: 1120
+    seller_product_mapping: {
+      seller_product_id: "sprod-1",
+      variant_id: "sprod-1-v2",
+      mapped_at: "2026-08-02T11:00:00Z",
+      is_buyer_approved: true
+    }
   },
+  // Rejected Quote for item-05 (CANCELLED lifecycle)
   {
-    id: "q-003",
-    rfq_item_id: "item-02",
-    seller_id: "pty-4",
-    status: "SUBMITTED",
-    current_revision_id: "qrev-003-1",
-    created_at: "2026-08-02T12:00:00Z",
-    updated_at: "2026-08-02T12:05:00Z",
-    unit_price: 1999
-  },
-  {
-    id: "q-004",
-    rfq_item_id: "item-02",
-    seller_id: "pty-5",
-    status: "DRAFT",
-    current_revision_id: "qrev-004-1",
+    id: "q-05-1",
+    rfq_item_id: "item-05",
+    seller_party_id: "pty-4",
+    seller_quote_number: "SQ-005-R1",
+    unit_price: 2500,
+    round: 1,
+    status: "REJECTED",
+    brand_id: ["brd-3"],
+    manufacturer_id: ["pty-4"],
     created_at: "2026-08-02T12:00:00Z",
     updated_at: "2026-08-02T12:00:00Z",
-    unit_price: 1899
-  },
-  {
-    id: "q-005",
-    rfq_item_id: "item-03",
-    seller_id: "pty-3",
-    status: "SUBMITTED",
-    current_revision_id: "qrev-005-2",
-    created_at: "2026-08-02T14:00:00Z",
-    updated_at: "2026-08-03T09:00:00Z",
-    unit_price: 160
-  },
-  {
-    id: "q-006",
-    rfq_item_id: "item-03",
-    seller_id: "pty-8",
-    status: "SUBMITTED",
-    current_revision_id: "qrev-006-1",
-    created_at: "2026-08-02T14:00:00Z",
-    updated_at: "2026-08-02T14:00:00Z",
-    unit_price: 155
+    seller_product_mapping: null
   }
 ];
