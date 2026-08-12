@@ -30,6 +30,7 @@ export const ItemDetailWorkspace: React.FC = () => {
   const [activeTab, setActiveTab] = useState('attributes');
 
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  console.log(parties)
   const activeParty = React.useMemo(() => {
     if (parties.length === 0) return null;
     return isBusinessContext
@@ -349,12 +350,25 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
     [itemId]
   ) || [];
 
+  const { rfqId } = useParams<{ rfqId: string }>();
+  const navigate = useNavigate();
+  const { activeWorkspace } = useWorkspace();
+  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
+
   const quotesColumns = [
     {
       title: 'Quote Reference',
       dataIndex: 'seller_quote_number',
       key: 'seller_quote_number',
-      render: (text: string) => <span className="font-bold text-slate-900">{text}</span>
+      render: (text: string, record: any) => (
+        <a
+          onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}/quotes/${record.id}/review`)}
+          className="font-bold text-blue-600 hover:text-blue-800"
+        >
+          {text}
+        </a>
+      )
     },
     {
       title: 'Seller ID',
