@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Tabs, Tag, Button, Table, Breadcrumb, Descriptions } from 'antd';
+import { Card, Tabs, Tag, Button, Table, Descriptions, Modal, InputNumber, App as AntApp, Drawer, Form, Input, Select } from 'antd';
 import {
   AppstoreOutlined,
   FileTextOutlined,
@@ -11,7 +11,8 @@ import { rfqDb } from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { RfqItemStatusBadge } from '../../components/rfq/RfqStatusBadge';
+import { RfqItemStatusBadge } from './RfqStatusBadge';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 interface TabProps {
   itemId: string;
@@ -27,10 +28,10 @@ export const ItemDetailWorkspace: React.FC = () => {
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
 
-  const [activeTab, setActiveTab] = useState('attributes');
+  const [activeTab, setActiveTab] = useState('quotes');
 
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
-  console.log(parties)
+
   const activeParty = React.useMemo(() => {
     if (parties.length === 0) return null;
     return isBusinessContext
@@ -48,13 +49,16 @@ export const ItemDetailWorkspace: React.FC = () => {
     [itemId]
   ) || 0;
 
-  const itemAttributesCount = useLiveQuery(
-    () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).count() : 0),
-    [itemId]
-  ) || 0;
-
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
+
+  const breadcrumbs = React.useMemo(() => [
+    { title: <a onClick={() => navigate(basePath)}>RFQs Workspace</a> },
+    { title: <a onClick={() => navigate(`${basePath}/${rfq?.id}`)}>{rfq?.rfq_number || 'RFQ Details'}</a> },
+    { title: <span className="text-slate-800 font-semibold">{item?.product_name || 'Item Detail'}</span> }
+  ], [basePath, rfq?.id, rfq?.rfq_number, item?.product_name, navigate]);
+
+  useBreadcrumb(breadcrumbs);
 
   if (!rfq || rfq.requester_id !== activePartyId || !item || !itemId) {
     return (
@@ -71,13 +75,6 @@ export const ItemDetailWorkspace: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <Breadcrumb
-        items={[
-          { title: <a onClick={() => navigate(basePath)}>RFQs Workspace</a> },
-          { title: <a onClick={() => navigate(`${basePath}/${rfq.id}`)}>{rfq.rfq_number}</a> },
-          { title: item.product_name || 'Item Detail' }
-        ]}
-      />
 
       <Card className="shadow-md border-slate-200 bg-white">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
@@ -118,17 +115,7 @@ export const ItemDetailWorkspace: React.FC = () => {
       <Card className="shadow-sm border-slate-200">
         <Tabs
           activeKey={activeTab}
-          onChange={setActiveTab}
-          items={[
-            {
-              key: 'attributes',
-              label: (
-                <span className="font-bold flex items-center gap-2">
-                  <AppstoreOutlined /> Requested Attributes ({itemAttributesCount})
-                </span>
-              ),
-              children: <RequestedAttributesTab itemId={itemId} />
-            },
+          onChange={setActiveTab} items={[
 
             {
               key: 'quotes',
@@ -138,6 +125,15 @@ export const ItemDetailWorkspace: React.FC = () => {
                 </span>
               ),
               children: <SupplierQuotesTab itemId={itemId} />
+            },
+            {
+              key: 'attributes',
+              label: (
+                <span className="font-bold flex items-center gap-2">
+                  <AppstoreOutlined /> Requested Attributes
+                </span>
+              ),
+              children: <RequestedAttributesTab itemId={itemId} />
             },
 
             {
@@ -356,6 +352,73 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
 
+  const { message: antMessage } = AntApp.useApp();
+  const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
+  const awards = useLiveQuery(() => (itemId ? rfqDb.rfq_awards.where('rfq_item_id').equals(itemId).toArray() : []), [itemId]) || [];
+
+  const [awardModalVisible, setAwardModalVisible] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<any>(null);
+  const [awardQty, setAwardQty] = useState<number>(1);
+  const [savingAward, setSavingAward] = useState(false);
+
+  const handleAwardClick = (quoteRecord: any) => {
+    setSelectedQuote(quoteRecord);
+    // Suggest remaining quantity to award
+    const totalAwarded = awards.reduce((sum, a) => sum + a.awarded_quantity, 0);
+    const remaining = Math.max(0, (item?.quantity || 0) - totalAwarded);
+    setAwardQty(remaining || 1);
+    setAwardModalVisible(true);
+  };
+
+  const submitAward = async () => {
+    if (!selectedQuote || !item) return;
+    if (awardQty <= 0) {
+      antMessage.error('Please enter a valid quantity to award.');
+      return;
+    }
+
+    setSavingAward(true);
+    try {
+      const awardId = `awd-${item.id}-${selectedQuote.seller_party_id}-${Date.now()}`;
+
+      // Determine if a catalog product variant already exists
+      const isCustomSpec = item.item_source === 'CUSTOM_REQUIREMENTS' || !item.catalog_product_id;
+
+      const awardPayload = {
+        id: awardId,
+        rfq_id: rfqId!,
+        rfq_item_id: itemId!,
+        seller_quote_id: selectedQuote.id,
+        seller_party_id: selectedQuote.seller_party_id,
+        awarded_quantity: awardQty,
+        unit_price: selectedQuote.unit_price,
+        award_status: 'AWARDED' as const,
+        product_mapping_status: 'PENDING' as const,
+        variant_id: undefined,
+        awarded_at: new Date().toISOString(),
+        awarded_by_user_id: activeWorkspace?.userId
+      };
+
+      await rfqDb.rfq_awards.put(awardPayload);
+
+      // Check if total awarded quantity meets requested quantity
+      const newTotalAwarded = awards.reduce((sum, a) => sum + a.awarded_quantity, 0) + awardQty;
+      if (newTotalAwarded >= item.quantity) {
+        await rfqDb.rfq_items.update(item.id, { status: 'AWARDED', awarded_quantity_total: newTotalAwarded });
+      } else {
+        await rfqDb.rfq_items.update(item.id, { awarded_quantity_total: newTotalAwarded });
+      }
+
+      antMessage.success(`Quote successfully awarded to supplier!`);
+      setAwardModalVisible(false);
+    } catch (err) {
+      console.error(err);
+      antMessage.error('Failed to register rfq award.');
+    } finally {
+      setSavingAward(false);
+    }
+  };
+
   const quotesColumns = [
     {
       title: 'Quote Reference',
@@ -395,19 +458,140 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => <Tag color={status === 'ACCEPTED' ? 'success' : 'default'}>{status}</Tag>
+      render: (status: string, record: any) => {
+        const matchingAward = awards.find((a) => a.seller_quote_id === record.id);
+        if (matchingAward) {
+          const poStatus = matchingAward.award_status;
+          if (poStatus === 'PO_RECEIVED') {
+            return <Tag color="success">PO RECEIVED / ORDER CONVERTED</Tag>;
+          }
+          return <Tag color="gold">AWARDED ({matchingAward.awarded_quantity} Qty)</Tag>;
+        }
+        return <Tag color={status === 'ACCEPTED' ? 'success' : 'default'}>{status}</Tag>;
+      }
+    },
+    {
+      title: 'Action / Award',
+      key: 'action',
+      render: (_: any, record: any) => {
+        const matchingAward = awards.find((a) => a.seller_quote_id === record.id);
+
+        if (matchingAward) {
+          const mapStatus = matchingAward.product_mapping_status;
+          const poStatus = matchingAward.award_status;
+
+          if (poStatus === 'PO_RECEIVED') {
+            return (
+              <div className="flex flex-col gap-0.5 text-left">
+                <span className="text-xs font-bold text-emerald-600">Active Order Ready</span>
+                <span className="text-[10px] text-slate-400 font-mono">PO: {matchingAward.purchase_order_id}</span>
+              </div>
+            );
+          }
+
+          if (poStatus === 'PO_CREATED') {
+            return (
+              <div className="flex flex-col gap-0.5 text-left">
+                <Tag color="cyan" className="font-bold w-fit">PO Released</Tag>
+                <span className="text-[10px] text-slate-400 font-mono">{matchingAward.purchase_order_id}</span>
+              </div>
+            );
+          }
+
+          if (mapStatus === 'PENDING') {
+            return <span className="text-xs text-amber-600 font-medium italic text-left">Awaiting Supplier Product Mapping...</span>;
+          }
+          if (mapStatus === 'SUBMITTED') {
+            return (
+              <div className="flex flex-col gap-1.5 text-left">
+                <span className="text-xs text-blue-600 font-medium italic">Specs Submitted (ID: {matchingAward.variant_id || 'Pending'})</span>
+                <Button
+                  type="primary"
+                  size="small"
+                  onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}/quotes/${record.id}/award/check-mapping`)}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  Acknowledge Specs
+                </Button>
+              </div>
+            );
+          }
+
+          // Mapped and Approved (ACKNOWLEDGED or NOT_REQUIRED)
+          return (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}/quotes/${record.id}/award/release-po`)}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              Release PO
+            </Button>
+          );
+        }
+
+        return (
+          <div className="flex gap-2">
+            <Button
+              size="small"
+              onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}/quotes/${record.id}/review`)}
+            >
+              Review
+            </Button>
+            {record.status === 'ACCEPTED' && (
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => handleAwardClick(record)}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                Award Quote
+              </Button>
+            )}
+          </div>
+        );
+      }
     }
   ];
 
   return (
-    <Table
-      dataSource={quotes}
-      columns={quotesColumns}
-      rowKey="id"
-      pagination={false}
-      size="small"
-      locale={{ emptyText: 'No quotes received yet for this item.' }}
-    />
+    <>
+      <Table
+        dataSource={quotes}
+        columns={quotesColumns}
+        rowKey="id"
+        pagination={false}
+        size="small"
+        locale={{ emptyText: 'No quotes received yet for this item.' }}
+      />
+
+      <Modal
+        title="Award Sourcing Contract"
+        open={awardModalVisible}
+        onOk={submitAward}
+        onCancel={() => setAwardModalVisible(false)}
+        confirmLoading={savingAward}
+        okText="Confirm Award"
+        cancelText="Cancel"
+      >
+        <div className="space-y-4 pt-3">
+          <p className="text-sm text-slate-500 leading-normal">
+            You are about to award a commercial sourcing contract to <strong className="text-slate-800">{selectedQuote ? (parties.find((p) => p.id === selectedQuote.seller_party_id)?.display_name || selectedQuote.seller_party_id) : ''}</strong> at a unit price of <strong className="text-emerald-700">${selectedQuote?.unit_price}</strong>.
+          </p>
+          <div className="flex items-center gap-3">
+            <span className="font-semibold text-slate-700">Enter Award Quantity:</span>
+            <InputNumber
+              min={1}
+              max={item?.quantity || 1}
+              value={awardQty}
+              onChange={(val) => setAwardQty(val || 1)}
+              className="w-32"
+            />
+            <span className="text-xs text-slate-400">(Max requested: {item?.quantity})</span>
+          </div>
+        </div>
+      </Modal>
+    </>
   );
 };
 

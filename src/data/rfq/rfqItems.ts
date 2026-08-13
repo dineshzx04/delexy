@@ -45,6 +45,14 @@ export const mockRfqItems: RfqItem[] = [
         assignment_type: "DIRECT_INVITATION",
         assigned_by_user_id: "usr-3",
         assigned_at: "2026-08-01T10:00:00Z"
+      },
+      {
+        id: "sa-02-2",
+        rfq_item_id: "item-02",
+        seller_party_id: "pty-2",
+        assignment_type: "DIRECT_INVITATION",
+        assigned_by_user_id: "usr-3",
+        assigned_at: "2026-08-01T10:00:00Z"
       }
     ]
   },

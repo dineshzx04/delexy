@@ -138,6 +138,14 @@ export interface RfqAward {
   variant_id?: string;
   awarded_at: string;
   awarded_by_user_id?: string;
+
+  // Metadata details for PO release & receipt
+  shipping_address?: string;
+  payment_terms?: string;
+  delivery_notes?: string;
+  po_released_at?: string;
+  po_received_at?: string;
+  supplier_acknowledgement_note?: string;
 }
 
 // ============================================================================
@@ -193,7 +201,7 @@ export type AwardItemStatus =
   | "PO_CREATED"
   | "CANCELLED";
 
-export type AwardStatus = "AWARDED" | "CANCELLED" | "PO_CREATED";
+export type AwardStatus = "AWARDED" | "CANCELLED" | "PO_CREATED" | "PO_RECEIVED";
 
 export type ProductMappingStatus =
   | "NOT_REQUIRED"

@@ -6,6 +6,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const SupplierRfqInbox: React.FC = () => {
   const navigate = useNavigate();
@@ -31,6 +32,11 @@ export const SupplierRfqInbox: React.FC = () => {
     [activePartyId]
   ) || [];
 
+  const awards = useLiveQuery(
+    () => activePartyId ? rfqDb.rfq_awards.where('seller_party_id').equals(activePartyId).toArray() : [],
+    [activePartyId]
+  ) || [];
+
   const items = useLiveQuery(() => rfqDb.rfq_items.toArray(), []) || [];
   const rfqs = useLiveQuery(() => rfqDb.rfqs.toArray(), []) || [];
 
@@ -42,10 +48,16 @@ export const SupplierRfqInbox: React.FC = () => {
     );
   }, [items, activePartyId]);
 
+  const breadcrumbs = React.useMemo(() => [
+    { title: <span className="text-slate-800 font-semibold">Supplier Inbox</span> }
+  ], []);
+  useBreadcrumb(breadcrumbs);
+
   const allResponses = React.useMemo(() => {
     return assignedItems.map((item) => {
       const rfq = rfqs.find((r) => r.id === item.rfq_id);
       const quote = quotes.find((q) => q.rfq_item_id === item.id);
+      const award = awards.find((a) => a.rfq_item_id === item.id);
 
       return {
         key: item.id,
@@ -60,10 +72,11 @@ export const SupplierRfqInbox: React.FC = () => {
         quote_status: quote ? quote.status : 'NOT_SUBMITTED',
         offered_price: quote ? quote.unit_price : undefined,
         quote_number: quote ? quote.seller_quote_number : undefined,
-        round: quote ? quote.round : undefined
+        round: quote ? quote.round : undefined,
+        award
       };
     });
-  }, [assignedItems, rfqs, quotes]);
+  }, [assignedItems, rfqs, quotes, awards]);
 
   const filteredResponses = allResponses.filter((res) => {
     const matchesTab = selectedStatus === 'ALL' || res.quote_status === selectedStatus;
@@ -107,20 +120,40 @@ export const SupplierRfqInbox: React.FC = () => {
       width: 140,
       render: (val: number, record: any) => (
         val ? (
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 text-left">
             <span className="font-bold text-emerald-600">${val}</span>
-            <div className="text-[10px] text-slate-400">Ref: {record.quote_number} (Rd {record.round})</div>
+            <div>
+              <a
+                onClick={() => navigate(`${isBusinessContext ? '/b/supplier' : '/user/supplier'}/rfqs/${record.rfq_id}/items/${record.item_id}/respond`)}
+                className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold underline block"
+              >
+                Ref: {record.quote_number} (Rd {record.round})
+              </a>
+            </div>
           </div>
         ) : <span className="text-slate-400">No Offer Yet</span>
       )
     },
     {
-      title: 'Quote Status',
-      dataIndex: 'quote_status',
+      title: 'Quote & Award Status',
       key: 'quote_status',
-      width: 160,
-      render: (status: string) => {
+      width: 200,
+      render: (_: any, record: any) => {
+        const award = record.award;
+        if (award) {
+          const mapStatus = award.product_mapping_status;
+          return (
+            <div className="flex flex-col gap-1">
+              <Tag color="gold" className="w-fit font-bold">CONTRACT AWARDED</Tag>
+              {mapStatus === 'PENDING' && <Tag color="warning" className="w-fit text-[10px]">Mapping Required</Tag>}
+              {mapStatus === 'SUBMITTED' && <Tag color="blue" className="w-fit text-[10px]">Submitted Mapping</Tag>}
+              {mapStatus === 'ACKNOWLEDGED' && <Tag color="success" className="w-fit text-[10px]">Mapping Approved</Tag>}
+            </div>
+          );
+        }
+        
         let color = 'default';
+        const status = record.quote_status;
         if (status === 'SUBMITTED') color = 'blue';
         if (status === 'ACCEPTED') color = 'success';
         if (status === 'REVISION_REQUIRED') color = 'warning';
@@ -133,17 +166,75 @@ export const SupplierRfqInbox: React.FC = () => {
       key: 'action',
       width: 150,
       align: 'right' as const,
-      render: (_: any, record: any) => (
-        <Button
-          type="primary"
-          ghost
-          size="small"
-          onClick={() => navigate(`${basePath}/${record.rfq_id}/items/${record.item_id}/respond`)}
-          icon={<ArrowRightOutlined />}
-        >
-          {record.offered_price ? 'Update Offer' : 'Submit Offer'}
-        </Button>
-      )
+      render: (_: any, record: any) => {
+        const award = record.award;
+        if (award) {
+          if (award.product_mapping_status === 'PENDING') {
+            return (
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => navigate(`${isBusinessContext ? '/b/supplier' : '/user/supplier'}/rfqs/${record.rfq_id}/items/${record.item_id}/product`)}
+                className="bg-purple-600 hover:bg-purple-700"
+              >
+                Map Product
+              </Button>
+            );
+          }
+          if (award.product_mapping_status === 'SUBMITTED') {
+            return <span className="text-xs text-blue-600 font-medium italic">Awaiting Spec Approval...</span>;
+          }
+          if (award.product_mapping_status === 'ACKNOWLEDGED' && award.award_status === 'AWARDED') {
+            return <span className="text-xs text-amber-600 font-medium italic">Awaiting PO Release...</span>;
+          }
+          
+          if (award.award_status === 'PO_CREATED') {
+            return (
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => navigate(`${isBusinessContext ? '/b/supplier' : '/user/supplier'}/rfqs/${record.rfq_id}/items/${record.item_id}/award/${award.id}/receipt`)}
+                className="bg-purple-600 hover:bg-purple-700 font-semibold"
+              >
+                Confirm PO Receipt
+              </Button>
+            );
+          }
+
+          if (award.award_status === 'PO_RECEIVED') {
+            return (
+              <Button
+                size="small"
+                onClick={() => navigate(`${isBusinessContext ? '/b/supplier' : '/user/supplier'}/rfqs/${record.rfq_id}/items/${record.item_id}/award/${award.id}/receipt`)}
+                className="border-emerald-600 text-emerald-600 hover:text-emerald-700"
+              >
+                View PO / Order
+              </Button>
+            );
+          }
+
+          return null;
+        }
+
+        let buttonText = 'Submit Offer';
+        if (record.quote_status === 'SUBMITTED') buttonText = 'Update Offer';
+        else if (record.quote_status === 'REVISION_REQUIRED') buttonText = 'Revise Offer';
+        else if (record.quote_status === 'DRAFT') buttonText = 'Continue Draft';
+        else if (record.quote_status === 'REJECTED') buttonText = 'View Offer';
+        else if (record.offered_price) buttonText = 'Update Offer';
+
+        return (
+          <Button
+            type="primary"
+            ghost
+            size="small"
+            onClick={() => navigate(`${basePath}/${record.rfq_id}/items/${record.item_id}/respond`)}
+            icon={<ArrowRightOutlined />}
+          >
+            {buttonText}
+          </Button>
+        );
+      }
     }
   ];
 

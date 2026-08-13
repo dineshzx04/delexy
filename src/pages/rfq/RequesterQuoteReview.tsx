@@ -7,7 +7,44 @@ import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { RfqItemStatusBadge } from '../../components/rfq/RfqStatusBadge';
+import { RfqItemStatusBadge } from './RfqStatusBadge';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
+
+const CommentThread: React.FC<{
+  comments: any[];
+  parties: any[];
+  viewerPartyId: string;
+}> = ({ comments, parties, viewerPartyId }) => {
+  if (comments.length === 0) return null;
+
+  return (
+    <div className="mt-1 space-y-1 text-left">
+      {comments.map((c) => {
+        const isBuyer = c.actor_type === 'BUYER';
+        const isSelf = c.actor_id === viewerPartyId;
+        const name = isSelf ? 'You' : (isBuyer ? 'Requester' : 'Seller');
+        const timeStr = c.created_at 
+          ? `${new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} ${new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+          : '';
+        return (
+          <div
+            key={c.id}
+            className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${
+              isBuyer
+                ? 'bg-blue-50/50 border-blue-100 text-blue-900'
+                : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
+            }`}
+          >
+            <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
+              [{name} {timeStr}]:
+            </span>
+            <span className="font-medium whitespace-pre-wrap">{c.comment}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export const RequesterQuoteReview: React.FC = () => {
   const { rfqId, itemId, quoteId } = useParams<{ rfqId: string; itemId: string; quoteId: string }>();
@@ -58,6 +95,14 @@ export const RequesterQuoteReview: React.FC = () => {
     [quoteId]
   ) || [];
 
+  const breadcrumbs = React.useMemo(() => [
+    { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
+    { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || 'RFQ'}</a> },
+    { title: <a onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}`)}>Item Review</a> },
+    { title: <span className="text-slate-800 font-semibold">Quote Review</span> }
+  ], [navigate, basePath, rfqId, itemId, rfq?.rfq_number]);
+  useBreadcrumb(breadcrumbs);
+
   // Load existing buyer comments if any
   React.useEffect(() => {
     if (existingComments.length > 0) {
@@ -98,6 +143,7 @@ export const RequesterQuoteReview: React.FC = () => {
 
   // Decision trigger
   const handleDecision = async (statusDecision: 'ACCEPTED' | 'REJECTED' | 'REVISION_REQUIRED') => {
+    if (!quote || !rfq) return;
     setProcessing(true);
     try {
       // 1. Update Quote status and increment round if revision is required
@@ -117,8 +163,10 @@ export const RequesterQuoteReview: React.FC = () => {
           const attributeId = isSystem ? key.replace('SYSTEM_', '') : key.split('_')[1];
           const groupId = isSystem ? 'SYSTEM' : key.split('_')[0];
 
+          const round = quote.round;
+          const commentId = `qc-buyer-${quote.id}-${groupId}-${attributeId}-r${round}`;
           return rfqDb.seller_quote_comments.put({
-            id: `qc-buyer-${quote.id}-${groupId}-${attributeId}-${Date.now()}`,
+            id: commentId,
             seller_quote_id: quote.id,
             group_id: groupId,
             attribute_id: attributeId,
@@ -197,7 +245,7 @@ export const RequesterQuoteReview: React.FC = () => {
     },
     {
       key: 'unit_price',
-      specification: 'Target Unit Price / Price Offer ($)',
+      specification: 'Unit Price ($)',
       buyerAsked: item.target_unit_price ? `$${item.target_unit_price}` : 'N/A',
       offered: `$${quote.unit_price.toFixed(2)}`,
       supplierComment: getSupplierCommentText('system-preferences', 'unit_price'),
@@ -253,24 +301,31 @@ export const RequesterQuoteReview: React.FC = () => {
       }
     },
     {
-      title: 'Supplier Remark',
-      dataIndex: 'supplierComment',
-      key: 'supplierComment',
-      width: 240,
-      render: (text: string) => <span className="text-slate-500 italic text-sm">{text || '—'}</span>
-    },
-    {
-      title: 'Your Feedback / Comment',
+      title: 'Your Feedback & History',
       key: 'buyerFeedback',
-      render: (_: any, record: any) => (
-        <Input.TextArea
-          rows={2}
-          placeholder="Leave feedback on this specification..."
-          value={buyerComments[record.commentKey] || ''}
-          onChange={(e) => setBuyerComments((prev) => ({ ...prev, [record.commentKey]: e.target.value }))}
-          disabled={quote.status !== 'SUBMITTED'}
-        />
-      )
+      render: (_: any, record: any) => {
+        const key = record.commentKey || (record.key === 'brand' ? 'SYSTEM_brand' : record.key === 'manufacturer' ? 'SYSTEM_manufacturer' : record.key === 'unit_price' ? 'SYSTEM_unit_price' : '');
+        const normGroupId = key.startsWith('SYSTEM_') ? 'SYSTEM' : key.split('_')[0];
+        const attrId = key.startsWith('SYSTEM_') ? key.replace('SYSTEM_', '') : key.split('_')[1];
+
+        const threadComments = existingComments
+          .filter((c) => c.group_id === normGroupId && c.attribute_id === attrId)
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        return (
+          <div className="space-y-2 text-left">
+            {quote.status === 'SUBMITTED' ? (
+              <Input.TextArea
+                rows={2}
+                placeholder="Leave feedback on this specification..."
+                value={buyerComments[record.commentKey || key] || ''}
+                onChange={(e) => setBuyerComments((prev) => ({ ...prev, [record.commentKey || key]: e.target.value }))}
+              />
+            ) : null}
+            <CommentThread comments={threadComments} parties={parties} viewerPartyId={activePartyId} />
+          </div>
+        );
+      }
     }
   ];
 
@@ -321,6 +376,11 @@ export const RequesterQuoteReview: React.FC = () => {
           <Descriptions.Item label="Product / Service" span={2}>
             <strong className="text-slate-800">{item.product_name}</strong>
           </Descriptions.Item>
+          <Descriptions.Item label="Catalog Product">
+            {item.catalog_product_id
+              ? catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id
+              : 'N/A'}
+          </Descriptions.Item>
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
             <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
@@ -328,14 +388,7 @@ export const RequesterQuoteReview: React.FC = () => {
           <Descriptions.Item label="Target Unit Price">
             {item.target_unit_price ? <span className="text-emerald-600 font-bold">${item.target_unit_price}</span> : 'N/A'}
           </Descriptions.Item>
-          <Descriptions.Item label="Supplier Proposed Price">
-            <span className="text-emerald-700 font-bold">${quote.unit_price.toFixed(2)}</span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Catalog Product">
-            {item.catalog_product_id
-              ? catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id
-              : 'N/A'}
-          </Descriptions.Item>
+          
         </Descriptions>
 
         <div className="space-y-6">

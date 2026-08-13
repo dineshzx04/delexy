@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Tabs, Tag, Button, Table, Breadcrumb } from 'antd';
+import { Card, Tabs, Tag, Button, Table } from 'antd';
 import {
   AppstoreOutlined,
   FolderOpenOutlined,
@@ -9,9 +9,10 @@ import {
 import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { RfqStatusBadge, RfqItemStatusBadge } from '../../components/rfq/RfqStatusBadge';
+import { RfqStatusBadge, RfqItemStatusBadge } from './RfqStatusBadge';
 
 import { catalogDb } from '../../data/catalog/catalog.db';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const RfqWorkspace: React.FC = () => {
   const { rfqId } = useParams<{ rfqId: string }>();
@@ -35,6 +36,12 @@ export const RfqWorkspace: React.FC = () => {
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const items = useLiveQuery(() => (rfqId ? rfqDb.rfq_items.where('rfq_id').equals(rfqId).toArray() : []), [rfqId]) || [];
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
+
+  const breadcrumbs = React.useMemo(() => [
+    { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
+    { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number ? `${rfq.rfq_number} - ${rfq.title}` : 'RFQ Workspace'}</span> }
+  ], [navigate, basePath, rfq?.rfq_number, rfq?.title]);
+  useBreadcrumb(breadcrumbs);
 
   if (!rfq || rfq.requester_id !== activePartyId) {
     return (
@@ -112,13 +119,6 @@ export const RfqWorkspace: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <Breadcrumb
-        items={[
-          { title: <a onClick={() => navigate(basePath)}>RFQs Workspace</a> },
-          { title: rfq.rfq_number },
-        ]}
-      />
-
       <Card className="shadow-md border-slate-200 bg-white">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>

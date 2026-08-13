@@ -15,7 +15,8 @@ import {
 import { rfqDb } from '../../data/rfq';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { businessDb } from '../../data/business/business.db';
-import { RfqStatusBadge } from '../../components/rfq/RfqStatusBadge';
+import { RfqStatusBadge } from './RfqStatusBadge';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const BuyerDashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -41,6 +42,11 @@ export const BuyerDashboard: React.FC = () => {
 
   const responses = useLiveQuery(() => rfqDb.seller_quotes.toArray(), []) || [];
   const awards = useLiveQuery(() => rfqDb.rfq_awards.toArray(), []) || [];
+
+  const breadcrumbs = React.useMemo(() => [
+    { title: <span className="text-slate-800 font-semibold">Sourcing Dashboard</span> }
+  ], []);
+  useBreadcrumb(breadcrumbs);
 
   const activeRfqs = partyRfqs.filter((r) => r.status === 'ISSUED' || r.status === 'IN_PROGRESS');
   const totalAwardedAmount = awards.reduce(

@@ -36,10 +36,11 @@ import {
   DisconnectOutlined,
   AimOutlined,
 } from '@ant-design/icons';
-import { rfqDb, type Rfq, type RfqItem, type RfqItemDynamicAttribute, type RfqItemSource, type SellerQuote } from '../../data/rfq';
+import { rfqDb, type Rfq, type RfqItem, type RfqItemAttribute, type RfqItemSource, type SellerQuote } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const RfqCreateWizard: React.FC = () => {
   const navigate = useNavigate();
@@ -67,6 +68,12 @@ export const RfqCreateWizard: React.FC = () => {
 
   const activePartyId = activeParty?.id || 'pty-1';
   const activePartyName = activeParty?.display_name || 'Active Party';
+
+  const breadcrumbs = React.useMemo(() => [
+    { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
+    { title: <span className="text-slate-800 font-semibold">Create New RFQ</span> }
+  ], [navigate, basePath]);
+  useBreadcrumb(breadcrumbs);
 
   const [currentStep, setCurrentStep] = useState(0);
   const [activeDrawerIndex, setActiveDrawerIndex] = useState<number | null>(null);
@@ -271,7 +278,7 @@ export const RfqCreateWizard: React.FC = () => {
 
     try {
       const newRfqId = `rfq-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newRfq: Rfq = {
+      const newRfq: any = {
         id: newRfqId,
         rfq_number: `RFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
         title: globalDetails.title,
@@ -289,7 +296,6 @@ export const RfqCreateWizard: React.FC = () => {
         total_items_count: items.length,
         total_estimated_budget: items.reduce((acc, i) => acc + (i.quantity || 0) * (i.target_unit_price || 0), 0),
         currency: globalDetails.currency,
-        attachments: [],
         timeline: [
           {
             id: `tl-${Date.now()}`,
@@ -305,7 +311,7 @@ export const RfqCreateWizard: React.FC = () => {
         updated_at: new Date().toISOString(),
       };
 
-      const newRfqItems: RfqItem[] = items.map((item, idx) => ({
+      const newRfqItems: any[] = items.map((item, idx) => ({
         id: `rfqi-${newRfqId}-${idx + 1}`,
         rfq_id: newRfqId,
         item_index: idx + 1,
@@ -349,8 +355,10 @@ export const RfqCreateWizard: React.FC = () => {
           newQuotes.push({
             id: `q-${item.id}-${sellerPartyId}`,
             rfq_item_id: item.id,
-            seller_id: sellerPartyId,
+            seller_party_id: sellerPartyId,
+            seller_quote_number: `SQ-${item.id.replace('rfqi-', '')}-${sellerPartyId.replace('pty-', '')}`,
             status: 'DRAFT',
+            round: 1,
             unit_price: item.target_unit_price || 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
@@ -358,8 +366,8 @@ export const RfqCreateWizard: React.FC = () => {
         });
       });
 
-      await rfqDb.rfqs.put(newRfq);
-      await rfqDb.rfq_items.bulkPut(newRfqItems);
+      await rfqDb.rfqs.put(newRfq as Rfq);
+      await rfqDb.rfq_items.bulkPut(newRfqItems as RfqItem[]);
       if (newQuotes.length > 0) {
         await rfqDb.seller_quotes.bulkPut(newQuotes);
       }
@@ -756,7 +764,7 @@ export const RfqCreateWizard: React.FC = () => {
 
             variantsList.forEach((v: any) => {
               // Dynamic Attribute Filters Evaluation: Compare group_id, attribute_id, value_id / value label
-              const selectedFilters: RfqItemDynamicAttribute[] = item.selected_dynamic_attributes || [];
+              const selectedFilters: any[] = item.selected_dynamic_attributes || [];
               let matchesAllAttributeFilters = true;
 
               for (const filter of selectedFilters) {
@@ -1118,7 +1126,7 @@ export const RfqCreateWizard: React.FC = () => {
                         <div className="grid grid-cols-1 gap-3">
                           {group.attributes.map((attr: any) => {
                             const existingSelection = (item.selected_dynamic_attributes || []).find(
-                              (s: RfqItemDynamicAttribute) => s.attribute_id === attr.id
+                              (s: any) => s.attribute_id === attr.id
                             );
                             const selectedValueIds = existingSelection?.selected_value_ids || [];
 
@@ -1131,7 +1139,7 @@ export const RfqCreateWizard: React.FC = () => {
                                   placeholder={`Select ${attr.name}`}
                                   onChange={(selectedValIds) => {
                                     const updated = [...items];
-                                    const dynAttrs: RfqItemDynamicAttribute[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
+                                    const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
                                     const idx = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
                                     if (idx >= 0) {
                                       dynAttrs[idx] = { group_id: group.groupId, attribute_id: attr.id, selected_value_ids: selectedValIds };

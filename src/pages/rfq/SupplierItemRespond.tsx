@@ -1,12 +1,48 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Input, InputNumber, Button, Select, Breadcrumb, Tag, Table, Descriptions, App as AntApp, Alert } from 'antd';
-import { SendOutlined, ArrowLeftOutlined, SaveOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Card, Input, InputNumber, Button, Select, Tag, Table, Descriptions, App as AntApp, Alert } from 'antd';
+import { SendOutlined, ArrowLeftOutlined, SaveOutlined, ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { rfqDb, type ItemAttributeValue } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
+
+const CommentThread: React.FC<{
+  comments: any[];
+  parties: any[];
+  viewerPartyId: string;
+}> = ({ comments, parties, viewerPartyId }) => {
+  if (comments.length === 0) return null;
+
+  return (
+    <div className="mt-1 space-y-1 text-left">
+      {comments.map((c) => {
+        const isBuyer = c.actor_type === 'BUYER';
+        const isSelf = c.actor_id === viewerPartyId;
+        const name = isSelf ? 'You' : (isBuyer ? 'Requester' : 'Seller');
+        const timeStr = c.created_at
+          ? `${new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} ${new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+          : '';
+        return (
+          <div
+            key={c.id}
+            className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
+                ? 'bg-blue-50/50 border-blue-100 text-blue-900'
+                : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
+              }`}
+          >
+            <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
+              [{name} {timeStr}]:
+            </span>
+            <span className="font-medium whitespace-pre-wrap">{c.comment}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
 
 export const SupplierItemRespond: React.FC = () => {
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
@@ -68,6 +104,22 @@ export const SupplierItemRespond: React.FC = () => {
     [existingQuote]
   ) || [];
 
+  const award = useLiveQuery(
+    async () => {
+      if (!itemId || !activePartyId) return undefined;
+      const awds = await rfqDb.rfq_awards.where('rfq_item_id').equals(itemId).toArray();
+      return awds.find((a) => a.seller_party_id === activePartyId);
+    },
+    [itemId, activePartyId]
+  );
+
+  const breadcrumbs = React.useMemo(() => [
+    { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
+    { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number || 'RFQ'} - Sourcing Offer</span> }
+  ], [basePath, rfq?.rfq_number, navigate]);
+
+  useBreadcrumb(breadcrumbs);
+
   // Auto-generate or load the quote number
   const quoteNumber = React.useMemo(() => {
     return existingQuote?.seller_quote_number || `SQ-${itemId?.replace('item-', '') || 'NEW'}-${activePartyId?.replace('pty-', '') || 'UNK'}`;
@@ -105,16 +157,31 @@ export const SupplierItemRespond: React.FC = () => {
     }
   }, [existingQuoteAttributes, existingQuote]);
 
-  React.useEffect(() => {
-    if (existingQuote && existingQuote.status !== 'DRAFT' && existingQuoteComments.length > 0) {
-      const initialComments: Record<string, string> = {};
-      existingQuoteComments.forEach((qc) => {
-        // group_id stored as 'SYSTEM' for SYSTEM attrs, group_id otherwise
+  const buyerComments = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    existingQuoteComments
+      .filter((qc) => qc.actor_type === 'BUYER')
+      .forEach((qc) => {
         const key = qc.group_id === 'SYSTEM'
           ? `SYSTEM_${qc.attribute_id}`
           : `${qc.group_id}_${qc.attribute_id}`;
-        initialComments[key] = qc.comment || '';
+        map[key] = qc.comment || '';
       });
+    return map;
+  }, [existingQuoteComments]);
+
+  React.useEffect(() => {
+    if (existingQuote && existingQuote.status !== 'DRAFT' && existingQuoteComments.length > 0) {
+      const initialComments: Record<string, string> = {};
+      existingQuoteComments
+        .filter((qc) => qc.actor_type === 'SELLER')
+        .forEach((qc) => {
+          // group_id stored as 'SYSTEM' for SYSTEM attrs, group_id otherwise
+          const key = qc.group_id === 'SYSTEM'
+            ? `SYSTEM_${qc.attribute_id}`
+            : `${qc.group_id}_${qc.attribute_id}`;
+          initialComments[key] = qc.comment || '';
+        });
       setOfferedComments(initialComments);
     }
   }, [existingQuoteComments, existingQuote]);
@@ -162,6 +229,8 @@ export const SupplierItemRespond: React.FC = () => {
   // Mode: SUBMITTED, ACCEPTED, REJECTED → view-only (locked)
   // NEW, DRAFT, REVISION_REQUIRED → actionable (editable)
   const isViewOnly = ['SUBMITTED', 'ACCEPTED', 'REJECTED'].includes(existingQuote?.status ?? '');
+
+
 
   const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
     if (submitMode === 'SUBMITTED' && (!unitPrice || unitPrice <= 0)) {
@@ -242,8 +311,10 @@ export const SupplierItemRespond: React.FC = () => {
             const key = getCommentKey(ia.attribute_type, ia.group_id, ia.attribute_id);
             // Store group_id as 'SYSTEM' for SYSTEM attrs so the load effect can reconstruct the correct key
             const storedGroupId = ia.attribute_type === 'SYSTEM' ? 'SYSTEM' : ia.group_id;
+            const round = existingQuote ? existingQuote.round : 1;
+            const commentId = `qc-${quoteId}-${storedGroupId}-${ia.attribute_id}-r${round}`;
             return rfqDb.seller_quote_comments.put({
-              id: `qc-${quoteId}-${storedGroupId}-${ia.attribute_id}`,
+              id: commentId,
               seller_quote_id: quoteId,
               group_id: storedGroupId,
               attribute_id: ia.attribute_id,
@@ -413,12 +484,31 @@ export const SupplierItemRespond: React.FC = () => {
       title: 'Your Offer',
       key: 'supplierOffer',
       width: 260,
-      render: (_: any, record: any) => record.renderOffers()
+      render: (_: any, record: any) => (
+        <div className="flex flex-col gap-1">
+          {record.renderOffers()}
+        </div>
+      )
     },
     {
-      title: 'Supplier Comment (Optional)',
+      title: 'Supplier Comment & History',
       key: 'supplierComment',
-      render: (_: any, record: any) => record.renderComment ? record.renderComment() : null
+      render: (_: any, record: any) => {
+        const key = record.commentKey || (record.key === 'brand' ? 'SYSTEM_brand' : record.key === 'manufacturer' ? 'SYSTEM_manufacturer' : record.key === 'unit_price' ? 'SYSTEM_unit_price' : '');
+        const normGroupId = key.startsWith('SYSTEM_') ? 'SYSTEM' : key.split('_')[0];
+        const attrId = key.startsWith('SYSTEM_') ? key.replace('SYSTEM_', '') : key.split('_')[1];
+
+        const threadComments = existingQuoteComments
+          .filter((c) => c.group_id === normGroupId && c.attribute_id === attrId)
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        return (
+          <div className="space-y-2">
+            {record.renderComment ? record.renderComment() : null}
+            <CommentThread comments={threadComments} parties={parties} viewerPartyId={activePartyId} />
+          </div>
+        );
+      }
     }
   ];
 
@@ -433,9 +523,19 @@ export const SupplierItemRespond: React.FC = () => {
       render: (_: any, record: any) => record.renderViewOffers ? record.renderViewOffers() : record.renderOffers()
     },
     {
-      title: 'Supplier Comment',
+      title: 'Comments Thread',
       key: 'supplierComment',
-      render: (_: any, record: any) => record.renderViewComment ? record.renderViewComment() : null
+      render: (_: any, record: any) => {
+        const key = record.commentKey || (record.key === 'brand' ? 'SYSTEM_brand' : record.key === 'manufacturer' ? 'SYSTEM_manufacturer' : record.key === 'unit_price' ? 'SYSTEM_unit_price' : '');
+        const normGroupId = key.startsWith('SYSTEM_') ? 'SYSTEM' : key.split('_')[0];
+        const attrId = key.startsWith('SYSTEM_') ? key.replace('SYSTEM_', '') : key.split('_')[1];
+
+        const threadComments = existingQuoteComments
+          .filter((c) => c.group_id === normGroupId && c.attribute_id === attrId)
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+        return <CommentThread comments={threadComments} parties={parties} viewerPartyId={activePartyId} />;
+      }
     }
   ];
 
@@ -443,12 +543,6 @@ export const SupplierItemRespond: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <Breadcrumb
-        items={[
-          { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
-          { title: `${rfq.rfq_number} - Sourcing Offer` }
-        ]}
-      />
 
       <Card
         className="shadow-md border-slate-200"
@@ -503,6 +597,11 @@ export const SupplierItemRespond: React.FC = () => {
           <Descriptions.Item label="Product / Service" span={2}>
             <strong className="text-slate-800">{item.product_name}</strong>
           </Descriptions.Item>
+          <Descriptions.Item label="Catalog Product">
+            {item.catalog_product_id
+              ? catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id
+              : 'N/A'}
+          </Descriptions.Item>
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
             <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
@@ -512,11 +611,6 @@ export const SupplierItemRespond: React.FC = () => {
           </Descriptions.Item>
           <Descriptions.Item label="Item Source">
             <Tag>{item.item_source || 'N/A'}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Catalog Product">
-            {item.catalog_product_id
-              ? catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id
-              : 'N/A'}
           </Descriptions.Item>
           <Descriptions.Item label="RFQ Number">
             <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
@@ -611,6 +705,7 @@ export const SupplierItemRespond: React.FC = () => {
 
               return {
                 key: ia.id,
+                commentKey: key,
                 specification: attrName,
                 description: ia.description || null,
                 buyerAsked: requestedVals,
@@ -696,6 +791,8 @@ export const SupplierItemRespond: React.FC = () => {
             );
           })}
         </div>
+
+
 
         {!isViewOnly && (
           <div className="pt-6 flex justify-end gap-3 mt-6">

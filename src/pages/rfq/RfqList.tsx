@@ -6,7 +6,8 @@ import { PlusOutlined, SearchOutlined, FolderOpenOutlined, ClockCircleOutlined, 
 import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { RfqStatusBadge } from '../../components/rfq/RfqStatusBadge';
+import { RfqStatusBadge } from './RfqStatusBadge';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const RfqList: React.FC = () => {
   const navigate = useNavigate();
@@ -33,6 +34,11 @@ export const RfqList: React.FC = () => {
     () => activePartyId ? rfqDb.rfqs.where('requester_id').equals(activePartyId).toArray() : [],
     [activePartyId]
   ) || [];
+
+  const breadcrumbs = React.useMemo(() => [
+    { title: <span className="text-slate-800 font-semibold">RFQ Sourcing</span> }
+  ], []);
+  useBreadcrumb(breadcrumbs);
 
   const filteredRfqs = partyRfqs.filter((r) => {
     const matchesTab = activeTab === 'ALL' || r.status === activeTab;

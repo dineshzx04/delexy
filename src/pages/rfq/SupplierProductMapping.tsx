@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Select, Button, Alert, App as AntApp, Breadcrumb, Tag, Divider } from 'antd';
+import { Card, Select, Button, Alert, App as AntApp, Tag, Divider } from 'antd';
 import { CheckCircleOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { businessDb } from '../../data/business/business.db';
+import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const SupplierProductMapping: React.FC = () => {
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
@@ -35,31 +36,45 @@ export const SupplierProductMapping: React.FC = () => {
     async () => {
       if (!itemId) return undefined;
       const quotes = await rfqDb.seller_quotes.where('rfq_item_id').equals(itemId).toArray();
-      return quotes.find((q) => q.seller_id === activePartyId);
+      return quotes.find((q) => q.seller_party_id === activePartyId);
+    },
+    [itemId, activePartyId]
+  );
+
+  const award = useLiveQuery(
+    async () => {
+      if (!itemId || !activePartyId) return undefined;
+      const awds = await rfqDb.rfq_awards.where('rfq_item_id').equals(itemId).toArray();
+      return awds.find((a) => a.seller_party_id === activePartyId);
     },
     [itemId, activePartyId]
   );
 
   const selectedProduct = sellerProducts.find((p) => p.id === selectedProductId);
 
+  const breadcrumbs = React.useMemo(() => [
+    { title: <a onClick={() => navigate(basePath)}>Supplier Inbox</a> },
+    { title: <span className="text-slate-800 font-semibold">Catalog Product Mapping</span> }
+  ], [basePath, navigate]);
+
+  useBreadcrumb(breadcrumbs);
+
   const handleSaveMapping = async () => {
+    if (!award) {
+      antMessage.error('No award found to map.');
+      return;
+    }
     setSubmitting(true);
     try {
-      if (quote) {
-        await rfqDb.seller_quotes.update(quote.id, {
-          seller_product_mapping: {
-            seller_product_id: selectedProductId,
-            variant_id: selectedVariantId,
-            mapped_at: new Date().toISOString(),
-            is_buyer_approved: false,
-          },
-        });
-      }
+      await rfqDb.rfq_awards.update(award.id, {
+        variant_id: selectedVariantId,
+        product_mapping_status: 'SUBMITTED'
+      });
 
-      antMessage.success('Catalog product & variant mapped successfully!');
-      navigate(basePath);
+      antMessage.success('Catalog product & variant submitted to buyer for approval!');
+      navigate(isBusinessContext ? '/b/supplier/rfqs' : '/user/supplier/rfqs');
     } catch (err) {
-      antMessage.error('Failed to map product');
+      antMessage.error('Failed to map product to award');
     } finally {
       setSubmitting(false);
     }
@@ -67,12 +82,6 @@ export const SupplierProductMapping: React.FC = () => {
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-      <Breadcrumb
-        items={[
-          { title: <a onClick={() => navigate(basePath)}>Supplier Inbox</a> },
-          { title: 'Catalog Product Mapping' },
-        ]}
-      />
 
       <Card className="shadow-md border-slate-200">
         <div className="flex items-center justify-between">
