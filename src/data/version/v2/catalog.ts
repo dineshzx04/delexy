@@ -43,8 +43,7 @@ export interface Attribute {
   isRequired?: boolean; // Useful for dynamic frontend form validation
 
   status: "ACTIVE" | "DEPRECATED" | "INACTIVE";
-  superseded_by_id?: string | null; // Forward pointer to new replacement version
-  previous_version_id?: string | null; // Backward pointer to legacy version
+  parent_id?: string | null; // Backward pointer to legacy version
   created_at?: string;
   updated_at?: string;
 
