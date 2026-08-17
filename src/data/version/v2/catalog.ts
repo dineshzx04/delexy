@@ -70,7 +70,7 @@ export interface SellerProduct {
 
   specifications: SellerProductSpecification[];
   variants: SellerProductVariant[];
-
+  visibility: boolean;
   status: "ACTIVE" | "INACTIVE";
   created_at: string;
   updated_at: string;
@@ -111,7 +111,6 @@ export interface SellerProductVariant {
   currency: string;
   stock: number;
   min_order_quantity: number;
-  visibility: boolean;
   combination_values: SellerProductVariantCombinationValue[];
   status: "RETIRED" | "ACTIVE" | "DEACTIVATED";
 }
