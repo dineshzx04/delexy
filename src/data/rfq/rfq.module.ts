@@ -8,44 +8,36 @@ export type AttributeType = "SYSTEM" | "CUSTOM";
 
 export interface Rfq {
   id: string;
+  rfq_number: string;
+  title: string;
+  description?: string;
   status: RfqStatus;
   requester_id: string;
   requester_name: string;
   requester_party_id?: string;
-  created_at: string;
-  updated_at: string;
-  rfq_number: string;
-  title: string;
-  description?: string;
   requester_party_type?: PartyOwnerType;
   created_by_user_id?: string;
   contact_email?: string;
   contact_phone?: string;
   shipping_destination?: string;
   submission_deadline: string;
-  total_items_count?: number;
-  total_estimated_budget?: number;
   currency?: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RfqItem {
   id: string;
   rfq_id: string;
   category_id: string;
-  quantity: number;
-  unit: string;
+  catalog_product_id: string | null;
+  product_id: string | null;
+  variant_id: string | null;
   item_index?: number;
+  quantity: number;
   created_at: string;
   updated_at: string;
   status: RfqItemStatus;
-  item_source?: RfqItemSource;
-  catalog_product_id?: string | null;
-  variant_id?: string | null;
-  product_name?: string;
-  brand_id?: string[] | null;
-  manufacturer_id?: string[] | null;
-  target_unit_price?: number;
-  awarded_quantity_total?: number;
   seller_assignments?: SellerAssignment[];
 }
 
@@ -55,6 +47,7 @@ export interface RfqItemAttribute {
   group_id: string;
   attribute_id: string;
   description?: string;
+  unit?: string;
   values: ItemAttributeValue[];
   created_at: string;
   updated_at: string;
@@ -69,39 +62,32 @@ export interface SellerQuote {
   unit_price: number;
   round: number;
   status: SellerQuoteStatus;
-  brand_id?: string[] | null;
-  manufacturer_id?: string[] | null;
   created_at: string;
   updated_at: string;
-  seller_product_mapping?: {
-    seller_product_id: string;
-    variant_id: string;
-    mapped_at: string;
-    is_buyer_approved: boolean;
-  } | null;
   draft_snapshot?: string | null;
 }
 
 export interface SellerQuoteAttribute {
   id: string;
   seller_quote_id: string;
+  attribute_type?: AttributeType;
   group_id: string;
   attribute_id: string;
-  offered_values: ItemAttributeValue[];
-  attribute_type?: AttributeType;
+  values: ItemAttributeValue[];
+  is_deviation: boolean;
+  rejection_comment?: string;
 }
 
 export interface SellerQuoteComment {
   id: string;
   seller_quote_id: string;
+  attribute_type?: AttributeType;
   group_id: string;
   attribute_id: string;
   comment: string;
-  parent_comment_id?: string;
   actor_type: "BUYER" | "SELLER";
   actor_id: string;
   created_at: string;
-  attribute_type?: AttributeType;
 }
 
 // export interface ItemAttributeChangeHistory {
@@ -130,12 +116,13 @@ export interface RfqAward {
   seller_quote_id: string;
   seller_party_id: string;
   awarded_quantity: number;
+  variant_id: string;
+  offered_variant_id: string | null;
   unit_price: number;
   currency?: string;
   award_status: AwardStatus;
   product_mapping_status: ProductMappingStatus;
   purchase_order_id?: string;
-  variant_id?: string;
   awarded_at: string;
   awarded_by_user_id?: string;
 
@@ -163,23 +150,22 @@ export interface RfqAward {
 
 export type RfqStatus =
   | "DRAFT"
-  | "ISSUED"
-  | "IN_PROGRESS"
-  | "CANCELLED"
-  | "CLOSED";
+  | "ISSUED" // Sellers can respond
+  | "IN_PROGRESS" // Active response period
+  | "EVALUATING" // Buyer is comparing/selecting
+  | "AWARDED" // Award decision made
+  | "CLOSED" // Process completed
+  | "CANCELLED";
 
 export type RfqItemStatus = "OPEN" | "AWARDED" | "CANCELLED";
 
 export interface SellerAssignment {
-  id: string;
   rfq_item_id: string;
   seller_party_id: string;
   assignment_type: "DIRECT_INVITATION" | "PUBLIC_MARKETPLACE";
   assigned_by_user_id: string;
   assigned_at: string;
 }
-
-export type RfqItemSource = "CATALOG_PRODUCT_VARIANT" | "CUSTOM_REQUIREMENTS";
 
 export interface ItemAttributeValue {
   value_id: string;
@@ -201,7 +187,11 @@ export type AwardItemStatus =
   | "PO_CREATED"
   | "CANCELLED";
 
-export type AwardStatus = "AWARDED" | "CANCELLED" | "PO_CREATED" | "PO_RECEIVED";
+export type AwardStatus =
+  | "AWARDED"
+  | "CANCELLED"
+  | "PO_CREATED"
+  | "PO_RECEIVED";
 
 export type ProductMappingStatus =
   | "NOT_REQUIRED"

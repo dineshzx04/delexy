@@ -29,8 +29,6 @@ export interface Rfq {
   total_estimated_budget?: number;
   currency?: string;
 
-  requester_seller_ids: string[];
-
   created_at: string;
   updated_at: string;
 }
@@ -40,13 +38,13 @@ export interface RfqItem {
   rfq_id: string;
   category_id: string;
   catalog_product_id: string | null;
-  seller_product_id: string | null;
   variant_id: string | null;
+  seller_product_id: string | null;
   item_index: number;
   quantity: number;
   unit: string;
   status: RfqItemStatus;
-  item_source: "CATALOG_PRODUCT_VARIANT" | "CUSTOM_REQUIREMENTS";
+  seller_assignments?: SellerAssignment[];
 
   created_at: string;
   updated_at: string;
@@ -152,13 +150,12 @@ export interface VariantPartyMapping {
 
 export type RfqStatus =
   | "DRAFT"
-  | "PENDING_VERIFICATION" // Buyer Spec Verification Queue
-  | "ISSUED" // Broadcasted to Sellers
-  | "IN_PROGRESS" // Quotes Received
-  | "EVALUATING" // Quotes Received
-  | "AWARDED" // Awarded to single seller
-  | "CANCELLED"
-  | "CLOSED";
+  | "ISSUED" // Sellers can respond
+  | "IN_PROGRESS" // Active response period
+  | "EVALUATING" // Buyer is comparing/selecting
+  | "AWARDED" // Award decision made
+  | "CLOSED" // Process completed
+  | "CANCELLED";
 
 export type RfqItemStatus = "OPEN" | "AWARDED" | "CANCELLED";
 
@@ -192,4 +189,13 @@ export interface SellerQuoteComment {
   actor_id: string;
   created_at: string;
   attribute_type?: AttributeType;
+}
+
+export interface SellerAssignment {
+  id: string;
+  rfq_item_id: string;
+  seller_party_id: string;
+  assignment_type: "DIRECT_INVITATION" | "PUBLIC_MARKETPLACE";
+  assigned_by_user_id: string;
+  assigned_at: string;
 }

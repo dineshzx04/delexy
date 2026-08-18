@@ -69,23 +69,24 @@ export const RfqList: React.FC = () => {
         </div>
       ),
     },
-    {
-      title: 'Items & Budget',
-      key: 'items_budget',
-      width: 160,
-      render: (_: any, record: any) => (
-        <div className="space-y-1">
-          <div className="font-bold text-slate-900 text-sm">
-            ${(record.total_estimated_budget || 0).toLocaleString()}
-          </div>
-          <div>
-            <Tag color="blue" className="font-semibold text-xs py-0 px-1.5">
-              {record.total_items_count} Items
-            </Tag>
-          </div>
-        </div>
-      ),
-    },
+    
+    // {
+    //   title: 'Items & Budget',
+    //   key: 'items_budget',
+    //   width: 160,
+    //   render: (_: any, record: any) => (
+    //     <div className="space-y-1">
+    //       <div className="font-bold text-slate-900 text-sm">
+    //         ${(record.total_estimated_budget || 0).toLocaleString()}
+    //       </div>
+    //       <div>
+    //         <Tag color="blue" className="font-semibold text-xs py-0 px-1.5">
+    //           {record.total_items_count} Items
+    //         </Tag>
+    //       </div>
+    //     </div>
+    //   ),
+    // },
     {
       title: 'Status & Deadline',
       key: 'status_deadline',

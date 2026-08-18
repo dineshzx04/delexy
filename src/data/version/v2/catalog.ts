@@ -66,7 +66,7 @@ export interface SellerProduct {
   brand_id?: string;
 
   owner_party_id: string;
-  parent_product_id?: string;
+  source_product_id?: string;
 
   specifications: SellerProductSpecification[];
   variants: SellerProductVariant[];
@@ -105,6 +105,7 @@ export interface SellerProductSubmission {
 export interface SellerProductVariant {
   seller_product_id: string;
   platform_product_variant_id: string;
+  source_variant_id?: string;
   owner_party_id: string;
   variant_type?: "DEFAULT" | "COMBINATION";
   price: number;
@@ -114,6 +115,8 @@ export interface SellerProductVariant {
   combination_values: SellerProductVariantCombinationValue[];
   status: "RETIRED" | "ACTIVE" | "DEACTIVATED";
 }
+
+// Need to add VariantParticipant
 
 export interface SellerProductSpecification {
   group_id: string;

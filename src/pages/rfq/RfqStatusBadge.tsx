@@ -7,6 +7,8 @@ export const RfqStatusBadge: React.FC<{ status: RfqStatus }> = ({ status }) => {
   if (status === 'DRAFT') color = 'default';
   if (status === 'ISSUED') color = 'blue';
   if (status === 'IN_PROGRESS') color = 'processing';
+  if (status === 'EVALUATING') color = 'warning';
+  if (status === 'AWARDED') color = 'success';
   if (status === 'CLOSED') color = 'success';
   if (status === 'CANCELLED') color = 'error';
 

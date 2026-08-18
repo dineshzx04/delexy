@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Tabs, Tag, Button, Table } from 'antd';
+import { Card, Tabs, Tag as AntTag, Button, Table } from 'antd';
 import {
   AppstoreOutlined,
   FolderOpenOutlined,
@@ -39,7 +39,7 @@ export const RfqWorkspace: React.FC = () => {
 
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
-    { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number ? `${rfq.rfq_number} - ${rfq.title}` : 'RFQ Workspace'}</span> }
+    { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number ? `${rfq.rfq_number}` : 'RFQ Workspace'}</span> }
   ], [navigate, basePath, rfq?.rfq_number, rfq?.title]);
   useBreadcrumb(breadcrumbs);
 
@@ -72,7 +72,7 @@ export const RfqWorkspace: React.FC = () => {
         return (
           <div>
             <div className="font-bold text-slate-900">{text}</div>
-            <div className="text-xs text-slate-500">Category: <Tag color="purple">{catName}</Tag></div>
+            <div className="text-xs text-slate-500">Category: <AntTag color="purple">{catName}</AntTag></div>
           </div>
         );
       },
@@ -123,14 +123,17 @@ export const RfqWorkspace: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-black text-slate-900">{rfq.rfq_number} - {rfq.title}</h1>
+              <h1 className="text-xl font-black text-slate-700 flex items-center">
+                <AntTag color={"processing"} className='mr-2'>{rfq.rfq_number}</AntTag>
+                <span>{rfq.title}</span>
               <RfqStatusBadge status={rfq.status} />
+              </h1>
             </div>
             <p className="text-slate-600 text-sm mt-1">{rfq.description}</p>
             <div className="flex items-center gap-6 mt-3 text-xs text-slate-500">
               <div>Requester: <strong className="text-slate-800">{rfq.requester_name}</strong></div>
               <div>Deadline: <strong className="text-slate-800">{new Date(rfq.submission_deadline).toLocaleDateString()}</strong></div>
-              <div>Total Estimated Budget: <strong className="text-emerald-600 text-sm font-bold">${(rfq.total_estimated_budget || 0).toLocaleString()}</strong></div>
+              {/* <div>Total Estimated Budget: <strong className="text-emerald-600 text-sm font-bold">${(rfq.total_estimated_budget || 0).toLocaleString()}</strong></div> */}
             </div>
           </div>
         </div>
