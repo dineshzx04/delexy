@@ -323,7 +323,7 @@ const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
 const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
 
 // For supplier pages:
-const supplierBasePath = isBusinessContext ? '/b/supplier/rfqs' : '/user/supplier/rfqs';
+const supplierBasePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
 ```
 
 ---

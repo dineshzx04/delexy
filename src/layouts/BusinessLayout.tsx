@@ -170,9 +170,9 @@ const BusinessLayout: React.FC = () => {
             label: <Link to="/b/rfqs">RFQ Containers</Link>,
           },
           {
-            key: '/b/supplier/rfqs',
+            key: '/b/seller/rfqs',
             icon: <Lucide.Inbox size={18} />,
-            label: <Link to="/b/supplier/rfqs">Supplier Opportunities</Link>,
+            label: <Link to="/b/seller/rfqs">Seller Opportunities</Link>,
           },
         ],
       },

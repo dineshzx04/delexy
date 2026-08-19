@@ -14,7 +14,7 @@ export const SupplierAwardReceipt: React.FC = () => {
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
-  const basePath = isBusinessContext ? '/b/supplier/rfqs' : '/user/supplier/rfqs';
+  const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
   const { message: antMessage } = AntApp.useApp();
 
   const [confirmingPo, setConfirmingPo] = useState(false);

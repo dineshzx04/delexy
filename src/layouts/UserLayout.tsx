@@ -183,9 +183,9 @@ const UserLayout: React.FC = () => {
                         label: <Link to="/user/rfqs">My RFQs</Link>,
                     },
                     {
-                        key: '/user/supplier/rfqs',
+                        key: '/user/seller/rfqs',
                         icon: <Lucide.Inbox size={18} />,
-                        label: <Link to="/user/supplier/rfqs">Supplier Opportunities</Link>,
+                        label: <Link to="/user/seller/rfqs">Seller Opportunities</Link>,
                     },
                 ],
             },

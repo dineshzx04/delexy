@@ -13,7 +13,7 @@ export const SupplierRfqInbox: React.FC = () => {
   const navigate = useNavigate();
   const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
-  const basePath = isBusinessContext ? '/b/supplier/rfqs' : '/user/supplier/rfqs';
+  const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
 
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [searchText, setSearchText] = useState<string>('');
@@ -149,7 +149,7 @@ export const SupplierRfqInbox: React.FC = () => {
             </div>
           );
         }
-        
+
         let color = 'default';
         const status = record.quote_status;
         if (status === 'SUBMITTED') color = 'blue';
@@ -185,7 +185,7 @@ export const SupplierRfqInbox: React.FC = () => {
           if (award.product_mapping_status === 'ACKNOWLEDGED' && award.award_status === 'AWARDED') {
             return <span className="text-xs text-amber-600 font-medium italic">Awaiting PO Release...</span>;
           }
-          
+
           if (award.award_status === 'PO_CREATED') {
             return (
               <Button

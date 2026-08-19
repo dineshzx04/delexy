@@ -142,10 +142,10 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/check-mapping" element={<RfqAwardCheckMapping />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/release-po" element={<RfqAwardReleasePo />} />
-                <Route path="supplier/rfqs" element={<SupplierRfqInbox />} />
-                <Route path="supplier/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
-                <Route path="supplier/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
-                <Route path="supplier/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
+                <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
 
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
@@ -175,10 +175,10 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/check-mapping" element={<RfqAwardCheckMapping />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/release-po" element={<RfqAwardReleasePo />} />
-                <Route path="supplier/rfqs" element={<SupplierRfqInbox />} />
-                <Route path="supplier/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
-                <Route path="supplier/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
-                <Route path="supplier/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
+                <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
 
                 <Route path="*" element={<NotFound scope="business" />} />
               </Route>

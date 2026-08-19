@@ -28,7 +28,7 @@ export const SupplierProductMapping: React.FC = () => {
     async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
     [item?.product_id]
   );
-  
+
   // Active seller party resolution
   const allParties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
   const activeParty = isBusinessContext
@@ -76,7 +76,7 @@ export const SupplierProductMapping: React.FC = () => {
       });
 
       antMessage.success('Catalog product & variant submitted to buyer for approval!');
-      navigate(isBusinessContext ? '/b/supplier/rfqs' : '/user/supplier/rfqs');
+      navigate(isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs');
     } catch (err) {
       antMessage.error('Failed to map product to award');
     } finally {

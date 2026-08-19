@@ -29,8 +29,8 @@ const CommentThread: React.FC<{
           <div
             key={c.id}
             className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
-                ? 'bg-blue-50/50 border-blue-100 text-blue-900'
-                : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
+              ? 'bg-blue-50/50 border-blue-100 text-blue-900'
+              : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
               }`}
           >
             <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
@@ -49,7 +49,7 @@ export const SupplierItemRespond: React.FC = () => {
   const navigate = useNavigate();
   const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
-  const basePath = isBusinessContext ? '/b/supplier/rfqs' : '/user/supplier/rfqs';
+  const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
   const { message: antMessage } = AntApp.useApp();
 
   const [submitting, setSubmitting] = useState(false);
@@ -80,7 +80,7 @@ export const SupplierItemRespond: React.FC = () => {
     async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
     [item?.product_id]
   );
-  
+
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const catalogBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
   const catalogManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
@@ -156,7 +156,7 @@ export const SupplierItemRespond: React.FC = () => {
       existingQuoteAttributes.forEach((qa) => {
         const key = `${qa.group_id}_${qa.attribute_id}`;
         initialAttrs[key] = qa.values || [];
-        
+
         if (qa.attribute_type === 'SYSTEM') {
           if (qa.attribute_id === 'brand') {
             setOfferedBrands(qa.values.map(v => v.value_id));
@@ -202,24 +202,24 @@ export const SupplierItemRespond: React.FC = () => {
   const attributeGroupsMap = React.useMemo(() => {
     const map: Record<string, { name: string; attributes: any[] }> = {};
     const customAttributes = sellerProduct?.dynamic_attributes?.filter((ia: any) => ia.is_variant !== true);
-    
+
     customAttributes?.forEach((ia: any) => {
       const groupId = ia.group_id || 'ungrouped';
       if (!map[groupId]) {
         const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
         map[groupId] = { name: groupName, attributes: [] };
       }
-      
+
       const hydratedValues = catalogAttributeValues
         .filter((av) => ia?.selected_value_ids?.includes(av.id))
         .map((v) => ({
           value_id: v.id,
           value_label: v.value || v.label,
         }));
-        
+
       map[groupId].attributes.push({ ...ia, values: hydratedValues });
     });
-    
+
     const currentVariant = sellerProduct?.variants?.find((v: any) => v.id === item?.variant_id);
     currentVariant?.combination_values?.forEach((cv: any) => {
       const groupId = cv.group_id || 'ungrouped';
@@ -227,7 +227,7 @@ export const SupplierItemRespond: React.FC = () => {
         const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'Variant Specifications';
         map[groupId] = { name: groupName, attributes: [] };
       }
-      
+
       map[groupId].attributes.push({
         id: `var-${cv.attribute_id}`,
         attribute_id: cv.attribute_id,
@@ -241,7 +241,7 @@ export const SupplierItemRespond: React.FC = () => {
         ]
       });
     });
-    
+
     return Object.entries(map);
   }, [attributeGroups, sellerProduct, catalogAttributeValues, item?.variant_id]);
 
@@ -356,7 +356,7 @@ export const SupplierItemRespond: React.FC = () => {
             const attributeType = isSystem ? 'SYSTEM' : undefined;
             const round = existingQuote ? existingQuote.round : 1;
             const commentId = `qc-${quoteId}-${storedGroupId}-${attributeId}-r${round}`;
-            
+
             return rfqDb.seller_quote_comments.put({
               id: commentId,
               seller_quote_id: quoteId,
