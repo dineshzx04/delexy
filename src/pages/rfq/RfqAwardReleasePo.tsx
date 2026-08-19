@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Card, Tag, Descriptions, Button, Form, Input, Select, App as AntApp } from 'antd';
 import { ArrowLeftOutlined, CheckCircleOutlined, SendOutlined } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
+import { catalogDb } from '../../data/catalog/catalog.db';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -24,6 +25,10 @@ export const RfqAwardReleasePo: React.FC = () => {
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
   const quote = useLiveQuery(() => (quoteId ? rfqDb.seller_quotes.get(quoteId) : undefined), [quoteId]);
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const sellerProduct = useLiveQuery(
+    async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
+    [item?.product_id]
+  );
 
   const award = useLiveQuery(
     async () => {
@@ -42,9 +47,9 @@ export const RfqAwardReleasePo: React.FC = () => {
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>Sourcing</a> },
     { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || 'RFQ Details'}</a> },
-    { title: <a onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}`)}>{item?.product_name || 'Item details'}</a> },
+    { title: <a onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}`)}>{sellerProduct?.product_name || 'Item details'}</a> },
     { title: <span className="text-slate-800 font-semibold">Release Purchase Order</span> }
-  ], [basePath, rfqId, itemId, rfq?.rfq_number, item?.product_name, navigate]);
+  ], [basePath, rfqId, itemId, rfq?.rfq_number, sellerProduct?.product_name, navigate]);
 
   useBreadcrumb(breadcrumbs);
 
@@ -111,6 +116,7 @@ export const RfqAwardReleasePo: React.FC = () => {
 
         <div className="mt-6 border rounded-xl p-4 bg-slate-50/50">
           <Descriptions column={2} size="small" title="Award Summary">
+            <Descriptions.Item label="Requested Item">{sellerProduct?.product_name || 'Custom Specifications'}</Descriptions.Item>
             <Descriptions.Item label="Supplier Name">
               <strong>{supplierPartyName}</strong>
             </Descriptions.Item>

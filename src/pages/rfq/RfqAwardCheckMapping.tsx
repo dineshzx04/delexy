@@ -100,9 +100,9 @@ export const RfqAwardCheckMapping: React.FC = () => {
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>RFQs Workspace</a> },
     { title: <a onClick={() => navigate(`${basePath}/${rfq?.id}`)}>{rfq?.rfq_number || 'RFQ Details'}</a> },
-    { title: <a onClick={() => navigate(`${basePath}/${rfq?.id}/items/${itemId}`)}>{item?.product_name || 'Item Detail'}</a> },
+    { title: <a onClick={() => navigate(`${basePath}/${rfq?.id}/items/${itemId}`)}>{mappingDetails.mappedProduct?.product_name || 'Item Detail'}</a> },
     { title: <span className="text-slate-800 font-semibold">Check Spec Mapping</span> }
-  ], [basePath, rfq?.id, rfq?.rfq_number, itemId, item?.product_name, navigate]);
+  ], [basePath, rfq?.id, rfq?.rfq_number, itemId, mappingDetails.mappedProduct?.product_name, navigate]);
 
   useBreadcrumb(breadcrumbs);
 

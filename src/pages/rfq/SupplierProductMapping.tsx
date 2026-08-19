@@ -24,6 +24,10 @@ export const SupplierProductMapping: React.FC = () => {
   // Live query from catalogDb indexed database store
   const sellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []) || [];
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
+  const itemProduct = useLiveQuery(
+    async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
+    [item?.product_id]
+  );
   
   // Active seller party resolution
   const allParties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
@@ -101,7 +105,7 @@ export const SupplierProductMapping: React.FC = () => {
           type="success"
           showIcon
           message="Technical Specification Approved!"
-          description={`Your technical response for item "${item?.product_name || 'Item'}" has been approved by the buyer. Select the catalog product and variant SKU below.`}
+          description={`Your technical response for item "${itemProduct?.product_name || 'Item'}" has been approved by the buyer. Select the catalog product and variant SKU below.`}
           className="mb-6"
         />
 

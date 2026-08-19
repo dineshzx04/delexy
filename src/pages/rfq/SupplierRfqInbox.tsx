@@ -4,6 +4,7 @@ import { SearchOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { rfqDb } from '../../data/rfq';
+import { catalogDb } from '../../data/catalog/catalog.db';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -39,6 +40,7 @@ export const SupplierRfqInbox: React.FC = () => {
 
   const items = useLiveQuery(() => rfqDb.rfq_items.toArray(), []) || [];
   const rfqs = useLiveQuery(() => rfqDb.rfqs.toArray(), []) || [];
+  const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
 
   // Filter items assigned to this seller
   const assignedItems = React.useMemo(() => {
@@ -48,16 +50,12 @@ export const SupplierRfqInbox: React.FC = () => {
     );
   }, [items, activePartyId]);
 
-  const breadcrumbs = React.useMemo(() => [
-    { title: <span className="text-slate-800 font-semibold">Supplier Inbox</span> }
-  ], []);
-  useBreadcrumb(breadcrumbs);
-
   const allResponses = React.useMemo(() => {
     return assignedItems.map((item) => {
       const rfq = rfqs.find((r) => r.id === item.rfq_id);
       const quote = quotes.find((q) => q.rfq_item_id === item.id);
       const award = awards.find((a) => a.rfq_item_id === item.id);
+      const product = catalogProducts.find((p) => p.id === item.catalog_product_id);
 
       return {
         key: item.id,
@@ -65,7 +63,7 @@ export const SupplierRfqInbox: React.FC = () => {
         rfq_number: rfq?.rfq_number || 'N/A',
         rfq_title: rfq?.title || 'Unknown RFQ',
         item_id: item.id,
-        product_name: item.product_name || 'Custom Specifications',
+        product_name: product?.name || 'Custom Specifications',
         quantity: item.quantity,
         unit: item.unit,
         target_unit_price: item.target_unit_price,

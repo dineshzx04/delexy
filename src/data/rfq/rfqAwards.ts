@@ -14,6 +14,7 @@ export const mockRfqAwards: RfqAward[] = [
     award_status: "PO_CREATED",
     product_mapping_status: "NOT_REQUIRED",
     variant_id: "sprod-1-v2",
+    offered_variant_id: null,
     awarded_at: "2026-08-05T14:00:00Z",
     awarded_by_user_id: "usr-2"
   }

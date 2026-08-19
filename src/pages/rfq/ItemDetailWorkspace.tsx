@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Tabs, Tag, Button, Table, Descriptions, Modal, InputNumber, App as AntApp, Drawer, Form, Input, Select } from 'antd';
+import { Card, Tabs, Tag as AntTag, Button, Table, Descriptions, Modal, InputNumber, App as AntApp, Drawer, Form, Input, Select } from 'antd';
 import {
   AppstoreOutlined,
+  CheckCircleOutlined,
   FileTextOutlined,
   TeamOutlined,
 } from '@ant-design/icons';
@@ -22,13 +23,16 @@ interface TabProps {
 // MAIN CONTAINER COMPONENT: ItemDetailWorkspace
 // ============================================================================
 export const ItemDetailWorkspace: React.FC = () => {
-  const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
+
   const navigate = useNavigate();
+
+  const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
   const { activeWorkspace, currentUserId } = useWorkspace();
+  const [activeTab, setActiveTab] = useState('quotes');
+
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
 
-  const [activeTab, setActiveTab] = useState('quotes');
 
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
 
@@ -43,20 +47,24 @@ export const ItemDetailWorkspace: React.FC = () => {
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
-
+  const itemProduct = useLiveQuery(() => (item?.catalog_product_id ? catalogDb.products.get(item.catalog_product_id) : undefined), [item])
   const quotesCount = useLiveQuery(
     () => (itemId ? rfqDb.seller_quotes.where('rfq_item_id').equals(itemId).count() : 0),
     [itemId]
   ) || 0;
 
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
-  const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
+  const allVariants = useLiveQuery(
+    async () => item?.product_id ? (await catalogDb.sellerProducts.get(item.product_id))?.variants : [],
+    [item?.product_id]
+  ) || [];
+  const itemVariant = allVariants.find((v) => v.id === item?.variant_id);
 
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>RFQs Workspace</a> },
     { title: <a onClick={() => navigate(`${basePath}/${rfq?.id}`)}>{rfq?.rfq_number || 'RFQ Details'}</a> },
-    { title: <span className="text-slate-800 font-semibold">{item?.product_name || 'Item Detail'}</span> }
-  ], [basePath, rfq?.id, rfq?.rfq_number, item?.product_name, navigate]);
+    { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number || 'Item Details'}-item-{item?.item_index}</span> }
+  ], [basePath, rfq?.id, rfq?.rfq_number, item?.item_index, navigate]);
 
   useBreadcrumb(breadcrumbs);
 
@@ -80,7 +88,7 @@ export const ItemDetailWorkspace: React.FC = () => {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-black text-slate-900">{item.product_name}</h1>
+              <h1 className="text-2xl font-black text-slate-900">{itemProduct?.name}</h1>
               <RfqItemStatusBadge status={item.status} />
             </div>
             <p className="text-slate-600 text-sm mt-1">Sourcing Line Item evaluation for container {rfq.rfq_number}.</p>
@@ -89,25 +97,18 @@ export const ItemDetailWorkspace: React.FC = () => {
 
         <Descriptions title="Requested Item Details" bordered size="small" column={2} className="mb-2">
           <Descriptions.Item label="Product / Service" span={2}>
-            <strong className="text-slate-800">{item.product_name}</strong>
+            <strong className="text-slate-800">{itemProduct?.name}</strong>
+          </Descriptions.Item>
+          <Descriptions.Item label="RFQ Number" >
+            <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
           </Descriptions.Item>
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
+          <Descriptions.Item label="Variant">{itemVariant?.sku}</Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
-            <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
+            <AntTag color="blue" className="font-bold">{item.quantity} {item.unit}</AntTag>
           </Descriptions.Item>
           <Descriptions.Item label="Target Unit Price">
             {item.target_unit_price ? <span className="text-emerald-600 font-bold">${item.target_unit_price}</span> : 'N/A'}
-          </Descriptions.Item>
-          <Descriptions.Item label="Item Source">
-            <Tag>{item.item_source || 'N/A'}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Catalog Product">
-            {item.catalog_product_id
-              ? catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id
-              : 'N/A'}
-          </Descriptions.Item>
-          <Descriptions.Item label="RFQ Number">
-            <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -169,58 +170,97 @@ export const ItemDetailWorkspace: React.FC = () => {
 // ============================================================================
 const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
   const item = useLiveQuery(() => rfqDb.rfq_items.get(itemId), [itemId]);
+
   const itemAttributes = useLiveQuery(
     () => rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray(),
     [itemId]
   ) || [];
 
-  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
+  const sellerProduct = useLiveQuery(
+    async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
+    [item?.product_id]
+  );
+
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
   const attributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
-  const catalogBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
-  const catalogManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+  const attributesValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
 
   const attributeGroupsMap = React.useMemo(() => {
-    const map: Record<string, { name: string; items: typeof itemAttributes }> = {};
-    const customAttributes = itemAttributes.filter((ia) => ia.attribute_type !== 'SYSTEM');
-    customAttributes.forEach((ia) => {
+    const map: Record<string, { name: string; attributes: any[] }> = {};
+    const customAttributes = sellerProduct?.dynamic_attributes?.filter((ia: any) => ia.is_variant !== true);
+
+    customAttributes?.forEach((ia: any) => {
       const groupId = ia.group_id || 'ungrouped';
       if (!map[groupId]) {
         const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
-        map[groupId] = { name: groupName, items: [] };
+        map[groupId] = { name: groupName, attributes: [] };
       }
-      map[groupId].items.push(ia);
+
+      const hydratedValues = attributesValues
+        .filter((av) => ia?.selected_value_ids?.includes(av.id))
+        .map((v) => ({
+          value_id: v.id,
+          value_label: v.value || v.label,
+        }));
+
+      map[groupId].attributes.push({ ...ia, values: hydratedValues });
     });
+
+    // Include the active variant's combination values
+    const currentVariant = sellerProduct?.variants?.find((v: any) => v.id === item?.variant_id);
+    currentVariant?.combination_values?.forEach((cv: any) => {
+      const groupId = cv.group_id || 'ungrouped';
+      if (!map[groupId]) {
+        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'Variant Specifications';
+        map[groupId] = { name: groupName, attributes: [] };
+      }
+
+      map[groupId].attributes.push({
+        attribute_id: cv.attribute_id,
+        group_id: cv.group_id,
+        is_variant: true,
+        values: [
+          {
+            value_id: cv.value_id,
+            value_label: cv.label || cv.value_id
+          }
+        ]
+      });
+    });
+
     return Object.entries(map);
-  }, [itemAttributes, attributeGroups]);
+  }, [attributeGroups, sellerProduct, attributesValues, item?.variant_id]);
 
-  const getBrandNames = (ids: string[] | null | undefined): string => {
-    if (!ids || ids.length === 0) return 'Any Brand';
-    return ids.map((id) => catalogBrands.find((b) => b.id === id)?.name || id).join(', ');
-  };
-
-  const getManufacturerNames = (ids: string[] | null | undefined): string => {
-    if (!ids || ids.length === 0) return 'Any Manufacturer';
-    return ids.map((id) => catalogManufacturers.find((m) => m.id === id)?.company_name || id).join(', ');
+  const formatSystemValues = (values: any[] | undefined, fallback: string) => {
+    if (!values || values.length === 0) return fallback;
+    return values.map((v) => v.value_label || v.value_id).join(', ');
   };
 
   if (!item) return null;
+
+  const brandAttribute = itemAttributes.find((ia) => ia.attribute_type === 'SYSTEM' && ia.attribute_id === 'brand');
+  const manufacturerAttribute = itemAttributes.find((ia) => ia.attribute_type === 'SYSTEM' && ia.attribute_id === 'manufacturer');
 
   const generalPreferencesData = [
     {
       key: 'brand',
       specification: 'Brand Preference',
-      buyerAsked: getBrandNames(item.brand_id)
+      buyerAsked: formatSystemValues(brandAttribute?.values, 'Any Brand'),
     },
     {
       key: 'manufacturer',
       specification: 'Manufacturer Preference',
-      buyerAsked: getManufacturerNames(item.manufacturer_id)
+      buyerAsked: formatSystemValues(manufacturerAttribute?.values, 'Any Manufacturer'),
     },
     {
       key: 'unit_price',
-      specification: 'Target Unit Price ($)',
+      specification: 'Unit Price ($)',
       buyerAsked: item.target_unit_price ? `$${item.target_unit_price}` : 'N/A'
+    },
+    {
+      key: 'request_qty',
+      specification: 'Requested Quantity',
+      buyerAsked: `${item.quantity} ${item.unit || ''}`.trim()
     }
   ];
 
@@ -232,7 +272,18 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
       width: 320,
       render: (text: string, record: any) => (
         <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-slate-800 leading-tight">{text}</span>
+          <span className="font-bold text-slate-800 leading-tight">
+            {text}
+            {record.isVariant && (
+              <AntTag
+                color="blue"
+                className="text-xs leading-tight italic ml-2"
+                icon={<CheckCircleOutlined />}
+              >
+                Variant Attribute
+              </AntTag>
+            )}
+          </span>
           {record.description && (
             <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
           )}
@@ -249,9 +300,6 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
 
   return (
     <div className="space-y-6">
-      <h3 className="text-base font-bold text-slate-900 pt-3">Sourcing Configuration</h3>
-
-      {/* 1. General Sourcing Preferences Card */}
       <div
         className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
         style={{ borderLeft: `4px solid #2563eb` }}
@@ -266,9 +314,9 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
             </span>
             <h4 className="text-md font-bold text-slate-800">General Sourcing Preferences</h4>
           </div>
-          <Tag color="default" style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 700 }}>
+          <AntTag color="default" style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 700 }}>
             {generalPreferencesData.length} attributes
-          </Tag>
+          </AntTag>
         </div>
         <div className="p-3">
           <Table
@@ -281,15 +329,15 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
         </div>
       </div>
 
-      {/* 2. Custom Specifications (Groups) */}
       {attributeGroupsMap.map(([groupId, group], idx) => {
-        const groupRows = group.items.map((ia) => {
+        const groupRows = group.attributes.map((ia) => {
           const attrName = attributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id;
-          const requestedVals = (ia.values || []).map((v) => v.value_label).join(', ') || 'N/A';
+          const requestedVals = (ia.values || []).map((v: any) => v.value_label).join(', ') || 'N/A';
 
           return {
-            key: ia.id,
+            key: ia.id || ia.attribute_id,
             specification: attrName,
+            isVariant: ia.is_variant,
             description: ia.description || null,
             buyerAsked: requestedVals
           };
@@ -316,9 +364,9 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
                 </span>
                 <h4 className="text-md font-bold text-slate-800">{group.name}</h4>
               </div>
-              <Tag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
+              <AntTag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
                 {groupRows.length} attributes
-              </Tag>
+              </AntTag>
             </div>
             <div className="p-3">
               <Table
@@ -371,52 +419,51 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
   };
 
   const submitAward = async () => {
-    if (!selectedQuote || !item) return;
-    if (awardQty <= 0) {
-      antMessage.error('Please enter a valid quantity to award.');
-      return;
-    }
+    // if (!selectedQuote || !item) return;
+    // if (awardQty <= 0) {
+    //   antMessage.error('Please enter a valid quantity to award.');
+    //   return;
+    // }
 
-    setSavingAward(true);
-    try {
-      const awardId = `awd-${item.id}-${selectedQuote.seller_party_id}-${Date.now()}`;
+    // setSavingAward(true);
+    // try {
+    //   const awardId = `awd-${item.id}-${selectedQuote.seller_party_id}-${Date.now()}`;
 
-      // Determine if a catalog product variant already exists
-      const isCustomSpec = item.item_source === 'CUSTOM_REQUIREMENTS' || !item.catalog_product_id;
+    //   // Determine if a catalog product variant already exists
 
-      const awardPayload = {
-        id: awardId,
-        rfq_id: rfqId!,
-        rfq_item_id: itemId!,
-        seller_quote_id: selectedQuote.id,
-        seller_party_id: selectedQuote.seller_party_id,
-        awarded_quantity: awardQty,
-        unit_price: selectedQuote.unit_price,
-        award_status: 'AWARDED' as const,
-        product_mapping_status: 'PENDING' as const,
-        variant_id: undefined,
-        awarded_at: new Date().toISOString(),
-        awarded_by_user_id: activeWorkspace?.userId
-      };
+    //   const awardPayload = {
+    //     id: awardId,
+    //     rfq_id: rfqId!,
+    //     rfq_item_id: itemId!,
+    //     seller_quote_id: selectedQuote.id,
+    //     seller_party_id: selectedQuote.seller_party_id,
+    //     awarded_quantity: awardQty,
+    //     unit_price: selectedQuote.unit_price,
+    //     award_status: 'AWARDED' as const,
+    //     product_mapping_status: 'PENDING' as const,
+    //     variant_id: undefined,
+    //     awarded_at: new Date().toISOString(),
+    //     awarded_by_user_id: activeWorkspace?.userId
+    //   };
 
-      await rfqDb.rfq_awards.put(awardPayload);
+    //   await rfqDb.rfq_awards.put(awardPayload);
 
-      // Check if total awarded quantity meets requested quantity
-      const newTotalAwarded = awards.reduce((sum, a) => sum + a.awarded_quantity, 0) + awardQty;
-      if (newTotalAwarded >= item.quantity) {
-        await rfqDb.rfq_items.update(item.id, { status: 'AWARDED', awarded_quantity_total: newTotalAwarded });
-      } else {
-        await rfqDb.rfq_items.update(item.id, { awarded_quantity_total: newTotalAwarded });
-      }
+    //   // Check if total awarded quantity meets requested quantity
+    //   const newTotalAwarded = awards.reduce((sum, a) => sum + a.awarded_quantity, 0) + awardQty;
+    //   if (newTotalAwarded >= item.quantity) {
+    //     await rfqDb.rfq_items.update(item.id, { status: 'AWARDED', awarded_quantity_total: newTotalAwarded });
+    //   } else {
+    //     await rfqDb.rfq_items.update(item.id, { awarded_quantity_total: newTotalAwarded });
+    //   }
 
-      antMessage.success(`Quote successfully awarded to supplier!`);
-      setAwardModalVisible(false);
-    } catch (err) {
-      console.error(err);
-      antMessage.error('Failed to register rfq award.');
-    } finally {
-      setSavingAward(false);
-    }
+    //   antMessage.success(`Quote successfully awarded to supplier!`);
+    //   setAwardModalVisible(false);
+    // } catch (err) {
+    //   console.error(err);
+    //   antMessage.error('Failed to register rfq award.');
+    // } finally {
+    //   setSavingAward(false);
+    // }
   };
 
   const quotesColumns = [
@@ -452,7 +499,7 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
       title: 'Round',
       dataIndex: 'round',
       key: 'round',
-      render: (val: number) => <Tag color="blue">Round #{val}</Tag>
+      render: (val: number) => <AntTag color="blue">Round #{val}</AntTag>
     },
     {
       title: 'Status',
@@ -463,11 +510,11 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
         if (matchingAward) {
           const poStatus = matchingAward.award_status;
           if (poStatus === 'PO_RECEIVED') {
-            return <Tag color="success">PO RECEIVED / ORDER CONVERTED</Tag>;
+            return <AntTag color="success">PO RECEIVED / ORDER CONVERTED</AntTag>;
           }
-          return <Tag color="gold">AWARDED ({matchingAward.awarded_quantity} Qty)</Tag>;
+          return <AntTag color="gold">AWARDED ({matchingAward.awarded_quantity} Qty)</AntTag>;
         }
-        return <Tag color={status === 'ACCEPTED' ? 'success' : 'default'}>{status}</Tag>;
+        return <AntTag color={status === 'ACCEPTED' ? 'success' : 'default'}>{status}</AntTag>;
       }
     },
     {
@@ -492,7 +539,7 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
           if (poStatus === 'PO_CREATED') {
             return (
               <div className="flex flex-col gap-0.5 text-left">
-                <Tag color="cyan" className="font-bold w-fit">PO Released</Tag>
+                <AntTag color="cyan" className="font-bold w-fit">PO Released</AntTag>
                 <span className="text-[10px] text-slate-400 font-mono">{matchingAward.purchase_order_id}</span>
               </div>
             );
@@ -623,9 +670,9 @@ const AssignedSellersTab: React.FC<TabProps> = ({ itemId }) => {
       dataIndex: 'assignment_type',
       key: 'assignment_type',
       render: (type: string) => (
-        <Tag color={type === 'DIRECT_INVITATION' ? 'blue' : 'orange'}>
+        <AntTag color={type === 'DIRECT_INVITATION' ? 'blue' : 'orange'}>
           {type === 'DIRECT_INVITATION' ? 'Direct Invitation' : 'Public Marketplace'}
-        </Tag>
+        </AntTag>
       )
     },
     {

@@ -47,10 +47,10 @@ class ErrorBoundary extends Component<Props, State> {
                 type="primary"
                 size="large"
                 className="bg-sky-600 hover:bg-sky-500 flex items-center gap-2 mx-auto"
-                onClick={() => window.location.href = '/'}
+                onClick={() => this.setState({ hasError: false, error: undefined })}
               >
                 <Lucide.RotateCcw size={16} />
-                Reload Application
+                Try Again
               </Button>
             }
           />

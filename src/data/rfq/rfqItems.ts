@@ -9,6 +9,8 @@ export const mockRfqItems: RfqItem[] = [
     product_id: "sprod-1",
     variant_id: "sprod-1-v1",
     quantity: 10,
+    unit: "Pcs",
+    target_unit_price: 100,
     item_index: 1,
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",
@@ -37,13 +39,15 @@ export const mockRfqItems: RfqItem[] = [
     catalog_product_id: "prod-2",
     product_id: "sprod-1",
     variant_id: "sprod-1-v2",
+    target_unit_price: 100,
     quantity: 10,
+    unit: "Pcs",
     item_index: 2,
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",
     status: "OPEN",
     seller_assignments: [
-     {
+      {
         rfq_item_id: "item-01",
         seller_party_id: "pty-2",
         assignment_type: "DIRECT_INVITATION",
@@ -66,13 +70,15 @@ export const mockRfqItems: RfqItem[] = [
     catalog_product_id: "prod-2",
     product_id: "sprod-1",
     variant_id: "sprod-1-v3",
+    target_unit_price: 100,
     quantity: 10,
+    unit: "Pcs",
     item_index: 3,
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",
     status: "OPEN",
     seller_assignments: [
-     {
+      {
         rfq_item_id: "item-01",
         seller_party_id: "pty-2",
         assignment_type: "DIRECT_INVITATION",

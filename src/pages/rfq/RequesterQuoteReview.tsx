@@ -78,6 +78,13 @@ export const RequesterQuoteReview: React.FC = () => {
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
   const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
 
+  const sellerProduct = useLiveQuery(
+    async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
+    [item?.product_id]
+  );
+  
+  const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
+
   const itemAttributes = useLiveQuery(
     () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray() : []),
     [itemId]
@@ -190,18 +197,50 @@ export const RequesterQuoteReview: React.FC = () => {
 
 
   const attributeGroupsMap = React.useMemo(() => {
-    const map: Record<string, { name: string; items: typeof itemAttributes }> = {};
-    const customAttributes = itemAttributes.filter((ia) => ia.attribute_type !== 'SYSTEM');
-    customAttributes.forEach((ia) => {
+    const map: Record<string, { name: string; attributes: any[] }> = {};
+    const customAttributes = sellerProduct?.dynamic_attributes?.filter((ia: any) => ia.is_variant !== true);
+    
+    customAttributes?.forEach((ia: any) => {
       const groupId = ia.group_id || 'ungrouped';
       if (!map[groupId]) {
         const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
-        map[groupId] = { name: groupName, items: [] };
+        map[groupId] = { name: groupName, attributes: [] };
       }
-      map[groupId].items.push(ia);
+      
+      const hydratedValues = catalogAttributeValues
+        .filter((av) => ia?.selected_value_ids?.includes(av.id))
+        .map((v) => ({
+          value_id: v.id,
+          value_label: v.value || v.label,
+        }));
+        
+      map[groupId].attributes.push({ ...ia, values: hydratedValues });
     });
+    
+    const currentVariant = sellerProduct?.variants?.find((v: any) => v.id === item?.variant_id);
+    currentVariant?.combination_values?.forEach((cv: any) => {
+      const groupId = cv.group_id || 'ungrouped';
+      if (!map[groupId]) {
+        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'Variant Specifications';
+        map[groupId] = { name: groupName, attributes: [] };
+      }
+      
+      map[groupId].attributes.push({
+        id: `var-${cv.attribute_id}`,
+        attribute_id: cv.attribute_id,
+        group_id: cv.group_id,
+        is_variant: true,
+        values: [
+          {
+            value_id: cv.value_id,
+            value_label: cv.label || cv.value_id
+          }
+        ]
+      });
+    });
+    
     return Object.entries(map);
-  }, [itemAttributes, attributeGroups]);
+  }, [attributeGroups, sellerProduct, catalogAttributeValues, item?.variant_id]);
 
   if (rfq === undefined || item === undefined || quote === undefined || parties.length === 0) {
     return (
@@ -230,16 +269,16 @@ export const RequesterQuoteReview: React.FC = () => {
     {
       key: 'brand',
       specification: 'Brand Preference',
-      buyerAsked: getBrandNames(item.brand_id),
-      offered: getBrandNames(quote.brand_id),
+      buyerAsked: getBrandNames(itemAttributes.find(ia => ia.attribute_id === 'brand')?.values?.map((v: any) => v.value_id)),
+      offered: getBrandNames(quoteAttributes.find(qa => qa.attribute_id === 'brand')?.values?.map((v: any) => v.value_id)),
       supplierComment: getSupplierCommentText('system-preferences', 'brand'),
       commentKey: 'SYSTEM_brand'
     },
     {
       key: 'manufacturer',
       specification: 'Manufacturer Preference',
-      buyerAsked: getManufacturerNames(item.manufacturer_id),
-      offered: getManufacturerNames(quote.manufacturer_id),
+      buyerAsked: getManufacturerNames(itemAttributes.find(ia => ia.attribute_id === 'manufacturer')?.values?.map((v: any) => v.value_id)),
+      offered: getManufacturerNames(quoteAttributes.find(qa => qa.attribute_id === 'manufacturer')?.values?.map((v: any) => v.value_id)),
       supplierComment: getSupplierCommentText('system-preferences', 'manufacturer'),
       commentKey: 'SYSTEM_manufacturer'
     },
@@ -258,12 +297,23 @@ export const RequesterQuoteReview: React.FC = () => {
       title: 'Specification / Attribute',
       dataIndex: 'specification',
       key: 'specification',
-      width: 200,
+      width: 280,
       render: (text: string, record: any) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-slate-800 leading-tight">{text}</span>
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center gap-2">
+            {record.is_variant ? (
+              <Tag color="blue" className="m-0 font-bold tracking-wide border-blue-200">
+                VARIANT
+              </Tag>
+            ) : (
+              <Tag color="purple" className="m-0 font-semibold tracking-wide border-purple-200">
+                SPEC
+              </Tag>
+            )}
+            <span className="font-bold text-slate-800 leading-tight text-[13px]">{text}</span>
+          </div>
           {record.description && (
-            <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
+            <span className="text-xs text-slate-500 leading-tight italic pl-1">{record.description}</span>
           )}
         </div>
       )
@@ -372,9 +422,9 @@ export const RequesterQuoteReview: React.FC = () => {
         </div>
 
         {/* Requested Item Details */}
-        <Descriptions title="Requested Item Details" bordered size="small" column={2} className="mb-6">
+        <Descriptions title="Target Specifications Overview" bordered size="small" column={2} className="mb-6">
           <Descriptions.Item label="Product / Service" span={2}>
-            <strong className="text-slate-800">{item.product_name}</strong>
+            <strong className="text-slate-800">{sellerProduct?.product_name || 'Custom Specifications'}</strong>
           </Descriptions.Item>
           <Descriptions.Item label="Catalog Product">
             {item.catalog_product_id
@@ -455,18 +505,19 @@ export const RequesterQuoteReview: React.FC = () => {
 
           {/* 2. Custom Specifications (Groups) */}
           {attributeGroupsMap.map(([groupId, group], idx) => {
-            const groupRows = group.items.map((ia) => {
+            const groupRows = group.attributes.map((ia: any) => {
               const attrName = catalogAttributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id;
-              const requestedVals = (ia.values || []).map((v) => v.value_label).join(', ') || 'N/A';
+              const requestedVals = (ia.values || []).map((v: any) => v.value_label).join(', ') || 'N/A';
 
               // Resolve what supplier offered
               const key = `${ia.group_id}_${ia.attribute_id}`;
               const foundAttr = quoteAttributes.find((qa) => qa.group_id === ia.group_id && qa.attribute_id === ia.attribute_id);
-              const supplierOffered = (foundAttr?.offered_values || []).map((v) => v.value_label).join(', ') || '—';
+              const supplierOffered = (foundAttr?.values || []).map((v: any) => v.value_label).join(', ') || '—';
 
               return {
-                key: ia.id,
+                key: ia.id || ia.attribute_id,
                 specification: attrName,
+                is_variant: ia.is_variant,
                 description: ia.description || null,
                 buyerAsked: requestedVals,
                 offered: supplierOffered,

@@ -36,7 +36,7 @@ import {
   DisconnectOutlined,
   AimOutlined,
 } from '@ant-design/icons';
-import { rfqDb, type Rfq, type RfqItem, type RfqItemAttribute, type RfqItemSource, type SellerQuote } from '../../data/rfq';
+import { rfqDb, type Rfq, type RfqItem, type RfqItemAttribute, type SellerQuote } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -191,8 +191,7 @@ export const RfqCreateWizard: React.FC = () => {
 
   const handleAddItem = () => {
     const newItem = {
-      id: `item-${Date.now()}-${items.length + 1}`,
-      item_source: 'CUSTOM_REQUIREMENTS' as RfqItemSource,
+      id: `item-${Date.now()}-${items.length + 1}`,      
       seller_product_id: undefined,
       variant_id: undefined,
       variant_sku: undefined,

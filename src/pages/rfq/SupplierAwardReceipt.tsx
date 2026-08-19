@@ -204,7 +204,7 @@ export const SupplierAwardReceipt: React.FC = () => {
                     <span className="font-semibold">{categoryName}</span>
                   </Descriptions.Item>
                   <Descriptions.Item label="Catalog Product Name">
-                    <span className="font-semibold text-slate-800">{mappingDetails.mappedProduct?.product_name || item.product_name}</span>
+                    <span className="font-semibold text-slate-800">{mappingDetails.mappedProduct?.product_name || 'Custom Specifications'}</span>
                   </Descriptions.Item>
                   <Descriptions.Item label="Variant Platform ID">
                     <Tag color="blue">{mappingDetails.mappedVariant.id}</Tag>
