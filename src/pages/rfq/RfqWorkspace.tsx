@@ -167,8 +167,8 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
     },
     {
       title: 'UnitPrice',
-      dataIndex: 'target_unit_price',
-      key: 'target_unit_price',
+      dataIndex: 'unit_price',
+      key: 'unit_price',
       width: 140,
       render: (val: number) => <span className="font-bold text-emerald-600">${val || 0}</span>,
     },
@@ -334,8 +334,8 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
     },
     {
       title: 'UnitPrice',
-      dataIndex: 'target_unit_price',
-      key: 'target_unit_price',
+      dataIndex: 'unit_price',
+      key: 'unit_price',
       render: (val: number) => <span className="font-bold text-emerald-600">${val || 0}</span>,
     },
     {

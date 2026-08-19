@@ -23,17 +23,16 @@ const CommentThread: React.FC<{
         const isBuyer = c.actor_type === 'BUYER';
         const isSelf = c.actor_id === viewerPartyId;
         const name = isSelf ? 'You' : (isBuyer ? 'Requester' : 'Seller');
-        const timeStr = c.created_at 
-          ? `${new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} ${new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` 
+        const timeStr = c.created_at
+          ? `${new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} ${new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
           : '';
         return (
           <div
             key={c.id}
-            className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${
-              isBuyer
+            className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
                 ? 'bg-blue-50/50 border-blue-100 text-blue-900'
                 : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
-            }`}
+              }`}
           >
             <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
               [{name} {timeStr}]:
@@ -82,7 +81,7 @@ export const RequesterQuoteReview: React.FC = () => {
     async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
     [item?.product_id]
   );
-  
+
   const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
 
   const itemAttributes = useLiveQuery(
@@ -199,24 +198,24 @@ export const RequesterQuoteReview: React.FC = () => {
   const attributeGroupsMap = React.useMemo(() => {
     const map: Record<string, { name: string; attributes: any[] }> = {};
     const customAttributes = sellerProduct?.dynamic_attributes?.filter((ia: any) => ia.is_variant !== true);
-    
+
     customAttributes?.forEach((ia: any) => {
       const groupId = ia.group_id || 'ungrouped';
       if (!map[groupId]) {
         const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
         map[groupId] = { name: groupName, attributes: [] };
       }
-      
+
       const hydratedValues = catalogAttributeValues
         .filter((av) => ia?.selected_value_ids?.includes(av.id))
         .map((v) => ({
           value_id: v.id,
           value_label: v.value || v.label,
         }));
-        
+
       map[groupId].attributes.push({ ...ia, values: hydratedValues });
     });
-    
+
     const currentVariant = sellerProduct?.variants?.find((v: any) => v.id === item?.variant_id);
     currentVariant?.combination_values?.forEach((cv: any) => {
       const groupId = cv.group_id || 'ungrouped';
@@ -224,7 +223,7 @@ export const RequesterQuoteReview: React.FC = () => {
         const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'Variant Specifications';
         map[groupId] = { name: groupName, attributes: [] };
       }
-      
+
       map[groupId].attributes.push({
         id: `var-${cv.attribute_id}`,
         attribute_id: cv.attribute_id,
@@ -238,7 +237,7 @@ export const RequesterQuoteReview: React.FC = () => {
         ]
       });
     });
-    
+
     return Object.entries(map);
   }, [attributeGroups, sellerProduct, catalogAttributeValues, item?.variant_id]);
 
@@ -285,7 +284,7 @@ export const RequesterQuoteReview: React.FC = () => {
     {
       key: 'unit_price',
       specification: 'Unit Price ($)',
-      buyerAsked: item.target_unit_price ? `$${item.target_unit_price}` : 'N/A',
+      buyerAsked: item.unit_price ? `$${item.unit_price}` : 'N/A',
       offered: `$${quote.unit_price.toFixed(2)}`,
       supplierComment: getSupplierCommentText('system-preferences', 'unit_price'),
       commentKey: 'SYSTEM_unit_price'
@@ -436,9 +435,9 @@ export const RequesterQuoteReview: React.FC = () => {
             <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Target Unit Price">
-            {item.target_unit_price ? <span className="text-emerald-600 font-bold">${item.target_unit_price}</span> : 'N/A'}
+            {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
           </Descriptions.Item>
-          
+
         </Descriptions>
 
         <div className="space-y-6">

@@ -191,7 +191,7 @@ export const RfqCreateWizard: React.FC = () => {
 
   const handleAddItem = () => {
     const newItem = {
-      id: `item-${Date.now()}-${items.length + 1}`,      
+      id: `item-${Date.now()}-${items.length + 1}`,
       seller_product_id: undefined,
       variant_id: undefined,
       variant_sku: undefined,
@@ -200,7 +200,7 @@ export const RfqCreateWizard: React.FC = () => {
       master_product_id: undefined,
       quantity: 1,
       unit_of_measure: 'Units',
-      target_unit_price: undefined,
+      unit_price: undefined,
       brand_id: undefined,
       manufacturer_id: undefined,
       country_of_origin: '',
@@ -238,7 +238,7 @@ export const RfqCreateWizard: React.FC = () => {
     itemToUpdate.brand_id = sellerProduct.brand_id || '';
     itemToUpdate.manufacturer_id = sellerProduct.manufacturer_id || '';
     if (variant?.price) {
-      itemToUpdate.target_unit_price = variant.price;
+      itemToUpdate.unit_price = variant.price;
     }
     if (sellerProduct.dynamic_attributes) {
       itemToUpdate.selected_dynamic_attributes = sellerProduct.dynamic_attributes.map((da: any) => ({
@@ -293,7 +293,7 @@ export const RfqCreateWizard: React.FC = () => {
         status: 'ISSUED',
         submission_deadline: new Date(globalDetails.submission_deadline).toISOString(),
         total_items_count: items.length,
-        total_estimated_budget: items.reduce((acc, i) => acc + (i.quantity || 0) * (i.target_unit_price || 0), 0),
+        total_estimated_budget: items.reduce((acc, i) => acc + (i.quantity || 0) * (i.unit_price || 0), 0),
         currency: globalDetails.currency,
         timeline: [
           {
@@ -326,7 +326,7 @@ export const RfqCreateWizard: React.FC = () => {
         manufacturer_id: item.manufacturer_id,
         quantity: item.quantity || 1,
         unit: item.unit_of_measure || item.unit || 'Units',
-        target_unit_price: item.target_unit_price,
+        unit_price: item.unit_price,
         dynamic_attributes: item.selected_dynamic_attributes || [],
         attachments: [],
         target_seller_party_ids: item.target_seller_party_ids || [],
@@ -358,7 +358,7 @@ export const RfqCreateWizard: React.FC = () => {
             seller_quote_number: `SQ-${item.id.replace('rfqi-', '')}-${sellerPartyId.replace('pty-', '')}`,
             status: 'DRAFT',
             round: 1,
-            unit_price: item.target_unit_price || 0,
+            unit_price: item.unit_price || 0,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           });
@@ -559,7 +559,7 @@ export const RfqCreateWizard: React.FC = () => {
                 render: (_, record) => (
                   <div>
                     <div className="font-bold text-slate-800">{record.quantity || 0} {record.unit_of_measure}</div>
-                    {record.target_unit_price && <div className="text-xs font-bold text-emerald-600">${record.target_unit_price} / unit</div>}
+                    {record.unit_price && <div className="text-xs font-bold text-emerald-600">${record.unit_price} / unit</div>}
                   </div>
                 ),
               },
@@ -604,8 +604,8 @@ export const RfqCreateWizard: React.FC = () => {
               { title: 'Sourcing Mode', width: 140, render: (_, r) => r.variant_id ? <Tag color="green">Targeted SKU</Tag> : <Tag color="blue">Open Spec</Tag> },
               { title: 'Title & Category', render: (_, r) => <span><strong>{r.product_name || 'Untitled'}</strong> ({r.category_id || 'N/A'})</span> },
               { title: 'Quantity', width: 120, render: (_, r) => `${r.quantity} ${r.unit_of_measure}` },
-              { title: 'Target Unit Price', width: 140, render: (_, r) => r.target_unit_price ? `$${r.target_unit_price}` : 'Unspecified' },
-              { title: 'Subtotal', width: 140, render: (_, r) => r.target_unit_price ? <strong className="text-emerald-600">${(r.quantity * r.target_unit_price).toLocaleString()}</strong> : '-' },
+              { title: 'Target Unit Price', width: 140, render: (_, r) => r.unit_price ? `$${r.unit_price}` : 'Unspecified' },
+              { title: 'Subtotal', width: 140, render: (_, r) => r.unit_price ? <strong className="text-emerald-600">${(r.quantity * r.unit_price).toLocaleString()}</strong> : '-' },
             ]}
           />
 
@@ -917,10 +917,10 @@ export const RfqCreateWizard: React.FC = () => {
                       <Input
                         type="number"
                         placeholder="Optional target budget price"
-                        value={item.target_unit_price}
+                        value={item.unit_price}
                         onChange={(e) => {
                           const updated = [...items];
-                          updated[activeDrawerIndex].target_unit_price = e.target.value ? Number(e.target.value) : undefined;
+                          updated[activeDrawerIndex].unit_price = e.target.value ? Number(e.target.value) : undefined;
                           setItems(updated);
                         }}
                         className="mt-1"

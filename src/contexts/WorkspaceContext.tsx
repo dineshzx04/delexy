@@ -46,6 +46,7 @@ interface WorkspaceContextProps {
 }
 
 const STORAGE_CREDENTIAL_KEY = 'delexy_current_credential_id';
+const STORAGE_WORKSPACE_KEY = 'delexy_selected_workspace_id';
 
 const WorkspaceContext = createContext<WorkspaceContextProps | undefined>(undefined);
 
@@ -62,7 +63,18 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     return localStorage.getItem(STORAGE_CREDENTIAL_KEY) || '';
   });
 
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>('');
+  const [selectedWorkspaceId, setSelectedWorkspaceIdState] = useState<string>(() => {
+    return sessionStorage.getItem(STORAGE_WORKSPACE_KEY) || '';
+  });
+
+  const setSelectedWorkspaceId = (id: string) => {
+    setSelectedWorkspaceIdState(id);
+    if (id) {
+      sessionStorage.setItem(STORAGE_WORKSPACE_KEY, id);
+    } else {
+      sessionStorage.removeItem(STORAGE_WORKSPACE_KEY);
+    }
+  };
 
   // Track window URL pathname to sync context layout mode (/b vs /user)
   const [currentPathname, setCurrentPathname] = useState(() => window.location.pathname);
@@ -306,6 +318,12 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
     }
   }
 
+  useEffect(() => {
+    if (isAuthenticated && !selectedWorkspaceId && activeWorkspace) {
+      setSelectedWorkspaceId(activeWorkspace.id);
+    }
+  }, [isAuthenticated, selectedWorkspaceId, activeWorkspace]);
+
   const switchWorkspace = (id: string): DynamicWorkspace | undefined => {
     const found = workspaces.find((ws) => ws.id === id);
     if (found) {
@@ -538,6 +556,7 @@ export const WorkspaceProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   const logout = () => {
     localStorage.removeItem(STORAGE_CREDENTIAL_KEY);
+    sessionStorage.removeItem(STORAGE_WORKSPACE_KEY);
     setCurrentCredentialIdState('');
     setSelectedWorkspaceId('');
   };

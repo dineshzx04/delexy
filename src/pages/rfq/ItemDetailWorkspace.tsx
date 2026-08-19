@@ -108,7 +108,7 @@ export const ItemDetailWorkspace: React.FC = () => {
             <AntTag color="blue" className="font-bold">{item.quantity} {item.unit}</AntTag>
           </Descriptions.Item>
           <Descriptions.Item label="Target Unit Price">
-            {item.target_unit_price ? <span className="text-emerald-600 font-bold">${item.target_unit_price}</span> : 'N/A'}
+            {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -255,7 +255,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
     {
       key: 'unit_price',
       specification: 'Unit Price ($)',
-      buyerAsked: item.target_unit_price ? `$${item.target_unit_price}` : 'N/A'
+      buyerAsked: item.unit_price ? `$${item.unit_price}` : 'N/A'
     },
     {
       key: 'request_qty',
@@ -277,7 +277,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
             {record.isVariant && (
               <AntTag
                 color="blue"
-                className="text-xs leading-tight italic ml-2"
+                className="leading-tight italic ml-2"
                 icon={<CheckCircleOutlined />}
               >
                 Variant Attribute
@@ -305,7 +305,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
         style={{ borderLeft: `4px solid #2563eb` }}
       >
         <div
-          className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
+          className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-1.5"
           style={{ backgroundColor: `#2563eb14` }}
         >
           <div className="flex items-center gap-3">
@@ -318,7 +318,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
             {generalPreferencesData.length} attributes
           </AntTag>
         </div>
-        <div className="p-3">
+        <div className="p-2">
           <Table
             dataSource={generalPreferencesData}
             columns={attributesColumns}
@@ -352,7 +352,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
             style={{ borderLeft: `4px solid ${accentColor}` }}
           >
             <div
-              className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
+              className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-1.5"
               style={{ backgroundColor: `${accentColor}14` }}
             >
               <div className="flex items-center gap-3">
@@ -368,7 +368,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
                 {groupRows.length} attributes
               </AntTag>
             </div>
-            <div className="p-3">
+            <div className="p-2">
               <Table
                 dataSource={groupRows}
                 columns={attributesColumns}

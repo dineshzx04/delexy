@@ -34,10 +34,10 @@ export interface RfqItem {
   product_id: string | null;
   variant_id: string | null;
   item_index?: number;
+  unit_price: number;
   quantity: number;
   unit?: string;
-  target_unit_price: number;
-  awarded_quantity_total?: number;
+  // awarded_quantity_total?: number;
   created_at: string;
   updated_at: string;
   status: RfqItemStatus;
@@ -60,10 +60,12 @@ export interface RfqItemAttribute {
 export interface SellerQuote {
   id: string;
   rfq_item_id: string;
+  round: number;
   seller_party_id: string;
   seller_quote_number: string;
-  unit_price: number;
-  round: number;
+  offer_unit_price: number;
+  offer_quantity: number;
+  offer_unit?: string;
   status: SellerQuoteStatus;
   created_at: string;
   updated_at: string;

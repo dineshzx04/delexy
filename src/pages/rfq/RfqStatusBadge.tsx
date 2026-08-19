@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tag } from 'antd';
-import type { RfqStatus, RfqItemStatus } from '../../data/rfq/rfq.module';
+import type { RfqStatus, RfqItemStatus, SellerQuoteStatus } from '../../data/rfq/rfq.module';
 
 export const RfqStatusBadge: React.FC<{ status: RfqStatus }> = ({ status }) => {
   let color = 'default';
@@ -20,6 +20,17 @@ export const RfqItemStatusBadge: React.FC<{ status: RfqItemStatus }> = ({ status
   if (status === 'OPEN') color = 'blue';
   if (status === 'AWARDED') color = 'success';
   if (status === 'CANCELLED') color = 'error';
+
+  return <Tag color={color}>{status}</Tag>;
+};
+
+export const RFQQuoteStatusBadge: React.FC<{ status: SellerQuoteStatus }> = ({ status }) => {
+  let color = 'default';
+  if (status === 'DRAFT') color = 'default';
+  if (status === 'SUBMITTED') color = 'blue';
+  if (status === 'REVISION_REQUIRED') color = 'warning';
+  if (status === 'ACCEPTED') color = 'success';
+  if (status === 'REJECTED') color = 'error';
 
   return <Tag color={color}>{status}</Tag>;
 };

@@ -144,7 +144,7 @@ export const SupplierItemRespond: React.FC = () => {
           console.error("Error parsing draft snapshot:", e);
         }
       } else {
-        setUnitPrice(existingQuote.unit_price);
+        setUnitPrice(existingQuote.offer_unit_price);
         // Load initial brand and manufacturer arrays from existing quote attributes, because they were removed from quote root
       }
     }
@@ -245,11 +245,6 @@ export const SupplierItemRespond: React.FC = () => {
     return Object.entries(map);
   }, [attributeGroups, sellerProduct, catalogAttributeValues, item?.variant_id]);
 
-  // Normalize comment key: SYSTEM attrs use 'SYSTEM_<id>', custom use '<group_id>_<attr_id>'
-  const getCommentKey = (attributeType: string | undefined, groupId: string, attributeId: string) =>
-    attributeType === 'SYSTEM' ? `SYSTEM_${attributeId}` : `${groupId}_${attributeId}`;
-
-
   if (rfq === undefined || item === undefined || parties.length === 0) {
     return (
       <div className="p-12 text-center text-slate-500">
@@ -278,108 +273,108 @@ export const SupplierItemRespond: React.FC = () => {
 
 
   const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
-    if (submitMode === 'SUBMITTED' && (!unitPrice || unitPrice <= 0)) {
-      antMessage.error('Please enter a valid offered unit price.');
-      return;
-    }
-    if (!quoteNumber.trim()) {
-      antMessage.error('Please enter a quote reference/number.');
-      return;
-    }
+    // if (submitMode === 'SUBMITTED' && (!unitPrice || unitPrice <= 0)) {
+    //   antMessage.error('Please enter a valid offered unit price.');
+    //   return;
+    // }
+    // if (!quoteNumber.trim()) {
+    //   antMessage.error('Please enter a quote reference/number.');
+    //   return;
+    // }
 
-    setSubmitting(true);
-    try {
-      const quoteId = existingQuote?.id || `q-${itemId}-${activePartyId}`;
-      // For DRAFT mode: serialize everything to JSON and skip writing to seller_quote_attributes
-      const draftSnapshot = submitMode === 'DRAFT' ? JSON.stringify({ unitPrice, offeredBrands, offeredManufacturers, offeredAttrValues, offeredComments }) : null;
+    // setSubmitting(true);
+    // try {
+    //   const quoteId = existingQuote?.id || `q-${itemId}-${activePartyId}`;
+    //   // For DRAFT mode: serialize everything to JSON and skip writing to seller_quote_attributes
+    //   const draftSnapshot = submitMode === 'DRAFT' ? JSON.stringify({ unitPrice, offeredBrands, offeredManufacturers, offeredAttrValues, offeredComments }) : null;
 
-      const quotePayload = {
-        id: quoteId,
-        rfq_item_id: itemId!,
-        seller_party_id: activePartyId,
-        seller_quote_number: quoteNumber.trim(),
-        unit_price: unitPrice || 0,
-        round: existingQuote ? existingQuote.round : 1,
-        status: submitMode,
-        created_at: existingQuote ? existingQuote.created_at : new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        draft_snapshot: draftSnapshot
-      };
+    //   const quotePayload = {
+    //     id: quoteId,
+    //     rfq_item_id: itemId!,
+    //     seller_party_id: activePartyId,
+    //     seller_quote_number: quoteNumber.trim(),
+    //     unit_price: unitPrice || 0,
+    //     round: existingQuote ? existingQuote.round : 1,
+    //     status: submitMode,
+    //     created_at: existingQuote ? existingQuote.created_at : new Date().toISOString(),
+    //     updated_at: new Date().toISOString(),
+    //     draft_snapshot: draftSnapshot
+    //   };
 
-      // Put Seller Quote
-      await rfqDb.seller_quotes.put(quotePayload);
+    //   // Put Seller Quote
+    //   await rfqDb.seller_quotes.put(quotePayload);
 
-      // For SUBMITTED mode: write individual attribute records to seller_quote_attributes
-      if (submitMode === 'SUBMITTED') {
-        const qaPromises = itemAttributes.map((ia) => {
-          const key = `${ia.group_id}_${ia.attribute_id}`;
-          let offered = offeredAttrValues[key] || [];
-          if (ia.attribute_type === 'SYSTEM') {
-            if (ia.attribute_id === 'brand') {
-              offered = offeredBrands.map((id) => ({
-                value_id: id,
-                value_label: catalogBrands.find((b) => b.id === id)?.name || id
-              }));
-            } else if (ia.attribute_id === 'manufacturer') {
-              offered = offeredManufacturers.map((id) => ({
-                value_id: id,
-                value_label: catalogManufacturers.find((m) => m.id === id)?.company_name || id
-              }));
-            } else if (ia.attribute_id === 'unit_price') {
-              offered = [{
-                value_id: 'price-offer',
-                value_label: String(unitPrice || 0)
-              }];
-            }
-          }
-          const qaPayload = {
-            id: `qa-${quoteId}-${ia.attribute_id}`,
-            seller_quote_id: quoteId,
-            group_id: ia.group_id,
-            attribute_id: ia.attribute_id,
-            values: offered,
-            is_deviation: false,
-            attribute_type: ia.attribute_type
-          };
-          return rfqDb.seller_quote_attributes.put(qaPayload);
-        });
-        await Promise.all(qaPromises);
+    //   // For SUBMITTED mode: write individual attribute records to seller_quote_attributes
+    //   if (submitMode === 'SUBMITTED') {
+    //     const qaPromises = itemAttributes.map((ia) => {
+    //       const key = `${ia.group_id}_${ia.attribute_id}`;
+    //       let offered = offeredAttrValues[key] || [];
+    //       if (ia.attribute_type === 'SYSTEM') {
+    //         if (ia.attribute_id === 'brand') {
+    //           offered = offeredBrands.map((id) => ({
+    //             value_id: id,
+    //             value_label: catalogBrands.find((b) => b.id === id)?.name || id
+    //           }));
+    //         } else if (ia.attribute_id === 'manufacturer') {
+    //           offered = offeredManufacturers.map((id) => ({
+    //             value_id: id,
+    //             value_label: catalogManufacturers.find((m) => m.id === id)?.company_name || id
+    //           }));
+    //         } else if (ia.attribute_id === 'unit_price') {
+    //           offered = [{
+    //             value_id: 'price-offer',
+    //             value_label: String(unitPrice || 0)
+    //           }];
+    //         }
+    //       }
+    //       const qaPayload = {
+    //         id: `qa-${quoteId}-${ia.attribute_id}`,
+    //         seller_quote_id: quoteId,
+    //         group_id: ia.group_id,
+    //         attribute_id: ia.attribute_id,
+    //         values: offered,
+    //         is_deviation: false,
+    //         attribute_type: ia.attribute_type
+    //       };
+    //       return rfqDb.seller_quote_attributes.put(qaPayload);
+    //     });
+    //     await Promise.all(qaPromises);
 
-        // Write seller_quote_comments for each attribute that has a comment (SYSTEM + custom)
-        // Write seller_quote_comments for each attribute that has a comment (SYSTEM + custom)
-        const commentPromises = Object.entries(offeredComments)
-          .filter(([key, comment]) => !!comment.trim())
-          .map(([key, comment]) => {
-            const isSystem = key.startsWith('SYSTEM_');
-            const storedGroupId = isSystem ? 'SYSTEM' : key.split('_')[0];
-            const attributeId = isSystem ? key.replace('SYSTEM_', '') : key.split('_')[1];
-            const attributeType = isSystem ? 'SYSTEM' : undefined;
-            const round = existingQuote ? existingQuote.round : 1;
-            const commentId = `qc-${quoteId}-${storedGroupId}-${attributeId}-r${round}`;
+    //     // Write seller_quote_comments for each attribute that has a comment (SYSTEM + custom)
+    //     // Write seller_quote_comments for each attribute that has a comment (SYSTEM + custom)
+    //     const commentPromises = Object.entries(offeredComments)
+    //       .filter(([key, comment]) => !!comment.trim())
+    //       .map(([key, comment]) => {
+    //         const isSystem = key.startsWith('SYSTEM_');
+    //         const storedGroupId = isSystem ? 'SYSTEM' : key.split('_')[0];
+    //         const attributeId = isSystem ? key.replace('SYSTEM_', '') : key.split('_')[1];
+    //         const attributeType = isSystem ? 'SYSTEM' : undefined;
+    //         const round = existingQuote ? existingQuote.round : 1;
+    //         const commentId = `qc-${quoteId}-${storedGroupId}-${attributeId}-r${round}`;
 
-            return rfqDb.seller_quote_comments.put({
-              id: commentId,
-              seller_quote_id: quoteId,
-              group_id: storedGroupId,
-              attribute_id: attributeId,
-              comment: comment.trim(),
-              actor_type: 'SELLER',
-              actor_id: activePartyId,
-              created_at: new Date().toISOString(),
-              attribute_type: attributeType as any
-            });
-          });
-        await Promise.all(commentPromises);
-      }
+    //         return rfqDb.seller_quote_comments.put({
+    //           id: commentId,
+    //           seller_quote_id: quoteId,
+    //           group_id: storedGroupId,
+    //           attribute_id: attributeId,
+    //           comment: comment.trim(),
+    //           actor_type: 'SELLER',
+    //           actor_id: activePartyId,
+    //           created_at: new Date().toISOString(),
+    //           attribute_type: attributeType as any
+    //         });
+    //       });
+    //     await Promise.all(commentPromises);
+    //   }
 
-      antMessage.success(submitMode === 'DRAFT' ? 'Draft saved successfully!' : 'Quotation proposal submitted successfully!');
-      navigate(basePath);
-    } catch (error: any) {
-      console.error('Error saving proposal:', error);
-      antMessage.error('Failed to save sourcing proposal.');
-    } finally {
-      setSubmitting(false);
-    }
+    //   antMessage.success(submitMode === 'DRAFT' ? 'Draft saved successfully!' : 'Quotation proposal submitted successfully!');
+    //   navigate(basePath);
+    // } catch (error: any) {
+    //   console.error('Error saving proposal:', error);
+    //   antMessage.error('Failed to save sourcing proposal.');
+    // } finally {
+    //   setSubmitting(false);
+    // }
   };
 
   const getBrandNames = (ids: string[] | null | undefined): string => {
@@ -464,7 +459,7 @@ export const SupplierItemRespond: React.FC = () => {
     {
       key: 'unit_price',
       specification: 'Offered Unit Price ($)',
-      buyerAsked: item.target_unit_price ? `$${item.target_unit_price}` : 'N/A',
+      buyerAsked: item.unit_price ? `$${item.unit_price}` : 'N/A',
       renderOffers: () => (
         <InputNumber
           value={unitPrice}
@@ -604,7 +599,7 @@ export const SupplierItemRespond: React.FC = () => {
         title={
           <div className="flex items-center gap-3">
             <div className="flex flex-col">
-              <span className="font-extrabold text-slate-900 leading-tight">Configure Sourcing Proposal</span>
+              <span className="font-extrabold text-slate-900 leading-tight">RFQ Item Proposal</span>
               <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; From: {rfq.requester_name || 'N/A'} </span>
             </div>
           </div>
@@ -662,10 +657,10 @@ export const SupplierItemRespond: React.FC = () => {
             <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Target Unit Price">
-            {item.target_unit_price ? <span className="text-emerald-600 font-bold">${item.target_unit_price}</span> : 'N/A'}
+            {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
           </Descriptions.Item>
           <Descriptions.Item label="Target Unit Price">
-            {item.target_unit_price ? <span className="text-emerald-600 font-bold">${item.target_unit_price}</span> : 'N/A'}
+            {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
           </Descriptions.Item>
           <Descriptions.Item label="RFQ Number">
             <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
