@@ -491,8 +491,8 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
     },
     {
       title: 'Offered Price',
-      dataIndex: 'unit_price',
-      key: 'unit_price',
+      dataIndex: 'offer_unit_price',
+      key: 'offer_unit_price',
       render: (val: number) => <span className="font-bold text-emerald-600">${val}</span>
     },
     {

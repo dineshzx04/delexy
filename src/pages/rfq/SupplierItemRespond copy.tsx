@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Card, Input, InputNumber, Button, Select, Tag, Table, Descriptions, App as AntApp, Alert } from 'antd';
-import { SendOutlined, ArrowLeftOutlined, SaveOutlined, ReloadOutlined } from '@ant-design/icons';
-import { rfqDb, type ItemAttributeValue, type SellerQuoteAttribute } from '../../data/rfq';
+import { SendOutlined, ArrowLeftOutlined, SaveOutlined, ReloadOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { rfqDb, type ItemAttributeValue } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -11,12 +11,13 @@ import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 const CommentThread: React.FC<{
   comments: any[];
+  parties: any[];
   viewerPartyId: string;
-}> = ({ comments, viewerPartyId }) => {
+}> = ({ comments, parties, viewerPartyId }) => {
   if (comments.length === 0) return null;
 
   return (
-    <div className="mt-2 space-y-1.5 text-left bg-slate-50/50 p-2.5 rounded-lg border border-slate-100 max-h-48 overflow-y-auto">
+    <div className="mt-1 space-y-1 text-left">
       {comments.map((c) => {
         const isBuyer = c.actor_type === 'BUYER';
         const isSelf = c.actor_id === viewerPartyId;
@@ -27,17 +28,14 @@ const CommentThread: React.FC<{
         return (
           <div
             key={c.id}
-            className={`text-[11px] px-2 py-1 rounded leading-normal border ${isBuyer
+            className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
               ? 'bg-blue-50/50 border-blue-100 text-blue-900'
               : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
               }`}
           >
-            <div className="flex justify-between items-center mb-0.5 opacity-75">
-              <span className="font-bold text-[9px] uppercase tracking-wider">
-                {name}
-              </span>
-              <span className="text-[9px] text-slate-400">{timeStr}</span>
-            </div>
+            <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
+              [{name} {timeStr}]:
+            </span>
             <span className="font-medium whitespace-pre-wrap">{c.comment}</span>
           </div>
         );
@@ -78,9 +76,13 @@ export const SupplierItemRespond: React.FC = () => {
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
+  const sellerProduct = useLiveQuery(
+    async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
+    [item?.product_id]
+  );
   const catalogProduct = useLiveQuery(
-    async () => (item?.catalog_product_id ? await catalogDb.products.get(item.catalog_product_id) : undefined),
-    [item?.catalog_product_id]
+    async () => (item?.product_id && item.catalog_product_id) ? await catalogDb.products.get(item.catalog_product_id) : undefined,
+    [item?.product_id, item?.catalog_product_id]
   );
 
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
@@ -89,6 +91,7 @@ export const SupplierItemRespond: React.FC = () => {
   const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
   const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
+  const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
 
   const itemAttributes = useLiveQuery(
     () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray() : []),
@@ -110,6 +113,15 @@ export const SupplierItemRespond: React.FC = () => {
     [existingQuote]
   ) || [];
 
+  const award = useLiveQuery(
+    async () => {
+      if (!itemId || !activePartyId) return undefined;
+      const awds = await rfqDb.rfq_awards.where('rfq_item_id').equals(itemId).toArray();
+      return awds.find((a) => a.seller_party_id === activePartyId);
+    },
+    [itemId, activePartyId]
+  );
+
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
     { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number || 'RFQ'} - Sourcing Offer</span> }
@@ -122,7 +134,7 @@ export const SupplierItemRespond: React.FC = () => {
     return existingQuote?.seller_quote_number || `SQ-${itemId?.replace('item-', '') || 'NEW'}-${activePartyId?.replace('pty-', '') || 'UNK'}`;
   }, [existingQuote, itemId, activePartyId]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (existingQuote) {
       if (existingQuote.status === 'DRAFT' && existingQuote.draft_snapshot) {
         try {
@@ -137,11 +149,12 @@ export const SupplierItemRespond: React.FC = () => {
         }
       } else {
         setUnitPrice(existingQuote.offer_unit_price);
+        // Load initial brand and manufacturer arrays from existing quote attributes, because they were removed from quote root
       }
     }
   }, [existingQuote]);
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (existingQuote && existingQuote.status !== 'DRAFT' && existingQuoteAttributes.length > 0) {
       const initialAttrs: Record<string, ItemAttributeValue[]> = {};
       existingQuoteAttributes.forEach((qa) => {
@@ -161,12 +174,26 @@ export const SupplierItemRespond: React.FC = () => {
     }
   }, [existingQuoteAttributes, existingQuote]);
 
-  useEffect(() => {
+  const buyerComments = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    existingQuoteComments
+      .filter((qc) => qc.actor_type === 'BUYER')
+      .forEach((qc) => {
+        const key = qc.group_id === 'SYSTEM'
+          ? `SYSTEM_${qc.attribute_id}`
+          : `${qc.group_id}_${qc.attribute_id}`;
+        map[key] = qc.comment || '';
+      });
+    return map;
+  }, [existingQuoteComments]);
+
+  React.useEffect(() => {
     if (existingQuote && existingQuote.status !== 'DRAFT' && existingQuoteComments.length > 0) {
       const initialComments: Record<string, string> = {};
       existingQuoteComments
         .filter((qc) => qc.actor_type === 'SELLER')
         .forEach((qc) => {
+          // group_id stored as 'SYSTEM' for SYSTEM attrs, group_id otherwise
           const key = qc.group_id === 'SYSTEM'
             ? `SYSTEM_${qc.attribute_id}`
             : `${qc.group_id}_${qc.attribute_id}`;
@@ -178,19 +205,49 @@ export const SupplierItemRespond: React.FC = () => {
 
   const attributeGroupsMap = React.useMemo(() => {
     const map: Record<string, { name: string; attributes: any[] }> = {};
-    const customAttributes = itemAttributes.filter((ia) => ia.attribute_type === 'CUSTOM');
+    const customAttributes = sellerProduct?.dynamic_attributes?.filter((ia: any) => ia.is_variant !== true);
 
-    customAttributes.forEach((ia) => {
+    customAttributes?.forEach((ia: any) => {
       const groupId = ia.group_id || 'ungrouped';
       if (!map[groupId]) {
         const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
         map[groupId] = { name: groupName, attributes: [] };
       }
-      map[groupId].attributes.push(ia);
+
+      const hydratedValues = catalogAttributeValues
+        .filter((av) => ia?.selected_value_ids?.includes(av.id))
+        .map((v) => ({
+          value_id: v.id,
+          value_label: v.value || v.label,
+        }));
+
+      map[groupId].attributes.push({ ...ia, values: hydratedValues });
+    });
+
+    const currentVariant = sellerProduct?.variants?.find((v: any) => v.id === item?.variant_id);
+    currentVariant?.combination_values?.forEach((cv: any) => {
+      const groupId = cv.group_id || 'ungrouped';
+      if (!map[groupId]) {
+        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'Variant Specifications';
+        map[groupId] = { name: groupName, attributes: [] };
+      }
+
+      map[groupId].attributes.push({
+        id: `var-${cv.attribute_id}`,
+        attribute_id: cv.attribute_id,
+        group_id: cv.group_id,
+        is_variant: true,
+        values: [
+          {
+            value_id: cv.value_id,
+            value_label: cv.label || cv.value_id
+          }
+        ]
+      });
     });
 
     return Object.entries(map);
-  }, [attributeGroups, itemAttributes]);
+  }, [attributeGroups, sellerProduct, catalogAttributeValues, item?.variant_id]);
 
   if (rfq === undefined || item === undefined || parties.length === 0) {
     return (
@@ -212,119 +269,116 @@ export const SupplierItemRespond: React.FC = () => {
   }
 
   const categoryName = categories.find((c) => c.id === item.category_id)?.name || 'Unknown';
+
+  // Mode: SUBMITTED, ACCEPTED, REJECTED → view-only (locked)
+  // NEW, DRAFT, REVISION_REQUIRED → actionable (editable)
   const isViewOnly = ['SUBMITTED', 'ACCEPTED', 'REJECTED'].includes(existingQuote?.status ?? '');
 
+
+
   const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
-    if (submitMode === 'SUBMITTED') {
-      if (!unitPrice || unitPrice <= 0) {
-        antMessage.error('Please enter a valid offered unit price.');
-        return;
-      }
-      if (!quoteNumber.trim()) {
-        antMessage.error('Please enter a quote reference/number.');
-        return;
-      }
-    }
+    // if (submitMode === 'SUBMITTED' && (!unitPrice || unitPrice <= 0)) {
+    //   antMessage.error('Please enter a valid offered unit price.');
+    //   return;
+    // }
+    // if (!quoteNumber.trim()) {
+    //   antMessage.error('Please enter a quote reference/number.');
+    //   return;
+    // }
 
-    setSubmitting(true);
-    try {
-      const quoteId = existingQuote?.id || `q-${itemId}-${activePartyId}`;
-      const round = existingQuote ? existingQuote.round : 1;
+    // setSubmitting(true);
+    // try {
+    //   const quoteId = existingQuote?.id || `q-${itemId}-${activePartyId}`;
+    //   // For DRAFT mode: serialize everything to JSON and skip writing to seller_quote_attributes
+    //   const draftSnapshot = submitMode === 'DRAFT' ? JSON.stringify({ unitPrice, offeredBrands, offeredManufacturers, offeredAttrValues, offeredComments }) : null;
 
-      const draftSnapshot = submitMode === 'DRAFT' 
-        ? JSON.stringify({ unitPrice, offeredBrands, offeredManufacturers, offeredAttrValues, offeredComments }) 
-        : null;
+    //   const quotePayload = {
+    //     id: quoteId,
+    //     rfq_item_id: itemId!,
+    //     seller_party_id: activePartyId,
+    //     seller_quote_number: quoteNumber.trim(),
+    //     unit_price: unitPrice || 0,
+    //     round: existingQuote ? existingQuote.round : 1,
+    //     status: submitMode,
+    //     created_at: existingQuote ? existingQuote.created_at : new Date().toISOString(),
+    //     updated_at: new Date().toISOString(),
+    //     draft_snapshot: draftSnapshot
+    //   };
 
-      const quotePayload = {
-        id: quoteId,
-        rfq_item_id: itemId!,
-        round,
-        seller_party_id: activePartyId,
-        seller_quote_number: quoteNumber.trim(),
-        offer_unit_price: unitPrice || 0,
-        offer_quantity: item.quantity,
-        offer_unit: item.unit || 'pcs',
-        status: submitMode,
-        created_at: existingQuote ? existingQuote.created_at : new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        draft_snapshot: draftSnapshot
-      };
+    //   // Put Seller Quote
+    //   await rfqDb.seller_quotes.put(quotePayload);
 
-      await rfqDb.seller_quotes.put(quotePayload);
+    //   // For SUBMITTED mode: write individual attribute records to seller_quote_attributes
+    //   if (submitMode === 'SUBMITTED') {
+    //     const qaPromises = itemAttributes.map((ia) => {
+    //       const key = `${ia.group_id}_${ia.attribute_id}`;
+    //       let offered = offeredAttrValues[key] || [];
+    //       if (ia.attribute_type === 'SYSTEM') {
+    //         if (ia.attribute_id === 'brand') {
+    //           offered = offeredBrands.map((id) => ({
+    //             value_id: id,
+    //             value_label: catalogBrands.find((b) => b.id === id)?.name || id
+    //           }));
+    //         } else if (ia.attribute_id === 'manufacturer') {
+    //           offered = offeredManufacturers.map((id) => ({
+    //             value_id: id,
+    //             value_label: catalogManufacturers.find((m) => m.id === id)?.company_name || id
+    //           }));
+    //         } else if (ia.attribute_id === 'unit_price') {
+    //           offered = [{
+    //             value_id: 'price-offer',
+    //             value_label: String(unitPrice || 0)
+    //           }];
+    //         }
+    //       }
+    //       const qaPayload = {
+    //         id: `qa-${quoteId}-${ia.attribute_id}`,
+    //         seller_quote_id: quoteId,
+    //         group_id: ia.group_id,
+    //         attribute_id: ia.attribute_id,
+    //         values: offered,
+    //         is_deviation: false,
+    //         attribute_type: ia.attribute_type
+    //       };
+    //       return rfqDb.seller_quote_attributes.put(qaPayload);
+    //     });
+    //     await Promise.all(qaPromises);
 
-      // Write individual attribute records to seller_quote_attributes
-      const qaPromises = itemAttributes.map((ia) => {
-        const key = `${ia.group_id}_${ia.attribute_id}`;
-        let offered = offeredAttrValues[key] || [];
+    //     // Write seller_quote_comments for each attribute that has a comment (SYSTEM + custom)
+    //     // Write seller_quote_comments for each attribute that has a comment (SYSTEM + custom)
+    //     const commentPromises = Object.entries(offeredComments)
+    //       .filter(([key, comment]) => !!comment.trim())
+    //       .map(([key, comment]) => {
+    //         const isSystem = key.startsWith('SYSTEM_');
+    //         const storedGroupId = isSystem ? 'SYSTEM' : key.split('_')[0];
+    //         const attributeId = isSystem ? key.replace('SYSTEM_', '') : key.split('_')[1];
+    //         const attributeType = isSystem ? 'SYSTEM' : undefined;
+    //         const round = existingQuote ? existingQuote.round : 1;
+    //         const commentId = `qc-${quoteId}-${storedGroupId}-${attributeId}-r${round}`;
 
-        if (ia.attribute_type === 'SYSTEM') {
-          if (ia.attribute_id === 'brand') {
-            offered = offeredBrands.map((id) => ({
-              value_id: id,
-              value_label: catalogBrands.find((b) => b.id === id)?.name || id
-            }));
-          } else if (ia.attribute_id === 'manufacturer') {
-            offered = offeredManufacturers.map((id) => ({
-              value_id: id,
-              value_label: catalogManufacturers.find((m) => m.id === id)?.company_name || id
-            }));
-          } else if (ia.attribute_id === 'unit_price') {
-            offered = [{
-              value_id: 'price-offer',
-              value_label: String(unitPrice || 0)
-            }];
-          }
-        }
+    //         return rfqDb.seller_quote_comments.put({
+    //           id: commentId,
+    //           seller_quote_id: quoteId,
+    //           group_id: storedGroupId,
+    //           attribute_id: attributeId,
+    //           comment: comment.trim(),
+    //           actor_type: 'SELLER',
+    //           actor_id: activePartyId,
+    //           created_at: new Date().toISOString(),
+    //           attribute_type: attributeType as any
+    //         });
+    //       });
+    //     await Promise.all(commentPromises);
+    //   }
 
-        const isDeviation = ia.attribute_type === 'SYSTEM' 
-          ? false 
-          : JSON.stringify(offered.map(v => v.value_id).sort()) !== JSON.stringify((ia.values || []).map(v => v.value_id).sort());
-
-        const qaPayload: SellerQuoteAttribute = {
-          id: `qa-${quoteId}-${ia.attribute_id}`,
-          seller_quote_id: quoteId,
-          group_id: ia.group_id,
-          attribute_id: ia.attribute_id,
-          values: offered,
-          is_deviation: isDeviation,
-          attribute_type: ia.attribute_type
-        };
-        return rfqDb.seller_quote_attributes.put(qaPayload);
-      });
-      await Promise.all(qaPromises);
-
-      // Save custom/system comments to seller_quote_comments
-      const commentPromises = Object.entries(offeredComments)
-        .filter(([key, comment]) => !!comment.trim())
-        .map(([key, comment]) => {
-          const isSystem = key.startsWith('SYSTEM_');
-          const storedGroupId = isSystem ? 'SYSTEM' : key.split('_')[0];
-          const attributeId = isSystem ? key.replace('SYSTEM_', '') : key.split('_')[1];
-          const attributeType = isSystem ? 'SYSTEM' : 'CUSTOM';
-          const commentId = `qc-${quoteId}-${storedGroupId}-${attributeId}-r${round}`;
-
-          return rfqDb.seller_quote_comments.put({
-            id: commentId,
-            seller_quote_id: quoteId,
-            group_id: storedGroupId,
-            attribute_id: attributeId,
-            comment: comment.trim(),
-            actor_type: 'SELLER',
-            actor_id: activePartyId,
-            created_at: new Date().toISOString(),
-            attribute_type: attributeType
-          });
-        });
-      await Promise.all(commentPromises);
-
-      antMessage.success(submitMode === 'DRAFT' ? 'Draft saved successfully!' : 'Quotation proposal submitted successfully!');
-      navigate(basePath);
-    } catch (error: any) {
-      console.error('Error saving proposal:', error);
-      antMessage.error('Failed to save sourcing proposal.');
-    } finally {
-      setSubmitting(false);
-    }
+    //   antMessage.success(submitMode === 'DRAFT' ? 'Draft saved successfully!' : 'Quotation proposal submitted successfully!');
+    //   navigate(basePath);
+    // } catch (error: any) {
+    //   console.error('Error saving proposal:', error);
+    //   antMessage.error('Failed to save sourcing proposal.');
+    // } finally {
+    //   setSubmitting(false);
+    // }
   };
 
   const getBrandNames = (ids: string[] | null | undefined): string => {
@@ -336,8 +390,7 @@ export const SupplierItemRespond: React.FC = () => {
     if (!ids || ids.length === 0) return 'Any Manufacturer';
     return ids.map((id) => catalogManufacturers.find((m) => m.id === id)?.company_name || id).join(', ');
   };
-
-  // Build general preferences data rows
+  // Build general preference rows
   const generalPreferencesData = [
     {
       key: 'brand',
@@ -347,7 +400,7 @@ export const SupplierItemRespond: React.FC = () => {
         <Select
           mode="multiple"
           placeholder="Select proposed brands"
-          className="w-full text-xs"
+          className="w-full"
           value={offeredBrands}
           onChange={setOfferedBrands}
           options={catalogBrands.map((b) => ({ value: b.id, label: b.name }))}
@@ -363,15 +416,14 @@ export const SupplierItemRespond: React.FC = () => {
         return (
           <Input.TextArea
             rows={2}
-            placeholder="Remarks..."
+            placeholder="Optional remark about brand offer..."
             value={offeredComments[key] || ''}
             onChange={(e) => setOfferedComments((prev) => ({ ...prev, [key]: e.target.value }))}
-            className="text-xs"
           />
         );
       },
       renderViewComment: () => (
-        <span className="text-slate-600 text-xs">{offeredComments['SYSTEM_brand'] || <span className="text-slate-300">—</span>}</span>
+        <span className="text-slate-600 text-sm">{offeredComments['SYSTEM_brand'] || <span className="text-slate-300">—</span>}</span>
       )
     },
     {
@@ -382,7 +434,7 @@ export const SupplierItemRespond: React.FC = () => {
         <Select
           mode="multiple"
           placeholder="Select proposed manufacturers"
-          className="w-full text-xs"
+          className="w-full"
           value={offeredManufacturers}
           onChange={setOfferedManufacturers}
           options={catalogManufacturers.map((m) => ({ value: m.id, label: m.company_name }))}
@@ -398,15 +450,14 @@ export const SupplierItemRespond: React.FC = () => {
         return (
           <Input.TextArea
             rows={2}
-            placeholder="Remarks..."
+            placeholder="Optional remark about manufacturer offer..."
             value={offeredComments[key] || ''}
             onChange={(e) => setOfferedComments((prev) => ({ ...prev, [key]: e.target.value }))}
-            className="text-xs"
           />
         );
       },
       renderViewComment: () => (
-        <span className="text-slate-600 text-xs">{offeredComments['SYSTEM_manufacturer'] || <span className="text-slate-300">—</span>}</span>
+        <span className="text-slate-600 text-sm">{offeredComments['SYSTEM_manufacturer'] || <span className="text-slate-300">—</span>}</span>
       )
     },
     {
@@ -420,7 +471,7 @@ export const SupplierItemRespond: React.FC = () => {
           min={0.01}
           precision={2}
           placeholder="e.g. 1050.00"
-          className="w-full text-xs"
+          className="w-full"
         />
       ),
       renderViewOffers: () => (
@@ -433,15 +484,14 @@ export const SupplierItemRespond: React.FC = () => {
         return (
           <Input.TextArea
             rows={2}
-            placeholder="Remarks..."
+            placeholder="Optional remark about pricing..."
             value={offeredComments[key] || ''}
             onChange={(e) => setOfferedComments((prev) => ({ ...prev, [key]: e.target.value }))}
-            className="text-xs"
           />
         );
       },
       renderViewComment: () => (
-        <span className="text-slate-600 text-xs">{offeredComments['SYSTEM_unit_price'] || <span className="text-slate-300">—</span>}</span>
+        <span className="text-slate-600 text-sm">{offeredComments['SYSTEM_unit_price'] || <span className="text-slate-300">—</span>}</span>
       )
     }
   ];
@@ -452,21 +502,21 @@ export const SupplierItemRespond: React.FC = () => {
     key: 'specification',
     width: 250,
     render: (text: string, record: any) => (
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1.5">
         <div className="flex items-center gap-2">
           {record.is_variant ? (
-            <Tag color="blue" className="m-0 font-bold border-blue-200">
+            <Tag color="blue" className="m-0 font-bold tracking-wide border-blue-200">
               VARIANT
             </Tag>
           ) : (
-            <Tag color="purple" className="m-0 font-semibold border-purple-200">
+            <Tag color="purple" className="m-0 font-semibold tracking-wide border-purple-200">
               SPEC
             </Tag>
           )}
-          <span className="font-bold text-slate-800 text-[13px]">{text}</span>
+          <span className="font-bold text-slate-800 leading-tight text-[13px]">{text}</span>
         </div>
         {record.description && (
-          <span className="text-[11px] text-slate-500 leading-tight italic pl-1">{record.description}</span>
+          <span className="text-xs text-slate-500 leading-tight italic pl-1">{record.description}</span>
         )}
       </div>
     )
@@ -476,18 +526,23 @@ export const SupplierItemRespond: React.FC = () => {
     title: 'What Buyer Asked',
     dataIndex: 'buyerAsked',
     key: 'buyerAsked',
-    width: 240,
+    width: 260,
     render: (text: string) => <span className="text-slate-600 font-medium">{text}</span>
   };
 
+  // Actionable columns (interactive inputs)
   const editableColumns = [
     specAttrColumn,
     buyerAskedColumn,
     {
       title: 'Your Offer',
       key: 'supplierOffer',
-      width: 250,
-      render: (_: any, record: any) => record.renderOffers()
+      width: 260,
+      render: (_: any, record: any) => (
+        <div className="flex flex-col gap-1">
+          {record.renderOffers()}
+        </div>
+      )
     },
     {
       title: 'Supplier Comment & History',
@@ -504,20 +559,21 @@ export const SupplierItemRespond: React.FC = () => {
         return (
           <div className="space-y-2">
             {record.renderComment ? record.renderComment() : null}
-            <CommentThread comments={threadComments} viewerPartyId={activePartyId} />
+            <CommentThread comments={threadComments} parties={parties} viewerPartyId={activePartyId} />
           </div>
         );
       }
     }
   ];
 
+  // Read-only columns (static display)
   const readOnlyColumns = [
     specAttrColumn,
     buyerAskedColumn,
     {
       title: 'Offered',
       key: 'supplierOffer',
-      width: 250,
+      width: 260,
       render: (_: any, record: any) => record.renderViewOffers ? record.renderViewOffers() : record.renderOffers()
     },
     {
@@ -532,7 +588,7 @@ export const SupplierItemRespond: React.FC = () => {
           .filter((c) => c.group_id === normGroupId && c.attribute_id === attrId)
           .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-        return <CommentThread comments={threadComments} viewerPartyId={activePartyId} />;
+        return <CommentThread comments={threadComments} parties={parties} viewerPartyId={activePartyId} />;
       }
     }
   ];
@@ -541,17 +597,19 @@ export const SupplierItemRespond: React.FC = () => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
+
       <Card
         className="shadow-md border-slate-200"
         title={
           <div className="flex items-center gap-3">
             <div className="flex flex-col">
               <span className="font-extrabold text-slate-900 leading-tight">RFQ Item Proposal</span>
-              <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; From: {rfq.requester_name || 'N/A'}</span>
+              <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; From: {rfq.requester_name || 'N/A'} </span>
             </div>
           </div>
         }
       >
+
         {/* Proposal Status Banner */}
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 mb-5 flex flex-wrap gap-6 items-start">
           <div className="flex flex-col gap-0.5">
@@ -598,7 +656,7 @@ export const SupplierItemRespond: React.FC = () => {
           </Descriptions.Item>
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
-            <Tag color="blue" className="font-bold">{item.quantity} {item.unit || 'pcs'}</Tag>
+            <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Requested Unit Price">
             {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
@@ -606,6 +664,7 @@ export const SupplierItemRespond: React.FC = () => {
         </Descriptions>
 
         <div className="space-y-6">
+
           {/* Status Notice Banners */}
           {existingQuote?.status === 'REVISION_REQUIRED' && (
             <Alert
@@ -647,6 +706,7 @@ export const SupplierItemRespond: React.FC = () => {
           <h3 className="text-base font-bold text-slate-900 pt-3">Attribute configuration</h3>
 
           {/* 1. General Sourcing Preferences Card */}
+
           <div
             className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
             style={{ borderLeft: `4px solid #2563eb` }}
@@ -682,68 +742,38 @@ export const SupplierItemRespond: React.FC = () => {
               const attrName = catalogAttributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id;
               const requestedVals = (ia.values || []).map((v: any) => v.value_label).join(', ') || 'N/A';
               const key = `${ia.group_id}_${ia.attribute_id}`;
-              const attrValuesOptions = catalogAttributeValues.filter(v => v.attributeId === ia.attribute_id);
 
               return {
                 key: ia.id || ia.attribute_id,
                 commentKey: key,
                 specification: attrName,
-                is_variant: false,
+                is_variant: ia.is_variant,
                 description: ia.description || null,
                 buyerAsked: requestedVals,
-                renderOffers: () => {
-                  const currentOfferValues = offeredAttrValues[key] || [];
-                  const selectedIds = currentOfferValues.map(v => v.value_id);
-
-                  return (
-                    <Select
-                      mode="tags"
-                      placeholder="Select or type offered value(s)..."
-                      className="w-full text-xs"
-                      value={selectedIds}
-                      onChange={(newValIds) => {
-                        const mappedValues: ItemAttributeValue[] = newValIds.map(valId => {
-                          const matchedVal = catalogAttributeValues.find(v => v.id === valId);
-                          return {
-                            value_id: valId,
-                            value_label: matchedVal ? (matchedVal.value || matchedVal.label || '') : valId
-                          };
-                        });
-                        setOfferedAttrValues(prev => ({
-                          ...prev,
-                          [key]: mappedValues
-                        }));
-                      }}
-                      options={attrValuesOptions.map(v => ({ value: v.id, label: v.value || v.label }))}
-                    />
-                  );
-                },
-                renderViewOffers: () => {
-                  const currentOfferValues = offeredAttrValues[key] || [];
-                  return (
-                    <span className="text-slate-700">
-                      {currentOfferValues.length > 0 
-                        ? currentOfferValues.map(v => v.value_label).join(', ') 
-                        : <span className="text-slate-400 italic">Not specified</span>}
-                    </span>
-                  );
-                },
+                renderOffers: () => (
+                  <div className="flex flex-col gap-1 text-sm pt-1">
+                    <span className="text-slate-500 italic">Fixed via Catalog Product</span>
+                  </div>
+                ),
+                renderViewOffers: () => (
+                  <span className="text-slate-700">
+                    {requestedVals}
+                  </span>
+                ),
                 renderComment: () => (
                   <Input.TextArea
                     rows={2}
                     placeholder={`Optional remark about ${attrName}...`}
                     value={offeredComments[key] || ''}
                     onChange={(e) => setOfferedComments((prev) => ({ ...prev, [key]: e.target.value }))}
-                    className="text-xs"
                   />
                 ),
                 renderViewComment: () => (
-                  <span className="text-slate-600 text-xs">
-                    {offeredComments[key] || <span className="text-slate-300">—</span>}
-                  </span>
+                  <span className="text-slate-600 text-sm">{offeredComments[key] || <span className="text-slate-300">—</span>}</span>
                 )
               };
             });
+
 
             const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
 
@@ -784,25 +814,29 @@ export const SupplierItemRespond: React.FC = () => {
           })}
         </div>
 
+
+
         {!isViewOnly && (
           <div className="pt-6 flex justify-end gap-3 mt-6">
-            <Button onClick={() => navigate(basePath)}>Cancel</Button>
-            <Button
-              icon={<SaveOutlined />}
-              onClick={() => handleSave('DRAFT')}
-              loading={submitting}
-            >
-              Save as Draft
-            </Button>
-            <Button
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={() => handleSave('SUBMITTED')}
-              loading={submitting}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              Submit Proposal
-            </Button>
+            <>
+              <Button onClick={() => navigate(basePath)}>Cancel</Button>
+              <Button
+                icon={<SaveOutlined />}
+                onClick={() => handleSave('DRAFT')}
+                loading={submitting}
+              >
+                Save as Draft
+              </Button>
+              <Button
+                type="primary"
+                icon={<SendOutlined />}
+                onClick={() => handleSave('SUBMITTED')}
+                loading={submitting}
+                className="bg-blue-600"
+              >
+                Submit Proposal
+              </Button>
+            </>
           </div>
         )}
       </Card>

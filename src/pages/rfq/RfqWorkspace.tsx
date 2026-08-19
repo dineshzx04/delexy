@@ -129,23 +129,18 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
       key: 'product_name',
       render: (_: any, record: any) => {
         const catName = categories.find((c) => c.id === record.category_id)?.name;
+        const cprod = catalogProducts.find(p => p.id === record.catalog_product_id);
 
         let productName = '';
         let variantName = '';
 
+        productName = cprod?.name || record.catalog_product_id;
         if (record.product_id) {
           const sprod = sellerProducts.find(p => p.id === record.product_id);
-          productName = sprod?.product_name || record.product_id;
-
           if (record.variant_id) {
             const variant = sprod?.variants?.find(v => v.id === record.variant_id);
             variantName = variant?.sku || record.variant_id;
           }
-        } else if (record.catalog_product_id) {
-          const cprod = catalogProducts.find(p => p.id === record.catalog_product_id);
-          productName = cprod?.name || record.catalog_product_id;
-        } else {
-          productName = 'Unknown Product';
         }
 
         return (

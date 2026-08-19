@@ -285,7 +285,7 @@ export const RequesterQuoteReview: React.FC = () => {
       key: 'unit_price',
       specification: 'Unit Price ($)',
       buyerAsked: item.unit_price ? `$${item.unit_price}` : 'N/A',
-      offered: `$${quote.unit_price.toFixed(2)}`,
+      offered: quote.offer_unit_price ? `$${quote.offer_unit_price.toFixed(2)}` : 'N/A',
       supplierComment: getSupplierCommentText('system-preferences', 'unit_price'),
       commentKey: 'SYSTEM_unit_price'
     }
