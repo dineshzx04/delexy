@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Card, Input as AntInput, InputNumber as AntInputNumber, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Alert } from 'antd';
 import { SendOutlined, ArrowLeftOutlined, SaveOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined } from '@ant-design/icons';
-import { rfqDb, type ItemAttributeValue, type SellerQuoteAttribute } from '../../data/rfq';
+import { rfqDb, type AttributeType, type ItemAttributeValue, type SellerQuoteAttribute } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -19,6 +19,7 @@ export const SupplierItemRespond: React.FC = () => {
   const { message: antMessage } = AntApp.useApp();
 
   const [submitting, setSubmitting] = useState(false);
+  const [proposalAttributes, setProposalAttributes] = useState<Record<string, { attribute_type: AttributeType, group_id: string, attribute_id: string, is_deviation: boolean, values: ItemAttributeValue[] }>>({});
 
 
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
@@ -36,10 +37,15 @@ export const SupplierItemRespond: React.FC = () => {
     [itemId, activePartyId]
   );
 
+  const existingQuoteAttributes = useLiveQuery(
+    () => (existingQuote?.id ? rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray() : []),
+    [existingQuote?.id]
+  );
+
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
 
   const itemAttributes = useLiveQuery(
-    () => rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray(),
+    () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray() : []),
     [itemId]
   ) || [];
 
@@ -178,6 +184,40 @@ export const SupplierItemRespond: React.FC = () => {
     return Object.entries(map);
   }, [attributeGroups, sellerProduct, catalogAttributeValues, item?.variant_id]);
 
+  useEffect(() => {
+    const initialValues: Record<string, {
+      attribute_type: AttributeType;
+      group_id: string;
+      attribute_id: string;
+      is_deviation: boolean;
+      values: ItemAttributeValue[]
+    }> = {};
+
+    if (existingQuote && existingQuoteAttributes !== undefined) {
+      // Load price and quantity
+      // initialValues['req_unit_price'] = [{ value_id: 'req-unit-price', value_label: existingQuote.offer_unit_price.toString() }];
+      // initialValues['req_quantity'] = [{ value_id: 'req-quantity', value_label: existingQuote.offer_quantity.toString() }];
+      // // Load other attributes
+      // existingQuoteAttributes.forEach(attr => {
+      //   initialValues[attr.attribute_id] = attr.values;
+      // });
+    } else {
+      for (const [groupId, groupData] of attributeGroupsMap) {
+        for (const attr of groupData.attributes) {
+          const propsalKey = `${groupId}_${attr.attribute_id}`
+          initialValues[propsalKey] = {
+            attribute_type: attr.attribute_type,
+            group_id: groupId,
+            attribute_id: attr.attribute_id,
+            is_deviation: false,
+            values: attr.values
+          }
+        }
+      }
+    }
+
+    setProposalAttributes(initialValues);
+  }, [existingQuote, existingQuoteAttributes, attributeGroupsMap]);
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
     { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number || 'RFQ'} - Sourcing Offer</span> }
@@ -206,7 +246,87 @@ export const SupplierItemRespond: React.FC = () => {
   const isViewOnly = ['SUBMITTED', 'ACCEPTED', 'REJECTED'].includes(existingQuote?.status ?? '');
 
   const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
+    // if (!item || !rfq || !activePartyId) return;
 
+    // setSubmitting(true);
+    // try {
+    //   const quoteId = existingQuote?.id || crypto.randomUUID();
+
+    //   const priceStr = proposalAttributes['req_unit_price']?.[0]?.value_label || '0';
+    //   const qtyStr = proposalAttributes['req_quantity']?.[0]?.value_label || '0';
+
+    //   const offerPrice = parseFloat(priceStr);
+    //   const offerQty = parseFloat(qtyStr);
+
+    //   if (submitMode === 'SUBMITTED') {
+    //     if (isNaN(offerPrice) || offerPrice <= 0) {
+    //       antMessage.error('Please enter a valid unit price.');
+    //       setSubmitting(false);
+    //       return;
+    //     }
+    //     if (isNaN(offerQty) || offerQty <= 0) {
+    //       antMessage.error('Please enter a valid quantity.');
+    //       setSubmitting(false);
+    //       return;
+    //     }
+    //   }
+
+    //   const quoteToSave = {
+    //     id: quoteId,
+    //     rfq_item_id: item.id,
+    //     round: existingQuote?.round || 1,
+    //     seller_party_id: activePartyId,
+    //     seller_quote_number: quoteNumber,
+    //     offer_unit_price: offerPrice || 0,
+    //     offer_quantity: offerQty || 0,
+    //     status: submitMode,
+    //     created_at: existingQuote?.created_at || new Date().toISOString(),
+    //     updated_at: new Date().toISOString(),
+    //   };
+
+    //   const attributesToSave: SellerQuoteAttribute[] = [];
+
+    //   attributeGroupsMap.forEach(([groupId, group]) => {
+    //     group.attributes.forEach((attr: any) => {
+    //       if (attr.attributeId === 'req_unit_price' || attr.attributeId === 'req_quantity') return;
+
+    //       const vals = proposalAttributes[attr.attributeId];
+    //       if (vals && vals.length > 0) {
+    //         attributesToSave.push({
+    //           id: crypto.randomUUID(),
+    //           seller_quote_id: quoteId,
+    //           attribute_type: attr.attribute_type,
+    //           group_id: groupId,
+    //           attribute_id: attr.attributeId,
+    //           values: vals,
+    //           is_deviation: false,
+    //         });
+    //       }
+    //     });
+    //   });
+
+    //   await rfqDb.transaction('rw', rfqDb.seller_quotes, rfqDb.seller_quote_attributes, async () => {
+    //     await rfqDb.seller_quotes.put(quoteToSave);
+
+    //     if (existingQuote) {
+    //       const oldAttrs = await rfqDb.seller_quote_attributes.where('seller_quote_id').equals(quoteId).toArray();
+    //       await rfqDb.seller_quote_attributes.bulkDelete(oldAttrs.map(a => a.id));
+    //     }
+
+    //     if (attributesToSave.length > 0) {
+    //       await rfqDb.seller_quote_attributes.bulkAdd(attributesToSave);
+    //     }
+    //   });
+
+    //   antMessage.success(submitMode === 'SUBMITTED' ? 'Proposal submitted successfully!' : 'Draft saved successfully!');
+    //   navigate(basePath);
+
+    // } catch (err) {
+    //   console.error(err);
+    //   antMessage.error('Failed to save proposal');
+    // } finally {
+    //   setSubmitting(false);
+    // }
   };
 
   const attributesColumns = [
@@ -245,36 +365,63 @@ export const SupplierItemRespond: React.FC = () => {
       title: 'Proposal Value',
       dataIndex: 'proposalValue',
       key: 'proposalValue',
-      render: (text: string, attribute: any) => {
+      render: (_: string, attribute: any) => {
+        const propsalKey = `${attribute.groupId}_${attribute.attributeId}`
         if (attribute.attribute_type === 'SYSTEM') {
           switch (attribute.attributeId) {
             case "req_unit_price":
               return (
                 <AntInput
-                  value={attribute.values[0].value_label}
+                  disabled={isViewOnly}
+                  value={proposalAttributes[propsalKey]?.values?.[0]?.value_label ?? ''}
                   onChange={(e) => {
-                    console.log("e", e)
+                    setProposalAttributes(prev => ({
+                      ...prev,
+                      [propsalKey]: {
+                        ...prev[propsalKey],
+                        values: [{
+                          value_id: 'req-unit-price',
+                          value_label: e.target.value
+                        }]
+                      }
+                    }));
                   }}
                 />
               )
             case "req_quantity":
               return (
                 <AntInput
-                  value={attribute.values[0].value_label}
+                  disabled={isViewOnly}
+                  value={proposalAttributes[propsalKey]?.values?.[0]?.value_label ?? ''}
                   onChange={(e) => {
-                    console.log("e", e)
+                    setProposalAttributes(prev => ({
+                      ...prev, [propsalKey]: {
+                        ...prev[propsalKey],
+                        values: [{ value_id: 'req-quantity', value_label: e.target.value }]
+                      }
+                    }));
                   }}
                 />
               )
             case "brand":
               return (
                 <AntSelect
+                  disabled={isViewOnly}
                   mode="multiple"
                   allowClear
                   placeholder="Select Preferred Brand(s)"
-                  value={attribute.values.map((v: any) => v.value_id)}
+                  value={proposalAttributes[propsalKey]?.values?.map((v: any) => v.value_id) || []}
                   onChange={(val: string[]) => {
-                    console.log("val", val)
+                    const newValues = val.map(id => {
+                      const matched = allBrands.find((v: any) => v.id === id);
+                      return { value_id: id, value_label: matched?.name || id };
+                    });
+                    setProposalAttributes(prev => ({
+                      ...prev, [propsalKey]: {
+                        ...prev[propsalKey],
+                        values: newValues
+                      }
+                    }));
                   }}
                   className="w-full mt-1"
                   options={allBrands.map((v: any) => ({ label: v.name, value: v.id }))}
@@ -283,13 +430,24 @@ export const SupplierItemRespond: React.FC = () => {
             case "manufacturer":
               return (
                 <AntSelect
+                  disabled={isViewOnly}
                   mode="multiple"
                   allowClear
                   placeholder="Select Preferred Manufacturer(s)"
-                  value={attribute.values.map((v: any) => v.value_id)}
+                  value={proposalAttributes[propsalKey]?.values?.map((v: any) => v.value_id) || []}
                   onChange={(val: string[]) => {
-                    console.log("val", val)
+                    const newValues = val.map(id => {
+                      const matched = allManufacturers.find((v: any) => v.id === id);
+                      return { value_id: id, value_label: matched?.company_name || id };
+                    });
+                    setProposalAttributes(prev => ({
+                      ...prev, [propsalKey]: {
+                        ...prev[propsalKey],
+                        values: newValues
+                      }
+                    }));
                   }}
+
                   className="w-full mt-1"
                   options={allManufacturers.map((v: any) => ({ label: v.company_name, value: v.id }))}
                 />
@@ -298,20 +456,28 @@ export const SupplierItemRespond: React.FC = () => {
               return "Contact System admin"
           }
         } else {
-          const values = catalogAttributeValues.filter(
-            (v) => v.attributeId === attribute.attributeId
-          );
+          const values = catalogAttributeValues.filter((v) => v.attributeId === attribute.attributeId);
           return (
             <AntSelect
+              disabled={isViewOnly}
               mode="multiple"
               allowClear
               placeholder={`Select ${attribute.attributeName}`}
               className="w-full mt-1"
-              onChange={(e) => {
-                console.log("e", e)
+              value={proposalAttributes[propsalKey]?.values?.map((v: any) => v.value_id) || []}
+              onChange={(val: string[]) => {
+                const newValues = val.map(id => {
+                  const matched = values.find((v: any) => v.id === id);
+                  return { value_id: id, value_label: matched?.value || matched?.label || id };
+                });
+                setProposalAttributes(prev => ({
+                  ...prev, [propsalKey]: {
+                    ...prev[propsalKey],
+                    values: newValues
+                  }
+                }));
               }}
-              value={attribute.values.map((v: any) => v.value_id)}
-              options={values.map((v: any) => ({ label: v.value, value: v.id }))}
+              options={values.map((v: any) => ({ label: v.value || v.label, value: v.id }))}
             />
           )
         }

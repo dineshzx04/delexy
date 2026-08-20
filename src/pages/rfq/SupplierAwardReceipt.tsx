@@ -160,7 +160,7 @@ export const SupplierAwardReceipt: React.FC = () => {
               {sellerPartyName}
             </Descriptions.Item>
             <Descriptions.Item label="Awarded Quantity">
-              {award.awarded_quantity} {item.unit}
+              {award.awarded_quantity} {item.req_unit}
             </Descriptions.Item>
             <Descriptions.Item label="Price / Unit">
               <strong className="text-emerald-700">${award.unit_price}</strong>

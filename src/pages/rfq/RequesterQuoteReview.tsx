@@ -284,7 +284,7 @@ export const RequesterQuoteReview: React.FC = () => {
     {
       key: 'unit_price',
       specification: 'Unit Price ($)',
-      buyerAsked: item.unit_price ? `$${item.unit_price}` : 'N/A',
+      buyerAsked: item.req_unit_price ? `$${item.req_unit_price}` : 'N/A',
       offered: quote.offer_unit_price ? `$${quote.offer_unit_price.toFixed(2)}` : 'N/A',
       supplierComment: getSupplierCommentText('system-preferences', 'unit_price'),
       commentKey: 'SYSTEM_unit_price'
@@ -432,10 +432,10 @@ export const RequesterQuoteReview: React.FC = () => {
           </Descriptions.Item>
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
-            <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
+            <Tag color="blue" className="font-bold">{item.req_quantity} {item.req_unit}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Requested Unit Price">
-            {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
+            {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
           </Descriptions.Item>
 
         </Descriptions>

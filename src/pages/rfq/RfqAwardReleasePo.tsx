@@ -121,7 +121,7 @@ export const RfqAwardReleasePo: React.FC = () => {
               <strong>{supplierPartyName}</strong>
             </Descriptions.Item>
             <Descriptions.Item label="Awarded Qty">
-              {award.awarded_quantity} {item.unit}
+              {award.awarded_quantity} {item.req_unit}
             </Descriptions.Item>
             <Descriptions.Item label="Price / Unit">
               <span className="font-semibold text-emerald-600">${award.unit_price}</span>
