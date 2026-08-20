@@ -1,25 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Input as AntInput, InputNumber as AntInputNumber, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Alert } from 'antd';
+import { Card, Input as AntInput, InputNumber as AntInputNumber, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Alert, Switch } from 'antd';
 import { SendOutlined, ArrowLeftOutlined, SaveOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined } from '@ant-design/icons';
-import { rfqDb, type AttributeType, type ItemAttributeValue, type SellerQuoteAttribute } from '../../data/rfq';
+import { rfqDb, type AttributeType, type ItemAttributeValue, type SellerQuote, type SellerQuoteAttribute, type SellerQuoteComment } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 
+
+
+
 export const SupplierItemRespond: React.FC = () => {
-  const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
+  const { message: antMessage } = AntApp.useApp();
   const navigate = useNavigate();
+
+  const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
   const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
-  const { message: antMessage } = AntApp.useApp();
 
   const [submitting, setSubmitting] = useState(false);
-  const [proposalAttributes, setProposalAttributes] = useState<Record<string, { attribute_type: AttributeType, group_id: string, attribute_id: string, is_deviation: boolean, values: ItemAttributeValue[] }>>({});
+
+  const [proposalAttributes, setProposalAttributes] = useState<Record<string, {
+    attribute_type: AttributeType,
+    group_id: string,
+    attribute_id: string,
+    is_deviation: boolean,
+    deviation_note?: string,
+    values: ItemAttributeValue[]
+  }>>({});
 
 
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
@@ -39,6 +51,10 @@ export const SupplierItemRespond: React.FC = () => {
 
   const existingQuoteAttributes = useLiveQuery(
     () => (existingQuote?.id ? rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray() : []),
+    [existingQuote?.id]
+  );
+  const existingQuoteAttributesComments = useLiveQuery(
+    () => (existingQuote?.id ? rfqDb.seller_quote_comments.where('seller_quote_id').equals(existingQuote.id).toArray() : []),
     [existingQuote?.id]
   );
 
@@ -71,8 +87,8 @@ export const SupplierItemRespond: React.FC = () => {
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
 
   const quoteNumber = React.useMemo(() => {
-    return existingQuote?.seller_quote_number || `SQ-${itemId?.replace('item-', '') || 'NEW'}-${activePartyId?.replace('pty-', '') || 'UNK'}`;
-  }, [existingQuote, itemId, activePartyId]);
+    return existingQuote?.seller_quote_number || `SQ-${activePartyId?.replace('pty-', '')}-${rfq?.id?.replace('rfq-', '')}-${itemId?.replace('item-', '')}`;
+  }, [existingQuote, rfq, itemId, activePartyId]);
 
   const brandAttribute = itemAttributes.find((ia) => ia.attribute_type === 'SYSTEM' && ia.attribute_id === 'brand');
   const manufacturerAttribute = itemAttributes.find((ia) => ia.attribute_type === 'SYSTEM' && ia.attribute_id === 'manufacturer');
@@ -85,22 +101,22 @@ export const SupplierItemRespond: React.FC = () => {
         name: 'System Specifications',
         attributes: [
           {
-            key: 'brand',
-            attribute_type: "SYSTEM",
-            group_id: "system",
-            attribute_id: "brand",
-            attributeName: 'Brand Preference',
-            is_variant: false,
-            values: brandAttribute?.values,
-          },
-          {
             key: 'manufacturer',
             attribute_type: "SYSTEM",
             group_id: "system",
             attribute_id: "manufacturer",
-            attributeName: 'Manufacturer Preference',
+            attributeName: 'Manufacturer',
             is_variant: false,
             values: manufacturerAttribute?.values,
+          },
+          {
+            key: 'brand',
+            attribute_type: "SYSTEM",
+            group_id: "system",
+            attribute_id: "brand",
+            attributeName: 'Brand',
+            is_variant: false,
+            values: brandAttribute?.values,
           },
           {
             key: 'req_unit_price',
@@ -190,26 +206,32 @@ export const SupplierItemRespond: React.FC = () => {
       group_id: string;
       attribute_id: string;
       is_deviation: boolean;
+      deviation_note?: string;
       values: ItemAttributeValue[]
     }> = {};
 
     if (existingQuote && existingQuoteAttributes !== undefined) {
-      // Load price and quantity
-      // initialValues['req_unit_price'] = [{ value_id: 'req-unit-price', value_label: existingQuote.offer_unit_price.toString() }];
-      // initialValues['req_quantity'] = [{ value_id: 'req-quantity', value_label: existingQuote.offer_quantity.toString() }];
-      // // Load other attributes
-      // existingQuoteAttributes.forEach(attr => {
-      //   initialValues[attr.attribute_id] = attr.values;
-      // });
+      existingQuoteAttributes.forEach(attr => {
+        const proposalKey = `${attr.group_id}_${attr.attribute_id}`
+        initialValues[proposalKey] = {
+          attribute_type: attr.attribute_type,
+          group_id: attr.group_id,
+          attribute_id: attr.attribute_id,
+          is_deviation: attr.is_deviation,
+          deviation_note: attr.deviation_note,
+          values: attr.values
+        };
+      });
     } else {
       for (const [groupId, groupData] of attributeGroupsMap) {
         for (const attr of groupData.attributes) {
-          const propsalKey = `${groupId}_${attr.attribute_id}`
-          initialValues[propsalKey] = {
+          const proposalKey = `${groupId}_${attr.attribute_id}`
+          initialValues[proposalKey] = {
             attribute_type: attr.attribute_type,
             group_id: groupId,
             attribute_id: attr.attribute_id,
             is_deviation: false,
+            deviation_note: "",
             values: attr.values
           }
         }
@@ -246,95 +268,130 @@ export const SupplierItemRespond: React.FC = () => {
   const isViewOnly = ['SUBMITTED', 'ACCEPTED', 'REJECTED'].includes(existingQuote?.status ?? '');
 
   const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
-    // if (!item || !rfq || !activePartyId) return;
+    if (!item || !rfq || !activePartyId) return;
 
-    // setSubmitting(true);
-    // try {
-    //   const quoteId = existingQuote?.id || crypto.randomUUID();
+    setSubmitting(true);
+    try {
 
-    //   const priceStr = proposalAttributes['req_unit_price']?.[0]?.value_label || '0';
-    //   const qtyStr = proposalAttributes['req_quantity']?.[0]?.value_label || '0';
+      const quoteId = existingQuote?.id || crypto.randomUUID();
 
-    //   const offerPrice = parseFloat(priceStr);
-    //   const offerQty = parseFloat(qtyStr);
+      const priceStr = proposalAttributes['system_req_unit_price']?.values.find(i => i.value_id == "req-unit-price")?.value_label || '0';
+      const qtyStr = proposalAttributes['system_req_quantity']?.values.find(i => i.value_id == "req-quantity")?.value_label || '0';
+      const qtyUnit = proposalAttributes['system_req_quantity']?.values.find(i => i.value_id == "req-quantity-unit")?.value_label || '0';
 
-    //   if (submitMode === 'SUBMITTED') {
-    //     if (isNaN(offerPrice) || offerPrice <= 0) {
-    //       antMessage.error('Please enter a valid unit price.');
-    //       setSubmitting(false);
-    //       return;
-    //     }
-    //     if (isNaN(offerQty) || offerQty <= 0) {
-    //       antMessage.error('Please enter a valid quantity.');
-    //       setSubmitting(false);
-    //       return;
-    //     }
-    //   }
+      const offerPrice = parseFloat(priceStr);
+      const offerQty = parseFloat(qtyStr);
 
-    //   const quoteToSave = {
-    //     id: quoteId,
-    //     rfq_item_id: item.id,
-    //     round: existingQuote?.round || 1,
-    //     seller_party_id: activePartyId,
-    //     seller_quote_number: quoteNumber,
-    //     offer_unit_price: offerPrice || 0,
-    //     offer_quantity: offerQty || 0,
-    //     status: submitMode,
-    //     created_at: existingQuote?.created_at || new Date().toISOString(),
-    //     updated_at: new Date().toISOString(),
-    //   };
+      if (submitMode === 'SUBMITTED') {
+        if (isNaN(offerPrice) || offerPrice <= 0) {
+          antMessage.error('Please enter a valid unit price.');
+          setSubmitting(false);
+          return;
+        }
+        if (isNaN(offerQty) || offerQty <= 0) {
+          antMessage.error('Please enter a valid quantity.');
+          setSubmitting(false);
+          return;
+        }
+      }
 
-    //   const attributesToSave: SellerQuoteAttribute[] = [];
+      const quoteToSave: SellerQuote = {
+        id: quoteId,
+        rfq_item_id: item.id,
+        round: existingQuote?.round || 1,
+        seller_party_id: activePartyId,
+        seller_quote_number: quoteNumber,
+        offer_unit_price: offerPrice || 0,
+        offer_quantity: offerQty || 0,
+        offer_unit: qtyUnit,
+        status: submitMode,
+        created_at: existingQuote?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-    //   attributeGroupsMap.forEach(([groupId, group]) => {
-    //     group.attributes.forEach((attr: any) => {
-    //       if (attr.attributeId === 'req_unit_price' || attr.attributeId === 'req_quantity') return;
+      const attributesToSave: SellerQuoteAttribute[] = [];
 
-    //       const vals = proposalAttributes[attr.attributeId];
-    //       if (vals && vals.length > 0) {
-    //         attributesToSave.push({
-    //           id: crypto.randomUUID(),
-    //           seller_quote_id: quoteId,
-    //           attribute_type: attr.attribute_type,
-    //           group_id: groupId,
-    //           attribute_id: attr.attributeId,
-    //           values: vals,
-    //           is_deviation: false,
-    //         });
-    //       }
-    //     });
-    //   });
+      attributeGroupsMap.forEach(([groupId, group]) => {
+        group.attributes.forEach((attr: any) => {
+          const attributeData = proposalAttributes[`${groupId}_${attr.attribute_id}`] || null;
+          if (attributeData) {
+            attributesToSave.push({
+              id: crypto.randomUUID(),
+              seller_quote_id: quoteId,
+              attribute_type: attributeData.attribute_type,
+              group_id: groupId,
+              attribute_id: attr.attribute_id,
+              values: attributeData.values || [],
+              is_deviation: attributeData.is_deviation,
+              deviation_note: attributeData.deviation_note || '',
+            });
+          }
+        });
+      });
 
-    //   await rfqDb.transaction('rw', rfqDb.seller_quotes, rfqDb.seller_quote_attributes, async () => {
-    //     await rfqDb.seller_quotes.put(quoteToSave);
+      const commentsToSave: SellerQuoteComment[] = [];
 
-    //     if (existingQuote) {
-    //       const oldAttrs = await rfqDb.seller_quote_attributes.where('seller_quote_id').equals(quoteId).toArray();
-    //       await rfqDb.seller_quote_attributes.bulkDelete(oldAttrs.map(a => a.id));
-    //     }
+      attributesToSave.forEach((attr) => {
+        if (attr.is_deviation) {
+          commentsToSave.push({
+            id: crypto.randomUUID(),
+            seller_quote_id: quoteId,
+            round: existingQuote?.round || 1,
+            attribute_type: attr.attribute_type,
+            group_id: attr.group_id,
+            attribute_id: attr.attribute_id,
+            comment: attr.deviation_note,
+            actor_type: "SELLER",
+            actor_id: activePartyId,
+            created_at: new Date().toISOString(),
+          });
+        }
+      });
 
-    //     if (attributesToSave.length > 0) {
-    //       await rfqDb.seller_quote_attributes.bulkAdd(attributesToSave);
-    //     }
-    //   });
+      await rfqDb.transaction('rw', rfqDb.seller_quotes, rfqDb.seller_quote_attributes, rfqDb.seller_quote_comments, async () => {
+        // 1. Save/Update the main quote record
+        await rfqDb.seller_quotes.put(quoteToSave);
 
-    //   antMessage.success(submitMode === 'SUBMITTED' ? 'Proposal submitted successfully!' : 'Draft saved successfully!');
-    //   navigate(basePath);
+        // 2. Update attributes (delete old and add new)
+        const oldAttrs = await rfqDb.seller_quote_attributes.where('seller_quote_id').equals(quoteId).toArray();
+        await rfqDb.seller_quote_attributes.bulkDelete(oldAttrs.map(a => a.id));
 
-    // } catch (err) {
-    //   console.error(err);
-    //   antMessage.error('Failed to save proposal');
-    // } finally {
-    //   setSubmitting(false);
-    // }
+        if (attributesToSave.length > 0) {
+          await rfqDb.seller_quote_attributes.bulkAdd(attributesToSave);
+        }
+
+        // 3. Save new comments (no history clearing here, just adding)
+        if (commentsToSave.length > 0) {
+          await rfqDb.seller_quote_comments.bulkAdd(commentsToSave);
+        }
+      });
+
+      antMessage.success(submitMode === 'SUBMITTED' ? 'Proposal submitted successfully!' : 'Draft saved successfully!');
+      navigate(basePath);
+
+    } catch (err) {
+      console.error(err);
+      antMessage.error('Failed to save proposal');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const attributesColumns = [
+    {
+      title: 'S.No',
+      dataIndex: 'sno',
+      key: 'sno',
+      width: 50,
+      className: "align-top",
+      render: (_: string, __: any, index: number) => <span className='pl-1.5'>{index + 1}</span>
+    },
     {
       title: 'Attribute',
       dataIndex: 'attributeName',
       key: 'attributeName',
       width: 320,
+      className: "align-top",
       render: (text: string, record: any) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-bold text-slate-800 leading-tight">
@@ -359,26 +416,59 @@ export const SupplierItemRespond: React.FC = () => {
       title: 'Requested Value',
       dataIndex: 'reqViewValue',
       key: 'reqViewValue',
+      className: "align-top",
       render: (text: string) => <span className="text-slate-600 font-medium">{text}</span>
+    },
+    {
+      title: 'Deviation',
+      dataIndex: 'deviation',
+      key: 'deviation',
+      className: "w-[80px] text-center align-top",
+      render: (_: string, attribute: any) => {
+        const proposalKey = `${attribute.groupId}_${attribute.attributeId}`
+        return (
+          <Switch
+            size='small'
+            disabled
+            value={proposalAttributes[proposalKey]?.is_deviation}
+            onChange={(v) => {
+              setProposalAttributes(prev => ({
+                ...prev,
+                [proposalKey]: { ...prev[proposalKey], is_deviation: v }
+              }));
+            }}
+          />
+        )
+      }
     },
     {
       title: 'Proposal Value',
       dataIndex: 'proposalValue',
       key: 'proposalValue',
+      className: "w-[400px] max-w-[400px] align-top",
       render: (_: string, attribute: any) => {
-        const propsalKey = `${attribute.groupId}_${attribute.attributeId}`
+        const proposalKey = `${attribute.groupId}_${attribute.attributeId}`
+        let field: any;
+
         if (attribute.attribute_type === 'SYSTEM') {
           switch (attribute.attributeId) {
             case "req_unit_price":
-              return (
+              field = (
                 <AntInput
                   disabled={isViewOnly}
-                  value={proposalAttributes[propsalKey]?.values?.[0]?.value_label ?? ''}
+                  value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-unit-price")?.value_label ?? ''}
                   onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (isNaN(val) || val <= 0) {
+                      antMessage.error('Please enter a valid price.');
+                      return;
+                    }
+                    const oldValue = attribute?.values?.find(i => i.value_id == "req-unit-price")?.value_label
                     setProposalAttributes(prev => ({
                       ...prev,
-                      [propsalKey]: {
-                        ...prev[propsalKey],
+                      [proposalKey]: {
+                        ...prev[proposalKey],
+                        is_deviation: val != Number(oldValue),
                         values: [{
                           value_id: 'req-unit-price',
                           value_label: e.target.value
@@ -388,37 +478,53 @@ export const SupplierItemRespond: React.FC = () => {
                   }}
                 />
               )
+              break;
             case "req_quantity":
-              return (
+              field = (
                 <AntInput
                   disabled={isViewOnly}
-                  value={proposalAttributes[propsalKey]?.values?.[0]?.value_label ?? ''}
+                  value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-quantity")?.value_label ?? ''}
                   onChange={(e) => {
+                    const oldValue = attribute?.values?.find(i => i.value_id == "req-quantity")?.value_label
+                    const val = Number(e.target.value);
+                    if (isNaN(val) || val <= 0) {
+                      antMessage.error('Please enter a valid price.');
+                      return;
+                    }
+                    const unit = attribute?.values?.find(i => i.value_id == "req-quantity-unit")
                     setProposalAttributes(prev => ({
-                      ...prev, [propsalKey]: {
-                        ...prev[propsalKey],
-                        values: [{ value_id: 'req-quantity', value_label: e.target.value }]
+                      ...prev, [proposalKey]: {
+                        ...prev[proposalKey],
+                        is_deviation: e.target.value !== oldValue,
+                        values: [
+                          { value_id: 'req-quantity', value_label: e.target.value },
+                          unit
+                        ]
                       }
                     }));
                   }}
                 />
               )
+              break;
             case "brand":
-              return (
+              field = (
                 <AntSelect
                   disabled={isViewOnly}
                   mode="multiple"
                   allowClear
                   placeholder="Select Preferred Brand(s)"
-                  value={proposalAttributes[propsalKey]?.values?.map((v: any) => v.value_id) || []}
+                  value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
                   onChange={(val: string[]) => {
                     const newValues = val.map(id => {
                       const matched = allBrands.find((v: any) => v.id === id);
                       return { value_id: id, value_label: matched?.name || id };
                     });
+                    const oldValue = attribute?.values?.map((v: any) => v.value_id) || []
+                    const isDeviation = oldValue.some((id: any) => !newValues.map((v: any) => v.value_id).includes(id));
                     setProposalAttributes(prev => ({
-                      ...prev, [propsalKey]: {
-                        ...prev[propsalKey],
+                      ...prev, [proposalKey]: {
+                        ...prev[proposalKey],
+                        is_deviation: isDeviation,
                         values: newValues
                       }
                     }));
@@ -427,52 +533,61 @@ export const SupplierItemRespond: React.FC = () => {
                   options={allBrands.map((v: any) => ({ label: v.name, value: v.id }))}
                 />
               )
+              break;
             case "manufacturer":
-              return (
+              field = (
                 <AntSelect
                   disabled={isViewOnly}
                   mode="multiple"
                   allowClear
                   placeholder="Select Preferred Manufacturer(s)"
-                  value={proposalAttributes[propsalKey]?.values?.map((v: any) => v.value_id) || []}
+                  value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
                   onChange={(val: string[]) => {
                     const newValues = val.map(id => {
                       const matched = allManufacturers.find((v: any) => v.id === id);
                       return { value_id: id, value_label: matched?.company_name || id };
                     });
+                    const oldValue = attribute?.values?.map((v: any) => v.value_id) || []
+                    const isDeviation = oldValue.some((id: any) => !newValues.map((v: any) => v.value_id).includes(id));
                     setProposalAttributes(prev => ({
-                      ...prev, [propsalKey]: {
-                        ...prev[propsalKey],
+                      ...prev, [proposalKey]: {
+                        ...prev[proposalKey],
+                        is_deviation: isDeviation,
                         values: newValues
                       }
                     }));
                   }}
-
                   className="w-full mt-1"
                   options={allManufacturers.map((v: any) => ({ label: v.company_name, value: v.id }))}
                 />
               )
+              break;
             default:
-              return "Contact System admin"
+              field = "Contact System admin"
+              break;
+
           }
         } else {
           const values = catalogAttributeValues.filter((v) => v.attributeId === attribute.attributeId);
-          return (
+          field = (
             <AntSelect
               disabled={isViewOnly}
               mode="multiple"
               allowClear
               placeholder={`Select ${attribute.attributeName}`}
               className="w-full mt-1"
-              value={proposalAttributes[propsalKey]?.values?.map((v: any) => v.value_id) || []}
+              value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
               onChange={(val: string[]) => {
                 const newValues = val.map(id => {
                   const matched = values.find((v: any) => v.id === id);
                   return { value_id: id, value_label: matched?.value || matched?.label || id };
                 });
+                const oldValue = attribute?.values?.map((v: any) => v.value_id) || []
+                const isDeviation = oldValue.some((id: any) => !newValues.map((v: any) => v.value_id).includes(id));
                 setProposalAttributes(prev => ({
-                  ...prev, [propsalKey]: {
-                    ...prev[propsalKey],
+                  ...prev, [proposalKey]: {
+                    ...prev[proposalKey],
+                    is_deviation: isDeviation,
                     values: newValues
                   }
                 }));
@@ -481,9 +596,68 @@ export const SupplierItemRespond: React.FC = () => {
             />
           )
         }
+        return (
+          <div className="flex gap-2 flex-col">
+            <div className="w-full">
+              {field}
+            </div>
+            <div className="flex items-center">
+              {
+                proposalAttributes[proposalKey]?.is_deviation && !isViewOnly && (
+                  <AntInput.TextArea
+                    placeholder="Deviation Reason"
+                    value={proposalAttributes[proposalKey]?.deviation_note}
+                    rows={2}
+                    onChange={(e) => {
+                      setProposalAttributes(prev => ({
+                        ...prev, [proposalKey]: {
+                          ...prev[proposalKey],
+                          deviation_note: e.target.value
+                        }
+                      }));
+                    }}
+                  />
+                )
+              }
+              {
+                isViewOnly && (
+                  <div className="mt-1 space-y-1 text-left w-full">
+                    {existingQuoteAttributesComments
+                      ?.filter(c => c.attribute_id === attribute.attributeId && c.group_id === attribute.groupId)
+                      .map((c) => {
+                        const isBuyer = c.actor_type === 'BUYER';
+                        const isSelf = c.actor_type === 'SELLER';
+                        const name = isSelf ? 'You' : 'Requester';
+                        const timeStr = c.created_at
+                          ? `${new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} ${new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                          : '';
+                        return (
+                          <div
+                            key={c.id}
+                            className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
+                              ? 'bg-blue-50/50 border-blue-100 text-blue-900'
+                              : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
+                              }`}
+                          >
+                            <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
+                              [{name} {timeStr}]:
+                            </span>
+                            <span className="font-medium whitespace-pre-wrap">{c.comment}</span>
+                          </div>
+                        );
+                      })}
+                  </div>
+                )
+              }
+            </div>
+          </div>
+        );
       }
     }
   ]
+
+
+
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -618,6 +792,7 @@ export const SupplierItemRespond: React.FC = () => {
                     pagination={false}
                     size="small"
                     bordered
+                    scroll={{ x: 768 }}
                   />
                 </div>
               </div>
@@ -628,13 +803,13 @@ export const SupplierItemRespond: React.FC = () => {
         {!isViewOnly && (
           <div className="pt-6 flex justify-end gap-3 mt-6">
             <AntButton onClick={() => navigate(basePath)}>Cancel</AntButton>
-            <AntButton
+            {/* <AntButton
               icon={<SaveOutlined />}
               onClick={() => handleSave('DRAFT')}
               loading={submitting}
             >
               Save as Draft
-            </AntButton>
+            </AntButton> */}
             <AntButton
               type="primary"
               icon={<SendOutlined />}

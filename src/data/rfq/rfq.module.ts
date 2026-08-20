@@ -80,12 +80,13 @@ export interface SellerQuoteAttribute {
   attribute_id: string;
   values: ItemAttributeValue[];
   is_deviation: boolean;
-  rejection_comment?: string;
+  deviation_note?: string;
 }
 
 export interface SellerQuoteComment {
   id: string;
   seller_quote_id: string;
+  round: number
   attribute_type?: AttributeType;
   group_id: string;
   attribute_id: string;

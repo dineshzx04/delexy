@@ -18,7 +18,7 @@ const PlatformLayout: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 768;
+      const mobile = window.innerWidth < 1200;
       setIsMobile(mobile);
       if (!mobile) setMobileOpen(false);
     };
