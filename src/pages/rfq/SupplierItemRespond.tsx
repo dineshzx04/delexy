@@ -340,7 +340,7 @@ export const SupplierItemRespond: React.FC = () => {
             attribute_type: attr.attribute_type,
             group_id: attr.group_id,
             attribute_id: attr.attribute_id,
-            comment: attr.deviation_note,
+            comment: attr.deviation_note || '',
             actor_type: "SELLER",
             actor_id: activePartyId,
             created_at: new Date().toISOString(),
@@ -463,7 +463,7 @@ export const SupplierItemRespond: React.FC = () => {
                       antMessage.error('Please enter a valid price.');
                       return;
                     }
-                    const oldValue = attribute?.values?.find(i => i.value_id == "req-unit-price")?.value_label
+                    const oldValue = attribute?.values?.find((i: any) => i.value_id == "req-unit-price")?.value_label
                     setProposalAttributes(prev => ({
                       ...prev,
                       [proposalKey]: {
@@ -485,13 +485,13 @@ export const SupplierItemRespond: React.FC = () => {
                   disabled={isViewOnly}
                   value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-quantity")?.value_label ?? ''}
                   onChange={(e) => {
-                    const oldValue = attribute?.values?.find(i => i.value_id == "req-quantity")?.value_label
+                    const oldValue = attribute?.values?.find((i: any) => i.value_id == "req-quantity")?.value_label
                     const val = Number(e.target.value);
                     if (isNaN(val) || val <= 0) {
                       antMessage.error('Please enter a valid price.');
                       return;
                     }
-                    const unit = attribute?.values?.find(i => i.value_id == "req-quantity-unit")
+                    const unit = attribute?.values?.find((i: any) => i.value_id == "req-quantity-unit")
                     setProposalAttributes(prev => ({
                       ...prev, [proposalKey]: {
                         ...prev[proposalKey],

@@ -1,24 +1,22 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Button, Tag, Table, Descriptions, App as AntApp, Alert, Input } from 'antd';
-import { CheckOutlined, CloseOutlined, UndoOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { rfqDb } from '../../data/rfq';
+import { Card, Button, Tag as AntTag, Table, Descriptions, App as AntApp, Alert, Input } from 'antd';
+import { CheckOutlined, CloseOutlined, UndoOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined } from '@ant-design/icons';
+import { rfqDb, type SellerQuote, type SellerQuoteAttribute, type SellerQuoteComment } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { RfqItemStatusBadge } from './RfqStatusBadge';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 const CommentThread: React.FC<{
   comments: any[];
-  parties: any[];
   viewerPartyId: string;
-}> = ({ comments, parties, viewerPartyId }) => {
+}> = ({ comments, viewerPartyId }) => {
   if (comments.length === 0) return null;
 
   return (
-    <div className="mt-1 space-y-1 text-left">
+    <div className="mt-1 space-y-1 text-left w-full">
       {comments.map((c) => {
         const isBuyer = c.actor_type === 'BUYER';
         const isSelf = c.actor_id === viewerPartyId;
@@ -71,18 +69,20 @@ export const RequesterQuoteReview: React.FC = () => {
   const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
 
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
-  const catalogBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
-  const catalogManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+  const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
   const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
-  const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
 
   const sellerProduct = useLiveQuery(
     async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
     [item?.product_id]
   );
-
-  const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
+  
+  const allVariants = useLiveQuery(
+    async () => item?.product_id ? (await catalogDb.sellerProducts.get(item.product_id))?.variants : [],
+    [item?.product_id]
+  ) || [];
+  const itemVariant = allVariants.find((v) => v.id === item?.variant_id);
 
   const itemAttributes = useLiveQuery(
     () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray() : []),
@@ -116,36 +116,13 @@ export const RequesterQuoteReview: React.FC = () => {
       existingComments
         .filter((c) => c.actor_type === 'BUYER')
         .forEach((c) => {
-          const key = c.group_id === 'SYSTEM' ? `SYSTEM_${c.attribute_id}` : `${c.group_id}_${c.attribute_id}`;
+          const key = `${c.group_id}_${c.attribute_id}`;
           initialComments[key] = c.comment || '';
         });
       setBuyerComments(initialComments);
     }
   }, [existingComments]);
 
-
-
-  // Normalize comment key: SYSTEM attrs use 'SYSTEM_<id>', custom use '<group_id>_<attr_id>'
-  const getCommentKey = (attributeType: string | undefined, groupId: string, attributeId: string) =>
-    attributeType === 'SYSTEM' ? `SYSTEM_${attributeId}` : `${groupId}_${attributeId}`;
-
-  const getBrandNames = (ids: string[] | null | undefined): string => {
-    if (!ids || ids.length === 0) return 'Any Brand';
-    return ids.map((id) => catalogBrands.find((b) => b.id === id)?.name || id).join(', ');
-  };
-
-  const getManufacturerNames = (ids: string[] | null | undefined): string => {
-    if (!ids || ids.length === 0) return 'Any Manufacturer';
-    return ids.map((id) => catalogManufacturers.find((m) => m.id === id)?.company_name || id).join(', ');
-  };
-
-  const getSupplierCommentText = (groupId: string, attributeId: string) => {
-    const normGroupId = groupId === 'system-preferences' ? 'SYSTEM' : groupId;
-    const found = existingComments.find(
-      (c) => c.actor_type === 'SELLER' && c.group_id === normGroupId && c.attribute_id === attributeId
-    );
-    return found?.comment || '';
-  };
 
   // Decision trigger
   const handleDecision = async (statusDecision: 'ACCEPTED' | 'REJECTED' | 'REVISION_REQUIRED') => {
@@ -165,9 +142,8 @@ export const RequesterQuoteReview: React.FC = () => {
       const commentPromises = Object.entries(buyerComments)
         .filter(([_, val]) => !!val.trim())
         .map(([key, commentVal]) => {
-          const isSystem = key.startsWith('SYSTEM_');
-          const attributeId = isSystem ? key.replace('SYSTEM_', '') : key.split('_')[1];
-          const groupId = isSystem ? 'SYSTEM' : key.split('_')[0];
+          const groupId = key.split('_')[0];
+          const attributeId = key.split('_').slice(1).join('_');
 
           const round = quote.round;
           const commentId = `qc-buyer-${quote.id}-${groupId}-${attributeId}-r${round}`;
@@ -179,6 +155,7 @@ export const RequesterQuoteReview: React.FC = () => {
             comment: commentVal.trim(),
             actor_type: 'BUYER',
             actor_id: rfq.requester_id,
+            round: quote.round,
             created_at: new Date().toISOString()
           });
         });
@@ -194,52 +171,55 @@ export const RequesterQuoteReview: React.FC = () => {
     }
   };
 
-
   const attributeGroupsMap = React.useMemo(() => {
     const map: Record<string, { name: string; attributes: any[] }> = {};
-    const customAttributes = sellerProduct?.dynamic_attributes?.filter((ia: any) => ia.is_variant !== true);
-
-    customAttributes?.forEach((ia: any) => {
-      const groupId = ia.group_id || 'ungrouped';
+    
+    quoteAttributes.forEach(qa => {
+      const groupId = qa.group_id;
       if (!map[groupId]) {
-        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
+        let groupName = 'General Specifications';
+        if (groupId === 'system') {
+          groupName = 'System Specifications';
+        } else {
+          groupName = attributeGroups.find(g => g.id === groupId)?.name || 'General Specifications';
+        }
         map[groupId] = { name: groupName, attributes: [] };
       }
 
-      const hydratedValues = catalogAttributeValues
-        .filter((av) => ia?.selected_value_ids?.includes(av.id))
-        .map((v) => ({
-          value_id: v.id,
-          value_label: v.value || v.label,
-        }));
-
-      map[groupId].attributes.push({ ...ia, values: hydratedValues });
-    });
-
-    const currentVariant = sellerProduct?.variants?.find((v: any) => v.id === item?.variant_id);
-    currentVariant?.combination_values?.forEach((cv: any) => {
-      const groupId = cv.group_id || 'ungrouped';
-      if (!map[groupId]) {
-        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'Variant Specifications';
-        map[groupId] = { name: groupName, attributes: [] };
+      let attrName = qa.attribute_id;
+      if (qa.attribute_id === 'req_unit_price') attrName = 'Unit Price ($)';
+      else if (qa.attribute_id === 'req_quantity') attrName = 'Requested Quantity';
+      else if (qa.attribute_id === 'brand') attrName = 'Brand Preference';
+      else if (qa.attribute_id === 'manufacturer') attrName = 'Manufacturer Preference';
+      else {
+        attrName = catalogAttributes.find(a => a.id === qa.attribute_id)?.name || qa.attribute_id;
       }
+
+      // Determine what the buyer requested for comparison
+      let reqViewValue = 'N/A';
+      if (qa.attribute_id === 'req_quantity' && item) {
+          reqViewValue = `${item.req_quantity} ${item.req_unit || 'pcs'}`;
+      } else if (qa.attribute_id === 'req_unit_price' && item) {
+          reqViewValue = item.req_unit_price ? `$${item.req_unit_price}` : 'N/A';
+      } else {
+          const matchedReqAttr = itemAttributes.find(ia => ia.attribute_id === qa.attribute_id);
+          reqViewValue = (matchedReqAttr?.values || []).map(v => v.value_label).join(', ') || 'N/A';
+      }
+
+      const proposalKey = `${qa.group_id}_${qa.attribute_id}`;
+      const isVariant = qa.attribute_id.startsWith('var-') || false;
 
       map[groupId].attributes.push({
-        id: `var-${cv.attribute_id}`,
-        attribute_id: cv.attribute_id,
-        group_id: cv.group_id,
-        is_variant: true,
-        values: [
-          {
-            value_id: cv.value_id,
-            value_label: cv.label || cv.value_id
-          }
-        ]
+        ...qa,
+        attributeName: attrName,
+        isVariant: isVariant,
+        reqViewValue: reqViewValue,
+        proposalKey: proposalKey
       });
     });
-
+    
     return Object.entries(map);
-  }, [attributeGroups, sellerProduct, catalogAttributeValues, item?.variant_id]);
+  }, [quoteAttributes, attributeGroups, catalogAttributes, itemAttributes, item]);
 
   if (rfq === undefined || item === undefined || quote === undefined || parties.length === 0) {
     return (
@@ -263,122 +243,92 @@ export const RequesterQuoteReview: React.FC = () => {
   const categoryName = categories.find((c) => c.id === item.category_id)?.name || 'Unknown';
   const sellerParty = parties.find((p) => p.id === quote.seller_party_id);
 
-  // Build General preferences comparison rows
-  const generalPreferencesData = [
-    {
-      key: 'brand',
-      specification: 'Brand Preference',
-      buyerAsked: getBrandNames(itemAttributes.find(ia => ia.attribute_id === 'brand')?.values?.map((v: any) => v.value_id)),
-      offered: getBrandNames(quoteAttributes.find(qa => qa.attribute_id === 'brand')?.values?.map((v: any) => v.value_id)),
-      supplierComment: getSupplierCommentText('system-preferences', 'brand'),
-      commentKey: 'SYSTEM_brand'
-    },
-    {
-      key: 'manufacturer',
-      specification: 'Manufacturer Preference',
-      buyerAsked: getManufacturerNames(itemAttributes.find(ia => ia.attribute_id === 'manufacturer')?.values?.map((v: any) => v.value_id)),
-      offered: getManufacturerNames(quoteAttributes.find(qa => qa.attribute_id === 'manufacturer')?.values?.map((v: any) => v.value_id)),
-      supplierComment: getSupplierCommentText('system-preferences', 'manufacturer'),
-      commentKey: 'SYSTEM_manufacturer'
-    },
-    {
-      key: 'unit_price',
-      specification: 'Unit Price ($)',
-      buyerAsked: item.req_unit_price ? `$${item.req_unit_price}` : 'N/A',
-      offered: quote.offer_unit_price ? `$${quote.offer_unit_price.toFixed(2)}` : 'N/A',
-      supplierComment: getSupplierCommentText('system-preferences', 'unit_price'),
-      commentKey: 'SYSTEM_unit_price'
-    }
-  ];
 
-  const columns = [
+  const attributesColumns = [
     {
-      title: 'Specification / Attribute',
-      dataIndex: 'specification',
-      key: 'specification',
-      width: 280,
+      title: 'S.No',
+      dataIndex: 'sno',
+      key: 'sno',
+      width: 50,
+      className: "align-top",
+      render: (_: string, __: any, index: number) => <span className='pl-1.5'>{index + 1}</span>
+    },
+    {
+      title: 'Attribute',
+      dataIndex: 'attributeName',
+      key: 'attributeName',
+      width: 320,
+      className: "align-top",
       render: (text: string, record: any) => (
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center gap-2">
-            {record.is_variant ? (
-              <Tag color="blue" className="m-0 font-bold tracking-wide border-blue-200">
-                VARIANT
-              </Tag>
-            ) : (
-              <Tag color="purple" className="m-0 font-semibold tracking-wide border-purple-200">
-                SPEC
-              </Tag>
+        <div className="flex flex-col gap-0.5">
+          <span className="font-bold text-slate-800 leading-tight">
+            {text}
+            {record.isVariant && (
+              <AntTag
+                color="blue"
+                className="leading-tight italic ml-2"
+                icon={<AntIconCheckCircleOutlined />}
+              >
+                Variant Attribute
+              </AntTag>
             )}
-            <span className="font-bold text-slate-800 leading-tight text-[13px]">{text}</span>
-          </div>
+          </span>
           {record.description && (
-            <span className="text-xs text-slate-500 leading-tight italic pl-1">{record.description}</span>
+            <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
           )}
         </div>
       )
     },
     {
-      title: 'Requested By You',
-      dataIndex: 'buyerAsked',
-      key: 'buyerAsked',
-      width: 220,
+      title: 'Requested Value',
+      dataIndex: 'reqViewValue',
+      key: 'reqViewValue',
+      className: "align-top",
       render: (text: string) => <span className="text-slate-600 font-medium">{text}</span>
     },
     {
-      title: 'Supplier Offer',
-      dataIndex: 'offered',
-      key: 'offered',
-      width: 220,
-      render: (text: string, record: any) => {
-        // Find if there is a deviation/mismatch
-        const cleanAsked = String(record.buyerAsked || '').trim().toLowerCase();
-        const cleanOffered = String(record.offered || '').trim().toLowerCase();
-        const isAnyPreference = cleanAsked === 'any brand' || cleanAsked === 'any manufacturer' || cleanAsked === 'n/a';
-
-        const hasDeviation = !isAnyPreference && cleanAsked !== cleanOffered;
-
-        return (
-          <div className="flex flex-col gap-1">
-            <span className="text-emerald-700 font-bold">{text}</span>
-            {hasDeviation && (
-              <Tag color="warning" className="w-fit text-[10px] font-bold py-0 px-1 border-amber-300 text-amber-700 bg-amber-50">
-                DEVIATION
-              </Tag>
-            )}
-          </div>
-        );
-      }
+      title: 'Deviation',
+      dataIndex: 'is_deviation',
+      key: 'deviation',
+      className: "w-[80px] text-center align-top",
+      render: (is_deviation: boolean) => (
+        is_deviation ? <AntTag color="warning" className="font-bold m-0 border-amber-300 text-amber-700 bg-amber-50 text-[10px]">YES</AntTag> : <span className="text-slate-400">-</span>
+      )
     },
     {
-      title: 'Your Feedback & History',
-      key: 'buyerFeedback',
-      render: (_: any, record: any) => {
-        const key = record.commentKey || (record.key === 'brand' ? 'SYSTEM_brand' : record.key === 'manufacturer' ? 'SYSTEM_manufacturer' : record.key === 'unit_price' ? 'SYSTEM_unit_price' : '');
-        const normGroupId = key.startsWith('SYSTEM_') ? 'SYSTEM' : key.split('_')[0];
-        const attrId = key.startsWith('SYSTEM_') ? key.replace('SYSTEM_', '') : key.split('_')[1];
-
+      title: 'Proposal Value & Feedback',
+      dataIndex: 'proposalValue',
+      key: 'proposalValue',
+      className: "w-[400px] max-w-[400px] align-top",
+      render: (_: string, attribute: any) => {
+        const proposalValue = (attribute.values || []).map((v: any) => v.value_label).join(', ') || '—';
+        
         const threadComments = existingComments
-          .filter((c) => c.group_id === normGroupId && c.attribute_id === attrId)
+          .filter((c) => c.group_id === attribute.group_id && c.attribute_id === attribute.attribute_id)
           .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
         return (
-          <div className="space-y-2 text-left">
-            {quote.status === 'SUBMITTED' ? (
-              <Input.TextArea
-                rows={2}
-                placeholder="Leave feedback on this specification..."
-                value={buyerComments[record.commentKey || key] || ''}
-                onChange={(e) => setBuyerComments((prev) => ({ ...prev, [record.commentKey || key]: e.target.value }))}
-              />
-            ) : null}
-            <CommentThread comments={threadComments} parties={parties} viewerPartyId={activePartyId} />
+          <div className="flex gap-2 flex-col">
+            <div className="w-full text-emerald-700 font-bold">
+              {proposalValue}
+            </div>
+            <div className="flex flex-col w-full">
+              {quote.status === 'SUBMITTED' && (
+                <Input.TextArea
+                  rows={2}
+                  className="mb-1"
+                  placeholder="Leave feedback on this specification..."
+                  value={buyerComments[attribute.proposalKey] || ''}
+                  onChange={(e) => setBuyerComments((prev) => ({ ...prev, [attribute.proposalKey]: e.target.value }))}
+                />
+              )}
+              <CommentThread comments={threadComments} viewerPartyId={activePartyId} />
+            </div>
           </div>
         );
       }
     }
   ];
-
-
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -397,16 +347,16 @@ export const RequesterQuoteReview: React.FC = () => {
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 mb-5 flex flex-wrap gap-6 items-start">
           <div className="flex flex-col gap-0.5">
             <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Reference</span>
-            <Tag color="purple" className="font-mono font-bold text-sm mt-0.5">{quote.seller_quote_number}</Tag>
+            <AntTag color="purple" className="font-mono font-bold text-sm mt-0.5">{quote.seller_quote_number}</AntTag>
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Status</span>
-            <Tag
+            <AntTag
               color={quote.status === 'SUBMITTED' ? 'blue' : quote.status === 'DRAFT' ? 'orange' : quote.status === 'ACCEPTED' ? 'green' : quote.status === 'REJECTED' ? 'red' : 'default'}
               className="mt-0.5 font-bold"
             >
               {quote.status}
-            </Tag>
+            </AntTag>
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Round</span>
@@ -421,7 +371,7 @@ export const RequesterQuoteReview: React.FC = () => {
         </div>
 
         {/* Requested Item Details */}
-        <Descriptions title="Target Specifications Overview" bordered size="small" column={2} className="mb-6">
+        <Descriptions title="Requested Item Details" bordered size="small" column={2} className="mb-6">
           <Descriptions.Item label="Product / Service" span={2}>
             <strong className="text-slate-800">{sellerProduct?.product_name || 'Custom Specifications'}</strong>
           </Descriptions.Item>
@@ -431,13 +381,13 @@ export const RequesterQuoteReview: React.FC = () => {
               : 'N/A'}
           </Descriptions.Item>
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
+          <Descriptions.Item label="Variant">{itemVariant?.sku || 'N/A'}</Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
-            <Tag color="blue" className="font-bold">{item.req_quantity} {item.req_unit}</Tag>
+            <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
           </Descriptions.Item>
           <Descriptions.Item label="Requested Unit Price">
             {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
           </Descriptions.Item>
-
         </Descriptions>
 
         <div className="space-y-6">
@@ -470,61 +420,9 @@ export const RequesterQuoteReview: React.FC = () => {
             />
           )}
 
-          <h3 className="text-base font-bold text-slate-900 pt-3">Side-by-Side Sourcing Configuration</h3>
+          <h3 className="text-base font-bold text-slate-900 pt-3">Attribute configuration</h3>
 
-          {/* 1. General Sourcing Preferences Card */}
-          <div
-            className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-            style={{ borderLeft: `4px solid #2563eb` }}
-          >
-            <div
-              className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
-              style={{ backgroundColor: `#2563eb14` }}
-            >
-              <div className="flex items-center gap-3">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white bg-blue-600">
-                  1
-                </span>
-                <h4 className="text-md font-bold text-slate-800">General Sourcing Preferences</h4>
-              </div>
-              <Tag color="default" style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 700 }}>
-                {generalPreferencesData.length} attributes
-              </Tag>
-            </div>
-            <div className="p-3">
-              <Table
-                dataSource={generalPreferencesData}
-                columns={columns}
-                pagination={false}
-                size="small"
-                bordered
-              />
-            </div>
-          </div>
-
-          {/* 2. Custom Specifications (Groups) */}
           {attributeGroupsMap.map(([groupId, group], idx) => {
-            const groupRows = group.attributes.map((ia: any) => {
-              const attrName = catalogAttributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id;
-              const requestedVals = (ia.values || []).map((v: any) => v.value_label).join(', ') || 'N/A';
-
-              // Resolve what supplier offered
-              const key = `${ia.group_id}_${ia.attribute_id}`;
-              const foundAttr = quoteAttributes.find((qa) => qa.group_id === ia.group_id && qa.attribute_id === ia.attribute_id);
-              const supplierOffered = (foundAttr?.values || []).map((v: any) => v.value_label).join(', ') || '—';
-
-              return {
-                key: ia.id || ia.attribute_id,
-                specification: attrName,
-                is_variant: ia.is_variant,
-                description: ia.description || null,
-                buyerAsked: requestedVals,
-                offered: supplierOffered,
-                supplierComment: getSupplierCommentText(ia.group_id, ia.attribute_id),
-                commentKey: key
-              };
-            });
-
             const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
 
             return (
@@ -542,21 +440,22 @@ export const RequesterQuoteReview: React.FC = () => {
                       className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
                       style={{ backgroundColor: accentColor }}
                     >
-                      {idx + 2}
+                      {idx + 1}
                     </span>
                     <h4 className="text-md font-bold text-slate-800">{group.name}</h4>
                   </div>
-                  <Tag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
-                    {groupRows.length} attributes
-                  </Tag>
+                  <AntTag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
+                    {group.attributes.length} attributes
+                  </AntTag>
                 </div>
                 <div className="p-3">
                   <Table
-                    dataSource={groupRows}
-                    columns={columns}
+                    dataSource={group.attributes}
+                    columns={attributesColumns}
                     pagination={false}
                     size="small"
                     bordered
+                    scroll={{ x: 768 }}
                   />
                 </div>
               </div>
