@@ -47,14 +47,15 @@ export interface RfqItem {
 export interface RfqItemAttribute {
   id: string;
   rfq_item_id: string;
+  attribute_type?: AttributeType;
   group_id: string;
   attribute_id: string;
+  is_variant: boolean;
   description?: string;
   unit?: string;
   values: ItemAttributeValue[];
   created_at: string;
   updated_at: string;
-  attribute_type?: AttributeType;
 }
 
 export interface SellerQuote {
@@ -78,9 +79,12 @@ export interface SellerQuoteAttribute {
   attribute_type?: AttributeType;
   group_id: string;
   attribute_id: string;
+  is_variant: boolean;
+  req_value: ItemAttributeValue[];
   values: ItemAttributeValue[];
   is_deviation: boolean;
   deviation_note?: string;
+  buyer_accepted?: boolean;
 }
 
 export interface SellerQuoteComment {

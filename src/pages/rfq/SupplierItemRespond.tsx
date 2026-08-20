@@ -10,8 +10,17 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 
-
-
+interface ProposalAttribute {
+  attribute_type: AttributeType;
+  group_id: string;
+  attribute_id: string;
+  is_deviation: boolean;
+  deviation_note?: string;
+  is_variant: boolean;
+  req_value: ItemAttributeValue[];
+  values: ItemAttributeValue[];
+  buyer_accepted?: boolean;
+}
 
 export const SupplierItemRespond: React.FC = () => {
   const { message: antMessage } = AntApp.useApp();
@@ -24,19 +33,12 @@ export const SupplierItemRespond: React.FC = () => {
 
   const [submitting, setSubmitting] = useState(false);
 
-  const [proposalAttributes, setProposalAttributes] = useState<Record<string, {
-    attribute_type: AttributeType,
-    group_id: string,
-    attribute_id: string,
-    is_deviation: boolean,
-    deviation_note?: string,
-    values: ItemAttributeValue[]
-  }>>({});
+  const [proposalAttributes, setProposalAttributes] = useState<Record<string, ProposalAttribute>>({});
 
 
-  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []);
   const activeParty = React.useMemo(() => {
-    if (parties.length === 0) return null;
+    if (!parties || parties.length === 0) return null;
     return isBusinessContext
       ? parties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace.businessId) || parties[0]
       : parties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || parties.find((p) => p.id === 'pty-6') || parties[0];
@@ -45,172 +47,232 @@ export const SupplierItemRespond: React.FC = () => {
   const activePartyId = activeParty?.id || '';
 
   const existingQuote = useLiveQuery(
-    () => (itemId && activePartyId ? rfqDb.seller_quotes.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first() : undefined),
+    async () => {
+      if (!itemId || !activePartyId) return null;
+      const res = await rfqDb.seller_quotes.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first();
+      return res || null;
+    },
     [itemId, activePartyId]
   );
 
   const existingQuoteAttributes = useLiveQuery(
-    () => (existingQuote?.id ? rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray() : []),
-    [existingQuote?.id]
-  );
-  const existingQuoteAttributesComments = useLiveQuery(
-    () => (existingQuote?.id ? rfqDb.seller_quote_comments.where('seller_quote_id').equals(existingQuote.id).toArray() : []),
-    [existingQuote?.id]
+    async () => {
+      if (existingQuote === undefined) return undefined;
+      if (!existingQuote?.id) return [];
+      return await rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray();
+    },
+    [existingQuote]
   );
 
-  const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
+  const existingQuoteAttributesComments = useLiveQuery(
+    async () => {
+      if (existingQuote === undefined) return undefined;
+      if (!existingQuote?.id) return [];
+      return await rfqDb.seller_quote_comments.where('seller_quote_id').equals(existingQuote.id).toArray();
+    },
+    [existingQuote]
+  );
+
+  const item = useLiveQuery(
+    async () => {
+      if (!itemId) return null;
+      const res = await rfqDb.rfq_items.get(itemId);
+      return res || null;
+    },
+    [itemId]
+  );
 
   const itemAttributes = useLiveQuery(
     () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray() : []),
     [itemId]
-  ) || [];
+  );
 
-  const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
+  const rfq = useLiveQuery(
+    async () => {
+      if (!rfqId) return null;
+      const res = await rfqDb.rfqs.get(rfqId);
+      return res || null;
+    },
+    [rfqId]
+  );
+
   const sellerProduct = useLiveQuery(
-    async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
-    [item?.product_id]
+    async () => {
+      if (item === undefined) return undefined;
+      if (!item?.product_id) return null;
+      const res = await catalogDb.sellerProducts.get(item.product_id);
+      return res || null;
+    },
+    [item]
   );
+
   const allVariants = useLiveQuery(
-    async () => item?.product_id ? (await catalogDb.sellerProducts.get(item.product_id))?.variants : [],
-    [item?.product_id]
-  ) || [];
-  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
-  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
-  const itemVariant = allVariants.find((v) => v.id === item?.variant_id);
-  const catalogProduct = useLiveQuery(
-    async () => (item?.catalog_product_id ? await catalogDb.products.get(item.catalog_product_id) : undefined),
-    [item?.catalog_product_id]
+    async () => {
+      if (item === undefined) return undefined;
+      if (!item?.product_id) return [];
+      const sprod = await catalogDb.sellerProducts.get(item.product_id);
+      return sprod?.variants || [];
+    },
+    [item]
   );
-  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
-  const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
-  const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
-  const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
+
+  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []);
+  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []);
+
+  const itemVariant = React.useMemo(() => {
+    if (!allVariants || !item) return null;
+    return allVariants.find((v) => v.id === item.variant_id) || null;
+  }, [allVariants, item]);
+
+  const catalogProduct = useLiveQuery(
+    async () => {
+      if (item === undefined) return undefined;
+      if (!item?.catalog_product_id) return null;
+      const res = await catalogDb.products.get(item.catalog_product_id);
+      return res || null;
+    },
+    [item]
+  );
+
+  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []);
+  const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []);
+  const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []);
+  const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []);
 
   const quoteNumber = React.useMemo(() => {
     return existingQuote?.seller_quote_number || `SQ-${activePartyId?.replace('pty-', '')}-${rfq?.id?.replace('rfq-', '')}-${itemId?.replace('item-', '')}`;
   }, [existingQuote, rfq, itemId, activePartyId]);
 
-  const brandAttribute = itemAttributes.find((ia) => ia.attribute_type === 'SYSTEM' && ia.attribute_id === 'brand');
-  const manufacturerAttribute = itemAttributes.find((ia) => ia.attribute_type === 'SYSTEM' && ia.attribute_id === 'manufacturer');
+  const isLoading =
+    rfq === undefined ||
+    item === undefined ||
+    existingQuote === undefined ||
+    existingQuoteAttributes === undefined ||
+    existingQuoteAttributesComments === undefined ||
+    parties === undefined ||
+    allBrands === undefined ||
+    allManufacturers === undefined ||
+    categories === undefined ||
+    catalogAttributes === undefined ||
+    catalogAttributeValues === undefined ||
+    attributeGroups === undefined ||
+    itemAttributes === undefined ||
+    sellerProduct === undefined ||
+    allVariants === undefined ||
+    catalogProduct === undefined;
 
   const attributeGroupsMap = React.useMemo(() => {
-    const map: Record<string, { name: string; attributes: any[] }> = {};
-    const customAttributes = sellerProduct?.dynamic_attributes?.filter((ia: any) => ia.is_variant !== true);
-    if (item) {
-      map["system"] = {
-        name: 'System Specifications',
-        attributes: [
-          {
-            key: 'manufacturer',
-            attribute_type: "SYSTEM",
-            group_id: "system",
-            attribute_id: "manufacturer",
-            attributeName: 'Manufacturer',
-            is_variant: false,
-            values: manufacturerAttribute?.values,
-          },
-          {
-            key: 'brand',
-            attribute_type: "SYSTEM",
-            group_id: "system",
-            attribute_id: "brand",
-            attributeName: 'Brand',
-            is_variant: false,
-            values: brandAttribute?.values,
-          },
-          {
-            key: 'req_unit_price',
-            attribute_type: "SYSTEM",
-            group_id: "system",
-            attribute_id: "req_unit_price",
-            attributeName: 'Unit Price ($)',
-            is_variant: false,
-            values: [
-              {
-                value_id: "req-unit-price",
-                value_label: item.req_unit_price ?
-                  `${item.req_unit_price}` : 'N/A'
-              }
-            ]
-          },
-          {
-            key: 'req_quantity',
-            attribute_type: "SYSTEM",
-            group_id: "system",
-            attribute_id: "req_quantity",
-            attributeName: 'Requested Quantity',
-            is_variant: false,
-            values: [
-              {
-                value_id: "req-quantity",
-                value_label: item.req_quantity
-              },
-              {
-                value_id: "req-quantity-unit",
-                value_label: item.req_unit
-              }
-            ]
-          }
-        ]
-      };
+    if (!item) return [];
+    if (!itemAttributes) {
+      return [];
     }
+    const map: Record<string, { name: string; attributes: any[] }> = {};
+    const customAttributes = itemAttributes
     customAttributes?.forEach((ia: any) => {
-      const groupId = ia.group_id || 'ungrouped';
+
+      const proposalKey = `${ia.group_id}_${ia.attribute_id}`;
+      const groupId = ia.group_id;
+      let groupName = "";
+      let attrName = "";
+      let values = []
+      let reqViewValue = 'N/A';
+
       if (!map[groupId]) {
-        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
+        if (groupId === 'system') {
+          groupName = 'System Specifications';
+        } else {
+          groupName = attributeGroups.find(g => g.id === groupId)?.name
+        }
         map[groupId] = { name: groupName, attributes: [] };
       }
 
-      const hydratedValues = catalogAttributeValues
-        .filter((av) => ia?.selected_value_ids?.includes(av.id))
-        .map((v) => ({
-          value_id: v.id,
-          value_label: v.value || v.label,
-        }));
-      delete ia.selected_value_ids
-      map[groupId].attributes.push({
-        ...ia,
-        attribute_type: "CUSTOM",
-        values: hydratedValues
-      });
-    });
+      if (ia.attribute_id === 'req_unit_price') attrName = 'Unit Price ($)';
+      else if (ia.attribute_id === 'req_quantity') attrName = 'Requested Quantity';
+      else if (ia.attribute_id === 'brand') attrName = 'Brand';
+      else if (ia.attribute_id === 'manufacturer') attrName = 'Manufacturer';
+      else { attrName = catalogAttributes.find(a => a.id === ia.attribute_id)?.name }
 
-    const currentVariant = sellerProduct?.variants?.find((v: any) => v.id === item?.variant_id);
-    currentVariant?.combination_values?.forEach((cv: any) => {
-      const groupId = cv.group_id || 'ungrouped';
-      if (!map[groupId]) {
-        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'Variant Specifications';
-        map[groupId] = { name: groupName, attributes: [] };
+      switch (ia.attribute_id) {
+        case 'req_quantity':
+          reqViewValue = `${item.req_quantity} ${item.req_unit}` || 'N/A'
+          break;
+        case 'req_unit_price':
+          reqViewValue = item.req_unit_price ? `$${item.req_unit_price}` : 'N/A'
+          break;
+        default:
+          reqViewValue = (ia.values || []).map((v: any) => v.value_label).join(', ') || 'N/A';
+          break;
       }
 
+      switch (ia.attribute_id) {
+        case 'manufacturer':
+          values = allManufacturers.filter((av) => ia?.values?.map(v => v.value_id)?.includes(av.id))
+            .map((v) => ({
+              value_id: v.id,
+              value_label: v.company_name,
+            }));
+          break;
+        case "brand":
+          values = allBrands.filter((av) => ia?.values?.map(v => v.value_id)?.includes(av.id))
+            .map((v) => ({
+              value_id: v.id,
+              value_label: v.name,
+            }));
+          break;
+        case "req_quantity":
+          values = [
+            {
+              value_id: "req-quantity",
+              value_label: item.req_quantity
+            },
+            {
+              value_id: "req-quantity-unit",
+              value_label: item.req_unit
+            }
+          ]
+          break;
+        case "req_unit_price":
+          values = [
+            {
+              value_id: "req-unit-price",
+              value_label: item.req_unit_price ?
+                `${item.req_unit_price}` : 'N/A'
+            }
+          ]
+          break;
+        default:
+          values = catalogAttributeValues
+            .filter((av) => ia?.values?.map(v => v.value_id)?.includes(av.id))
+            .map((v) => ({
+              value_id: v.id,
+              value_label: v.value || v.label,
+            }));
+          break;
+      }
       map[groupId].attributes.push({
-        group_id: cv.group_id,
-        attribute_id: cv.attribute_id,
-        is_variant: true,
-        attribute_type: "CUSTOM",
-        values: [
-          {
-            value_id: cv.value_id,
-            value_label: cv.label || cv.value_id
-          }
-        ]
+        key: proposalKey,
+        attribute_type: ia.attribute_type,
+        group_id: ia.group_id,
+        attribute_id: ia.attribute_id,
+        is_variant: ia.is_variant,
+        attributeName: attrName,
+        values: values,
+        reqViewValue: reqViewValue
       });
     });
 
     return Object.entries(map);
-  }, [attributeGroups, sellerProduct, catalogAttributeValues, item?.variant_id]);
+  }, [attributeGroups, sellerProduct, catalogAttributeValues, item, itemAttributes, allBrands, allManufacturers]);
 
   useEffect(() => {
-    const initialValues: Record<string, {
-      attribute_type: AttributeType;
-      group_id: string;
-      attribute_id: string;
-      is_deviation: boolean;
-      deviation_note?: string;
-      values: ItemAttributeValue[]
-    }> = {};
 
-    if (existingQuote && existingQuoteAttributes !== undefined) {
+    if (attributeGroupsMap.length === 0) {
+      return;
+    }
+
+    const initialValues: Record<string, ProposalAttribute> = {};
+
+    if (existingQuote && existingQuoteAttributes) {
       existingQuoteAttributes.forEach(attr => {
         const proposalKey = `${attr.group_id}_${attr.attribute_id}`
         initialValues[proposalKey] = {
@@ -218,8 +280,11 @@ export const SupplierItemRespond: React.FC = () => {
           group_id: attr.group_id,
           attribute_id: attr.attribute_id,
           is_deviation: attr.is_deviation,
-          deviation_note: attr.deviation_note,
-          values: attr.values
+          deviation_note: "",
+          is_variant: attr.is_variant,
+          req_value: attr.values,
+          values: attr.values,
+          buyer_accepted: attr.buyer_accepted || false
         };
       });
     } else {
@@ -232,21 +297,25 @@ export const SupplierItemRespond: React.FC = () => {
             attribute_id: attr.attribute_id,
             is_deviation: false,
             deviation_note: "",
-            values: attr.values
+            is_variant: attr.is_variant,
+            req_value: attr.values,
+            values: attr.values,
+            buyer_accepted: false
           }
         }
       }
     }
-
     setProposalAttributes(initialValues);
-  }, [existingQuote, existingQuoteAttributes, attributeGroupsMap]);
+
+  }, [existingQuote, existingQuoteAttributes, attributeGroupsMap, item]);
+
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
     { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number || 'RFQ'} - Sourcing Offer</span> }
   ], [basePath, rfq?.rfq_number, navigate]);
   useBreadcrumb(breadcrumbs);
 
-  if (rfq === undefined || item === undefined || parties.length === 0) {
+  if (isLoading) {
     return (
       <div className="p-12 text-center text-slate-500">
         <h2 className="text-xl font-bold text-slate-800 font-sans animate-pulse">Loading Sourcing Workspace...</h2>
@@ -321,9 +390,12 @@ export const SupplierItemRespond: React.FC = () => {
               attribute_type: attributeData.attribute_type,
               group_id: groupId,
               attribute_id: attr.attribute_id,
+              is_variant: attributeData.is_variant,
+              req_value: attributeData.req_value || [],
               values: attributeData.values || [],
               is_deviation: attributeData.is_deviation,
               deviation_note: attributeData.deviation_note || '',
+              buyer_accepted: attributeData.buyer_accepted || false
             });
           }
         });
@@ -392,32 +464,51 @@ export const SupplierItemRespond: React.FC = () => {
       key: 'attributeName',
       width: 320,
       className: "align-top",
-      render: (text: string, record: any) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-slate-800 leading-tight">
-            {text}
-            {record.isVariant && (
-              <AntTag
-                color="blue"
-                className="leading-tight italic ml-2"
-                icon={<AntIconCheckCircleOutlined />}
-              >
-                Variant Attribute
-              </AntTag>
+      render: (text: string, record: any) => {
+        const proposalKey = `${record.group_id}_${record.attribute_id}`;
+        const attributeData = proposalAttributes[proposalKey];
+        const showStatus = existingQuote && ['REVISION_REQUIRED', 'SUBMITTED', 'DRAFT'].includes(existingQuote.status);
+
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="font-semibold text-slate-800 leading-tight">
+              {text}
+              {record.is_variant && (
+                <AntTag
+                  color="blue"
+                  className="leading-tight italic ml-2"
+                  icon={<AntIconCheckCircleOutlined />}
+                >
+                  Variant Attribute
+                </AntTag>
+              )}
+              {showStatus && attributeData && (
+                attributeData.buyer_accepted ? (
+                  <AntTag color="success" className="font-bold ml-2">
+                    APPROVED
+                  </AntTag>
+                ) : (
+                  <AntTag color="error" className="font-bold ml-2">
+                    REVISION REQUIRED
+                  </AntTag>
+                )
+              )}
+            </span>
+            {record.description && (
+              <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
             )}
-          </span>
-          {record.description && (
-            <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
-          )}
-        </div>
-      )
+          </div>
+        );
+      }
     },
     {
       title: 'Requested Value',
       dataIndex: 'reqViewValue',
       key: 'reqViewValue',
       className: "align-top",
-      render: (text: string) => <span className="text-slate-600 font-medium">{text}</span>
+      render: (text: string, record: any) => {
+        return <span className="text-slate-600 font-medium">{text}</span>
+      }
     },
     {
       title: 'Deviation',
@@ -425,18 +516,18 @@ export const SupplierItemRespond: React.FC = () => {
       key: 'deviation',
       className: "w-[80px] text-center align-top",
       render: (_: string, attribute: any) => {
-        const proposalKey = `${attribute.groupId}_${attribute.attributeId}`
+        const proposalKey = `${attribute.group_id}_${attribute.attribute_id}`
         return (
           <Switch
             size='small'
             disabled
-            value={proposalAttributes[proposalKey]?.is_deviation}
-            onChange={(v) => {
-              setProposalAttributes(prev => ({
-                ...prev,
-                [proposalKey]: { ...prev[proposalKey], is_deviation: v }
-              }));
-            }}
+            checked={proposalAttributes[proposalKey]?.is_deviation}
+          // onChange={(v) => {
+          //   setProposalAttributes(prev => ({
+          //     ...prev,
+          //     [proposalKey]: { ...prev[proposalKey], is_deviation: v }
+          //   }));
+          // }}
           />
         )
       }
@@ -447,62 +538,42 @@ export const SupplierItemRespond: React.FC = () => {
       key: 'proposalValue',
       className: "w-[400px] max-w-[400px] align-top",
       render: (_: string, attribute: any) => {
-        const proposalKey = `${attribute.groupId}_${attribute.attributeId}`
+        const proposalKey = `${attribute.group_id}_${attribute.attribute_id}`
         let field: any;
 
         if (attribute.attribute_type === 'SYSTEM') {
-          switch (attribute.attributeId) {
-            case "req_unit_price":
+          switch (attribute.attribute_id) {
+            case "manufacturer":
               field = (
-                <AntInput
+                <AntSelect
                   disabled={isViewOnly}
-                  value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-unit-price")?.value_label ?? ''}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (isNaN(val) || val <= 0) {
-                      antMessage.error('Please enter a valid price.');
-                      return;
-                    }
-                    const oldValue = attribute?.values?.find((i: any) => i.value_id == "req-unit-price")?.value_label
-                    setProposalAttributes(prev => ({
-                      ...prev,
-                      [proposalKey]: {
-                        ...prev[proposalKey],
-                        is_deviation: val != Number(oldValue),
-                        values: [{
-                          value_id: 'req-unit-price',
-                          value_label: e.target.value
-                        }]
-                      }
-                    }));
-                  }}
-                />
-              )
-              break;
-            case "req_quantity":
-              field = (
-                <AntInput
-                  disabled={isViewOnly}
-                  value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-quantity")?.value_label ?? ''}
-                  onChange={(e) => {
-                    const oldValue = attribute?.values?.find((i: any) => i.value_id == "req-quantity")?.value_label
-                    const val = Number(e.target.value);
-                    if (isNaN(val) || val <= 0) {
-                      antMessage.error('Please enter a valid price.');
-                      return;
-                    }
-                    const unit = attribute?.values?.find((i: any) => i.value_id == "req-quantity-unit")
+                  mode="multiple"
+                  allowClear
+                  placeholder="Select Preferred Manufacturer(s)"
+                  value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
+                  onChange={(val: string[]) => {
+                    const newValues = val.map(id => {
+                      const matched = allManufacturers.find((v: any) => v.id === id);
+                      return { value_id: id, value_label: matched?.company_name || id };
+                    });
+                    const oldValue = attribute?.values?.map((v: any) => v.value_id) || [];
+                    const newValueIds = newValues.map((v: any) => v.value_id);
+                    const isDeviation = oldValue.length !== newValueIds.length || !oldValue.every((id: any) => newValueIds.includes(id));
+                    const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
+                    const initValIds = initialAttr?.values?.map(v => v.value_id) || [];
+                    const isChangedFromPrev = initValIds.length !== val.length || !initValIds.every(id => val.includes(id));
+
                     setProposalAttributes(prev => ({
                       ...prev, [proposalKey]: {
                         ...prev[proposalKey],
-                        is_deviation: e.target.value !== oldValue,
-                        values: [
-                          { value_id: 'req-quantity', value_label: e.target.value },
-                          unit
-                        ]
+                        is_deviation: isDeviation,
+                        values: newValues,
+                        buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
                       }
                     }));
                   }}
+                  className="w-full mt-1"
+                  options={allManufacturers.map((v: any) => ({ label: v.company_name, value: v.id }))}
                 />
               )
               break;
@@ -519,13 +590,19 @@ export const SupplierItemRespond: React.FC = () => {
                       const matched = allBrands.find((v: any) => v.id === id);
                       return { value_id: id, value_label: matched?.name || id };
                     });
-                    const oldValue = attribute?.values?.map((v: any) => v.value_id) || []
-                    const isDeviation = oldValue.some((id: any) => !newValues.map((v: any) => v.value_id).includes(id));
+                    const oldValue = attribute?.values?.map((v: any) => v.value_id) || [];
+                    const newValueIds = newValues.map((v: any) => v.value_id);
+                    const isDeviation = oldValue.length !== newValueIds.length || !oldValue.every((id: any) => newValueIds.includes(id));
+                    const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
+                    const initValIds = initialAttr?.values?.map(v => v.value_id) || [];
+                    const isChangedFromPrev = initValIds.length !== val.length || !initValIds.every(id => val.includes(id));
+
                     setProposalAttributes(prev => ({
                       ...prev, [proposalKey]: {
                         ...prev[proposalKey],
                         is_deviation: isDeviation,
-                        values: newValues
+                        values: newValues,
+                        buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
                       }
                     }));
                   }}
@@ -534,31 +611,67 @@ export const SupplierItemRespond: React.FC = () => {
                 />
               )
               break;
-            case "manufacturer":
+            case "req_quantity":
               field = (
-                <AntSelect
+                <AntInput
                   disabled={isViewOnly}
-                  mode="multiple"
-                  allowClear
-                  placeholder="Select Preferred Manufacturer(s)"
-                  value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
-                  onChange={(val: string[]) => {
-                    const newValues = val.map(id => {
-                      const matched = allManufacturers.find((v: any) => v.id === id);
-                      return { value_id: id, value_label: matched?.company_name || id };
-                    });
-                    const oldValue = attribute?.values?.map((v: any) => v.value_id) || []
-                    const isDeviation = oldValue.some((id: any) => !newValues.map((v: any) => v.value_id).includes(id));
+                  value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-quantity")?.value_label ?? ''}
+                  onChange={(e) => {
+                    const oldValue = attribute?.values?.find((i: any) => i.value_id == "req-quantity")?.value_label
+                    const val = Number(e.target.value);
+                    if (isNaN(val) || val <= 0) {
+                      antMessage.error('Please enter a valid price.');
+                      return;
+                    }
+                    const unit = attribute?.values?.find((i: any) => i.value_id == "req-quantity-unit")
+                    const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
+                    const initVal = initialAttr?.values?.find(v => v.value_id === 'req-quantity')?.value_label || '';
+                    const isChangedFromPrev = e.target.value !== initVal;
+
                     setProposalAttributes(prev => ({
                       ...prev, [proposalKey]: {
                         ...prev[proposalKey],
-                        is_deviation: isDeviation,
-                        values: newValues
+                        is_deviation: e.target.value !== oldValue,
+                        values: [
+                          { value_id: 'req-quantity', value_label: e.target.value },
+                          unit
+                        ],
+                        buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
                       }
                     }));
                   }}
-                  className="w-full mt-1"
-                  options={allManufacturers.map((v: any) => ({ label: v.company_name, value: v.id }))}
+                />
+              )
+              break;
+            case "req_unit_price":
+              field = (
+                <AntInput
+                  disabled={isViewOnly}
+                  value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-unit-price")?.value_label ?? ''}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    if (isNaN(val) || val <= 0) {
+                      antMessage.error('Please enter a valid price.');
+                      return;
+                    }
+                    const oldValue = attribute?.values?.find((i: any) => i.value_id == "req-unit-price")?.value_label
+                    const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
+                    const initVal = initialAttr?.values?.find(v => v.value_id === 'req-unit-price')?.value_label || '';
+                    const isChangedFromPrev = val !== Number(initVal);
+
+                    setProposalAttributes(prev => ({
+                      ...prev,
+                      [proposalKey]: {
+                        ...prev[proposalKey],
+                        is_deviation: val != Number(oldValue),
+                        values: [{
+                          value_id: 'req-unit-price',
+                          value_label: e.target.value
+                        }],
+                        buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
+                      }
+                    }));
+                  }}
                 />
               )
               break;
@@ -568,7 +681,7 @@ export const SupplierItemRespond: React.FC = () => {
 
           }
         } else {
-          const values = catalogAttributeValues.filter((v) => v.attributeId === attribute.attributeId);
+          const values = catalogAttributeValues.filter((v) => v.attributeId === attribute.attribute_id);
           field = (
             <AntSelect
               disabled={isViewOnly}
@@ -582,13 +695,19 @@ export const SupplierItemRespond: React.FC = () => {
                   const matched = values.find((v: any) => v.id === id);
                   return { value_id: id, value_label: matched?.value || matched?.label || id };
                 });
-                const oldValue = attribute?.values?.map((v: any) => v.value_id) || []
-                const isDeviation = oldValue.some((id: any) => !newValues.map((v: any) => v.value_id).includes(id));
+                const oldValue = attribute?.values?.map((v: any) => v.value_id) || [];
+                const newValueIds = newValues.map((v: any) => v.value_id);
+                const isDeviation = oldValue.length !== newValueIds.length || !oldValue.every((id: any) => newValueIds.includes(id));
+                const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
+                const initValIds = initialAttr?.values?.map(v => v.value_id) || [];
+                const isChangedFromPrev = initValIds.length !== val.length || !initValIds.every(id => val.includes(id));
+
                 setProposalAttributes(prev => ({
                   ...prev, [proposalKey]: {
                     ...prev[proposalKey],
                     is_deviation: isDeviation,
-                    values: newValues
+                    values: newValues,
+                    buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
                   }
                 }));
               }}
@@ -601,54 +720,57 @@ export const SupplierItemRespond: React.FC = () => {
             <div className="w-full">
               {field}
             </div>
-            <div className="flex items-center">
+            <div className="flex flex-col">
               {
                 proposalAttributes[proposalKey]?.is_deviation && !isViewOnly && (
-                  <AntInput.TextArea
-                    placeholder="Deviation Reason"
-                    value={proposalAttributes[proposalKey]?.deviation_note}
-                    rows={2}
-                    onChange={(e) => {
-                      setProposalAttributes(prev => ({
-                        ...prev, [proposalKey]: {
-                          ...prev[proposalKey],
-                          deviation_note: e.target.value
-                        }
-                      }));
-                    }}
-                  />
-                )
-              }
-              {
-                isViewOnly && (
-                  <div className="mt-1 space-y-1 text-left w-full">
-                    {existingQuoteAttributesComments
-                      ?.filter(c => c.attribute_id === attribute.attributeId && c.group_id === attribute.groupId)
-                      .map((c) => {
-                        const isBuyer = c.actor_type === 'BUYER';
-                        const isSelf = c.actor_type === 'SELLER';
-                        const name = isSelf ? 'You' : 'Requester';
-                        const timeStr = c.created_at
-                          ? `${new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} ${new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
-                          : '';
-                        return (
-                          <div
-                            key={c.id}
-                            className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
-                              ? 'bg-blue-50/50 border-blue-100 text-blue-900'
-                              : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
-                              }`}
-                          >
-                            <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
-                              [{name} {timeStr}]:
-                            </span>
-                            <span className="font-medium whitespace-pre-wrap">{c.comment}</span>
-                          </div>
-                        );
-                      })}
+                  <div>
+                    <AntInput.TextArea
+                      placeholder="Deviation Reason"
+                      value={proposalAttributes[proposalKey]?.deviation_note}
+                      rows={1}
+                      onChange={(e) => {
+                        setProposalAttributes(prev => ({
+                          ...prev, [proposalKey]: {
+                            ...prev[proposalKey],
+                            deviation_note: e.target.value
+                          }
+                        }));
+                      }}
+                    />
                   </div>
                 )
               }
+              {/* {
+                isViewOnly && ( */}
+              <div className="mt-1 space-y-1 text-left w-full">
+                {existingQuoteAttributesComments
+                  ?.filter(c => c.attribute_id === attribute.attribute_id && c.group_id === attribute.group_id)
+                  .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+                  .map((c) => {
+                    const isBuyer = c.actor_type === 'BUYER';
+                    const isSelf = c.actor_type === 'SELLER';
+                    const name = isSelf ? 'You' : 'Requester';
+                    const timeStr = c.created_at
+                      ? `${new Date(c.created_at).toLocaleDateString([], { month: 'short', day: 'numeric' })} ${new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+                      : '';
+                    return (
+                      <div
+                        key={c.id}
+                        className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
+                          ? 'bg-blue-50/50 border-blue-100 text-blue-900'
+                          : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
+                          }`}
+                      >
+                        <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
+                          [{name} {timeStr}]:
+                        </span>
+                        <span className="font-medium whitespace-pre-wrap">{c.comment}</span>
+                      </div>
+                    );
+                  })}
+              </div>
+              {/* )
+              } */}
             </div>
           </div>
         );
@@ -731,34 +853,6 @@ export const SupplierItemRespond: React.FC = () => {
           <h3 className="text-base font-bold text-slate-900 pt-3">Attribute configuration</h3>
 
           {attributeGroupsMap.map(([groupId, group], idx) => {
-            const groupAttributes = group.attributes.map((ia: any) => {
-              const attrName = ia.attributeName || catalogAttributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id;
-              let reqViewValue = 'N/A';
-
-              switch (ia.attribute_id) {
-                case 'req_quantity':
-                  reqViewValue = `${item.req_quantity} ${item.req_unit}` || 'N/A'
-                  break;
-                case 'req_unit_price':
-                  reqViewValue = item.req_unit_price ? `$${item.req_unit_price}` : 'N/A'
-                  break;
-                default:
-                  reqViewValue = (ia.values || []).map((v: any) => v.value_label).join(', ') || 'N/A';
-                  break;
-              }
-
-              return {
-                key: ia.id || ia.attribute_id,
-                attribute_type: ia.attribute_type,
-                groupId: groupId,
-                attributeId: ia.attribute_id,
-                attributeName: attrName,
-                isVariant: ia.is_variant,
-                description: ia.description || null,
-                reqViewValue: reqViewValue,
-                values: ia.values
-              };
-            });
 
             const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
 
@@ -782,12 +876,12 @@ export const SupplierItemRespond: React.FC = () => {
                     <h4 className="text-md font-bold text-slate-800">{group.name}</h4>
                   </div>
                   <AntTag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
-                    {groupAttributes.length} attributes
+                    {group.attributes.length} attributes
                   </AntTag>
                 </div>
                 <div className="p-3">
                   <Table
-                    dataSource={groupAttributes}
+                    dataSource={group.attributes}
                     columns={attributesColumns}
                     pagination={false}
                     size="small"
