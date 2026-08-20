@@ -30,8 +30,8 @@ const CommentThread: React.FC<{
           <div
             key={c.id}
             className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
-                ? 'bg-blue-50/50 border-blue-100 text-blue-900'
-                : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
+              ? 'bg-blue-50/50 border-blue-100 text-blue-900'
+              : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
               }`}
           >
             <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
@@ -434,7 +434,7 @@ export const RequesterQuoteReview: React.FC = () => {
           <Descriptions.Item label="Requested Quantity">
             <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="Target Unit Price">
+          <Descriptions.Item label="Requested Unit Price">
             {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
           </Descriptions.Item>
 

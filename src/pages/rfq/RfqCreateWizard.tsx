@@ -59,7 +59,7 @@ export const RfqCreateWizard: React.FC = () => {
   const allAttributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
   const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
   const allAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
-  console.log(allMasterProducts);
+
 
   // Active party resolution
   const activeParty = isBusinessContext
@@ -605,7 +605,7 @@ export const RfqCreateWizard: React.FC = () => {
               { title: 'Sourcing Mode', width: 140, render: (_, r) => r.variant_id ? <Tag color="green">Targeted SKU</Tag> : <Tag color="blue">Open Spec</Tag> },
               { title: 'Title & Category', render: (_, r) => <span><strong>{r.product_name || 'Untitled'}</strong> ({r.category_id || 'N/A'})</span> },
               { title: 'Quantity', width: 120, render: (_, r) => `${r.quantity} ${r.unit_of_measure}` },
-              { title: 'Target Unit Price', width: 140, render: (_, r) => r.unit_price ? `$${r.unit_price}` : 'Unspecified' },
+              { title: 'Requested Unit Price', width: 140, render: (_, r) => r.unit_price ? `$${r.unit_price}` : 'Unspecified' },
               { title: 'Subtotal', width: 140, render: (_, r) => r.unit_price ? <strong className="text-emerald-600">${(r.quantity * r.unit_price).toLocaleString()}</strong> : '-' },
             ]}
           />
@@ -914,7 +914,7 @@ export const RfqCreateWizard: React.FC = () => {
                     </div>
 
                     <div>
-                      <label className="text-xs font-semibold text-slate-700">Target Unit Price ($)</label>
+                      <label className="text-xs font-semibold text-slate-700">Requested Unit Price ($)</label>
                       <Input
                         type="number"
                         placeholder="Optional target budget price"

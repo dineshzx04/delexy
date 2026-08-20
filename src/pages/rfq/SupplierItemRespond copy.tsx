@@ -463,7 +463,7 @@ export const SupplierItemRespond: React.FC = () => {
     {
       key: 'unit_price',
       specification: 'Offered Unit Price ($)',
-      buyerAsked: item.unit_price ? `$${item.unit_price}` : 'N/A',
+      buyerAsked: item.req_unit_price ? `$${item.req_unit_price}` : 'N/A',
       renderOffers: () => (
         <InputNumber
           value={unitPrice}
@@ -656,10 +656,10 @@ export const SupplierItemRespond: React.FC = () => {
           </Descriptions.Item>
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
-            <Tag color="blue" className="font-bold">{item.quantity} {item.unit}</Tag>
+            <Tag color="blue" className="font-bold">{item.req_quantity} {item.req_unit}</Tag>
           </Descriptions.Item>
           <Descriptions.Item label="Requested Unit Price">
-            {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
+            {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
           </Descriptions.Item>
         </Descriptions>
 

@@ -34,9 +34,9 @@ export interface RfqItem {
   product_id: string | null;
   variant_id: string | null;
   item_index?: number;
-  unit_price: number;
-  quantity: number;
-  unit?: string;
+  req_unit_price: number;
+  req_quantity: number;
+  req_unit?: string;
   // awarded_quantity_total?: number;
   created_at: string;
   updated_at: string;

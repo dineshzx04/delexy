@@ -105,10 +105,10 @@ export const ItemDetailWorkspace: React.FC = () => {
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
           <Descriptions.Item label="Variant">{itemVariant?.sku}</Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
-            <AntTag color="blue" className="font-bold">{item.quantity} {item.unit}</AntTag>
+            <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit}</AntTag>
           </Descriptions.Item>
-          <Descriptions.Item label="Target Unit Price">
-            {item.unit_price ? <span className="text-emerald-600 font-bold">${item.unit_price}</span> : 'N/A'}
+          <Descriptions.Item label="Requested Unit Price">
+            {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
           </Descriptions.Item>
         </Descriptions>
       </Card>
@@ -253,14 +253,14 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
       buyerAsked: formatSystemValues(manufacturerAttribute?.values, 'Any Manufacturer'),
     },
     {
-      key: 'unit_price',
+      key: 'req_unit_price',
       specification: 'Unit Price ($)',
-      buyerAsked: item.unit_price ? `$${item.unit_price}` : 'N/A'
+      buyerAsked: item.req_unit_price ? `$${item.req_unit_price}` : 'N/A'
     },
     {
-      key: 'request_qty',
+      key: 'req_quantity',
       specification: 'Requested Quantity',
-      buyerAsked: `${item.quantity} ${item.unit || ''}`.trim()
+      buyerAsked: `${item.req_quantity} ${item.req_unit || ''}`.trim()
     }
   ];
 
@@ -413,7 +413,7 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
     setSelectedQuote(quoteRecord);
     // Suggest remaining quantity to award
     const totalAwarded = awards.reduce((sum, a) => sum + a.awarded_quantity, 0);
-    const remaining = Math.max(0, (item?.quantity || 0) - totalAwarded);
+    const remaining = Math.max(0, (item?.req_quantity || 0) - totalAwarded);
     setAwardQty(remaining || 1);
     setAwardModalVisible(true);
   };
@@ -629,12 +629,12 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
             <span className="font-semibold text-slate-700">Enter Award Quantity:</span>
             <InputNumber
               min={1}
-              max={item?.quantity || 1}
+              max={item?.req_quantity || 1}
               value={awardQty}
               onChange={(val) => setAwardQty(val || 1)}
               className="w-32"
             />
-            <span className="text-xs text-slate-400">(Max requested: {item?.quantity})</span>
+            <span className="text-xs text-slate-400">(Max requested: {item?.req_quantity})</span>
           </div>
         </div>
       </Modal>
