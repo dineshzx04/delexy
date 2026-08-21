@@ -186,7 +186,9 @@ export type SellerQuoteStatus =
   | "DRAFT"
   | "SUBMITTED"
   | "REVISION_REQUIRED"
-  | "ACCEPTED"
+  | "DEVIATION_ACCEPTED"
+  | "PRODUCT_SUBMIT_REVISION"
+  | "FINAL_ACKNOWLEDGE"
   | "REJECTED";
 
 export type AwardItemStatus =

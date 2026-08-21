@@ -70,6 +70,8 @@ export const mockRfqItemAttributes: RfqItemAttribute[] = [
     is_variant: false,
     values: [
       { value_id: "val-8-1", value_label: "IP68" },
+      { value_id: "val-8-2", value_label: "IP67" },
+      { value_id: "val-8-3", value_label: "IP65" },
     ],
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",
@@ -84,6 +86,7 @@ export const mockRfqItemAttributes: RfqItemAttribute[] = [
     is_variant: true,
     values: [
       { value_id: "val-7-1", value_label: "Titanium Black" },
+      { value_id: "val-7-2", value_label: "Titanium Gray" },
     ],
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",
@@ -112,6 +115,7 @@ export const mockRfqItemAttributes: RfqItemAttribute[] = [
     is_variant: true,
     values: [
       { value_id: "val-9-1", value_label: "512GB" },
+      { value_id: "val-9-2", value_label: "1TB" },
     ],
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",

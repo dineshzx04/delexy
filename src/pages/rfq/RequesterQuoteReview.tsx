@@ -274,7 +274,7 @@ export const RequesterQuoteReview: React.FC = () => {
   const sellerParty = parties.find((p) => p.id === quote.seller_party_id);
 
   // Decision trigger
-  const handleDecision = async (statusDecision: 'ACCEPTED' | 'REJECTED' | 'REVISION_REQUIRED') => {
+  const handleDecision = async (statusDecision: 'DEVIATION_ACCEPTED' | 'REJECTED' | 'REVISION_REQUIRED') => {
     if (!quote || !rfq) return;
     setProcessing(true);
     try {
@@ -481,7 +481,7 @@ export const RequesterQuoteReview: React.FC = () => {
           <div className="flex flex-col gap-0.5">
             <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Status</span>
             <AntTag
-              color={quote.status === 'SUBMITTED' ? 'blue' : quote.status === 'DRAFT' ? 'orange' : quote.status === 'ACCEPTED' ? 'green' : quote.status === 'REJECTED' ? 'red' : 'default'}
+              color={quote.status === 'SUBMITTED' ? 'blue' : quote.status === 'DRAFT' ? 'orange' : quote.status === 'DEVIATION_ACCEPTED' ? 'green' : quote.status === 'REJECTED' ? 'red' : 'default'}
               className="mt-0.5 font-bold"
             >
               {quote.status}
@@ -521,7 +521,7 @@ export const RequesterQuoteReview: React.FC = () => {
 
         <div className="space-y-6">
           {/* Status Decision Alerts */}
-          {quote.status === 'ACCEPTED' && (
+          {quote.status === 'DEVIATION_ACCEPTED' && (
             <Alert
               type="success"
               showIcon
@@ -639,7 +639,7 @@ export const RequesterQuoteReview: React.FC = () => {
               <Button
                 type="primary"
                 icon={<CheckOutlined />}
-                onClick={() => handleDecision('ACCEPTED')}
+                onClick={() => handleDecision('DEVIATION_ACCEPTED')}
                 loading={processing}
                 className="bg-emerald-600 hover:bg-emerald-700"
               >

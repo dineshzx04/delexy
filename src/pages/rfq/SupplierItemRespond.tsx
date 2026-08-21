@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Input as AntInput, InputNumber as AntInputNumber, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Alert, Switch } from 'antd';
-import { SendOutlined, ArrowLeftOutlined, SaveOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined } from '@ant-design/icons';
+import { Card, Input as AntInput, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Switch, Steps, Result } from 'antd';
+import { SendOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined, ArrowLeftOutlined, ArrowRightOutlined } from '@ant-design/icons';
 import { rfqDb, type AttributeType, type ItemAttributeValue, type SellerQuote, type SellerQuoteAttribute, type SellerQuoteComment } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
-
 
 interface ProposalAttribute {
   attribute_type: AttributeType;
@@ -23,18 +22,14 @@ interface ProposalAttribute {
 }
 
 export const SupplierItemRespond: React.FC = () => {
-  const { message: antMessage } = AntApp.useApp();
-  const navigate = useNavigate();
-
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
+  const navigate = useNavigate();
   const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
 
-  const [submitting, setSubmitting] = useState(false);
 
-  const [proposalAttributes, setProposalAttributes] = useState<Record<string, ProposalAttribute>>({});
-
+  const [viewStep, setViewStep] = useState(0);
 
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []);
   const activeParty = React.useMemo(() => {
@@ -54,23 +49,26 @@ export const SupplierItemRespond: React.FC = () => {
     },
     [itemId, activePartyId]
   );
+  const status = existingQuote?.status || 'NEW';
+  let currentStep = 0;
+  if (['DEVIATION_ACCEPTED', 'PRODUCT_SUBMIT_REVISION'].includes(status)) {
+    currentStep = 1;
+  } else if (['FINAL_ACKNOWLEDGE'].includes(status)) {
+    currentStep = 2;
+  } else if (status === 'REJECTED') {
+    // If rejected, might want to show step 0 as view only or something, currently step 0 handles it.
+  }
+  useEffect(() => {
+    setViewStep(currentStep);
+  }, [currentStep]);
 
-  const existingQuoteAttributes = useLiveQuery(
+  const rfq = useLiveQuery(
     async () => {
-      if (existingQuote === undefined) return undefined;
-      if (!existingQuote?.id) return [];
-      return await rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray();
+      if (!rfqId) return null;
+      const res = await rfqDb.rfqs.get(rfqId);
+      return res || null;
     },
-    [existingQuote]
-  );
-
-  const existingQuoteAttributesComments = useLiveQuery(
-    async () => {
-      if (existingQuote === undefined) return undefined;
-      if (!existingQuote?.id) return [];
-      return await rfqDb.seller_quote_comments.where('seller_quote_id').equals(existingQuote.id).toArray();
-    },
-    [existingQuote]
+    [rfqId]
   );
 
   const item = useLiveQuery(
@@ -82,187 +80,285 @@ export const SupplierItemRespond: React.FC = () => {
     [itemId]
   );
 
-  const itemAttributes = useLiveQuery(
-    () => (itemId ? rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray() : []),
-    [itemId]
-  );
+  const breadcrumbs = React.useMemo(() => [
+    { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
+    { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number || 'RFQ'} - Sourcing Offer</span> }
+  ], [basePath, rfq?.rfq_number, navigate]);
+  useBreadcrumb(breadcrumbs);
 
-  const rfq = useLiveQuery(
-    async () => {
-      if (!rfqId) return null;
-      const res = await rfqDb.rfqs.get(rfqId);
-      return res || null;
-    },
-    [rfqId]
-  );
+  if (parties === undefined || rfq === undefined || existingQuote === undefined || item === undefined) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <h2 className="text-xl font-bold text-slate-800 font-sans animate-pulse">Loading Sourcing Workspace...</h2>
+      </div>
+    );
+  }
 
-  const sellerProduct = useLiveQuery(
-    async () => {
-      if (item === undefined) return undefined;
-      if (!item?.product_id) return null;
-      const res = await catalogDb.sellerProducts.get(item.product_id);
-      return res || null;
-    },
-    [item]
-  );
+  if (!rfq || !item || !item.seller_assignments?.some((a) => a.seller_party_id === activePartyId)) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <h2 className="text-xl font-bold text-slate-800">Sourcing response container not found or unauthorized</h2>
+        <AntButton className="mt-4" onClick={() => navigate(basePath)}>
+          Back to Sourcing Inbox
+        </AntButton>
+      </div>
+    );
+  }
 
-  const allVariants = useLiveQuery(
-    async () => {
-      if (item === undefined) return undefined;
-      if (!item?.product_id) return [];
-      const sprod = await catalogDb.sellerProducts.get(item.product_id);
-      return sprod?.variants || [];
-    },
-    [item]
-  );
 
-  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []);
-  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []);
+  return (
+    <div className="max-w-7xl mx-auto space-y-6">
+      <Card
+        className="shadow-md border-slate-200"
+        title={
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col">
+              <span className="font-extrabold text-slate-900 leading-tight">RFQ Item Proposal Wizard</span>
+              <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; From: {rfq.requester_name || 'N/A'}</span>
+            </div>
+          </div>
+        }
+      >
+        <div className="mb-10 px-8">
+          <Steps
+            current={viewStep}
+            onChange={(step) => setViewStep(step)}
+            items={[
+              { title: 'Quote Proposal', description: 'Submit or revise your offer specifications.' },
+              { title: 'Product Mapping', description: 'Map negotiated item to product catalog.' },
+              { title: 'Final Approval', description: 'Final sign-off by both parties.' },
+            ]}
+          />
+          <div className="flex justify-between mt-6">
+            <AntButton
+              disabled={viewStep === 0}
+              onClick={() => setViewStep(v => v - 1)}
+              icon={<ArrowLeftOutlined />}
+            >
+              Previous Step
+            </AntButton>
+            <AntButton
+              disabled={viewStep === 2}
+              onClick={() => setViewStep(v => v + 1)}
+            >
+              Next Step <ArrowRightOutlined />
+            </AntButton>
+          </div>
+        </div>
+
+        {viewStep === 0 && <StepQuoteProposal rfqId={rfqId!} itemId={itemId!} activePartyId={activePartyId} />}
+        {viewStep === 1 && <StepProductMapping rfqId={rfqId!} itemId={itemId!} activePartyId={activePartyId} />}
+        {viewStep === 2 && <StepFinalAcknowledgement rfqId={rfqId!} itemId={itemId!} activePartyId={activePartyId} />}
+      </Card>
+    </div>
+  );
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId: string }> = ({ rfqId, itemId, activePartyId }) => {
+  const { message: antMessage } = AntApp.useApp();
+  const navigate = useNavigate();
+  const { activeWorkspace } = useWorkspace();
+  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
+
+  const [submitting, setSubmitting] = useState(false);
+  const [proposalAttributes, setProposalAttributes] = useState<Record<string, ProposalAttribute>>({});
+
+  const data = useLiveQuery(async () => {
+    if (!itemId || !activePartyId || !rfqId) return undefined;
+
+    const [
+      existingQuote,
+      item,
+      rfq,
+      itemAttributes,
+      allBrands,
+      allManufacturers,
+      categories,
+      catalogAttributes,
+      catalogAttributeValues,
+      attributeGroups
+    ] = await Promise.all([
+      rfqDb.seller_quotes.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first(),
+      rfqDb.rfq_items.get(itemId),
+      rfqDb.rfqs.get(rfqId),
+      rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray(),
+      businessDb.brands.toArray(),
+      businessDb.manufacturers.toArray(),
+      catalogDb.categories.toArray(),
+      catalogDb.attributes.toArray(),
+      catalogDb.attributeValues.toArray(),
+      catalogDb.attributeGroups.toArray()
+    ]);
+
+    let existingQuoteAttributes: SellerQuoteAttribute[] = [];
+    let existingQuoteAttributesComments: SellerQuoteComment[] = [];
+    if (existingQuote?.id) {
+      [existingQuoteAttributes, existingQuoteAttributesComments] = await Promise.all([
+        rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray(),
+        rfqDb.seller_quote_comments.where('seller_quote_id').equals(existingQuote.id).toArray()
+      ]);
+    }
+
+    let sellerProduct = null;
+    let allVariants = [];
+    if (item?.product_id) {
+      sellerProduct = await catalogDb.sellerProducts.get(item.product_id);
+      allVariants = sellerProduct?.variants || [];
+    }
+
+    let catalogProduct = null;
+    if (item?.catalog_product_id) {
+      catalogProduct = await catalogDb.products.get(item.catalog_product_id);
+    }
+
+    return {
+      existingQuote: existingQuote || null,
+      existingQuoteAttributes,
+      existingQuoteAttributesComments,
+      item: item || null,
+      itemAttributes,
+      rfq: rfq || null,
+      allBrands,
+      allManufacturers,
+      categories,
+      catalogAttributes,
+      catalogAttributeValues,
+      attributeGroups,
+      sellerProduct: sellerProduct || null,
+      allVariants,
+      catalogProduct: catalogProduct || null
+    };
+  }, [itemId, activePartyId, rfqId]);
+
+  const {
+    existingQuote,
+    existingQuoteAttributes,
+    existingQuoteAttributesComments,
+    item,
+    itemAttributes,
+    rfq,
+    allBrands,
+    allManufacturers,
+    categories,
+    catalogAttributes,
+    catalogAttributeValues,
+    attributeGroups,
+    sellerProduct,
+    allVariants,
+    catalogProduct
+  } = data || {};
 
   const itemVariant = React.useMemo(() => {
     if (!allVariants || !item) return null;
-    return allVariants.find((v) => v.id === item.variant_id) || null;
+    return (allVariants as any[]).find((v) => v.id === item.variant_id) || null;
   }, [allVariants, item]);
-
-  const catalogProduct = useLiveQuery(
-    async () => {
-      if (item === undefined) return undefined;
-      if (!item?.catalog_product_id) return null;
-      const res = await catalogDb.products.get(item.catalog_product_id);
-      return res || null;
-    },
-    [item]
-  );
-
-  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []);
-  const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []);
-  const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []);
-  const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []);
 
   const quoteNumber = React.useMemo(() => {
     return existingQuote?.seller_quote_number || `SQ-${activePartyId?.replace('pty-', '')}-${rfq?.id?.replace('rfq-', '')}-${itemId?.replace('item-', '')}`;
   }, [existingQuote, rfq, itemId, activePartyId]);
 
-  const isLoading =
-    rfq === undefined ||
-    item === undefined ||
-    existingQuote === undefined ||
-    existingQuoteAttributes === undefined ||
-    existingQuoteAttributesComments === undefined ||
-    parties === undefined ||
-    allBrands === undefined ||
-    allManufacturers === undefined ||
-    categories === undefined ||
-    catalogAttributes === undefined ||
-    catalogAttributeValues === undefined ||
-    attributeGroups === undefined ||
-    itemAttributes === undefined ||
-    sellerProduct === undefined ||
-    allVariants === undefined ||
-    catalogProduct === undefined;
 
   const attributeGroupsMap = React.useMemo(() => {
-    if (!item) return [];
-    if (!itemAttributes) {
-      return [];
-    }
-    const map: Record<string, { name: string; attributes: any[] }> = {};
-    const customAttributes = itemAttributes
-    customAttributes?.forEach((ia: any) => {
+    if (!item || !itemAttributes?.length) return [];
 
-      const proposalKey = `${ia.group_id}_${ia.attribute_id}`;
-      const groupId = ia.group_id;
-      let groupName = "";
-      let attrName = "";
-      let values = []
-      let reqViewValue = 'N/A';
+    const groups = new Map(attributeGroups.map(g => [g.id, g.name]));
+    const attrs = new Map(catalogAttributes.map(a => [a.id, a.name]));
 
-      if (!map[groupId]) {
-        if (groupId === 'system') {
-          groupName = 'System Specifications';
-        } else {
-          groupName = attributeGroups.find(g => g.id === groupId)?.name
-        }
-        map[groupId] = { name: groupName, attributes: [] };
-      }
-
-      if (ia.attribute_id === 'req_unit_price') attrName = 'Unit Price ($)';
-      else if (ia.attribute_id === 'req_quantity') attrName = 'Requested Quantity';
-      else if (ia.attribute_id === 'brand') attrName = 'Brand';
-      else if (ia.attribute_id === 'manufacturer') attrName = 'Manufacturer';
-      else { attrName = catalogAttributes.find(a => a.id === ia.attribute_id)?.name }
+    const getValues = (ia: any) => {
+      const ids = new Set((ia.values || []).map((v: any) => v.value_id));
 
       switch (ia.attribute_id) {
-        case 'req_quantity':
-          reqViewValue = `${item.req_quantity} ${item.req_unit}` || 'N/A'
-          break;
-        case 'req_unit_price':
-          reqViewValue = item.req_unit_price ? `$${item.req_unit_price}` : 'N/A'
-          break;
-        default:
-          reqViewValue = (ia.values || []).map((v: any) => v.value_label).join(', ') || 'N/A';
-          break;
-      }
+        case "manufacturer":
+          return allManufacturers
+            .filter(v => ids.has(v.id))
+            .map(v => ({ value_id: v.id, value_label: v.company_name }));
 
-      switch (ia.attribute_id) {
-        case 'manufacturer':
-          values = allManufacturers.filter((av) => ia?.values?.map(v => v.value_id)?.includes(av.id))
-            .map((v) => ({
-              value_id: v.id,
-              value_label: v.company_name,
-            }));
-          break;
         case "brand":
-          values = allBrands.filter((av) => ia?.values?.map(v => v.value_id)?.includes(av.id))
-            .map((v) => ({
-              value_id: v.id,
-              value_label: v.name,
-            }));
-          break;
+          return allBrands
+            .filter(v => ids.has(v.id))
+            .map(v => ({ value_id: v.id, value_label: v.name }));
+
         case "req_quantity":
-          values = [
-            {
-              value_id: "req-quantity",
-              value_label: item.req_quantity
-            },
-            {
-              value_id: "req-quantity-unit",
-              value_label: item.req_unit
-            }
-          ]
-          break;
+          return [
+            { value_id: "req-quantity", value_label: item.req_quantity },
+            { value_id: "req-quantity-unit", value_label: item.req_unit },
+          ];
+
         case "req_unit_price":
-          values = [
-            {
-              value_id: "req-unit-price",
-              value_label: item.req_unit_price ?
-                `${item.req_unit_price}` : 'N/A'
-            }
-          ]
-          break;
+          return [{
+            value_id: "req-unit-price",
+            value_label: item.req_unit_price ?? "N/A",
+          }];
+
         default:
-          values = catalogAttributeValues
-            .filter((av) => ia?.values?.map(v => v.value_id)?.includes(av.id))
-            .map((v) => ({
-              value_id: v.id,
-              value_label: v.value || v.label,
-            }));
-          break;
+          return catalogAttributeValues
+            .filter(v => ids.has(v.id))
+            .map(v => ({ value_id: v.id, value_label: v.value || v.label }));
       }
-      map[groupId].attributes.push({
-        key: proposalKey,
+    };
+
+    const names: Record<string, string> = {
+      req_unit_price: "Unit Price ($)",
+      req_quantity: "Requested Quantity",
+      brand: "Brand",
+      manufacturer: "Manufacturer",
+    };
+
+    const map = new Map<string, any>();
+
+    itemAttributes.forEach((ia: any) => {
+      const groupId = ia.group_id;
+      const values = getValues(ia);
+
+      if (!map.has(groupId)) {
+        map.set(groupId, {
+          name: groupId === "system"
+            ? "System Specifications"
+            : groups.get(groupId) || "",
+          attributes: [],
+        });
+      }
+
+      map.get(groupId).attributes.push({
+        key: `${groupId}_${ia.attribute_id}`,
         attribute_type: ia.attribute_type,
-        group_id: ia.group_id,
+        group_id: groupId,
         attribute_id: ia.attribute_id,
         is_variant: ia.is_variant,
-        attributeName: attrName,
-        values: values,
-        reqViewValue: reqViewValue
+        attributeName: names[ia.attribute_id] || attrs.get(ia.attribute_id) || "",
+        values,
+        reqViewValue:
+          ia.attribute_id === "req_quantity"
+            ? `${item.req_quantity} ${item.req_unit}`
+            : ia.attribute_id === "req_unit_price"
+              ? item.req_unit_price ? `$${item.req_unit_price}` : "N/A"
+              : values.map(v => v.value_label).join(", ") || "N/A",
       });
     });
 
-    return Object.entries(map);
-  }, [attributeGroups, sellerProduct, catalogAttributeValues, item, itemAttributes, allBrands, allManufacturers]);
+    return [...map.entries()];
+  }, [item, itemAttributes, attributeGroups, catalogAttributes, catalogAttributeValues, allBrands, allManufacturers,]);
 
   useEffect(() => {
 
@@ -282,7 +378,7 @@ export const SupplierItemRespond: React.FC = () => {
           is_deviation: attr.is_deviation,
           deviation_note: "",
           is_variant: attr.is_variant,
-          req_value: attr.values,
+          req_value: attr.req_value,
           values: attr.values,
           buyer_accepted: attr.buyer_accepted || false
         };
@@ -305,45 +401,33 @@ export const SupplierItemRespond: React.FC = () => {
         }
       }
     }
+
     setProposalAttributes(initialValues);
 
   }, [existingQuote, existingQuoteAttributes, attributeGroupsMap, item]);
 
-  const breadcrumbs = React.useMemo(() => [
-    { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
-    { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number || 'RFQ'} - Sourcing Offer</span> }
-  ], [basePath, rfq?.rfq_number, navigate]);
-  useBreadcrumb(breadcrumbs);
+  const isLoading = data === undefined;
 
   if (isLoading) {
     return (
       <div className="p-12 text-center text-slate-500">
-        <h2 className="text-xl font-bold text-slate-800 font-sans animate-pulse">Loading Sourcing Workspace...</h2>
+        <h2 className="text-xl font-bold text-slate-800 font-sans animate-pulse">Loading Quote Editor...</h2>
       </div>
     );
   }
 
-  if (!rfq || !item || !item.seller_assignments?.some((a) => a.seller_party_id === activePartyId)) {
-    return (
-      <div className="p-12 text-center text-slate-500">
-        <h2 className="text-xl font-bold text-slate-800">Sourcing response container not found or unauthorized</h2>
-        <AntButton className="mt-4" onClick={() => navigate(basePath)}>
-          Back to Sourcing Inbox
-        </AntButton>
-      </div>
-    );
+  if (!rfq || !item) {
+    return null;
   }
 
-  const isViewOnly = ['SUBMITTED', 'ACCEPTED', 'REJECTED'].includes(existingQuote?.status ?? '');
+  const isViewOnly = ['SUBMITTED', "DEVIATION_ACCEPTED", "PRODUCT_SUBMIT_REVISION", "FINAL_ACKNOWLEDGE", 'REJECTED'].includes(existingQuote?.status ?? '');
 
   const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
     if (!item || !rfq || !activePartyId) return;
 
     setSubmitting(true);
     try {
-
       const quoteId = existingQuote?.id || crypto.randomUUID();
-
       const priceStr = proposalAttributes['system_req_unit_price']?.values.find(i => i.value_id == "req-unit-price")?.value_label || '0';
       const qtyStr = proposalAttributes['system_req_quantity']?.values.find(i => i.value_id == "req-quantity")?.value_label || '0';
       const qtyUnit = proposalAttributes['system_req_quantity']?.values.find(i => i.value_id == "req-quantity-unit")?.value_label || '0';
@@ -379,7 +463,6 @@ export const SupplierItemRespond: React.FC = () => {
       };
 
       const attributesToSave: SellerQuoteAttribute[] = [];
-
       attributeGroupsMap.forEach(([groupId, group]) => {
         group.attributes.forEach((attr: any) => {
           const attributeData = proposalAttributes[`${groupId}_${attr.attribute_id}`] || null;
@@ -402,9 +485,8 @@ export const SupplierItemRespond: React.FC = () => {
       });
 
       const commentsToSave: SellerQuoteComment[] = [];
-
       attributesToSave.forEach((attr) => {
-        if (attr.is_deviation) {
+        if (attr.is_deviation && attr.deviation_note) {
           commentsToSave.push({
             id: crypto.randomUUID(),
             seller_quote_id: quoteId,
@@ -421,18 +503,12 @@ export const SupplierItemRespond: React.FC = () => {
       });
 
       await rfqDb.transaction('rw', rfqDb.seller_quotes, rfqDb.seller_quote_attributes, rfqDb.seller_quote_comments, async () => {
-        // 1. Save/Update the main quote record
         await rfqDb.seller_quotes.put(quoteToSave);
-
-        // 2. Update attributes (delete old and add new)
         const oldAttrs = await rfqDb.seller_quote_attributes.where('seller_quote_id').equals(quoteId).toArray();
         await rfqDb.seller_quote_attributes.bulkDelete(oldAttrs.map(a => a.id));
-
         if (attributesToSave.length > 0) {
           await rfqDb.seller_quote_attributes.bulkAdd(attributesToSave);
         }
-
-        // 3. Save new comments (no history clearing here, just adding)
         if (commentsToSave.length > 0) {
           await rfqDb.seller_quote_comments.bulkAdd(commentsToSave);
         }
@@ -440,7 +516,6 @@ export const SupplierItemRespond: React.FC = () => {
 
       antMessage.success(submitMode === 'SUBMITTED' ? 'Proposal submitted successfully!' : 'Draft saved successfully!');
       navigate(basePath);
-
     } catch (err) {
       console.error(err);
       antMessage.error('Failed to save proposal');
@@ -474,23 +549,13 @@ export const SupplierItemRespond: React.FC = () => {
             <span className="font-semibold text-slate-800 leading-tight">
               {text}
               {record.is_variant && (
-                <AntTag
-                  color="blue"
-                  className="leading-tight italic ml-2"
-                  icon={<AntIconCheckCircleOutlined />}
-                >
-                  Variant Attribute
-                </AntTag>
+                <AntTag color="blue" className="leading-tight italic ml-2" icon={<AntIconCheckCircleOutlined />}>Variant Attribute</AntTag>
               )}
               {showStatus && attributeData && (
                 attributeData.buyer_accepted ? (
-                  <AntTag color="success" className="font-bold ml-2">
-                    APPROVED
-                  </AntTag>
+                  <AntTag color="success" className="font-bold ml-2">APPROVED</AntTag>
                 ) : (
-                  <AntTag color="error" className="font-bold ml-2">
-                    REVISION REQUIRED
-                  </AntTag>
+                  <AntTag color="error" className="font-bold ml-2">REVISION REQUIRED</AntTag>
                 )
               )}
             </span>
@@ -506,7 +571,7 @@ export const SupplierItemRespond: React.FC = () => {
       dataIndex: 'reqViewValue',
       key: 'reqViewValue',
       className: "align-top",
-      render: (text: string, record: any) => {
+      render: (text: string) => {
         return <span className="text-slate-600 font-medium">{text}</span>
       }
     },
@@ -522,12 +587,6 @@ export const SupplierItemRespond: React.FC = () => {
             size='small'
             disabled
             checked={proposalAttributes[proposalKey]?.is_deviation}
-          // onChange={(v) => {
-          //   setProposalAttributes(prev => ({
-          //     ...prev,
-          //     [proposalKey]: { ...prev[proposalKey], is_deviation: v }
-          //   }));
-          // }}
           />
         )
       }
@@ -632,10 +691,7 @@ export const SupplierItemRespond: React.FC = () => {
                       ...prev, [proposalKey]: {
                         ...prev[proposalKey],
                         is_deviation: e.target.value !== oldValue,
-                        values: [
-                          { value_id: 'req-quantity', value_label: e.target.value },
-                          unit
-                        ],
+                        values: [{ value_id: 'req-quantity', value_label: e.target.value }, unit],
                         buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
                       }
                     }));
@@ -664,10 +720,7 @@ export const SupplierItemRespond: React.FC = () => {
                       [proposalKey]: {
                         ...prev[proposalKey],
                         is_deviation: val != Number(oldValue),
-                        values: [{
-                          value_id: 'req-unit-price',
-                          value_label: e.target.value
-                        }],
+                        values: [{ value_id: 'req-unit-price', value_label: e.target.value }],
                         buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
                       }
                     }));
@@ -678,7 +731,6 @@ export const SupplierItemRespond: React.FC = () => {
             default:
               field = "Contact System admin"
               break;
-
           }
         } else {
           const values = catalogAttributeValues.filter((v) => v.attributeId === attribute.attribute_id);
@@ -717,31 +769,25 @@ export const SupplierItemRespond: React.FC = () => {
         }
         return (
           <div className="flex gap-2 flex-col">
-            <div className="w-full">
-              {field}
-            </div>
+            <div className="w-full">{field}</div>
             <div className="flex flex-col">
-              {
-                proposalAttributes[proposalKey]?.is_deviation && !isViewOnly && (
-                  <div>
-                    <AntInput.TextArea
-                      placeholder="Deviation Reason"
-                      value={proposalAttributes[proposalKey]?.deviation_note}
-                      rows={1}
-                      onChange={(e) => {
-                        setProposalAttributes(prev => ({
-                          ...prev, [proposalKey]: {
-                            ...prev[proposalKey],
-                            deviation_note: e.target.value
-                          }
-                        }));
-                      }}
-                    />
-                  </div>
-                )
-              }
-              {/* {
-                isViewOnly && ( */}
+              {proposalAttributes[proposalKey]?.is_deviation && !isViewOnly && (
+                <div>
+                  <AntInput.TextArea
+                    placeholder="Deviation Reason"
+                    value={proposalAttributes[proposalKey]?.deviation_note}
+                    rows={1}
+                    onChange={(e) => {
+                      setProposalAttributes(prev => ({
+                        ...prev, [proposalKey]: {
+                          ...prev[proposalKey],
+                          deviation_note: e.target.value
+                        }
+                      }));
+                    }}
+                  />
+                </div>
+              )}
               <div className="mt-1 space-y-1 text-left w-full">
                 {existingQuoteAttributesComments
                   ?.filter(c => c.attribute_id === attribute.attribute_id && c.group_id === attribute.group_id)
@@ -756,166 +802,153 @@ export const SupplierItemRespond: React.FC = () => {
                     return (
                       <div
                         key={c.id}
-                        className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer
-                          ? 'bg-blue-50/50 border-blue-100 text-blue-900'
-                          : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'
-                          }`}
+                        className={`text-[11px] px-2 py-0.5 rounded leading-normal border ${isBuyer ? 'bg-blue-50/50 border-blue-100 text-blue-900' : 'bg-emerald-50/50 border-emerald-100 text-emerald-900'}`}
                       >
-                        <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">
-                          [{name} {timeStr}]:
-                        </span>
+                        <span className="font-bold text-[9px] uppercase tracking-wider mr-1 opacity-70">[{name} {timeStr}]:</span>
                         <span className="font-medium whitespace-pre-wrap">{c.comment}</span>
                       </div>
                     );
                   })}
               </div>
-              {/* )
-              } */}
             </div>
           </div>
         );
       }
     }
-  ]
-
-
-
+  ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <Card
-        className="shadow-md border-slate-200"
-        title={
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col">
-              <span className="font-extrabold text-slate-900 leading-tight">RFQ Item Proposal</span>
-              <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; From: {rfq.requester_name || 'N/A'}</span>
-            </div>
-          </div>
-        }
-      >
-        {/* Proposal Status Banner */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 mb-5 flex flex-wrap gap-6 items-start">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Reference</span>
-            <AntTag color="purple" className="font-mono font-bold text-sm mt-0.5">{quoteNumber}</AntTag>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Status</span>
-            <AntTag
-              color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'ACCEPTED' ? 'green' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
-              className="mt-0.5 font-bold"
-            >
-              {existingQuote?.status || 'NEW'}
-            </AntTag>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Round</span>
-            <div className="flex items-center gap-1 mt-0.5">
-              <ReloadOutlined className="text-blue-500 text-xs" />
-              <span className="font-bold text-slate-800 text-sm">Round {existingQuote?.round ?? 1}</span>
-            </div>
-          </div>
-          {existingQuote?.created_at && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Created</span>
-              <span className="text-xs text-slate-600 mt-0.5">{new Date(existingQuote.created_at).toLocaleString()}</span>
-            </div>
-          )}
-          {existingQuote?.updated_at && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Last Updated</span>
-              <span className="text-xs text-slate-600 mt-0.5">{new Date(existingQuote.updated_at).toLocaleString()}</span>
-            </div>
-          )}
+    <div className="space-y-6">
+      {/* Proposal Status Banner */}
+      <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 mb-5 flex flex-wrap gap-6 items-start">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Reference</span>
+          <AntTag color="purple" className="font-mono font-bold text-sm mt-0.5">{quoteNumber}</AntTag>
         </div>
-
-        {/* Requested Item Details */}
-        <Descriptions title="Requested Item Details" bordered size="small" column={2} className="mb-6">
-          <Descriptions.Item label="Product / Service" span={2}>
-            <strong className="text-slate-800">{catalogProduct?.name || 'Custom Specifications'}</strong>
-          </Descriptions.Item>
-          <Descriptions.Item label="RFQ Number">
-            <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
-          </Descriptions.Item>
-          <Descriptions.Item label="Category">{categories.find((c) => c.id === item.category_id)?.name || 'Unknown'}</Descriptions.Item>
-          <Descriptions.Item label="Variant">{itemVariant?.sku}</Descriptions.Item>
-          <Descriptions.Item label="Requested Quantity">
-            <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Requested Unit Price">
-            {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
-          </Descriptions.Item>
-        </Descriptions>
-
-        <div className="space-y-6">
-
-          <h3 className="text-base font-bold text-slate-900 pt-3">Attribute configuration</h3>
-
-          {attributeGroupsMap.map(([groupId, group], idx) => {
-
-            const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
-
-            return (
-              <div
-                key={groupId}
-                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-                style={{ borderLeft: `4px solid ${accentColor}` }}
-              >
-                <div
-                  className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
-                  style={{ backgroundColor: `${accentColor}14` }}
-                >
-                  <div className="flex items-center gap-3">
-                    <span
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
-                      style={{ backgroundColor: accentColor }}
-                    >
-                      {idx + 1}
-                    </span>
-                    <h4 className="text-md font-bold text-slate-800">{group.name}</h4>
-                  </div>
-                  <AntTag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
-                    {group.attributes.length} attributes
-                  </AntTag>
-                </div>
-                <div className="p-3">
-                  <Table
-                    dataSource={group.attributes}
-                    columns={attributesColumns}
-                    pagination={false}
-                    size="small"
-                    bordered
-                    scroll={{ x: 768 }}
-                  />
-                </div>
-              </div>
-            );
-          })}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Status</span>
+          <AntTag
+            color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
+            className="mt-0.5 font-bold"
+          >
+            {existingQuote?.status || 'NEW'}
+          </AntTag>
         </div>
-
-        {!isViewOnly && (
-          <div className="pt-6 flex justify-end gap-3 mt-6">
-            <AntButton onClick={() => navigate(basePath)}>Cancel</AntButton>
-            {/* <AntButton
-              icon={<SaveOutlined />}
-              onClick={() => handleSave('DRAFT')}
-              loading={submitting}
-            >
-              Save as Draft
-            </AntButton> */}
-            <AntButton
-              type="primary"
-              icon={<SendOutlined />}
-              onClick={() => handleSave('SUBMITTED')}
-              loading={submitting}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              Submit Proposal
-            </AntButton>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Round</span>
+          <div className="flex items-center gap-1 mt-0.5">
+            <ReloadOutlined className="text-blue-500 text-xs" />
+            <span className="font-bold text-slate-800 text-sm">Round {existingQuote?.round ?? 1}</span>
+          </div>
+        </div>
+        {existingQuote?.created_at && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Created</span>
+            <span className="text-xs text-slate-600 mt-0.5">{new Date(existingQuote.created_at).toLocaleString()}</span>
           </div>
         )}
-      </Card>
+        {existingQuote?.updated_at && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Last Updated</span>
+            <span className="text-xs text-slate-600 mt-0.5">{new Date(existingQuote.updated_at).toLocaleString()}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Requested Item Details */}
+      <Descriptions title="Requested Item Details" bordered size="small" column={2} className="mb-6">
+        <Descriptions.Item label="Product / Service" span={2}>
+          <strong className="text-slate-800">{catalogProduct?.name || 'Custom Specifications'}</strong>
+        </Descriptions.Item>
+        <Descriptions.Item label="RFQ Number">
+          <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Category">{categories.find((c) => c.id === item.category_id)?.name || 'Unknown'}</Descriptions.Item>
+        <Descriptions.Item label="Variant">{itemVariant?.sku}</Descriptions.Item>
+        <Descriptions.Item label="Requested Quantity">
+          <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+        </Descriptions.Item>
+        <Descriptions.Item label="Requested Unit Price">
+          {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
+        </Descriptions.Item>
+      </Descriptions>
+
+      <div className="space-y-6">
+        <h3 className="text-base font-bold text-slate-900 pt-3">Attribute configuration</h3>
+        {attributeGroupsMap.map(([groupId, group], idx) => {
+          const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
+          return (
+            <div key={groupId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid ${accentColor}` }}>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `${accentColor}14` }}>
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: accentColor }}>
+                    {idx + 1}
+                  </span>
+                  <h4 className="text-md font-bold text-slate-800">{group.name}</h4>
+                </div>
+                <AntTag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
+                  {group.attributes.length} attributes
+                </AntTag>
+              </div>
+              <div className="p-3">
+                <Table dataSource={group.attributes} columns={attributesColumns} pagination={false} size="small" bordered scroll={{ x: 768 }} />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {!isViewOnly && (
+        <div className="pt-6 flex justify-end gap-3 mt-6">
+          <AntButton onClick={() => navigate(basePath)}>Cancel</AntButton>
+          <AntButton type="primary" icon={<SendOutlined />} onClick={() => handleSave('SUBMITTED')} loading={submitting} className="bg-blue-600 hover:bg-blue-700">
+            Submit Proposal
+          </AntButton>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+
+
+const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyId: string }> = ({ rfqId, itemId, activePartyId }) => {
+  return (
+    <div className="p-8">
+      <Result
+        status="info"
+        title="Product Mapping & Creation"
+        subTitle="This step is for mapping the negotiated item to your catalog product or creating a new product based on the accepted specifications."
+        extra={[
+          <AntButton type="primary" key="map">
+            Map / Create Product
+          </AntButton>
+        ]}
+      />
+    </div>
+  );
+};
+
+
+
+
+
+
+const StepFinalAcknowledgement: React.FC<{ rfqId: string; itemId: string; activePartyId: string }> = ({ rfqId, itemId, activePartyId }) => {
+  return (
+    <div className="p-8">
+      <Result
+        status="success"
+        title="Final Acknowledgement"
+        subTitle="Both parties have approved the product mapping and specifications. Waiting for final confirmation or Purchase Order generation."
+        extra={[
+          <AntButton type="primary" key="ack">
+            Acknowledge
+          </AntButton>
+        ]}
+      />
     </div>
   );
 };

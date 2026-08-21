@@ -506,15 +506,8 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
       dataIndex: 'status',
       key: 'status',
       render: (status: string, record: any) => {
-        const matchingAward = awards.find((a) => a.seller_quote_id === record.id);
-        if (matchingAward) {
-          const poStatus = matchingAward.award_status;
-          if (poStatus === 'PO_RECEIVED') {
-            return <AntTag color="success">PO RECEIVED / ORDER CONVERTED</AntTag>;
-          }
-          return <AntTag color="gold">AWARDED ({matchingAward.awarded_quantity} Qty)</AntTag>;
-        }
-        return <AntTag color={status === 'ACCEPTED' ? 'success' : 'default'}>{status}</AntTag>;
+
+        return <AntTag color={status === 'DEVIATION_ACCEPTED' ? 'success' : 'default'}>{status}</AntTag>;
       }
     },
     {
@@ -585,7 +578,7 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
             >
               Review
             </Button>
-            {record.status === 'ACCEPTED' && (
+            {/* {record.status === 'DEVIATION_ACCEPTED' && (
               <Button
                 type="primary"
                 size="small"
@@ -594,7 +587,7 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
               >
                 Award Quote
               </Button>
-            )}
+            )} */}
           </div>
         );
       }

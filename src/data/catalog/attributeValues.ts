@@ -17,6 +17,8 @@ export const mockAttributeValues: AttributeValue[] = [
   { id: 'val-7-1', attributeId: 'attr-7', value: 'Titanium Black', label: 'Titanium Black' },
   { id: 'val-7-2', attributeId: 'attr-7', value: 'Titanium Gray', label: 'Titanium Gray' },
   { id: 'val-8-1', attributeId: 'attr-8', value: 'IP68', label: 'IP68' },
+  { id: 'val-8-2', attributeId: 'attr-8', value: 'IP67', label: 'IP67' },
+  { id: 'val-8-3', attributeId: 'attr-8', value: 'IP65', label: 'IP65' },
   { id: 'val-9-1', attributeId: 'attr-9', value: '512GB', label: '512GB' },
   { id: 'val-9-2', attributeId: 'attr-9', value: '1TB', label: '1TB' },
   { id: 'val-10-1', attributeId: 'attr-10', value: 'Snapdragon 8 Gen 3', label: 'Snapdragon 8 Gen 3' },

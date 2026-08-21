@@ -29,7 +29,9 @@ export const RFQQuoteStatusBadge: React.FC<{ status: SellerQuoteStatus }> = ({ s
   if (status === 'DRAFT') color = 'default';
   if (status === 'SUBMITTED') color = 'blue';
   if (status === 'REVISION_REQUIRED') color = 'warning';
-  if (status === 'ACCEPTED') color = 'success';
+  if (status === 'DEVIATION_ACCEPTED') color = 'success';
+  if (status === 'PRODUCT_SUBMIT_REVISION') color = 'processing';
+  if (status === 'FINAL_ACKNOWLEDGE') color = 'success';
   if (status === 'REJECTED') color = 'error';
 
   return <Tag color={color}>{status}</Tag>;

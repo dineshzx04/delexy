@@ -108,7 +108,9 @@ export const SupplierRfqInbox: React.FC = () => {
                 { value: 'DRAFT', label: 'Draft' },
                 { value: 'SUBMITTED', label: 'Submitted' },
                 { value: 'REVISION_REQUIRED', label: 'Revision Required' },
-                { value: 'ACCEPTED', label: 'Accepted' },
+                { value: 'DEVIATION_ACCEPTED', label: 'Deviation Accepted' },
+                { value: 'PRODUCT_SUBMIT_REVISION', label: 'Product Submit Revision' },
+                { value: 'FINAL_ACKNOWLEDGE', label: 'Final Acknowledge' },
                 { value: 'REJECTED', label: 'Rejected' }
               ]}
             />
@@ -205,7 +207,7 @@ export const SupplierRfqInbox: React.FC = () => {
                   if (record.quote_status === 'DRAFT') buttonText = 'Continue Draft';
                   else if (record.quote_status === 'SUBMITTED') buttonText = 'View Proposal';
                   else if (record.quote_status === 'REVISION_REQUIRED') buttonText = 'Revise Proposal';
-                  else if (record.quote_status === 'ACCEPTED') buttonText = 'View Proposal';
+                  else if (['DEVIATION_ACCEPTED', 'PRODUCT_SUBMIT_REVISION', 'FINAL_ACKNOWLEDGE'].includes(record.quote_status || '')) buttonText = 'View Proposal';
                   else if (record.quote_status === 'REJECTED') buttonText = 'View Proposal';
 
                   return (
