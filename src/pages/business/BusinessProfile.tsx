@@ -136,7 +136,7 @@ const BusinessProfile: React.FC = () => {
           <h1 className="text-2xl font-bold text-slate-900 mb-1">Business Profile</h1>
           <p className="text-slate-500 text-sm">Read-only overview of organization profile, legal entity details, and connected data.</p>
         </div>
-        <Link to="/b/settings">
+        {/* <Link to="/b/settings">
           <AntButton
             type="primary"
             icon={<Lucide.Settings size={15} />}
@@ -144,7 +144,7 @@ const BusinessProfile: React.FC = () => {
           >
             Edit Settings
           </AntButton>
-        </Link>
+        </Link> */}
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6">

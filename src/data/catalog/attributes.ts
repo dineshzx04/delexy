@@ -10,10 +10,11 @@ export const mockAttributes: Attribute[] = [
   { id: 'attr-6', name: 'Refresh Rate', code: 'refresh_rate', label: 'Refresh Rate', valueIds: ['val-6-1', 'val-6-2'] },
 
   // Smartphones
-  { id: 'attr-7', name: 'Exterior Finish', code: 'finish', label: 'Exterior Finish', valueIds: ['val-7-1', 'val-7-2'] },
-  { id: 'attr-8', name: 'Water Resistance', code: 'ip_rating', label: 'Water Resistance', valueIds: ['val-8-1',"val-8-2",'val-8-3'] },
+  { id: 'attr-7', name: 'Exterior Finish', code: 'finish', label: 'Exterior Finish', valueIds: ['val-7-1', 'val-7-2', 'val-7-3'] },
+  { id: 'attr-8', name: 'Water Resistance', code: 'ip_rating', label: 'Water Resistance', valueIds: ['val-8-1', "val-8-2", 'val-8-3'] },
   { id: 'attr-9', name: 'Storage Capacity', code: 'internal_storage', label: 'Storage Capacity', valueIds: ['val-9-1', 'val-9-2'] },
   { id: 'attr-10', name: 'Processor Chipset', code: 'soc', label: 'Processor Chipset', valueIds: ['val-10-1'] },
+  { id: 'attr-25', name: 'Cellular', code: 'cellular', label: 'Cellular', valueIds: ['val-25-1', 'val-25-2', 'val-25-3'] },
   { id: 'attr-11', name: 'Main Camera Resolution', code: 'main_sensor', label: 'Main Camera Resolution', valueIds: ['val-11-1'] },
   { id: 'attr-12', name: 'Telephoto Zoom', code: 'zoom_type', label: 'Telephoto Zoom', valueIds: ['val-12-1'] },
 

@@ -22,6 +22,7 @@ export const RequesterQuoteReview: React.FC = () => {
   const [processing, setProcessing] = useState(false);
   const [buyerComments, setBuyerComments] = useState<Record<string, string>>({});
   const [acceptedAttributes, setAcceptedAttributes] = useState<Record<string, boolean>>({});
+  const [acceptedVariants, setAcceptedVariants] = useState<Record<string, boolean>>({});
 
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []);
   const activeParty = React.useMemo(() => {
@@ -110,11 +111,20 @@ export const RequesterQuoteReview: React.FC = () => {
     [quoteId]
   );
 
+  const quoteVariants = useLiveQuery(
+    async () => {
+      if (!quoteId) return [];
+      return await rfqDb.seller_quote_variants.where('seller_quote_id').equals(quoteId).toArray();
+    },
+    [quoteId]
+  );
+
   const isLoading =
     rfq === undefined ||
     item === undefined ||
     quote === undefined ||
     quoteAttributes === undefined ||
+    quoteVariants === undefined ||
     existingComments === undefined ||
     parties === undefined ||
     categories === undefined ||
@@ -127,8 +137,10 @@ export const RequesterQuoteReview: React.FC = () => {
 
   const allAccepted = React.useMemo(() => {
     if (!quoteAttributes || quoteAttributes.length === 0) return false;
-    return quoteAttributes.every((attr) => acceptedAttributes[attr.id] === true);
-  }, [quoteAttributes, acceptedAttributes]);
+    const attrsAccepted = quoteAttributes.every((attr) => acceptedAttributes[attr.id] === true);
+    const variantsAccepted = !quoteVariants || quoteVariants.length === 0 || quoteVariants.every((v) => acceptedVariants[v.id] === true);
+    return attrsAccepted && variantsAccepted;
+  }, [quoteAttributes, acceptedAttributes, quoteVariants, acceptedVariants]);
 
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
@@ -163,6 +175,16 @@ export const RequesterQuoteReview: React.FC = () => {
     }
   }, [quoteAttributes]);
 
+  React.useEffect(() => {
+    if (quoteVariants && quoteVariants.length > 0) {
+      const initialAccepted: Record<string, boolean> = {};
+      quoteVariants.forEach((v) => {
+        initialAccepted[v.id] = !!v.buyer_accepted;
+      });
+      setAcceptedVariants(initialAccepted);
+    }
+  }, [quoteVariants]);
+
 
   const attributeGroupsMap = React.useMemo(() => {
     if (!quoteAttributes) return [];
@@ -184,8 +206,7 @@ export const RequesterQuoteReview: React.FC = () => {
       }
 
       let attrName = "";
-      if (qa.attribute_id === 'req_unit_price') attrName = 'Unit Price ($)';
-      else if (qa.attribute_id === 'req_quantity') attrName = 'Requested Quantity';
+      if (qa.attribute_id === 'req_quantity') attrName = 'Requested Quantity';
       else if (qa.attribute_id === 'brand') attrName = 'Brand';
       else if (qa.attribute_id === 'manufacturer') attrName = 'Manufacturer';
       else {
@@ -198,11 +219,10 @@ export const RequesterQuoteReview: React.FC = () => {
         const qtyVal = qa.req_value?.find(v => v.value_id === 'req-quantity')?.value_label || '';
         const qtyUnit = qa.req_value?.find(v => v.value_id === 'req-quantity-unit')?.value_label || '';
         reqViewValue = qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A';
-      } else if (qa.attribute_id === 'req_unit_price') {
-        const priceVal = qa.req_value?.find(v => v.value_id === 'req-unit-price')?.value_label || 'N/A';
-        reqViewValue = priceVal !== 'N/A' ? `$${priceVal}` : 'N/A';
       } else {
-        reqViewValue = (qa.req_value || []).map(v => v.value_label).join(', ') || 'N/A';
+        const ia = itemAttributes?.find((a: any) => a.group_id === qa.group_id && a.attribute_id === qa.attribute_id);
+        const reqJoiner = ia?.connector === "AND" ? " , " : ia?.connector === "OR" ? " | " : ", ";
+        reqViewValue = (qa.req_value || []).map(v => v.value_label).join(reqJoiner) || 'N/A';
       }
 
       // Determine what the supplier proposed for comparison
@@ -211,11 +231,9 @@ export const RequesterQuoteReview: React.FC = () => {
         const qtyVal = qa.values?.find(v => v.value_id === 'req-quantity')?.value_label || '';
         const qtyUnit = qa.values?.find(v => v.value_id === 'req-quantity-unit')?.value_label || '';
         proposalViewValue = qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A';
-      } else if (qa.attribute_id === 'req_unit_price') {
-        const priceVal = qa.values?.find(v => v.value_id === 'req-unit-price')?.value_label || '';
-        proposalViewValue = priceVal ? `$${priceVal}` : 'N/A';
       } else {
-        proposalViewValue = (qa.values || []).map(v => v.value_label).join(', ') || '—';
+        const propJoiner = (qa as any).connector === "AND" ? " , " : (qa as any).connector === "OR" ? " | " : ", ";
+        proposalViewValue = (qa.values || []).map(v => v.value_label).join(propJoiner) || '—';
       }
 
       const proposalKey = `${qa.group_id}_${qa.attribute_id}`;
@@ -237,7 +255,7 @@ export const RequesterQuoteReview: React.FC = () => {
     // Sort attributes within each group (especially system group)
     Object.keys(map).forEach(groupId => {
       if (groupId === 'system') {
-        const order = ['manufacturer', 'brand', 'req_unit_price', 'req_quantity'];
+        const order = ['manufacturer', 'brand', 'req_quantity'];
         map[groupId].attributes.sort((a, b) => {
           return order.indexOf(a.attribute_id) - order.indexOf(b.attribute_id);
         });
@@ -279,9 +297,12 @@ export const RequesterQuoteReview: React.FC = () => {
     setProcessing(true);
     try {
       // 0. Persist buyer_accepted status of attributes in DB
-      await rfqDb.transaction('rw', rfqDb.seller_quote_attributes, async () => {
+      await rfqDb.transaction('rw', [rfqDb.seller_quote_attributes, rfqDb.seller_quote_variants], async () => {
         for (const [attrId, accepted] of Object.entries(acceptedAttributes)) {
           await rfqDb.seller_quote_attributes.update(attrId, { buyer_accepted: accepted });
+        }
+        for (const [variantId, accepted] of Object.entries(acceptedVariants)) {
+          await rfqDb.seller_quote_variants.update(variantId, { buyer_accepted: accepted });
         }
       });
 
@@ -337,6 +358,16 @@ export const RequesterQuoteReview: React.FC = () => {
     });
   };
 
+  const handleToggleVariantAcceptance = (variants: any[], accept: boolean) => {
+    setAcceptedVariants((prev) => {
+      const updated = { ...prev };
+      variants.forEach((v) => {
+        updated[v.id] = accept;
+      });
+      return updated;
+    });
+  };
+
   const attributesColumns = [
     {
       title: 'S.No',
@@ -380,22 +411,22 @@ export const RequesterQuoteReview: React.FC = () => {
       render: (text: string) => <span className="text-slate-600 font-medium">{text}</span>
     },
     {
-      title: 'Accept',
-      dataIndex: 'buyer_accepted',
-      key: 'buyer_accepted',
-      className: "w-[80px] text-center align-top",
-      render: (_: boolean, record: any) => (
-        <Checkbox
-          checked={!!acceptedAttributes[record.id]}
-          disabled={quote?.status !== 'SUBMITTED'}
-          onChange={(e) => {
-            setAcceptedAttributes((prev) => ({
-              ...prev,
-              [record.id]: e.target.checked
-            }));
-          }}
-        />
-      )
+      title: 'Connector',
+      dataIndex: 'connector',
+      key: 'connector',
+      className: "w-[100px] text-center align-top",
+      render: (connector: string, attribute: any) => {
+        if (attribute.attribute_id === 'req_quantity') return null;
+        
+        const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
+        const displayConnector = forceORDisabled ? 'OR' : (connector || 'AND');
+
+        return (
+          <AntTag color="default" className="font-bold border-slate-300">
+            {displayConnector}
+          </AntTag>
+        )
+      }
     },
     {
       title: 'Proposal Value & Feedback',
@@ -455,8 +486,26 @@ export const RequesterQuoteReview: React.FC = () => {
             </div>
           </div>
         );
-      }
-    }
+      },
+    },
+    {
+      title: 'Accept',
+      dataIndex: 'buyer_accepted',
+      key: 'buyer_accepted',
+      className: "w-[80px] text-center align-top",
+      render: (_: boolean, record: any) => (
+        <Checkbox
+          checked={!!acceptedAttributes[record.id]}
+          disabled={quote?.status !== 'SUBMITTED'}
+          onChange={(e) => {
+            setAcceptedAttributes((prev) => ({
+              ...prev,
+              [record.id]: e.target.checked
+            }));
+          }}
+        />
+      )
+    },
   ];
 
   return (
@@ -614,6 +663,108 @@ export const RequesterQuoteReview: React.FC = () => {
             );
           })}
         </div>
+
+        {quoteVariants && quoteVariants.length > 0 && (
+          <div className="space-y-6 mt-6">
+            <h3 className="text-base font-bold text-slate-900 pt-3">Variant Configuration</h3>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #3b82f6` }}>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#3b82f614` }}>
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white bg-blue-500">
+                    V
+                  </span>
+                  <h4 className="text-md font-bold text-slate-800">Variant and Price</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  {quote?.status === 'SUBMITTED' && (
+                    <div className="flex gap-1.5 mr-2">
+                      <Button
+                        size="small"
+                        type="dashed"
+                        onClick={() => handleToggleVariantAcceptance(quoteVariants, true)}
+                        className="text-[11px] h-6 px-2 text-emerald-600 border-emerald-200 hover:text-emerald-700 hover:border-emerald-300"
+                      >
+                        Approve All
+                      </Button>
+                      <Button
+                        size="small"
+                        type="dashed"
+                        onClick={() => handleToggleVariantAcceptance(quoteVariants, false)}
+                        className="text-[11px] h-6 px-2 text-slate-500 border-slate-200 hover:text-slate-600 hover:border-slate-300"
+                      >
+                        Reject All
+                      </Button>
+                    </div>
+                  )}
+                  <AntTag color="default" style={{ borderColor: '#3b82f6', color: '#3b82f6', fontWeight: 700 }}>
+                    {quoteVariants.length} variants
+                  </AntTag>
+                </div>
+              </div>
+              <div className="p-3">
+                <Table
+                  dataSource={quoteVariants}
+                  rowKey="id"
+                  pagination={{ pageSize: 10, showSizeChanger: true }}
+                  size="small"
+                  bordered
+                  columns={[
+                    {
+                      title: 'S.No',
+                      key: 'sno',
+                      className: "w-[50px] max-w-[50px] align-top",
+                      render: (_: string, __: any, index: number) => <span className='pl-1.5'>{index + 1}</span>
+                    },
+                    {
+                      title: 'Variant Combinations',
+                      key: 'combinations',
+                      className: "align-top",
+                      render: (_: string, record: any) => {
+                        if (!record.combinations || record.combinations.length === 0) {
+                          return <span className="text-slate-500 italic">Default Variant</span>;
+                        }
+                        return (
+                          <div className="flex flex-wrap gap-2">
+                            {record.combinations.map((c: any, i: number) => (
+                              <AntTag key={i} color="blue">{c.value_label}</AntTag>
+                            ))}
+                          </div>
+                        );
+                      }
+                    },
+                    {
+                      title: 'Unit Price',
+                      dataIndex: 'offer_price',
+                      key: 'offer_price',
+                      className: "w-[250px] max-w-[250px] align-top",
+                      render: (price: number) => (
+                        <span className="font-bold text-emerald-600">${price}</span>
+                      )
+                    },
+                    {
+                      title: 'Accept',
+                      dataIndex: 'buyer_accepted',
+                      key: 'buyer_accepted',
+                      className: "w-[80px] text-center align-top",
+                      render: (_: boolean, record: any) => (
+                        <Checkbox
+                          checked={!!acceptedVariants[record.id]}
+                          disabled={quote?.status !== 'SUBMITTED'}
+                          onChange={(e) => {
+                            setAcceptedVariants((prev) => ({
+                              ...prev,
+                              [record.id]: e.target.checked
+                            }));
+                          }}
+                        />
+                      )
+                    }
+                  ]}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {quote.status === 'SUBMITTED' && (
           <div className="pt-6 flex justify-end gap-3 border-t mt-6">

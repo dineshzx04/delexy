@@ -176,33 +176,33 @@ const BusinessLayout: React.FC = () => {
           },
         ],
       },
-      {
-        key: 'team-rbac-group',
-        type: 'group',
-        label: collapsed ? null : 'Organization & Team',
-        children: [
-          {
-            key: '/b/members',
-            icon: <Lucide.Users size={18} />,
-            label: <Link to="/b/members">Team Members</Link>,
-          },
-          {
-            key: '/b/roles',
-            icon: <Lucide.ShieldCheck size={18} />,
-            label: <Link to="/b/roles">Roles & RBAC Permissions</Link>,
-          },
-          {
-            key: '/b/business-emails',
-            icon: <Lucide.Mail size={18} />,
-            label: <Link to="/b/business-emails">Corporate Emails</Link>,
-          },
-          {
-            key: '/b/settings',
-            icon: <Lucide.Settings size={18} />,
-            label: <Link to="/b/settings">Settings</Link>,
-          },
-        ],
-      },
+      // {
+      //   key: 'team-rbac-group',
+      //   type: 'group',
+      //   label: collapsed ? null : 'Organization & Team',
+      //   children: [
+      //     {
+      //       key: '/b/members',
+      //       icon: <Lucide.Users size={18} />,
+      //       label: <Link to="/b/members">Team Members</Link>,
+      //     },
+      //     {
+      //       key: '/b/roles',
+      //       icon: <Lucide.ShieldCheck size={18} />,
+      //       label: <Link to="/b/roles">Roles & RBAC Permissions</Link>,
+      //     },
+      //     // {
+      //     //   key: '/b/business-emails',
+      //     //   icon: <Lucide.Mail size={18} />,
+      //     //   label: <Link to="/b/business-emails">Corporate Emails</Link>,
+      //     // },
+      //     // {
+      //     //   key: '/b/settings',
+      //     //   icon: <Lucide.Settings size={18} />,
+      //     //   label: <Link to="/b/settings">Settings</Link>,
+      //     // },
+      //   ],
+      // },
     ];
   };
 

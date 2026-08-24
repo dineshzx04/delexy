@@ -103,7 +103,7 @@ export const ItemDetailWorkspace: React.FC = () => {
             <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
           </Descriptions.Item>
           <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
-          <Descriptions.Item label="Variant">{itemVariant?.sku}</Descriptions.Item>
+          {/* <Descriptions.Item label="Variant">{itemVariant?.sku}</Descriptions.Item> */}
           <Descriptions.Item label="Requested Quantity">
             <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit}</AntTag>
           </Descriptions.Item>
@@ -185,7 +185,6 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
 
   const attributeGroupsMap = React.useMemo(() => {
     if (!item || !itemAttributes?.length) return [];
-
     const groups = new Map((attributeGroups || []).map(g => [g.id, g.name]));
     const attrs = new Map((attributes || []).map(a => [a.id, a.name]));
 
@@ -247,7 +246,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
           reqViewValue = values.map((v: any) => v.value_label).join(", ") || "N/A";
         }
       } else {
-        const joiner = ia.connector === "AND" ? " AND " : ia.connector === "OR" ? " | " : ", ";
+        const joiner = ia.connector === "AND" ? ", " : ia.connector === "OR" ? " | " : ", ";
         reqViewValue = values.map((v: any) => v.value_label).join(joiner) || "N/A";
       }
 
@@ -261,6 +260,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
         reqViewValue,
       });
     });
+        console.log(itemAttributes)
 
     return [...map.entries()];
   }, [item, itemAttributes, attributeGroups, attributes, attributesValues, allBrands, allManufacturers]);
@@ -444,12 +444,12 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
         return <span>{p?.display_name || sellerId}</span>;
       }
     },
-    {
-      title: 'Offered Price',
-      dataIndex: 'offer_unit_price',
-      key: 'offer_unit_price',
-      render: (val: number) => <span className="font-bold text-emerald-600">${val}</span>
-    },
+    // {
+    //   title: 'Offered Price',
+    //   dataIndex: 'offer_unit_price',
+    //   key: 'offer_unit_price',
+    //   render: (val: number) => <span className="font-bold text-emerald-600">${val}</span>
+    // },
     {
       title: 'Round',
       dataIndex: 'round',

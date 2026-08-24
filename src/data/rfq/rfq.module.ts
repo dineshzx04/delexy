@@ -1,6 +1,6 @@
 import type { PartyOwnerType } from "../business/business.module";
 
-export type AttributeType = "SYSTEM" | "CUSTOM";
+export type AttributeType = "SYSTEM" | "CUSTOM" | "CUSTOM_VARIANT";
 
 // ============================================================================
 // SECTION 1: CORE DATABASE TABLES / ENTITIES (Persisted in Dexie DB)
@@ -86,6 +86,16 @@ export interface SellerQuoteAttribute {
   is_deviation: boolean;
   deviation_note?: string;
   buyer_accepted?: boolean;
+  connector?: RfqItemAttributeConnector;
+}
+
+export interface SellerQuoteVariant {
+  id: string;
+  seller_quote_id: string;
+  is_default: boolean;
+  offer_price: number;
+  buyer_accepted?: boolean;
+  combinations: VariantCombination[]
 }
 
 export interface SellerQuoteComment {
@@ -214,3 +224,10 @@ export type ProductMappingStatus =
 
 export type RfqItemAttributeConnector = "AND" | "OR";
 
+
+interface VariantCombination {
+  group_id: string;
+  attribute_id: string;
+  value_id: string
+  [key: string]: any;
+}

@@ -71,7 +71,7 @@ export const mockRfqItemAttributes: RfqItemAttribute[] = [
     attribute_id: "attr-8",
     description: "",
     // is_variant: false,
-    connector: "OR",
+    connector: "AND",
     values: [
       { value_id: "val-8-1", value_label: "IP68" },
       { value_id: "val-8-2", value_label: "IP67" },
@@ -123,6 +123,23 @@ export const mockRfqItemAttributes: RfqItemAttribute[] = [
     values: [
       { value_id: "val-9-1", value_label: "512GB" },
       { value_id: "val-9-2", value_label: "1TB" },
+    ],
+    created_at: "2026-08-10T09:00:00Z",
+    updated_at: "2026-08-10T09:00:00Z",
+  },
+  {
+    id: "ia-009",
+    rfq_item_id: "item-01",
+    attribute_type: "CUSTOM",
+    group_id: "grp-5",
+    attribute_id: "attr-25",
+    description: "",
+    // is_variant: true,
+    connector: "AND",
+    values: [
+      { value_id: "val-25-1", value_label: "5G" },
+      { value_id: "val-25-2", value_label: "4G" },
+      { value_id: "val-25-3", value_label: "3G" },
     ],
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",
