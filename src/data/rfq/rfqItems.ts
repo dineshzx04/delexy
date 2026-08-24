@@ -10,7 +10,7 @@ export const mockRfqItems: RfqItem[] = [
     variant_id: "sprod-1-v1",
     req_quantity: 10,
     req_unit: "Pcs",
-    req_unit_price: 100,
+    // req_unit_price: 100,
     item_index: 1,
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",

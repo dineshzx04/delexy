@@ -67,10 +67,10 @@ export const SupplierRfqInbox: React.FC = () => {
         product_name: product?.name || 'Custom Specifications',
         req_quantity: item.req_quantity,
         req_unit: item.req_unit,
-        req_unit_price: item.req_unit_price,
+        // req_unit_price: item.req_unit_price,
         offer_quantity: quote ? quote.offer_quantity : undefined,
         offer_unit: quote ? quote.offer_unit : undefined,
-        offer_unit_price: quote ? quote.offer_unit_price : undefined,
+        // offer_unit_price: quote ? quote.offer_unit_price : undefined,
       };
     });
   }, [assignedItems, rfqs, quotes]);
@@ -157,42 +157,42 @@ export const SupplierRfqInbox: React.FC = () => {
               {
                 title: 'Req.Qty',
                 key: 'qty',
-                // width: 140,
+                className: "w-[150px] max-w-[150px]",
                 render: (_: any, record: any) => (
                   <span className="font-semibold text-slate-700">{record.req_quantity} {record.req_unit}</span>
                 )
               },
-              {
-                title: 'Req.UnitPrice',
-                key: 'req_unit_price',
-                // width: 120,
-                render: (_: any, record: any) => record.req_unit_price ? <span className="font-bold text-slate-600">${record.req_unit_price}</span> : 'N/A'
-              },
-              {
-                title: 'Offer Price',
-                dataIndex: 'offered_price',
-                key: 'offered_price',
-                // width: 140,
-                render: (val: number, record: any) => (
-                  val ? (
-                    <div className="space-y-0.5 text-left">
-                      <span className="font-bold text-emerald-600">${val}</span>
-                      <div>
-                        <a
-                          onClick={() => navigate(`${isBusinessContext ? '/b/supplier' : '/user/supplier'}/rfqs/${record.rfq_id}/items/${record.item_id}/respond`)}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold underline block"
-                        >
-                          Ref: {record.quote_number} (Rd {record.round})
-                        </a>
-                      </div>
-                    </div>
-                  ) : <span className="text-slate-400">No Offer Yet</span>
-                )
-              },
+              // {
+              //   title: 'Req.UnitPrice',
+              //   key: 'req_unit_price',
+              //   // width: 120,
+              //   render: (_: any, record: any) => record.req_unit_price ? <span className="font-bold text-slate-600">${record.req_unit_price}</span> : 'N/A'
+              // },
+              // {
+              //   title: 'Offer Price',
+              //   dataIndex: 'offered_price',
+              //   key: 'offered_price',
+              //   // width: 140,
+              //   render: (val: number, record: any) => (
+              //     val ? (
+              //       <div className="space-y-0.5 text-left">
+              //         <span className="font-bold text-emerald-600">${val}</span>
+              //         <div>
+              //           <a
+              //             onClick={() => navigate(`${isBusinessContext ? '/b/supplier' : '/user/supplier'}/rfqs/${record.rfq_id}/items/${record.item_id}/respond`)}
+              //             className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold underline block"
+              //           >
+              //             Ref: {record.quote_number} (Rd {record.round})
+              //           </a>
+              //         </div>
+              //       </div>
+              //     ) : <span className="text-slate-400">No Offer Yet</span>
+              //   )
+              // },
               {
                 title: 'Status',
                 key: 'status',
-                // width: 200,
+                className: "w-[150px] max-w-[150px]",
                 render: (_: any, record: any) => (
                   <RFQQuoteStatusBadge status={record.quote_status} />
                 )
@@ -200,7 +200,7 @@ export const SupplierRfqInbox: React.FC = () => {
               {
                 title: 'Action',
                 key: 'action',
-                // width: 150,
+                className: "w-[150px] max-w-[150px]",
                 align: 'right' as const,
                 render: (_: any, record: any) => {
                   let buttonText = 'Make Proposal';

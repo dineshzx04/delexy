@@ -107,9 +107,9 @@ export const ItemDetailWorkspace: React.FC = () => {
           <Descriptions.Item label="Requested Quantity">
             <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit}</AntTag>
           </Descriptions.Item>
-          <Descriptions.Item label="Requested Unit Price">
+          {/* <Descriptions.Item label="Requested Unit Price">
             {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
-          </Descriptions.Item>
+          </Descriptions.Item> */}
         </Descriptions>
       </Card>
 
@@ -176,113 +176,108 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
     [itemId]
   ) || [];
 
-  const sellerProduct = useLiveQuery(
-    async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
-    [item?.product_id]
-  );
-
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
   const attributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
   const attributesValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
 
+  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
+  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+
   const attributeGroupsMap = React.useMemo(() => {
-    const map: Record<string, { name: string; attributes: any[] }> = {};
-    const customAttributes = sellerProduct?.dynamic_attributes?.filter((ia: any) => ia.is_variant !== true);
+    if (!item || !itemAttributes?.length) return [];
 
-    customAttributes?.forEach((ia: any) => {
-      const groupId = ia.group_id || 'ungrouped';
-      if (!map[groupId]) {
-        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
-        map[groupId] = { name: groupName, attributes: [] };
+    const groups = new Map((attributeGroups || []).map(g => [g.id, g.name]));
+    const attrs = new Map((attributes || []).map(a => [a.id, a.name]));
+
+    const getValues = (ia: any) => {
+      const ids = new Set((ia.values || []).map((v: any) => v.value_id));
+
+      switch (ia.attribute_id) {
+        case "manufacturer":
+          return (allManufacturers || [])
+            .filter(v => ids.has(v.id))
+            .map(v => ({ value_id: v.id, value_label: v.company_name }));
+
+        case "brand":
+          return (allBrands || [])
+            .filter(v => ids.has(v.id))
+            .map(v => ({ value_id: v.id, value_label: v.name }));
+
+        case "req_quantity":
+          return [
+            { value_id: "req-quantity", value_label: item.req_quantity },
+            { value_id: "req-quantity-unit", value_label: item.req_unit },
+          ];
+
+        default:
+          return (attributesValues || [])
+            .filter(v => ids.has(v.id))
+            .map(v => ({ value_id: v.id, value_label: v.value || v.label }));
+      }
+    };
+
+    const names: Record<string, string> = {
+      req_quantity: "Requested Quantity",
+      brand: "Brand",
+      manufacturer: "Manufacturer",
+    };
+
+    const map = new Map<string, any>();
+
+    itemAttributes.forEach((ia: any) => {
+      const groupId = ia.group_id;
+      const values = getValues(ia);
+
+      if (!map.has(groupId)) {
+        map.set(groupId, {
+          name: groupId === "system"
+            ? "System Specifications"
+            : groups.get(groupId) || "",
+          attributes: [],
+        });
       }
 
-      const hydratedValues = attributesValues
-        .filter((av) => ia?.selected_value_ids?.includes(av.id))
-        .map((v) => ({
-          value_id: v.id,
-          value_label: v.value || v.label,
-        }));
-
-      map[groupId].attributes.push({ ...ia, values: hydratedValues });
-    });
-
-    // Include the active variant's combination values
-    const currentVariant = sellerProduct?.variants?.find((v: any) => v.id === item?.variant_id);
-    currentVariant?.combination_values?.forEach((cv: any) => {
-      const groupId = cv.group_id || 'ungrouped';
-      if (!map[groupId]) {
-        const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'Variant Specifications';
-        map[groupId] = { name: groupName, attributes: [] };
+      let reqViewValue = "N/A";
+      if (ia.attribute_type === "SYSTEM") {
+        if (ia.attribute_id === "req_quantity") {
+          reqViewValue = `${item.req_quantity} ${item.req_unit}`;
+        } else if (ia.attribute_id === "manufacturer" || ia.attribute_id === "brand") {
+          reqViewValue = values.map((v: any) => v.value_label).join(" | ") || "N/A";
+        } else {
+          reqViewValue = values.map((v: any) => v.value_label).join(", ") || "N/A";
+        }
+      } else {
+        const joiner = ia.connector === "AND" ? " AND " : ia.connector === "OR" ? " | " : ", ";
+        reqViewValue = values.map((v: any) => v.value_label).join(joiner) || "N/A";
       }
 
-      map[groupId].attributes.push({
-        attribute_id: cv.attribute_id,
-        group_id: cv.group_id,
-        is_variant: true,
-        values: [
-          {
-            value_id: cv.value_id,
-            value_label: cv.label || cv.value_id
-          }
-        ]
+      map.get(groupId).attributes.push({
+        key: `${groupId}_${ia.attribute_id}`,
+        attribute_type: ia.attribute_type,
+        group_id: groupId,
+        attribute_id: ia.attribute_id,
+        attributeName: names[ia.attribute_id] || attrs.get(ia.attribute_id) || "",
+        values,
+        reqViewValue,
       });
     });
 
-    return Object.entries(map);
-  }, [attributeGroups, sellerProduct, attributesValues, item?.variant_id]);
-
-  const formatSystemValues = (values: any[] | undefined, fallback: string) => {
-    if (!values || values.length === 0) return fallback;
-    return values.map((v) => v.value_label || v.value_id).join(', ');
-  };
+    return [...map.entries()];
+  }, [item, itemAttributes, attributeGroups, attributes, attributesValues, allBrands, allManufacturers]);
 
   if (!item) return null;
 
-  const brandAttribute = itemAttributes.find((ia) => ia.attribute_type === 'SYSTEM' && ia.attribute_id === 'brand');
-  const manufacturerAttribute = itemAttributes.find((ia) => ia.attribute_type === 'SYSTEM' && ia.attribute_id === 'manufacturer');
-
-  const generalPreferencesData = [
-    {
-      key: 'brand',
-      specification: 'Brand Preference',
-      buyerAsked: formatSystemValues(brandAttribute?.values, 'Any Brand'),
-    },
-    {
-      key: 'manufacturer',
-      specification: 'Manufacturer Preference',
-      buyerAsked: formatSystemValues(manufacturerAttribute?.values, 'Any Manufacturer'),
-    },
-    {
-      key: 'req_unit_price',
-      specification: 'Unit Price ($)',
-      buyerAsked: item.req_unit_price ? `$${item.req_unit_price}` : 'N/A'
-    },
-    {
-      key: 'req_quantity',
-      specification: 'Requested Quantity',
-      buyerAsked: `${item.req_quantity} ${item.req_unit || ''}`.trim()
-    }
-  ];
 
   const attributesColumns = [
     {
-      title: 'Specification / Attribute',
-      dataIndex: 'specification',
-      key: 'specification',
+      title: 'Attribute',
+      dataIndex: 'attributeName',
+      key: 'attributeName',
       width: 320,
       render: (text: string, record: any) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-bold text-slate-800 leading-tight">
             {text}
-            {record.isVariant && (
-              <AntTag
-                color="blue"
-                className="leading-tight italic ml-2"
-                icon={<CheckCircleOutlined />}
-              >
-                Variant Attribute
-              </AntTag>
-            )}
           </span>
           {record.description && (
             <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
@@ -292,56 +287,17 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
     },
     {
       title: 'Requested / Required Value',
-      dataIndex: 'buyerAsked',
-      key: 'buyerAsked',
+      dataIndex: 'reqViewValue',
+      key: 'reqViewValue',
       render: (text: string) => <span className="text-slate-600 font-medium">{text}</span>
     }
   ];
 
   return (
     <div className="space-y-6">
-      <div
-        className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
-        style={{ borderLeft: `4px solid #2563eb` }}
-      >
-        <div
-          className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-1.5"
-          style={{ backgroundColor: `#2563eb14` }}
-        >
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white bg-blue-600">
-              1
-            </span>
-            <h4 className="text-md font-bold text-slate-800">General Sourcing Preferences</h4>
-          </div>
-          <AntTag color="default" style={{ borderColor: '#2563eb', color: '#2563eb', fontWeight: 700 }}>
-            {generalPreferencesData.length} attributes
-          </AntTag>
-        </div>
-        <div className="p-2">
-          <Table
-            dataSource={generalPreferencesData}
-            columns={attributesColumns}
-            pagination={false}
-            size="small"
-            bordered
-          />
-        </div>
-      </div>
 
       {attributeGroupsMap.map(([groupId, group], idx) => {
-        const groupRows = group.attributes.map((ia) => {
-          const attrName = attributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id;
-          const requestedVals = (ia.values || []).map((v: any) => v.value_label).join(', ') || 'N/A';
-
-          return {
-            key: ia.id || ia.attribute_id,
-            specification: attrName,
-            isVariant: ia.is_variant,
-            description: ia.description || null,
-            buyerAsked: requestedVals
-          };
-        });
+        const groupRows = group.attributes;
 
         const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
 
@@ -360,7 +316,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
                   className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white"
                   style={{ backgroundColor: accentColor }}
                 >
-                  {idx + 2}
+                  {idx + 1}
                 </span>
                 <h4 className="text-md font-bold text-slate-800">{group.name}</h4>
               </div>
@@ -441,7 +397,6 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
     //     unit_price: selectedQuote.unit_price,
     //     award_status: 'AWARDED' as const,
     //     product_mapping_status: 'PENDING' as const,
-    //     variant_id: undefined,
     //     awarded_at: new Date().toISOString(),
     //     awarded_by_user_id: activeWorkspace?.userId
     //   };

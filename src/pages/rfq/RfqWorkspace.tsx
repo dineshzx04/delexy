@@ -153,20 +153,20 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
     },
     {
       title: 'Req.Qty',
-      dataIndex: 'quantity',
-      key: 'quantity',
+      dataIndex: 'req_quantity',
+      key: 'req_quantity',
       width: 160,
       render: (val: number, record: any) => (
         <span className="font-semibold text-slate-800">{val} {record.unit}</span>
       ),
     },
-    {
-      title: 'UnitPrice',
-      dataIndex: 'unit_price',
-      key: 'unit_price',
-      width: 140,
-      render: (val: number) => <span className="font-bold text-emerald-600">${val || 0}</span>,
-    },
+    // {
+    //   title: 'UnitPrice',
+    //   dataIndex: 'unit_price',
+    //   key: 'unit_price',
+    //   width: 140,
+    //   render: (val: number) => <span className="font-bold text-emerald-600">${val || 0}</span>,
+    // },
     {
       title: 'Item Status',
       dataIndex: 'status',
@@ -327,12 +327,12 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
         <span className="font-semibold text-slate-800">{val} {record.unit}</span>
       ),
     },
-    {
-      title: 'UnitPrice',
-      dataIndex: 'unit_price',
-      key: 'unit_price',
-      render: (val: number) => <span className="font-bold text-emerald-600">${val || 0}</span>,
-    },
+    // {
+    //   title: 'UnitPrice',
+    //   dataIndex: 'unit_price',
+    //   key: 'unit_price',
+    //   render: (val: number) => <span className="font-bold text-emerald-600">${val || 0}</span>,
+    // },
     {
       title: 'Action',
       key: 'action',

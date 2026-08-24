@@ -221,7 +221,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
     }
 
     let sellerProduct = null;
-    let allVariants = [];
+    let allVariants: any[] = [];
     if (item?.product_id) {
       sellerProduct = await catalogDb.sellerProducts.get(item.product_id);
       allVariants = sellerProduct?.variants || [];
@@ -282,20 +282,20 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   const attributeGroupsMap = React.useMemo(() => {
     if (!item || !itemAttributes?.length) return [];
 
-    const groups = new Map(attributeGroups.map(g => [g.id, g.name]));
-    const attrs = new Map(catalogAttributes.map(a => [a.id, a.name]));
+    const groups = new Map((attributeGroups || []).map(g => [g.id, g.name]));
+    const attrs = new Map((catalogAttributes || []).map(a => [a.id, a.name]));
 
     const getValues = (ia: any) => {
       const ids = new Set((ia.values || []).map((v: any) => v.value_id));
 
       switch (ia.attribute_id) {
         case "manufacturer":
-          return allManufacturers
+          return (allManufacturers || [])
             .filter(v => ids.has(v.id))
             .map(v => ({ value_id: v.id, value_label: v.company_name }));
 
         case "brand":
-          return allBrands
+          return (allBrands || [])
             .filter(v => ids.has(v.id))
             .map(v => ({ value_id: v.id, value_label: v.name }));
 
@@ -305,21 +305,21 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
             { value_id: "req-quantity-unit", value_label: item.req_unit },
           ];
 
-        case "req_unit_price":
-          return [{
-            value_id: "req-unit-price",
-            value_label: item.req_unit_price ?? "N/A",
-          }];
+        // case "req_unit_price":
+        //   return [{
+        //     value_id: "req-unit-price",
+        //     value_label: item.req_unit_price ?? "N/A",
+        //   }];
 
         default:
-          return catalogAttributeValues
+          return (catalogAttributeValues || [])
             .filter(v => ids.has(v.id))
             .map(v => ({ value_id: v.id, value_label: v.value || v.label }));
       }
     };
 
     const names: Record<string, string> = {
-      req_unit_price: "Unit Price ($)",
+      // req_unit_price: "Unit Price ($)",
       req_quantity: "Requested Quantity",
       brand: "Brand",
       manufacturer: "Manufacturer",
@@ -340,6 +340,20 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         });
       }
 
+      let reqViewValue = "N/A";
+      if (ia.attribute_type === "SYSTEM") {
+        if (ia.attribute_id === "req_quantity") {
+          reqViewValue = `${item.req_quantity} ${item.req_unit}`;
+        } else if (ia.attribute_id === "manufacturer" || ia.attribute_id === "brand") {
+          reqViewValue = values.map((v: any) => v.value_label).join(" OR ") || "N/A";
+        } else {
+          reqViewValue = values.map((v: any) => v.value_label).join(", ") || "N/A";
+        }
+      } else {
+        const joiner = ia.connector === "AND" ? " AND " : ia.connector === "OR" ? " OR " : ", ";
+        reqViewValue = values.map((v: any) => v.value_label).join(joiner) || "N/A";
+      }
+
       map.get(groupId).attributes.push({
         key: `${groupId}_${ia.attribute_id}`,
         attribute_type: ia.attribute_type,
@@ -348,12 +362,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         is_variant: ia.is_variant,
         attributeName: names[ia.attribute_id] || attrs.get(ia.attribute_id) || "",
         values,
-        reqViewValue:
-          ia.attribute_id === "req_quantity"
-            ? `${item.req_quantity} ${item.req_unit}`
-            : ia.attribute_id === "req_unit_price"
-              ? item.req_unit_price ? `$${item.req_unit_price}` : "N/A"
-              : values.map(v => v.value_label).join(", ") || "N/A",
+        reqViewValue,
       });
     });
 
@@ -372,7 +381,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       existingQuoteAttributes.forEach(attr => {
         const proposalKey = `${attr.group_id}_${attr.attribute_id}`
         initialValues[proposalKey] = {
-          attribute_type: attr.attribute_type,
+          attribute_type: attr.attribute_type as AttributeType,
           group_id: attr.group_id,
           attribute_id: attr.attribute_id,
           is_deviation: attr.is_deviation,
@@ -428,19 +437,19 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
     setSubmitting(true);
     try {
       const quoteId = existingQuote?.id || crypto.randomUUID();
-      const priceStr = proposalAttributes['system_req_unit_price']?.values.find(i => i.value_id == "req-unit-price")?.value_label || '0';
+      // const priceStr = proposalAttributes['system_req_unit_price']?.values.find(i => i.value_id == "req-unit-price")?.value_label || '0';
       const qtyStr = proposalAttributes['system_req_quantity']?.values.find(i => i.value_id == "req-quantity")?.value_label || '0';
       const qtyUnit = proposalAttributes['system_req_quantity']?.values.find(i => i.value_id == "req-quantity-unit")?.value_label || '0';
 
-      const offerPrice = parseFloat(priceStr);
+      // const offerPrice = parseFloat(priceStr);
       const offerQty = parseFloat(qtyStr);
 
       if (submitMode === 'SUBMITTED') {
-        if (isNaN(offerPrice) || offerPrice <= 0) {
-          antMessage.error('Please enter a valid unit price.');
-          setSubmitting(false);
-          return;
-        }
+        // if (isNaN(offerPrice) || offerPrice <= 0) {
+        //   antMessage.error('Please enter a valid unit price.');
+        //   setSubmitting(false);
+        //   return;
+        // }
         if (isNaN(offerQty) || offerQty <= 0) {
           antMessage.error('Please enter a valid quantity.');
           setSubmitting(false);
@@ -454,7 +463,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         round: existingQuote?.round || 1,
         seller_party_id: activePartyId,
         seller_quote_number: quoteNumber,
-        offer_unit_price: offerPrice || 0,
+        // offer_unit_price: offerPrice || 0,
         offer_quantity: offerQty || 0,
         offer_unit: qtyUnit,
         status: submitMode,
@@ -612,7 +621,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                   value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
                   onChange={(val: string[]) => {
                     const newValues = val.map(id => {
-                      const matched = allManufacturers.find((v: any) => v.id === id);
+                      const matched = allManufacturers?.find((v: any) => v.id === id);
                       return { value_id: id, value_label: matched?.company_name || id };
                     });
                     const oldValue = attribute?.values?.map((v: any) => v.value_id) || [];
@@ -632,7 +641,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                     }));
                   }}
                   className="w-full mt-1"
-                  options={allManufacturers.map((v: any) => ({ label: v.company_name, value: v.id }))}
+                  options={(allManufacturers || []).map((v: any) => ({ label: v.company_name, value: v.id }))}
                 />
               )
               break;
@@ -646,7 +655,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                   value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
                   onChange={(val: string[]) => {
                     const newValues = val.map(id => {
-                      const matched = allBrands.find((v: any) => v.id === id);
+                      const matched = allBrands?.find((v: any) => v.id === id);
                       return { value_id: id, value_label: matched?.name || id };
                     });
                     const oldValue = attribute?.values?.map((v: any) => v.value_id) || [];
@@ -666,7 +675,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                     }));
                   }}
                   className="w-full mt-1"
-                  options={allBrands.map((v: any) => ({ label: v.name, value: v.id }))}
+                  options={allBrands?.map((v: any) => ({ label: v.name, value: v.id }))}
                 />
               )
               break;
@@ -699,41 +708,41 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                 />
               )
               break;
-            case "req_unit_price":
-              field = (
-                <AntInput
-                  disabled={isViewOnly}
-                  value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-unit-price")?.value_label ?? ''}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (isNaN(val) || val <= 0) {
-                      antMessage.error('Please enter a valid price.');
-                      return;
-                    }
-                    const oldValue = attribute?.values?.find((i: any) => i.value_id == "req-unit-price")?.value_label
-                    const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
-                    const initVal = initialAttr?.values?.find(v => v.value_id === 'req-unit-price')?.value_label || '';
-                    const isChangedFromPrev = val !== Number(initVal);
+            // case "req_unit_price":
+            //   field = (
+            //     <AntInput
+            //       disabled={isViewOnly}
+            //       value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-unit-price")?.value_label ?? ''}
+            //       onChange={(e) => {
+            //         const val = Number(e.target.value);
+            //         if (isNaN(val) || val <= 0) {
+            //           antMessage.error('Please enter a valid price.');
+            //           return;
+            //         }
+            //         const oldValue = attribute?.values?.find((i: any) => i.value_id == "req-unit-price")?.value_label
+            //         const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
+            //         const initVal = initialAttr?.values?.find(v => v.value_id === 'req-unit-price')?.value_label || '';
+            //         const isChangedFromPrev = val !== Number(initVal);
 
-                    setProposalAttributes(prev => ({
-                      ...prev,
-                      [proposalKey]: {
-                        ...prev[proposalKey],
-                        is_deviation: val != Number(oldValue),
-                        values: [{ value_id: 'req-unit-price', value_label: e.target.value }],
-                        buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
-                      }
-                    }));
-                  }}
-                />
-              )
-              break;
+            //         setProposalAttributes(prev => ({
+            //           ...prev,
+            //           [proposalKey]: {
+            //             ...prev[proposalKey],
+            //             is_deviation: val != Number(oldValue),
+            //             values: [{ value_id: 'req-unit-price', value_label: e.target.value }],
+            //             buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
+            //           }
+            //         }));
+            //       }}
+            //     />
+            //   )
+            //   break;
             default:
               field = "Contact System admin"
               break;
           }
         } else {
-          const values = catalogAttributeValues.filter((v) => v.attributeId === attribute.attribute_id);
+          const values = catalogAttributeValues?.filter((v) => v.attributeId === attribute.attribute_id) || [];
           field = (
             <AntSelect
               disabled={isViewOnly}
@@ -863,14 +872,14 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         <Descriptions.Item label="RFQ Number">
           <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
         </Descriptions.Item>
-        <Descriptions.Item label="Category">{categories.find((c) => c.id === item.category_id)?.name || 'Unknown'}</Descriptions.Item>
+        <Descriptions.Item label="Category">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</Descriptions.Item>
         <Descriptions.Item label="Variant">{itemVariant?.sku}</Descriptions.Item>
         <Descriptions.Item label="Requested Quantity">
           <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
         </Descriptions.Item>
-        <Descriptions.Item label="Requested Unit Price">
+        {/* <Descriptions.Item label="Requested Unit Price">
           {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
-        </Descriptions.Item>
+        </Descriptions.Item> */}
       </Descriptions>
 
       <div className="space-y-6">

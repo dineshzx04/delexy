@@ -34,7 +34,7 @@ export interface RfqItem {
   product_id: string | null;
   variant_id: string | null;
   item_index?: number;
-  req_unit_price: number;
+  // req_unit_price: number;
   req_quantity: number;
   req_unit?: string;
   // awarded_quantity_total?: number;
@@ -50,9 +50,10 @@ export interface RfqItemAttribute {
   attribute_type?: AttributeType;
   group_id: string;
   attribute_id: string;
-  is_variant: boolean;
+  // is_variant: boolean;
   description?: string;
   unit?: string;
+  connector: RfqItemAttributeConnector;
   values: ItemAttributeValue[];
   created_at: string;
   updated_at: string;
@@ -64,7 +65,7 @@ export interface SellerQuote {
   round: number;
   seller_party_id: string;
   seller_quote_number: string;
-  offer_unit_price: number;
+  // offer_unit_price: number;
   offer_quantity: number;
   offer_unit?: string;
   status: SellerQuoteStatus;
@@ -210,3 +211,6 @@ export type ProductMappingStatus =
   | "PENDING"
   | "SUBMITTED"
   | "ACKNOWLEDGED";
+
+export type RfqItemAttributeConnector = "AND" | "OR";
+

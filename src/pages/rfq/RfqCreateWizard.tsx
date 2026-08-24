@@ -358,7 +358,6 @@ export const RfqCreateWizard: React.FC = () => {
             seller_quote_number: `SQ-${item.id.replace('rfqi-', '')}-${sellerPartyId.replace('pty-', '')}`,
             status: 'DRAFT',
             round: 1,
-            offer_unit_price: item.unit_price || 0,
             offer_quantity: item.quantity,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),

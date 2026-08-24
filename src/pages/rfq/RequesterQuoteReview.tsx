@@ -177,7 +177,7 @@ export const RequesterQuoteReview: React.FC = () => {
         if (groupId === 'system') {
           groupName = 'System Specifications';
         } else {
-          groupName = attributeGroups.find(g => g.id === groupId)?.name ||
+          groupName = attributeGroups?.find(g => g.id === groupId)?.name ||
             (isVariant ? 'Variant Specifications' : 'General Specifications');
         }
         map[groupId] = { name: groupName, attributes: [] };
@@ -189,7 +189,7 @@ export const RequesterQuoteReview: React.FC = () => {
       else if (qa.attribute_id === 'brand') attrName = 'Brand';
       else if (qa.attribute_id === 'manufacturer') attrName = 'Manufacturer';
       else {
-        attrName = catalogAttributes.find(a => a.id === qa.attribute_id)?.name || qa.attribute_id;
+        attrName = catalogAttributes?.find(a => a.id === qa.attribute_id)?.name || qa.attribute_id;
       }
 
       // Determine what the buyer requested for comparison (taken from the snapshotted req_value)
@@ -514,9 +514,9 @@ export const RequesterQuoteReview: React.FC = () => {
           <Descriptions.Item label="Requested Quantity">
             <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
           </Descriptions.Item>
-          <Descriptions.Item label="Requested Unit Price">
+          {/* <Descriptions.Item label="Requested Unit Price">
             {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
-          </Descriptions.Item>
+          </Descriptions.Item> */}
         </Descriptions>
 
         <div className="space-y-6">
