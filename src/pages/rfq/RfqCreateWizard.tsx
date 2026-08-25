@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Card as AntCard,
   Steps as AntSteps,
@@ -11,17 +11,23 @@ import {
   Drawer as AntDrawer,
   Popconfirm as AntPopconfirm,
   Checkbox as AntCheckbox,
+  Badge as AntBadge,
+  FloatButton as AntFloatButton,
+  Modal as AntModal,
+  Descriptions as AntDescriptions,
+  Grid as AntGrid,
 } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
+import * as Lucide from 'lucide-react';
 import {
   FileTextOutlined as AntFileTextOutlined,
   AppstoreOutlined as AntAppstoreOutlined,
   CheckCircleOutlined as AntCheckCircleOutlined,
   PlusOutlined as AntPlusOutlined,
-  SendOutlined as AntSendOutlined  ,
-  ArrowLeftOutlined as AntArrowLeftOutlined  ,
-  SettingOutlined as AntSettingOutlined  ,
+  SendOutlined as AntSendOutlined,
+  ArrowLeftOutlined as AntArrowLeftOutlined,
+  SettingOutlined as AntSettingOutlined,
   DeleteOutlined as AntDeleteOutlined,
   GlobalOutlined as AntGlobalOutlined,
   ToolOutlined as AntToolOutlined,
@@ -51,7 +57,7 @@ export const RfqCreateWizard: React.FC = () => {
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
 
   const allParties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
-  
+
   const activeParty = isBusinessContext
     ? allParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace?.businessId) || allParties[0]
     : allParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || allParties.find((p) => p.id === 'pty-6') || allParties[0];
@@ -171,7 +177,7 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
         <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-slate-800">RFQ Global Settings</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-xs font-semibold text-slate-700">RFQ Title *</label>
+            <label className="text-xs font-semibold text-slate-600">RFQ Title *</label>
             <AntInput
               size="large"
               placeholder="e.g. Q4 Enterprise Hardware Sourcing"
@@ -181,7 +187,7 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700">Currency *</label>
+            <label className="text-xs font-semibold text-slate-600">Currency *</label>
             <AntSelect
               size="large"
               value={details.currency}
@@ -195,7 +201,7 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700">Submission Deadline *</label>
+            <label className="text-xs font-semibold text-slate-600">Submission Deadline *</label>
             <AntInput
               type="date"
               size="large"
@@ -205,7 +211,7 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700">Contact Email *</label>
+            <label className="text-xs font-semibold text-slate-600">Contact Email *</label>
             <AntInput
               type="email"
               size="large"
@@ -216,7 +222,7 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700">Contact Mobile / Phone</label>
+            <label className="text-xs font-semibold text-slate-600">Contact Mobile / Phone</label>
             <AntInput
               size="large"
               placeholder="+1-555-0199"
@@ -226,7 +232,7 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-700">Shipping Destination *</label>
+            <label className="text-xs font-semibold text-slate-600">Shipping Destination *</label>
             <AntInput
               size="large"
               placeholder="e.g. Warehouse 4, Central Procurement HQ"
@@ -236,7 +242,7 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
             />
           </div>
           <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-slate-700">Detailed Sourcing Specification / General Instructions</label>
+            <label className="text-xs font-semibold text-slate-600">Detailed Sourcing Specification / General Instructions</label>
             <AntInput.TextArea
               rows={4}
               value={details.description}
@@ -272,11 +278,17 @@ interface RfqLineItemsStepProps {
 
 const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activePartyId, onPrev, onNext }) => {
   const { message: antMessage } = AntApp.useApp();
+  const screens = AntGrid.useBreakpoint();
+  const descriptionsLayout = screens.sm ? 'horizontal' : 'vertical';
   const [items, setItems] = useState<any[]>(initialItems);
   const [activeDrawerIndex, setActiveDrawerIndex] = useState<number | null>(null);
   const [previewProduct, setPreviewProduct] = useState<{ sellerProduct: any; variant: any; drawerIndex: number } | null>(null);
   const [variantPage, setVariantPage] = useState<number>(1);
-  const VARIANTS_PER_PAGE = 10;
+  const [searchResults, setSearchResults] = useState<{ sellerProduct: any; variant: any }[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchModalOpen, setSearchModalOpen] = useState(false);
+  const [viewingVariant, setViewingVariant] = useState<{ sellerProduct: any; variant: any } | null>(null);
+
 
   const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
   const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
@@ -344,7 +356,348 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
     };
     setItems((prev) => [...prev, newItem]);
     setActiveDrawerIndex(items.length);
+    setSearchResults(null);
     antMessage.info('Line item added. Fill in details.');
+  };
+
+  useEffect(() => {
+    if (activeDrawerIndex === null) {
+      setSearchResults(null);
+      return;
+    }
+    const item = items[activeDrawerIndex];
+    if (!item.category_id) {
+      setSearchResults(null);
+      return;
+    }
+
+    setIsSearching(true);
+    const timeout = setTimeout(() => {
+      let results: { sellerProduct: any; variant: any }[] = [];
+      allSellerProducts.forEach(sp => {
+        if (sp.category_id !== item.category_id) return;
+
+        const hasBrand = (item.brand_id && item.brand_id.length > 0) ? item.brand_id.includes(sp.brand_id) : true;
+        const hasMfg = (item.manufacturer_id && item.manufacturer_id.length > 0) ? item.manufacturer_id.includes(sp.manufacturer_id) : true;
+        if (!hasBrand || !hasMfg) return;
+
+        sp.variants?.forEach((variant: any) => {
+          let variantMatches = true;
+
+          if (item.selected_dynamic_attributes && item.selected_dynamic_attributes.length > 0) {
+            for (const attrReq of item.selected_dynamic_attributes) {
+              if (!attrReq.selected_value_ids || attrReq.selected_value_ids.length === 0) continue;
+
+              const hasSpec = sp.specifications?.some((s: any) => s.attribute_id === attrReq.attribute_id && attrReq.selected_value_ids.includes(s.values[0]?.id));
+              const hasComb = variant.combination_values?.some((c: any) => c.attribute_id === attrReq.attribute_id && attrReq.selected_value_ids.includes(c.value_id));
+
+              if (!hasSpec && !hasComb) {
+                variantMatches = false;
+                break;
+              }
+            }
+          }
+
+          if (variantMatches) {
+            results.push({ sellerProduct: sp, variant });
+          }
+        });
+      });
+
+      setSearchResults(results);
+      setIsSearching(false);
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [activeDrawerIndex, items, allSellerProducts]);
+
+  const handleSelectVariant = (sellerProduct: any, variant: any) => {
+    if (activeDrawerIndex === null) return;
+    const updated = [...items];
+    const current = updated[activeDrawerIndex];
+
+    current.catalog_product_id = sellerProduct.catalog_product_id;
+    current.product_id = sellerProduct.id;
+    current.variant_id = variant.id;
+    current.brand_id = sellerProduct.brand_id ? [sellerProduct.brand_id] : [];
+    current.manufacturer_id = sellerProduct.manufacturer_id ? [sellerProduct.manufacturer_id] : [];
+
+    const snapshotAttrs: any[] = [];
+
+    sellerProduct.specifications?.forEach((spec: any) => {
+      snapshotAttrs.push({
+        group_id: spec.group_id,
+        attribute_id: spec.attribute_id,
+        selected_value_ids: spec.values.map((v: any) => v.id),
+        connector: 'OR'
+      });
+    });
+
+    variant.combination_values?.forEach((comb: any) => {
+      const existing = snapshotAttrs.find(s => s.attribute_id === comb.attribute_id);
+      if (existing) {
+        if (!existing.selected_value_ids.includes(comb.value_id)) {
+          existing.selected_value_ids.push(comb.value_id);
+        }
+      } else {
+        snapshotAttrs.push({
+          group_id: comb.group_id,
+          attribute_id: comb.attribute_id,
+          selected_value_ids: [comb.value_id],
+          connector: 'OR'
+        });
+      }
+    });
+
+    current.selected_dynamic_attributes = snapshotAttrs;
+    setItems(updated);
+    antMessage.success(`Selected variant ${variant.sku}`);
+  };
+
+  const renderSearchResults = () => {
+    if (viewingVariant) {
+      const { sellerProduct, variant } = viewingVariant;
+      return (
+        <div className="flex flex-col h-full">
+          <div className="mb-4">
+            {/* <AntButton
+              type="default"
+              icon={<Lucide.ArrowLeft size={16} />}
+              onClick={() => setViewingVariant(null)}
+              className="mt-2 h-10 px-4 rounded-full border-slate-300 text-slate-700 font-medium hover:border-slate-300 hover:text-slate-900"
+            >
+              Back to Results
+            </AntButton> */}
+            <h3 className="text-md font-bold text-slate-800 leading-tight mt-3">
+              {sellerProduct.product_name}
+            </h3>
+            <div className="text-sm text-slate-500 flex items-center gap-2 mt-2">
+              <span className="font-mono bg-slate-200 px-1.5 py-0.5 rounded text-xs border border-slate-300 text-slate-700">SKU: {variant.sku}</span>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto pr-2 space-y-3 py-2 border-t border-slate-200 ">
+            <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex items-center justify-between">
+              <div>
+                <div className="text-xs text-slate-800 font-bold">Unit Price</div>
+                <div className="text-lg text-emerald-600 font-bold">{variant.currency} {variant.price}</div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="text-xs font-bold text-slate-800 px-4 py-3 bg-slate-50 border-b border-slate-200">Seller & Brand Information</div>
+              <AntTable
+                showHeader={false}
+                pagination={false}
+                size="small"
+                className="w-full"
+                classNames={{
+                  body: {
+                    cell: "text-xs"
+                  }
+                }}
+                columns={[
+                  { dataIndex: 'label', key: 'label', width: '33.33%', render: (text: React.ReactNode) => <span className="text-slate-500">{text}</span> },
+                  { dataIndex: 'value', key: 'value', render: (text: React.ReactNode) => <span className="font-semibold text-slate-800">{text}</span> }
+                ]}
+                dataSource={[
+                  ...(sellerProduct.manufacturer_id ? [{
+                    key: 'manufacturer',
+                    label: <><AntToolOutlined className="mr-1" /> Manufacturer</>,
+                    value: allManufacturers.find((m: any) => m.id === sellerProduct.manufacturer_id)?.company_name || sellerProduct.manufacturer_id
+                  }] : []),
+                  ...(sellerProduct.brand_id ? [{
+                    key: 'brand',
+                    label: <><AntAppstoreOutlined className="mr-1" /> Brand</>,
+                    value: allBrands.find((b: any) => b.id === sellerProduct.brand_id)?.name || sellerProduct.brand_id
+                  }] : []),
+                  ...(sellerProduct.party_id ? [{
+                    key: 'seller',
+                    label: <><AntShopOutlined className="mr-1" /> Seller</>,
+                    value: allParties.find((p: any) => p.id === sellerProduct.party_id)?.display_name || sellerProduct.seller_party_id
+                  }] : []),
+                ]}
+              />
+            </div>
+
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="text-xs font-bold text-slate-800 px-4 py-3 bg-slate-50 border-b border-slate-200">Variant Specifications</div>
+              <AntTable
+                showHeader={false}
+                pagination={false}
+                size="small"
+                className="w-full"
+                classNames={{ body: { cell: "text-xs" } }}
+                columns={[
+                  { dataIndex: 'label', key: 'label', width: '40%', render: (text: React.ReactNode) => <span className="text-slate-500">{text}</span> },
+                  { dataIndex: 'value', key: 'value', render: (text: React.ReactNode) => <span className="font-semibold text-slate-800">{text}</span> }
+                ]}
+                dataSource={
+                  variant.combination_values?.map((c: any, cIdx: number) => ({
+                    key: cIdx,
+                    label: c.attribute_name,
+                    value: c.label
+                  })) || []
+                }
+              />
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="text-xs font-bold text-slate-800 px-4 py-3 bg-slate-50 border-b border-slate-200">Variant Specifications</div>
+              <AntTable
+                showHeader={false}
+                pagination={false}
+                size="small"
+                className="w-full"
+                classNames={{ body: { cell: "text-xs" } }}
+                columns={[
+                  { dataIndex: 'label', key: 'label', width: '40%', render: (text: React.ReactNode) => <span className="text-slate-500">{text}</span> },
+                  { dataIndex: 'value', key: 'value', render: (text: React.ReactNode) => <span className="font-semibold text-slate-800">{text}</span> }
+                ]}
+                dataSource={
+                  variant.combination_values?.map((c: any, cIdx: number) => ({
+                    key: cIdx,
+                    label: c.attribute_name,
+                    value: c.label
+                  })) || []
+                }
+              />
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="text-xs font-bold text-slate-800 px-4 py-3 bg-slate-50 border-b border-slate-200">Variant Specifications</div>
+              <AntTable
+                showHeader={false}
+                pagination={false}
+                size="small"
+                className="w-full"
+                classNames={{ body: { cell: "text-xs" } }}
+                columns={[
+                  { dataIndex: 'label', key: 'label', width: '40%', render: (text: React.ReactNode) => <span className="text-slate-500">{text}</span> },
+                  { dataIndex: 'value', key: 'value', render: (text: React.ReactNode) => <span className="font-semibold text-slate-800">{text}</span> }
+                ]}
+                dataSource={
+                  variant.combination_values?.map((c: any, cIdx: number) => ({
+                    key: cIdx,
+                    label: c.attribute_name,
+                    value: c.label
+                  })) || []
+                }
+              />
+            </div>
+
+            {sellerProduct.specifications && sellerProduct.specifications.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="text-xs font-bold text-slate-800 px-4 py-3 bg-slate-50 border-b border-slate-200">Product Specifications</div>
+                <AntTable
+                  showHeader={false}
+                  pagination={false}
+                  size="small"
+                  className="w-full"
+                  classNames={{ body: { cell: "text-xs" } }}
+                  columns={[
+                    { dataIndex: 'label', key: 'label', width: '40%', render: (text: React.ReactNode) => <span className="text-slate-500">{text}</span> },
+                    { dataIndex: 'value', key: 'value', render: (text: React.ReactNode) => <span className="font-semibold text-slate-800">{text}</span> }
+                  ]}
+                  dataSource={
+                    sellerProduct.specifications.map((s: any, sIdx: number) => ({
+                      key: sIdx,
+                      label: allAttributes.find(a => a.id === s.attribute_id)?.name || s.attribute_id,
+                      value: s.values.map((v: any) => allAttributeValues.find(av => av.id === v.id)?.label || v.label || v.id).join(', ')
+                    }))
+                  }
+                />
+              </div>
+            )}
+
+          </div>
+
+          <div className="sticky bottom-0 bg-slate-50 pt-2 border-t border-slate-200 z-10 mt-auto flex gap-2">
+            <AntButton
+              size="medium"
+              icon={<Lucide.ArrowLeft size={16} />}
+              onClick={() => setViewingVariant(null)}
+              className="w-full"
+            >
+              Back to Results
+            </AntButton>
+            <AntButton
+              size="medium"
+              variant='solid'
+              color='blue'
+              className="w-full  "
+              onClick={() => {
+                handleSelectVariant(sellerProduct, variant);
+                setSearchModalOpen(false);
+                setViewingVariant(null);
+              }}
+            >
+              Select this Product
+            </AntButton>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="flex flex-col h-full">
+        <div className="mb-4 flex items-center justify-between">
+          <h3 className="text-md font-bold text-slate-800 flex items-center gap-2">
+            <AntAimOutlined className="text-blue-600" />
+            Live Matching
+          </h3>
+          {isSearching && <AntBadge status="processing" text="Searching..." />}
+        </div>
+
+        {!searchResults ? (
+          <div className="flex-1 flex items-center justify-center text-slate-500 italic text-sm">
+            Select a category to view variants.
+          </div>
+        ) : searchResults.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center border border-slate-200 border-dashed rounded-xl bg-white">
+            <div className="text-slate-400 mb-2">
+              <AntFileTextOutlined className="text-3xl" />
+            </div>
+            <div className="text-slate-600 font-semibold">No matches found</div>
+            <div className="text-slate-500 text-xs mt-1">Try relaxing your attribute constraints.</div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-4">
+            <div className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">
+              {searchResults.length} Results
+            </div>
+            <div className="space-y-2">
+              {searchResults.map((res, i) => (
+                <div key={i} className="p-3 border border-slate-200 rounded-xl bg-white hover:border-blue-400 transition-all flex flex-col gap-2 relative">
+                  <div className="flex justify-between items-start">
+                    <div className="flex flex-col gap-1 pr-16">
+                      <div className="font-bold text-slate-800 text-xs leading-tight">{res.sellerProduct.product_name}</div>
+                      {(res.sellerProduct.party_id || res.sellerProduct.seller_party_id) && (
+                        <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                          <AntShopOutlined className="text-slate-400" /> {allParties.find((p: any) => p.id === (res.sellerProduct.party_id || res.sellerProduct.seller_party_id))?.display_name || res.sellerProduct.party_id || res.sellerProduct.seller_party_id}
+                        </div>
+                      )}
+                    </div>
+                    <div className="absolute top-3 right-3">
+                      <AntButton type="default" size="small" className="text-blue-600 border-blue-600 text-[10px] font-semibold" onClick={() => setViewingVariant(res)}>
+                        View
+                      </AntButton>
+                    </div>
+                  </div>
+                  <div className="text-xs text-slate-500 flex items-center gap-2">
+                    <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[10px] border border-slate-200">{res.variant.sku}</span>
+                    <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">{res.variant.currency} {res.variant.price}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {res.variant.combination_values?.map((c: any, cIdx: number) => (
+                      <AntTag key={cIdx} className="text-[10px] m-0 border-slate-200 text-slate-600 bg-slate-50">{c.attribute_name}: {c.label}</AntTag>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   const handleRemoveItem = (index: number) => {
@@ -431,7 +784,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
               },
             },
             {
-              title: 'Quantity & Target Price',
+              title: 'Quantity',
               width: 160,
               render: (_, record) => (
                 <div>
@@ -445,7 +798,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
               render: (_, __, index) => (
                 <div className="flex items-center gap-2">
                   <AntButton size="small" type="dashed" icon={<AntSettingOutlined />} onClick={() => { setActiveDrawerIndex(index); setVariantPage(1); }}>
-                    Configure
+                    Add Specifications
                   </AntButton>
                   <AntPopconfirm title="Remove this line item?" onConfirm={() => handleRemoveItem(index)}>
                     <AntButton size="small" danger type="text" icon={<AntDeleteOutlined />} />
@@ -469,23 +822,27 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
       {/* ITEM CONFIGURATION DRAWER */}
       <AntDrawer
         title={
-          <div className="flex items-center justify-between pr-8">
+          <div className="flex items-center justify-between px-8">
             <span className="font-bold text-slate-900">
-              Configure Line Item #{activeDrawerIndex !== null ? activeDrawerIndex + 1 : ''} Specifications
+              #{activeDrawerIndex !== null ? activeDrawerIndex + 1 : ''} - Configure Line Item Specifications
             </span>
-            {activeDrawerIndex !== null && items[activeDrawerIndex]?.variant_id && (
-              <AntTag color="green" icon={<AntAimOutlined />}>Targeted Variant Mode</AntTag>
-            )}
+            {/* {activeDrawerIndex !== null && items[activeDrawerIndex]?.variant_id && (
+              <AntTag color="green" icon={<AntAimOutlined />}>Product Selected</AntTag>
+            )} */}
           </div>
         }
-        width={960}
+        size={1200}
         onClose={() => setActiveDrawerIndex(null)}
         open={activeDrawerIndex !== null}
-        destroyOnClose
+        destroyOnHidden
+        closable={false}
+        classNames={{ body: "p-3", header: "p-2" }}
         extra={
-          <AntButton type="primary" onClick={() => setActiveDrawerIndex(null)} className="bg-blue-600">
-            Done
-          </AntButton>
+          <div className="pr-3">
+            <AntButton type="primary" onClick={() => setActiveDrawerIndex(null)} className="bg-blue-600">
+              Done
+            </AntButton>
+          </div>
         }
       >
         {activeDrawerIndex !== null && (() => {
@@ -543,269 +900,354 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
           ].filter((g) => g.options.length > 0);
 
           return (
-            <div className="w-full max-w-4xl mx-auto space-y-6">
-              <div className="space-y-6">
+            <div className="h-full grid grid-cols-1 lg:grid-cols-12">
+              {/* Left Pane: Attributes Form */}
+              <div className="lg:col-span-7 xl:col-span-8 overflow-y-auto rounded-xl lg:pr-2  ">
+                <div className="w-full max-w-4xl mx-auto space-y-6 ">
+                  <div className="space-y-6">
+                    <div className="overflow-hidden rounded-xl border border-slate-200">
+                      <div className=" border-b border-slate-200 px-4 py-3 bg-slate-50"  >
+                        <AntAppstoreOutlined className="text-blue-600" /> Product Details
+                      </div>
+                      <div className="p-3">
+                        {/* <AntDescriptions layout={descriptionsLayout} bordered size="small" column={{ xs: 1, sm: 2 }} labelStyle={{ backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569', width: '25%' }} contentStyle={{ backgroundColor: '#ffffff' }}> */}
+                        <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
 
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #3b82f6` }}>
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#3b82f614` }}>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white bg-blue-500">
-                        1
-                      </span>
-                      <h4 className="text-md font-bold text-slate-800">Basic Parameters & Catalog Mapping</h4>
-                    </div>
-                  </div>
-                  <div className="p-4 grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700">Leaf Category *</label>
-                      <AntSelect
-                        allowClear
-                        placeholder="Select Leaf Category"
-                        value={item.category_id}
-                        onChange={(catId) => {
-                          const updated = [...items];
-                          updated[activeDrawerIndex].category_id = catId;
-                          updated[activeDrawerIndex].master_product_id = undefined;
-                          updated[activeDrawerIndex].selected_dynamic_attributes = [];
-                          setItems(updated);
-                          setVariantPage(1);
-                        }}
-                        className="w-full mt-1"
-                        options={leafCategories.map((c) => ({ value: c.id, label: `${c.name} (${c.id})` }))}
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700">Master Product</label>
-                      <AntSelect
-                        allowClear
-                        placeholder="Select Master Product"
-                        value={item.master_product_id}
-                        onChange={(masterProdId) => {
-                          const updated = [...items];
-                          updated[activeDrawerIndex].master_product_id = masterProdId;
-                          const mProd = allMasterProducts.find((p) => p.id === masterProdId);
-                          if (mProd) {
-                            updated[activeDrawerIndex].category_id = mProd.categoryId;
-                          }
-                          setItems(updated);
-                          setVariantPage(1);
-                        }}
-                        className="w-full mt-1"
-                        options={filteredMasterProducts.map((p) => ({ value: p.id, label: `${p.name} (${p.id})` }))}
-                      />
-                    </div>
-
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700">Quantity *</label>
-                      <AntInput
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) => {
-                          const updated = [...items];
-                          updated[activeDrawerIndex].quantity = Number(e.target.value) || 1;
-                          setItems(updated);
-                        }}
-                        className="mt-1"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700">Unit of Measure</label>
-                      <AntSelect
-                        value={item.unit_of_measure}
-                        onChange={(val) => {
-                          const updated = [...items];
-                          updated[activeDrawerIndex].unit_of_measure = val;
-                          setItems(updated);
-                        }}
-                        className="w-full mt-1"
-                        options={[
-                          { label: 'Units', value: 'Units' },
-                          { label: 'Pieces', value: 'Pieces' },
-                          { label: 'Kg', value: 'Kg' },
-                          { label: 'Boxes', value: 'Boxes' },
-                        ]}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #8b5cf6` }}>
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#8b5cf614` }}>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#8b5cf6' }}>
-                        2
-                      </span>
-                      <h4 className="text-md font-bold text-slate-800">Static Specs & Physical Dimensions</h4>
-                    </div>
-                  </div>
-                  <div className="p-4 grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700">Preferred Brand(s)</label>
-                      <AntSelect
-                        mode="multiple"
-                        allowClear
-                        placeholder="Select Preferred Brand(s)"
-                        value={Array.isArray(item.brand_id) ? item.brand_id : item.brand_id ? [item.brand_id] : []}
-                        onChange={(val: string[]) => {
-                          const updated = [...items];
-                          updated[activeDrawerIndex].brand_id = val;
-                          setItems(updated);
-                          setVariantPage(1);
-                        }}
-                        className="w-full mt-1"
-                        options={dynamicBrandOptions}
-                      />
+                          <AntDescriptions.Item label="Category *">
+                            <AntSelect
+                              allowClear
+                              placeholder="Select Category"
+                              value={item.category_id}
+                              onChange={(catId) => {
+                                const updated = [...items];
+                                updated[activeDrawerIndex].category_id = catId;
+                                updated[activeDrawerIndex].master_product_id = undefined;
+                                updated[activeDrawerIndex].selected_dynamic_attributes = [];
+                                updated[activeDrawerIndex].variant_id = null;
+                                updated[activeDrawerIndex].product_id = null;
+                                updated[activeDrawerIndex].catalog_product_id = null;
+                                setItems(updated);
+                                setVariantPage(1);
+                              }}
+                              className="w-full"
+                              options={leafCategories.map((c) => ({ value: c.id, label: `${c.name} (${c.id})` }))}
+                            />
+                          </AntDescriptions.Item>
+                          <AntDescriptions.Item label="Master Product *">
+                            <AntSelect
+                              allowClear
+                              placeholder="Select Master Product"
+                              value={item.master_product_id}
+                              onChange={(masterProdId) => {
+                                const updated = [...items];
+                                updated[activeDrawerIndex].master_product_id = masterProdId;
+                                const mProd = allMasterProducts.find((p) => p.id === masterProdId);
+                                if (mProd) {
+                                  updated[activeDrawerIndex].category_id = mProd.categoryId;
+                                }
+                                updated[activeDrawerIndex].variant_id = null;
+                                updated[activeDrawerIndex].product_id = null;
+                                updated[activeDrawerIndex].catalog_product_id = null;
+                                setItems(updated);
+                                setVariantPage(1);
+                              }}
+                              className="w-full"
+                              options={filteredMasterProducts.map((p) => ({ value: p.id, label: `${p.name} (${p.id})` }))}
+                            />
+                          </AntDescriptions.Item>
+                          <AntDescriptions.Item label="Quantity *">
+                            <AntInput
+                              type="number"
+                              min={1}
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const updated = [...items];
+                                updated[activeDrawerIndex].quantity = Number(e.target.value) || 1;
+                                setItems(updated);
+                              }}
+                              className="w-full"
+                            />
+                          </AntDescriptions.Item>
+                          <AntDescriptions.Item label="Unit of Measure">
+                            <AntSelect
+                              value={item.unit_of_measure}
+                              onChange={(val) => {
+                                const updated = [...items];
+                                updated[activeDrawerIndex].unit_of_measure = val;
+                                setItems(updated);
+                              }}
+                              className="w-full"
+                              options={[
+                                { label: 'Pcs', value: 'Pcs' },
+                                { label: 'Kg', value: 'Kg' },
+                                { label: 'Boxes', value: 'Boxes' },
+                              ]}
+                            />
+                          </AntDescriptions.Item>
+                        </AntDescriptions>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="text-xs font-semibold text-slate-700">Preferred Manufacturer(s)</label>
-                      <AntSelect
-                        mode="multiple"
-                        allowClear
-                        placeholder="Select Preferred Manufacturer(s)"
-                        value={Array.isArray(item.manufacturer_id) ? item.manufacturer_id : item.manufacturer_id ? [item.manufacturer_id] : []}
-                        onChange={(val: string[]) => {
-                          const updated = [...items];
-                          updated[activeDrawerIndex].manufacturer_id = val;
-                          setItems(updated);
-                          setVariantPage(1);
-                        }}
-                        className="w-full mt-1"
-                        options={dynamicMfgOptions}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #f59e0b` }}>
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#f59e0b14` }}>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#f59e0b' }}>
-                        3
-                      </span>
-                      <h4 className="text-md font-bold text-slate-800">Master Taxonomy Mapped Attributes</h4>
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-4">
-
-                  {!item.category_id ? (
-                    <div className="text-xs text-amber-700 italic font-semibold">Select a Leaf Category above (or choose a Master Product) to load mapped dynamic attributes.</div>
-                  ) : categoryAttributeTree.length === 0 ? (
-                    <div className="text-xs text-slate-500 italic">No dynamic attribute groups mapped for this category.</div>
-                  ) : (
-                    categoryAttributeTree.map((group: any) => (
-                      <div key={group.groupId} className="p-3 bg-white rounded-lg border border-purple-100 shadow-sm space-y-3">
-                        <div className="text-xs font-bold uppercase tracking-wider text-purple-800">
-                          {group.groupName} ({group.groupId})
+                    {!!item.category_id && (
+                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #2a79adff` }}>
+                        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#2a79ad14` }}>
+                          <div className="flex items-center gap-3">
+                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: '#2a79adff' }}>
+                              1
+                            </span>
+                            <h4 className="text-xs font-semibold text-slate-800">Brand & Manufacturer</h4>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <AntTag color="default" style={{ borderColor: "#2a79adff", color: "#2a79adff", fontWeight: 700 }}>
+                              2 attributes
+                            </AntTag>
+                          </div>
                         </div>
-                        <div className="grid grid-cols-1 gap-3">
-                          {group.attributes.map((attr: any) => {
-                            const existingSelection = (item.selected_dynamic_attributes || []).find(
-                              (s: any) => s.attribute_id === attr.id
-                            );
-                            const selectedValueIds = existingSelection?.selected_value_ids || [];
-
-                            return (
-                              <div key={attr.id} className="space-y-1">
-                                <div className="flex items-center justify-between">
-                                  <label className="text-xs font-semibold text-slate-700">{attr.name}</label>
-                                  {selectedValueIds.length > 1 && (
-                                    <AntSelect
-                                      size="small"
-                                      value={existingSelection?.connector || 'OR'}
-                                      onChange={(conn) => {
-                                        const updated = [...items];
-                                        const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
-                                        const idx = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
-                                        if (idx >= 0) {
-                                          dynAttrs[idx].connector = conn;
-                                          updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
-                                          setItems(updated);
-                                        }
-                                      }}
-                                      options={[
-                                        { label: 'Match ANY (OR)', value: 'OR' },
-                                        { label: 'Match ALL (AND)', value: 'AND' }
-                                      ]}
-                                      className="w-40 text-[10px]"
-                                    />
-                                  )}
-                                </div>
-                                <AntSelect
-                                  mode="multiple"
-                                  value={selectedValueIds}
-                                  placeholder={`Select ${attr.name}`}
-                                  onChange={(selectedValIds) => {
-                                    const updated = [...items];
-                                    const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
-                                    const idx = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
-                                    if (idx >= 0) {
-                                      dynAttrs[idx] = { ...dynAttrs[idx], selected_value_ids: selectedValIds };
-                                    } else {
-                                      dynAttrs.push({ group_id: group.groupId, attribute_id: attr.id, selected_value_ids: selectedValIds, connector: 'OR' });
-                                    }
-                                    updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
-                                    setItems(updated);
-                                  }}
-                                  className="w-full mt-1"
-                                  options={attr.values.map((v: any) => ({ value: v.id, label: `${v.label} (${v.id})` }))}
-                                />
-                              </div>
-                            );
-                          })}
+                        <div className="p-3">
+                          <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                            <AntDescriptions.Item label="Preferred Brand(s)">
+                              <AntSelect
+                                mode="multiple"
+                                allowClear
+                                placeholder="Select Preferred Brand(s)"
+                                value={Array.isArray(item.brand_id) ? item.brand_id : item.brand_id ? [item.brand_id] : []}
+                                onChange={(val: string[]) => {
+                                  const updated = [...items];
+                                  updated[activeDrawerIndex].brand_id = val;
+                                  updated[activeDrawerIndex].variant_id = null;
+                                  updated[activeDrawerIndex].product_id = null;
+                                  updated[activeDrawerIndex].catalog_product_id = null;
+                                  setItems(updated);
+                                  setVariantPage(1);
+                                }}
+                                className="w-full"
+                                options={dynamicBrandOptions}
+                              />
+                            </AntDescriptions.Item>
+                            <AntDescriptions.Item label="Preferred Manufacturer(s)">
+                              <AntSelect
+                                mode="multiple"
+                                allowClear
+                                placeholder="Select Preferred Manufacturer(s)"
+                                value={Array.isArray(item.manufacturer_id) ? item.manufacturer_id : item.manufacturer_id ? [item.manufacturer_id] : []}
+                                onChange={(val: string[]) => {
+                                  const updated = [...items];
+                                  updated[activeDrawerIndex].manufacturer_id = val;
+                                  updated[activeDrawerIndex].variant_id = null;
+                                  updated[activeDrawerIndex].product_id = null;
+                                  updated[activeDrawerIndex].catalog_product_id = null;
+                                  setItems(updated);
+                                  setVariantPage(1);
+                                }}
+                                className="w-full"
+                                options={dynamicMfgOptions}
+                              />
+                            </AntDescriptions.Item>
+                          </AntDescriptions>
                         </div>
                       </div>
-                    ))
-                  )}
+                    )}
+
+                    {!item.category_id ? (
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="text-xs text-amber-700 italic font-semibold">Select a Category above (or choose a Master Product) to load attributes.</div>
+                      </div>
+                    ) : categoryAttributeTree.length === 0 ? (
+                      <div className="p-3 bg-slate-50 rounded-xl border border-slate-200">
+                        <div className="text-xs text-slate-500 italic">No attributes defined for this category.</div>
+                      </div>
+                    ) : (
+                      categoryAttributeTree.map((group: any, idx: number) => {
+                        const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][(idx + 1) % 5];
+                        return (
+                          <div key={group.groupId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid ${accentColor}` }}>
+                            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `${accentColor}14` }}>
+                              <div className="flex items-center gap-3">
+                                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: accentColor }}>
+                                  {idx + 2}
+                                </span>
+                                <h4 className="text-xs font-semibold text-slate-800">{group.groupName}</h4>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <AntTag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
+                                  {group.attributes?.length || 0} attributes
+                                </AntTag>
+                              </div>
+                            </div>
+                            <div className="p-3">
+                              <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                                {group.attributes.map((attr: any) => {
+                                  const existingSelection = (item.selected_dynamic_attributes || []).find((s: any) => s.attribute_id === attr.id);
+                                  const selectedValueIds = existingSelection?.selected_value_ids || [];
+
+                                  return (
+                                    <AntDescriptions.Item
+                                      key={attr.id}
+                                      label={
+                                        <div className="flex flex-col gap-1">
+                                          <span>{attr.name}</span>
+                                          {selectedValueIds.length > 1 && (
+                                            <AntSelect
+                                              size="small"
+                                              value={existingSelection?.connector || 'OR'}
+                                              onChange={(conn) => {
+                                                const updated = [...items];
+                                                const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
+                                                const index = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
+                                                if (index >= 0) {
+                                                  dynAttrs[index].connector = conn;
+                                                  updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
+                                                  setItems(updated);
+                                                }
+                                              }}
+                                              options={[
+                                                { label: 'Match ANY (OR)', value: 'OR' },
+                                                { label: 'Match ALL (AND)', value: 'AND' }
+                                              ]}
+                                              className="w-full text-[10px]"
+                                            />
+                                          )}
+                                        </div>
+                                      }
+                                    >
+                                      <AntSelect
+                                        mode="multiple"
+                                        value={selectedValueIds}
+                                        placeholder={`Select ${attr.name}`}
+                                        onChange={(selectedValIds) => {
+                                          const updated = [...items];
+                                          const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
+                                          const index = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
+                                          if (index >= 0) {
+                                            dynAttrs[index] = { ...dynAttrs[index], selected_value_ids: selectedValIds };
+                                          } else {
+                                            dynAttrs.push({ group_id: group.groupId, attribute_id: attr.id, selected_value_ids: selectedValIds, connector: 'OR' });
+                                          }
+                                          updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
+                                          updated[activeDrawerIndex].variant_id = null;
+                                          updated[activeDrawerIndex].product_id = null;
+                                          updated[activeDrawerIndex].catalog_product_id = null;
+                                          setItems(updated);
+                                        }}
+                                        className="w-full"
+                                        options={attr.values.map((v: any) => ({ value: v.id, label: `${v.label} (${v.id})` }))}
+                                      />
+                                    </AntDescriptions.Item>
+                                  );
+                                })}
+                              </AntDescriptions>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                    {!!item.category_id && (
+                      <div className="overflow-hidden rounded-xl border border-slate-200">
+                        <div className=" border-b border-slate-200 px-4 py-3 bg-slate-50 flex items-center justify-between"  >
+                          <div className="flex items-center gap-2">
+                            <AntAimOutlined className="text-blue-600" /> Target Sellers
+                          </div>
+                          {(!item.target_seller_party_ids || item.target_seller_party_ids.length === 0) ? (
+                            <AntTag color="cyan" icon={<AntGlobalOutlined />}>Open RFQ (All Marketplace Sellers)</AntTag>
+                          ) : (
+                            <AntTag color="purple">{item.target_seller_party_ids.length} Selected Sellers</AntTag>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 px-3 py-2 m-0">
+                          (Leave empty to make this line item an Open RFQ for all verified marketplace suppliers, or select specific target sellers for direct invitations.)
+                        </p>
+                        <div className="px-3 pb-3">
+                          <AntSelect
+                            mode="multiple"
+                            allowClear
+                            placeholder="Select Preferred Seller (or leave empty for Open RFQ)"
+                            value={item.target_seller_party_ids}
+                            onChange={(selectedIds) => {
+                              const updated = [...items];
+                              updated[activeDrawerIndex].target_seller_party_ids = selectedIds;
+                              setItems(updated);
+                            }}
+                            className="w-full"
+                            options={allParties.map((p: any) => ({ value: p.id, label: `${p.display_name} (${p.id})` }))}
+                          />
+                        </div>
+                      </div>
+                    )}
+                    {item.variant_id && (
+                      <div className='bg-white sticky bottom-0 z-100'>
+                        <div className=" p-3 bg-blue-50 border border-blue-200 rounded-xl flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <AntCheckCircleOutlined className="text-blue-600 text-lg" />
+                            <div>
+                              <div className="text-sm font-bold text-blue-900">Catalog Variant Selected</div>
+                              <div className="text-xs text-blue-700">The RFQ item is now populated with the specifications of the selected product variant.</div>
+                            </div>
+                          </div>
+                          <AntButton
+                            size="medium"
+                            variant='dashed'
+                            color='danger'
+                            onClick={() => {
+                              const updated = [...items];
+                              updated[activeDrawerIndex].variant_id = null;
+                              updated[activeDrawerIndex].product_id = null;
+                              updated[activeDrawerIndex].catalog_product_id = null;
+                              setItems(updated);
+                            }}>Clear Selected variant</AntButton>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #10b981` }}>
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#10b98114` }}>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#10b981' }}>
-                        4
-                      </span>
-                      <h4 className="text-md font-bold text-slate-800">Target Seller Scope</h4>
-                    </div>
-                  </div>
-                  <div className="p-4 space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-bold text-slate-800 text-sm m-0">Supplier Reach</h4>
-                    {(!item.target_seller_party_ids || item.target_seller_party_ids.length === 0) ? (
-                      <AntTag color="cyan" icon={<AntGlobalOutlined />}>Open RFQ (All Marketplace Sellers)</AntTag>
-                    ) : (
-                      <AntTag color="purple">{item.target_seller_party_ids.length} Selected Sellers</AntTag>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 m-0">
-                    Leave empty to make this line item an Open RFQ for all verified marketplace suppliers, or select specific target sellers for direct invitations.
-                  </p>
-                  <AntSelect
-                    mode="multiple"
-                    allowClear
-                    placeholder="Select Target Seller Parties (or leave empty for Open RFQ)"
-                    value={item.target_seller_party_ids}
-                    onChange={(selectedIds) => {
-                      const updated = [...items];
-                      updated[activeDrawerIndex].target_seller_party_ids = selectedIds;
-                      setItems(updated);
-                    }}
-                    className="w-full"
-                    options={allParties.map((p: any) => ({ value: p.id, label: `${p.display_name} (${p.id})` }))}
-                  />
+              {/* Right Pane: Desktop Live Search Results */}
+              <div className="hidden lg:flex lg:col-span-5 xl:col-span-4 flex-col pl-2 h-full sticky top-0 bg-white overflow-y-auto">
+                <div className='h-full p-2 border border-slate-200 rounded-xl'>
+                  {renderSearchResults()}
                 </div>
               </div>
+
+              {/* Mobile Float Button */}
+              <AntFloatButton
+                className="lg:hidden w-12"
+                type="primary"
+                onClick={() => setSearchModalOpen(true)}
+                badge={{ count: searchResults?.length || 0, color: 'blue' }}
+                style={{ zIndex: 1050, bottom: '100px', right: '50px', }}
+                icon={<AntAimOutlined />}
+                content="Results"
+                shape="square"
+              />
+
+              {/* Mobile Nested Search Modal */}
+              <AntModal
+                title={null}
+                footer={null}
+                closable={{
+                  afterClose: () => {
+                    setSearchModalOpen(false); setViewingVariant(null);
+                  }
+                }}
+                onCancel={() => { setSearchModalOpen(false); setViewingVariant(null); }}
+                open={searchModalOpen}
+                className="lg:hidden"
+                styles={{ body: { padding: 0, height: '85vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' } }}
+                width="100%"
+                style={{ top: 20, margin: 0, maxWidth: '100vw', padding: 16 }}
+              >
+                {/* <div className="absolute top-2 right-2 z-10">
+                  <AntButton type="text" shape="circle" onClick={() => { setSearchModalOpen(false); setViewingVariant(null); }} className="bg-white/80 hover:bg-slate-200">
+                    <span className="text-xl">&times;</span>
+                  </AntButton>
+                </div> */}
+                {renderSearchResults()}
+              </AntModal>
             </div>
-          </div>
           );
         })()}
       </AntDrawer>
-    </div>
+    </div >
   );
 };
 
@@ -896,7 +1338,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
 
       items.forEach((item, idx) => {
         const itemId = `rfqi-${newRfqId}-${idx + 1}`;
-        
+
         newRfqItems.push({
           id: itemId,
           rfq_id: newRfqId,
@@ -958,8 +1400,8 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
           attribute_id: 'req_quantity',
           connector: 'AND',
           values: [
-             { value_id: 'req-quantity', value_label: String(item.quantity || 1) },
-             { value_id: 'req-quantity-unit', value_label: item.unit_of_measure || 'Units' }
+            { value_id: 'req-quantity', value_label: String(item.quantity || 1) },
+            { value_id: 'req-quantity-unit', value_label: item.unit_of_measure || 'Units' }
           ],
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -968,19 +1410,19 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
         // Custom Dynamic Attributes
         if (item.selected_dynamic_attributes) {
           item.selected_dynamic_attributes.forEach((da: any, daIdx: number) => {
-             if (da.selected_value_ids && da.selected_value_ids.length > 0) {
-               newRfqItemAttributes.push({
-                 id: `attr-${itemId}-custom-${daIdx}`,
-                 rfq_item_id: itemId,
-                 attribute_type: 'CUSTOM',
-                 group_id: da.group_id,
-                 attribute_id: da.attribute_id,
-                 connector: da.connector || 'OR',
-                 values: da.selected_value_ids.map((vid: string) => ({ value_id: vid, value_label: vid })),
-                 created_at: new Date().toISOString(),
-                 updated_at: new Date().toISOString(),
-               });
-             }
+            if (da.selected_value_ids && da.selected_value_ids.length > 0) {
+              newRfqItemAttributes.push({
+                id: `attr-${itemId}-custom-${daIdx}`,
+                rfq_item_id: itemId,
+                attribute_type: 'CUSTOM',
+                group_id: da.group_id,
+                attribute_id: da.attribute_id,
+                connector: da.connector || 'OR',
+                values: da.selected_value_ids.map((vid: string) => ({ value_id: vid, value_label: vid })),
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              });
+            }
           });
         }
 

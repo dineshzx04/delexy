@@ -43,9 +43,9 @@ html::-webkit-scrollbar-thumb:hover {
   background: rgb(255, 255, 255);
 }
 
-html {
+html ,*{
   scrollbar-width: thin;
-  scrollbar-color: rgba(1, 44, 64, 0.692) transparent;
+  /* scrollbar-color: rgba(74, 182, 231, 0.692) transparent; */
 }
 
 .custom-scrollbar::-webkit-scrollbar {
