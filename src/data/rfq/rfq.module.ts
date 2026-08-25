@@ -1,6 +1,6 @@
 import type { PartyOwnerType } from "../business/business.module";
 
-export type AttributeType = "SYSTEM" | "CUSTOM" | "CUSTOM_VARIANT";
+export type AttributeType = "SYSTEM" | "CUSTOM";
 
 // ============================================================================
 // SECTION 1: CORE DATABASE TABLES / ENTITIES (Persisted in Dexie DB)
@@ -30,7 +30,7 @@ export interface RfqItem {
   id: string;
   rfq_id: string;
   category_id: string;
-  catalog_product_id: string | null;
+  catalog_product_id: string;
   product_id: string | null;
   variant_id: string | null;
   item_index?: number;
