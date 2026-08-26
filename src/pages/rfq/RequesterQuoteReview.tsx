@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Button, Tag as AntTag, Table, Descriptions, App as AntApp, Alert, Input, Switch, Checkbox } from 'antd';
+import { Card, Button, Tag as AntTag, Table, Descriptions, App as AntApp, Alert, Input, Checkbox } from 'antd';
 import { CheckOutlined, CloseOutlined, UndoOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined } from '@ant-design/icons';
 import { rfqDb, type SellerQuote, type SellerQuoteAttribute, type SellerQuoteComment } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
@@ -404,25 +404,48 @@ export const RequesterQuoteReview: React.FC = () => {
       title: 'Requested Value',
       dataIndex: 'reqViewValue',
       key: 'reqViewValue',
-      className: "align-top",
-      render: (text: string) => <span className="text-slate-600 font-medium">{text}</span>
-    },
-    {
-      title: 'Connector',
-      dataIndex: 'connector',
-      key: 'connector',
-      className: "w-[100px] text-center align-top",
-      render: (connector: string, attribute: any) => {
-        if (attribute.attribute_id === 'req_quantity') return null;
-
+      className: "w-[300px] max-w-[300px] align-top",
+      render: (_: string, attribute: any) => {
+        const isQty = attribute.attribute_id === 'req_quantity';
         const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
-        const displayConnector = forceORDisabled ? 'OR' : (connector || 'AND');
+        const ia = itemAttributes?.find((a: any) => a.group_id === attribute.group_id && a.attribute_id === attribute.attribute_id);
+        const reqConnector = forceORDisabled ? "OR" : (ia?.connector || 'AND');
+        const reqJoiner = reqConnector === "OR" ? " | " : " , ";
+
+        if (isQty) {
+          const qtyVal = attribute.req_value?.find((v: any) => v.value_id === 'req-quantity')?.value_label || '';
+          const qtyUnit = attribute.req_value?.find((v: any) => v.value_id === 'req-quantity-unit')?.value_label || '';
+          return (
+            <span className="text-slate-700 font-bold text-[14px]">
+              {qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A'}
+            </span>
+          );
+        }
+
+        const reqValues = attribute.req_value || [];
+        if (reqValues.length === 0) {
+          return <span className="text-slate-400 italic">N/A</span>;
+        }
 
         return (
-          <AntTag color="default" className="font-bold border-slate-300">
-            {displayConnector}
-          </AntTag>
-        )
+          <div className="flex flex-wrap items-center gap-y-1">
+            {reqValues.map((v: any, index: number) => {
+              const isLast = index === reqValues.length - 1;
+              return (
+                <div key={v.value_id} className='flex items-center'>
+                  <AntTag className="inline-flex items-center m-0 min-h-6 leading-tight bg-slate-50 text-slate-600 border-slate-200">
+                    {v.value_label}
+                  </AntTag>
+                  {!isLast && (
+                    <span className="mx-1 text-slate-500 font-bold text-[13px] select-none">
+                      {reqJoiner}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        );
       }
     },
     {
@@ -435,21 +458,70 @@ export const RequesterQuoteReview: React.FC = () => {
           .filter((c) => c.group_id === attribute.group_id && c.attribute_id === attribute.attribute_id)
           .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
+        const isQty = attribute.attribute_id === 'req_quantity';
+        const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
+        const connector = forceORDisabled ? "OR" : (attribute.connector || 'AND');
+        const propJoiner = connector === "OR" ? " | " : " , ";
+
+        let proposalContent: React.ReactNode;
+        if (isQty) {
+          const qtyVal = attribute.values?.find((v: any) => v.value_id === 'req-quantity')?.value_label || '';
+          const qtyUnit = attribute.values?.find((v: any) => v.value_id === 'req-quantity-unit')?.value_label || '';
+          proposalContent = (
+            <span className="text-emerald-700 font-bold text-[14px]">
+              {qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A'}
+            </span>
+          );
+        } else {
+          const valuesArray = attribute.values || [];
+          if (valuesArray.length === 0) {
+            proposalContent = <span className="text-slate-400 italic">—</span>;
+          } else {
+            proposalContent = (
+              <div className="flex flex-wrap items-center gap-y-1">
+                {valuesArray.map((v: any, index: number) => {
+                  const isLast = index === valuesArray.length - 1;
+                  return (
+                    <div key={v.value_id} className='flex items-center'>
+                      <AntTag className="inline-flex items-center m-0 min-h-6 leading-tight bg-slate-50 text-slate-700 border-slate-200">
+                        {v.value_label}
+                      </AntTag>
+                      {!isLast && (
+                        <span className="mx-1 text-emerald-600 font-bold text-[13px] select-none">
+                          {propJoiner}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+        }
+
         return (
           <div className="flex gap-2 flex-col">
-            <div className="w-full flex items-center gap-2">
-              <span className="text-emerald-700 font-bold">{attribute.proposalViewValue}</span>
-              {attribute.is_deviation && (
-                <AntTag className="m-0 leading-tight bg-amber-50 text-amber-700 border-amber-200">
-                  Deviation
-                </AntTag>
+            <div className="w-full flex flex-col gap-1.5">
+              <div className="flex flex-wrap items-center gap-2">
+                {proposalContent}
+                {attribute.is_deviation && (
+                  <AntTag className="m-0 leading-tight bg-amber-50 text-amber-700 border-amber-200">
+                    Deviation
+                  </AntTag>
+                )}
+              </div>
+              {attribute.is_deviation && attribute.deviation_note && (
+                <div className="text-[12px] bg-amber-50/50 text-amber-800 border border-amber-100/70 rounded px-2.5 py-1 leading-normal italic mt-0.5">
+                  <span className="font-bold not-italic mr-1 text-[10px] uppercase tracking-wider text-amber-700">[Seller Reason]:</span>
+                  {attribute.deviation_note}
+                </div>
               )}
             </div>
             <div className="flex flex-col w-full">
               {quote.status === 'SUBMITTED' && (
                 <Input.TextArea
                   rows={2}
-                  className="mb-1"
+                  className="mb-1 text-[13px]"
                   placeholder="Leave feedback on this specification..."
                   value={buyerComments[attribute.proposalKey] || ''}
                   onChange={(e) => setBuyerComments((prev) => ({ ...prev, [attribute.proposalKey]: e.target.value }))}

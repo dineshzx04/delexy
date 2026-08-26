@@ -285,8 +285,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   }, [allVariants, item]);
 
   const quoteNumber = React.useMemo(() => {
-    return existingQuote?.seller_quote_number
-  }, [existingQuote]);
+    return existingQuote?.seller_quote_number || `SQ-${itemId}-${activePartyId.replace(/[^a-zA-Z0-9]/g, '')}`;
+  }, [existingQuote, itemId, activePartyId]);
 
 
   useEffect(() => {
@@ -402,15 +402,15 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         attribute_type: ia.attribute_type,
         group_id: groupId,
         attribute_id: ia.attribute_id,
-        is_variant: ia.is_variant,
+        is_variant: initialValues[proposalKey].is_variant,
         attributeName: attributeName,
         description: ia.description,
         connector: initialValues[proposalKey].connector,
         values,
         reqViewValue,
       });
-    });
 
+    });
     const entries = [...map.entries()];
     setAttributeGroupsMap(entries);
     setProposalAttributes(initialValues);
@@ -651,7 +651,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
             <div className="flex flex-wrap gap-1 items-center">
               {record.is_variant && (
-                <AntTag className="m-0 leading-tight bg-slate-50 text-slate-600 border-slate-200" icon={<AntIconCheckCircleOutlined />}>Variant Attribute</AntTag>
+                <AntTag className="m-0 leading-tight bg-blue-50 text-blue-600 border-blue-200" icon={<AntIconCheckCircleOutlined />}>
+                  Variant Attribute
+                </AntTag>
               )}
             </div>
           </div>
@@ -663,23 +665,71 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       dataIndex: 'reqViewValue',
       key: 'reqViewValue',
       className: "align-top",
-      render: (text: string, record: any) => {
+      render: (_: string, record: any) => {
+        const isQty = record.attribute_id === 'req_quantity';
+        const forceORDisabled = record.attribute_id === 'manufacturer' || record.attribute_id === 'brand';
+        const itemAttr = itemAttributes?.find((a: any) => a.group_id === record.group_id && a.attribute_id === record.attribute_id);
+        const reqConnector = forceORDisabled ? "OR" : (itemAttr?.connector || 'AND');
+        const reqJoiner = reqConnector === "OR" ? " | " : " , ";
+
+        let requestedContent: React.ReactNode;
+        if (isQty) {
+          const qtyVal = record.values?.find((v: any) => v.value_id === 'req-quantity')?.value_label || '';
+          const qtyUnit = record.values?.find((v: any) => v.value_id === 'req-quantity-unit')?.value_label || '';
+          requestedContent = (
+            <span className="text-slate-700 font-bold text-[14px]">
+              {qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A'}
+            </span>
+          );
+        } else {
+          const reqValues = record.values || [];
+          if (reqValues.length === 0) {
+            requestedContent = <span className="text-slate-400 italic">N/A</span>;
+          } else {
+            requestedContent = (
+              <div className="flex flex-wrap items-center gap-y-1">
+                {reqValues.map((v: any, index: number) => {
+                  const isLast = index === reqValues.length - 1;
+                  return (
+                    <div key={v.value_id} className='flex items-center'>
+                      <AntTag className="inline-flex items-center m-0 min-h-6 leading-tight bg-slate-50 text-slate-600 border-slate-200">
+                        {v.value_label}
+                      </AntTag>
+                      {!isLast && (
+                        <span className="mx-1 text-slate-500 font-bold text-[13px] select-none">
+                          {reqJoiner}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
+        }
+
         const proposalKey = `${record.group_id}_${record.attribute_id}`;
         const attributeData = proposalAttributes[proposalKey];
         const showStatus = existingQuote && ['REVISION_REQUIRED', 'SUBMITTED', 'DRAFT'].includes(existingQuote.status);
-        return <span className="text-slate-600 font-medium">
-          {text}
-          {showStatus && attributeData && (
-            attributeData.buyer_accepted ? (
-              <AntTag className="m-0 leading-tight bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
-            ) : (
-              <AntTag className="m-0 leading-tight bg-red-50/10 text-red-400 border-red-100">Revision required</AntTag>
-            )
-          )}
-          {proposalAttributes[proposalKey]?.is_deviation && (
-            <AntTag className="mr-0 ml-3 leading-tight bg-amber-50 text-amber-700 border-amber-200">Deviation</AntTag>
-          )}
-        </span>
+        return (
+          <span className="text-slate-600 font-medium">
+            {requestedContent}
+            <div className="mt-1">
+              {showStatus && attributeData && (
+                attributeData.buyer_accepted ? (
+                  <AntTag className="m-0 leading-tight bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
+                ) : (
+                  <AntTag className="m-0 leading-tight bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
+                )
+              )}
+              <div className="">
+                {proposalAttributes[proposalKey]?.is_deviation && (
+                  <AntTag className="leading-tight bg-amber-50 text-amber-700 border-amber-200">Deviation</AntTag>
+                )}
+              </div>
+            </div>
+          </span>
+        );
       }
     },
 
@@ -702,8 +752,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
           const propJoiner = connector === "OR" ? " | " : " , ";
 
           return (
-            <span className="inline-flex items-center">
-              <span className="inline-flex items-center gap-1 h-6 pl-2 pr-1 mr-1 my-0.5 bg-slate-100/80 border border-slate-200 rounded text-slate-700 text-[13px] font-medium leading-none">
+            <span className="inline-flex items-center my-0.5">
+              <AntTag className="inline-flex items-center m-0 min-h-6 leading-tight bg-slate-100/80 border border-slate-200 text-slate-700 pr-1 pl-2 gap-1">
                 <span>{label}</span>
                 {closable && (
                   <button
@@ -716,7 +766,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                     <Lucide.X size={12} strokeWidth={2.5} />
                   </button>
                 )}
-              </span>
+              </AntTag>
               {!isLast && (
                 <span className="mx-0.5 text-emerald-600 font-bold text-[13px] select-none">
                   {propJoiner}
@@ -1078,19 +1128,23 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                       );
                     }
                     return (
-                      <div className="flex flex-wrap gap-2 items-center">
-                        {record.combinations.map((c, i) => {
-                          return <AntTag key={i} color="blue">
-                            {/* {c.attribute_name}: */}
-                            {c.value_label}</AntTag>
-                        })}
-                        {showStatus && (
-                          record.buyer_accepted ? (
-                            <AntTag className="ml-2 bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
-                          ) : (
-                            <AntTag className="ml-2 bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
-                          )
-                        )}
+                      <div className="flex justify-between items-center">
+                        <div className="flex flex-wrap gap-2">
+                          {record.combinations.map((c, i) => {
+                            return <AntTag key={i} color="blue">
+                              {/* {c.attribute_name}: */}
+                              {c.value_label}</AntTag>
+                          })}
+                        </div>
+                        <div className="">
+                          {showStatus && (
+                            record.buyer_accepted ? (
+                              <AntTag className="bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
+                            ) : (
+                              <AntTag className="bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
+                            )
+                          )}
+                        </div>
                       </div>
                     );
                   }
