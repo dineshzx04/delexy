@@ -996,42 +996,124 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                         <div className="p-3">
                           <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
                             <AntDescriptions.Item label="Preferred Brand(s)">
-                              <AntSelect
-                                mode="multiple"
-                                variant='underlined'
-                                allowClear
-                                placeholder="Select Preferred Brand(s)"
-                                value={Array.isArray(item.brand_id) ? item.brand_id : item.brand_id ? [item.brand_id] : []}
-                                onChange={(val: string[]) => {
-                                  const updated = [...items];
-                                  updated[activeDrawerIndex].brand_id = val;
-                                  updated[activeDrawerIndex].variant_id = null;
-                                  updated[activeDrawerIndex].product_id = null;
-                                  setItems(updated);
-                                  setVariantPage(1);
-                                }}
-                                className="w-full"
-                                options={dynamicBrandOptions}
-                              />
+                              <div className="flex flex-col gap-2">
+                                <AntSelect
+                                  mode="multiple"
+                                  variant='underlined'
+                                  allowClear
+                                  placeholder="Select Preferred Brand(s)"
+                                  value={Array.isArray(item.brand_id) ? item.brand_id : item.brand_id ? [item.brand_id] : []}
+                                  onChange={(val: string[]) => {
+                                    const updated = [...items];
+                                    updated[activeDrawerIndex].brand_id = val;
+                                    updated[activeDrawerIndex].variant_id = null;
+                                    updated[activeDrawerIndex].product_id = null;
+                                    setItems(updated);
+                                    setVariantPage(1);
+                                  }}
+                                  className="w-full"
+                                  options={dynamicBrandOptions}
+                                />
+                                {(item.brand_show_description || item.brand_description) ? (
+                                  <div className="flex items-start gap-2 mt-1">
+                                    <AntInput
+                                      key={`desc-brand-${activeDrawerIndex}`}
+                                      placeholder={`Add optional note/description for brands...`}
+                                      defaultValue={item.brand_description || ''}
+                                      onBlur={(e) => {
+                                        const updated = [...items];
+                                        updated[activeDrawerIndex].brand_description = e.target.value;
+                                        setItems(updated);
+                                      }}
+                                      size="small"
+                                      className="text-xs bg-slate-50 border-slate-200"
+                                    />
+                                    <AntButton
+                                      type="text"
+                                      size="small"
+                                      danger
+                                      icon={<Lucide.Trash2 size={14} />}
+                                      onClick={() => {
+                                        const updated = [...items];
+                                        updated[activeDrawerIndex].brand_description = '';
+                                        updated[activeDrawerIndex].brand_show_description = false;
+                                        setItems(updated);
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="text-[10px] text-blue-600 cursor-pointer hover:underline self-start font-medium flex items-center gap-1 mt-0.5"
+                                    onClick={() => {
+                                      const updated = [...items];
+                                      updated[activeDrawerIndex].brand_show_description = true;
+                                      setItems(updated);
+                                    }}
+                                  >
+                                    <AntPlusOutlined /> Add Note / Description
+                                  </div>
+                                )}
+                              </div>
                             </AntDescriptions.Item>
                             <AntDescriptions.Item label="Preferred Manufacturer(s)">
-                              <AntSelect
-                                mode="multiple"
-                                variant='underlined'
-                                allowClear
-                                placeholder="Select Preferred Manufacturer(s)"
-                                value={Array.isArray(item.manufacturer_id) ? item.manufacturer_id : item.manufacturer_id ? [item.manufacturer_id] : []}
-                                onChange={(val: string[]) => {
-                                  const updated = [...items];
-                                  updated[activeDrawerIndex].manufacturer_id = val;
-                                  updated[activeDrawerIndex].variant_id = null;
-                                  updated[activeDrawerIndex].product_id = null;
-                                  setItems(updated);
-                                  setVariantPage(1);
-                                }}
-                                className="w-full"
-                                options={dynamicMfgOptions}
-                              />
+                              <div className="flex flex-col gap-2">
+                                <AntSelect
+                                  mode="multiple"
+                                  variant='underlined'
+                                  allowClear
+                                  placeholder="Select Preferred Manufacturer(s)"
+                                  value={Array.isArray(item.manufacturer_id) ? item.manufacturer_id : item.manufacturer_id ? [item.manufacturer_id] : []}
+                                  onChange={(val: string[]) => {
+                                    const updated = [...items];
+                                    updated[activeDrawerIndex].manufacturer_id = val;
+                                    updated[activeDrawerIndex].variant_id = null;
+                                    updated[activeDrawerIndex].product_id = null;
+                                    setItems(updated);
+                                    setVariantPage(1);
+                                  }}
+                                  className="w-100"
+                                  options={dynamicMfgOptions}
+                                />
+                                {(item.manufacturer_show_description || item.manufacturer_description) ? (
+                                  <div className="flex items-start gap-2 mt-1">
+                                    <AntInput
+                                      key={`desc-mfg-${activeDrawerIndex}`}
+                                      placeholder={`Add optional note/description for manufacturers...`}
+                                      defaultValue={item.manufacturer_description || ''}
+                                      onBlur={(e) => {
+                                        const updated = [...items];
+                                        updated[activeDrawerIndex].manufacturer_description = e.target.value;
+                                        setItems(updated);
+                                      }}
+                                      size="small"
+                                      className="text-xs bg-slate-50 border-slate-200"
+                                    />
+                                    <AntButton
+                                      type="text"
+                                      size="small"
+                                      danger
+                                      icon={<Lucide.Trash2 size={14} />}
+                                      onClick={() => {
+                                        const updated = [...items];
+                                        updated[activeDrawerIndex].manufacturer_description = '';
+                                        updated[activeDrawerIndex].manufacturer_show_description = false;
+                                        setItems(updated);
+                                      }}
+                                    />
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="text-[10px] text-blue-600 cursor-pointer hover:underline self-start font-medium flex items-center gap-1 mt-0.5"
+                                    onClick={() => {
+                                      const updated = [...items];
+                                      updated[activeDrawerIndex].manufacturer_show_description = true;
+                                      setItems(updated);
+                                    }}
+                                  >
+                                    <AntPlusOutlined /> Add Note / Description
+                                  </div>
+                                )}
+                              </div>
                             </AntDescriptions.Item>
                           </AntDescriptions>
                         </div>
@@ -1048,7 +1130,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                       </div>
                     ) : (
                       categoryAttributeTree.map((group: any, idx: number) => {
-                        const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][(idx + 1) % 5];
+                        const accentColor = ['#527EA3', '#5D9365', '#C9825A', '#8975A8'][(idx + 1) % 4];
                         return (
                           <div key={group.groupId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid ${accentColor}` }}>
                             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `${accentColor}14` }}>
@@ -1100,30 +1182,89 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                                         </div>
                                       }
                                     >
-                                      <AntSelect
-                                        mode="multiple"
-                                        allowClear
-                                        value={selectedValueIds}
-                                        variant='underlined'
-                                        maxTagCount={"responsive"}
-                                        placeholder={`Select ${attr.name}`}
-                                        onChange={(selectedValIds) => {
-                                          const updated = [...items];
-                                          const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
-                                          const index = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
-                                          if (index >= 0) {
-                                            dynAttrs[index] = { ...dynAttrs[index], selected_value_ids: selectedValIds };
-                                          } else {
-                                            dynAttrs.push({ group_id: group.groupId, attribute_id: attr.id, selected_value_ids: selectedValIds, connector: 'OR' });
-                                          }
-                                          updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
-                                          updated[activeDrawerIndex].variant_id = null;
-                                          updated[activeDrawerIndex].product_id = null;
-                                          setItems(updated);
-                                        }}
-                                        className="w-full"
-                                        options={attr.values.map((v: any) => ({ value: v.id, label: `${v.label}` }))}
-                                      />
+                                      <div className="flex flex-col gap-2">
+                                        <AntSelect
+                                          mode="multiple"
+                                          allowClear
+                                          value={selectedValueIds}
+                                          variant='underlined'
+                                          maxTagCount={"responsive"}
+                                          placeholder={`Select ${attr.name}`}
+                                          onChange={(selectedValIds) => {
+                                            const updated = [...items];
+                                            const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
+                                            const index = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
+                                            if (index >= 0) {
+                                              dynAttrs[index] = { ...dynAttrs[index], selected_value_ids: selectedValIds };
+                                            } else {
+                                              dynAttrs.push({ group_id: group.groupId, attribute_id: attr.id, selected_value_ids: selectedValIds, connector: 'OR' });
+                                            }
+                                            updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
+                                            updated[activeDrawerIndex].variant_id = null;
+                                            updated[activeDrawerIndex].product_id = null;
+                                            setItems(updated);
+                                          }}
+                                          className="w-full"
+                                          options={attr.values.map((v: any) => ({ value: v.id, label: `${v.label}` }))}
+                                        />
+                                        {(existingSelection?.show_description || existingSelection?.description) ? (
+                                          <div className="flex items-start gap-2 mt-1">
+                                            <AntInput
+                                              key={`desc-input-${activeDrawerIndex}-${attr.id}`}
+                                              placeholder={`Add optional note/description for ${attr.name}...`}
+                                              defaultValue={existingSelection?.description || ''}
+                                              onBlur={(e) => {
+                                                const updated = [...items];
+                                                const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
+                                                const index = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
+                                                if (index >= 0) {
+                                                  dynAttrs[index] = { ...dynAttrs[index], description: e.target.value };
+                                                } else {
+                                                  dynAttrs.push({ group_id: group.groupId, attribute_id: attr.id, selected_value_ids: [], connector: 'OR', description: e.target.value, show_description: true });
+                                                }
+                                                updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
+                                                setItems(updated);
+                                              }}
+                                              size="small"
+                                              className="text-xs bg-slate-50 border-slate-200"
+                                            />
+                                            <AntButton
+                                              type="text"
+                                              size="small"
+                                              danger
+                                              icon={<Lucide.Trash2 size={14} />}
+                                              onClick={() => {
+                                                const updated = [...items];
+                                                const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
+                                                const index = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
+                                                if (index >= 0) {
+                                                  dynAttrs[index] = { ...dynAttrs[index], description: '', show_description: false };
+                                                  updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
+                                                  setItems(updated);
+                                                }
+                                              }}
+                                            />
+                                          </div>
+                                        ) : (
+                                          <div
+                                            className="text-[10px] text-blue-600 cursor-pointer hover:underline self-start font-medium flex items-center gap-1 mt-0.5"
+                                            onClick={() => {
+                                              const updated = [...items];
+                                              const dynAttrs: any[] = [...(updated[activeDrawerIndex].selected_dynamic_attributes || [])];
+                                              const index = dynAttrs.findIndex((s) => s.attribute_id === attr.id);
+                                              if (index >= 0) {
+                                                dynAttrs[index] = { ...dynAttrs[index], show_description: true };
+                                              } else {
+                                                dynAttrs.push({ group_id: group.groupId, attribute_id: attr.id, selected_value_ids: [], connector: 'OR', show_description: true });
+                                              }
+                                              updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
+                                              setItems(updated);
+                                            }}
+                                          >
+                                            <AntPlusOutlined /> Add Note / Description
+                                          </div>
+                                        )}
+                                      </div>
                                     </AntDescriptions.Item>
                                   );
                                 })}
@@ -1378,8 +1519,8 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
         });
 
         // 1. System Attribute: Brand Selection
-        if (item.brand_id && item.brand_id.length > 0) {
-          const brandValues: ItemAttributeValue[] = item.brand_id.map((bId: string) => {
+        if ((item.brand_id && item.brand_id.length > 0) || (item.brand_description && item.brand_description.trim() !== '')) {
+          const brandValues: ItemAttributeValue[] = (item.brand_id || []).map((bId: string) => {
             const matchedBrand = allBrands.find((b) => b.id === bId);
             return {
               value_id: bId,
@@ -1393,7 +1534,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
             attribute_type: 'SYSTEM',
             group_id: 'system',
             attribute_id: 'brand',
-            description: 'Sourcing Brand Selection',
+            description: item.brand_description || 'Sourcing Brand Selection',
             connector: 'OR',
             values: brandValues,
             created_at: now,
@@ -1401,8 +1542,8 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
           });
         }
         // 2. System Attribute: Manufacturer Selection
-        if (item.manufacturer_id && item.manufacturer_id.length > 0) {
-          const mfgValues: ItemAttributeValue[] = item.manufacturer_id.map((mId: string) => {
+        if ((item.manufacturer_id && item.manufacturer_id.length > 0) || (item.manufacturer_description && item.manufacturer_description.trim() !== '')) {
+          const mfgValues: ItemAttributeValue[] = (item.manufacturer_id || []).map((mId: string) => {
             const matchedMfg = allManufacturers.find((m) => m.id === mId);
             return {
               value_id: mId,
@@ -1416,7 +1557,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
             attribute_type: 'SYSTEM',
             group_id: 'system',
             attribute_id: 'manufacturer',
-            description: 'Sourcing Manufacturer Selection',
+            description: item.manufacturer_description || 'Sourcing Manufacturer Selection',
             connector: 'OR',
             values: mfgValues,
             created_at: now,
@@ -1444,8 +1585,8 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
         // 4. Custom Dynamic Attributes
         if (item.selected_dynamic_attributes && Array.isArray(item.selected_dynamic_attributes)) {
           item.selected_dynamic_attributes.forEach((da: any, daIdx: number) => {
-            if (da.selected_value_ids && da.selected_value_ids.length > 0) {
-              const dynamicValues: ItemAttributeValue[] = da.selected_value_ids.map((vid: string) => {
+            if ((da.selected_value_ids && da.selected_value_ids.length > 0) || (da.description && da.description.trim() !== '')) {
+              const dynamicValues: ItemAttributeValue[] = (da.selected_value_ids || []).map((vid: string) => {
                 const matchedVal = allAttributeValues.find((v) => v.id === vid);
                 return {
                   value_id: vid,
@@ -1459,7 +1600,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
                 attribute_type: 'CUSTOM',
                 group_id: da.group_id,
                 attribute_id: da.attribute_id,
-                description: '',
+                description: da.description || '',
                 connector: (da.connector === 'AND' ? 'AND' : 'OR') as 'AND' | 'OR',
                 values: dynamicValues,
                 created_at: now,
@@ -1653,7 +1794,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
               </div>
 
               {/* Target Brands / Manufacturers */}
-              {(item.brand_id?.length > 0 || item.manufacturer_id?.length > 0) && (
+              {(item.brand_id?.length > 0 || item.manufacturer_id?.length > 0 || item.brand_description?.trim() || item.manufacturer_description?.trim()) && (
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #2a79adff` }}>
                   <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#2a79ad14` }}>
                     <div className="flex items-center gap-3">
@@ -1665,23 +1806,37 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
                   </div>
                   <div className="p-3">
                     <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
-                      {item.brand_id?.length > 0 && (
+                      {(item.brand_id?.length > 0 || item.brand_description?.trim()) && (
                         <AntDescriptions.Item label="Brands">
-                          <div className="flex flex-wrap gap-1">
-                            {item.brand_id.map((bId: string) => {
-                              const b = allBrands.find(b => b.id === bId);
-                              return <AntTag key={bId} color="blue" className="m-0">{b?.name || bId}</AntTag>;
-                            })}
+                          <div className="flex flex-col gap-1">
+                            {item.brand_id?.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {item.brand_id.map((bId: string) => {
+                                  const b = allBrands.find(b => b.id === bId);
+                                  return <AntTag key={bId} color="blue" className="m-0">{b?.name || bId}</AntTag>;
+                                })}
+                              </div>
+                            )}
+                            {item.brand_description?.trim() && (
+                              <span className="text-xs text-slate-500 italic mt-0.5">{item.brand_description}</span>
+                            )}
                           </div>
                         </AntDescriptions.Item>
                       )}
-                      {item.manufacturer_id?.length > 0 && (
+                      {(item.manufacturer_id?.length > 0 || item.manufacturer_description?.trim()) && (
                         <AntDescriptions.Item label="Manufacturers">
-                          <div className="flex flex-wrap gap-1">
-                            {item.manufacturer_id.map((mId: string) => {
-                              const m = allManufacturers.find(m => m.id === mId);
-                              return <AntTag key={mId} color="purple" className="m-0">{m?.company_name || mId}</AntTag>;
-                            })}
+                          <div className="flex flex-col gap-1">
+                            {item.manufacturer_id?.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {item.manufacturer_id.map((mId: string) => {
+                                  const m = allManufacturers.find(m => m.id === mId);
+                                  return <AntTag key={mId} color="purple" className="m-0">{m?.company_name || mId}</AntTag>;
+                                })}
+                              </div>
+                            )}
+                            {item.manufacturer_description?.trim() && (
+                              <span className="text-xs text-slate-500 italic mt-0.5">{item.manufacturer_description}</span>
+                            )}
                           </div>
                         </AntDescriptions.Item>
                       )}
@@ -1711,18 +1866,25 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
                         });
                         return (
                           <AntDescriptions.Item key={idx} label={<span className="font-semibold">{attr?.name || da.attribute_id}</span>}>
-                            <span className="text-slate-900">
-                              {valLabels.map((vl: string, vIdx: number) => (
-                                <span key={vIdx}>
-                                  {vl}
-                                  {vIdx < valLabels.length - 1 && (
-                                    <span className="mx-1 text-slate-400 font-bold">
-                                      {(da.connector || 'OR') === 'OR' ? '|' : ','}
+                            <div className="flex flex-col gap-1">
+                              {valLabels.length > 0 && (
+                                <span className="text-slate-900">
+                                  {valLabels.map((vl: string, vIdx: number) => (
+                                    <span key={vIdx}>
+                                      {vl}
+                                      {vIdx < valLabels.length - 1 && (
+                                        <span className="mx-1 text-slate-400 font-bold">
+                                          {(da.connector || 'OR') === 'OR' ? '|' : ','}
+                                        </span>
+                                      )}
                                     </span>
-                                  )}
+                                  ))}
                                 </span>
-                              ))}
-                            </span>
+                              )}
+                              {da.description?.trim() && (
+                                <span className="text-xs text-slate-500 italic mt-0.5">{da.description}</span>
+                              )}
+                            </div>
                           </AntDescriptions.Item>
                         );
                       })}

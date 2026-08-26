@@ -219,8 +219,8 @@ export const SupplierAwardReceipt: React.FC = () => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                   {mappingDetails.groupedVariantSpecs.map(([groupId, group]: [string, any], idx: number) => {
-                    const accentColors = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'];
-                    const accentColor = accentColors[idx % accentColors.length];
+                    const accentColors = ['#527EA3', '#5D9365', '#C9825A', '#8975A8'];
+                    const accentColor = accentColors[idx % 4];
                     return (
                       <Card
                         key={groupId}

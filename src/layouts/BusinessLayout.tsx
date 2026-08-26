@@ -304,7 +304,7 @@ const BusinessLayout: React.FC = () => {
           <div className="flex items-center gap-2 sm:gap-4">
             <AntButton
               type="text"
-              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.Logs size={20} />)}
+              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.PanelLeftClose size={20} />)}
               onClick={() => {
                 if (isMobile) {
                   setMobileOpen(!mobileOpen);

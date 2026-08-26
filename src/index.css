@@ -24,6 +24,9 @@
   }
 }
 
+.ant-select-selection-item{
+   @apply bg-slate-100/50 grow-1;
+}
 /* Custom Scrollbar Utility */
 html::-webkit-scrollbar {
   width: 6px;

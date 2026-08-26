@@ -373,33 +373,30 @@ export const RequesterQuoteReview: React.FC = () => {
       title: 'S.No',
       dataIndex: 'sno',
       key: 'sno',
-      width: 50,
-      className: "align-top",
+      className: "w-[50px] max-w-[50px] align-top",
       render: (_: string, __: any, index: number) => <span className='pl-1.5'>{index + 1}</span>
     },
     {
       title: 'Attribute',
       dataIndex: 'attributeName',
       key: 'attributeName',
-      width: 320,
-      className: "align-top",
+      className: "w-[250px] max-w-[250px] align-top",
       render: (text: string, record: any) => (
-        <div className="flex flex-col gap-0.5">
-          <span className="font-bold text-slate-800 leading-tight">
-            {text}
+        <div className="flex flex-col gap-1.5 py-0.5">
+          <div className="flex flex-col gap-0.5">
+            <div className="font-semibold text-slate-800 leading-tight">{text}</div>
+            {record.description && (
+              <div className="text-[11px] text-slate-500 leading-tight italic">{record.description}</div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-1 items-center">
             {(record.is_variant || record.isVariant) && (
-              <AntTag
-                color="blue"
-                className="leading-tight italic ml-2"
-                icon={<AntIconCheckCircleOutlined />}
-              >
+              <AntTag className="m-0 leading-tight bg-blue-50 text-blue-600 border-blue-200" icon={<AntIconCheckCircleOutlined />}>
                 Variant Attribute
               </AntTag>
             )}
-          </span>
-          {record.description && (
-            <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
-          )}
+          </div>
         </div>
       )
     },
@@ -417,7 +414,7 @@ export const RequesterQuoteReview: React.FC = () => {
       className: "w-[100px] text-center align-top",
       render: (connector: string, attribute: any) => {
         if (attribute.attribute_id === 'req_quantity') return null;
-        
+
         const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
         const displayConnector = forceORDisabled ? 'OR' : (connector || 'AND');
 
@@ -432,7 +429,7 @@ export const RequesterQuoteReview: React.FC = () => {
       title: 'Proposal Value & Feedback',
       dataIndex: 'proposalViewValue',
       key: 'proposalValue',
-      className: "w-[400px] max-w-[400px] align-top",
+      className: "max-w-[400px] align-top",
       render: (_: string, attribute: any) => {
         const threadComments = existingComments
           .filter((c) => c.group_id === attribute.group_id && c.attribute_id === attribute.attribute_id)
@@ -443,8 +440,8 @@ export const RequesterQuoteReview: React.FC = () => {
             <div className="w-full flex items-center gap-2">
               <span className="text-emerald-700 font-bold">{attribute.proposalViewValue}</span>
               {attribute.is_deviation && (
-                <AntTag color="warning" className="font-bold m-0 border-amber-300 text-amber-700 bg-amber-50 text-[10px]">
-                  DEVIATION
+                <AntTag className="m-0 leading-tight bg-amber-50 text-amber-700 border-amber-200">
+                  Deviation
                 </AntTag>
               )}
             </div>
@@ -601,7 +598,7 @@ export const RequesterQuoteReview: React.FC = () => {
           <h3 className="text-base font-bold text-slate-900 pt-3">Attribute configuration</h3>
 
           {attributeGroupsMap.map(([groupId, group], idx) => {
-            const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
+            const accentColor = ['#527EA3', '#5D9365', '#C9825A', '#8975A8'][idx % 4];
 
             return (
               <div
@@ -667,10 +664,10 @@ export const RequesterQuoteReview: React.FC = () => {
         {quoteVariants && quoteVariants.length > 0 && (
           <div className="space-y-6 mt-6">
             <h3 className="text-base font-bold text-slate-900 pt-3">Variant Configuration</h3>
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #3b82f6` }}>
-              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#3b82f614` }}>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #527EA3` }}>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#527EA314` }}>
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white bg-blue-500">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#527EA3' }}>
                     V
                   </span>
                   <h4 className="text-md font-bold text-slate-800">Variant and Price</h4>
@@ -696,7 +693,7 @@ export const RequesterQuoteReview: React.FC = () => {
                       </Button>
                     </div>
                   )}
-                  <AntTag color="default" style={{ borderColor: '#3b82f6', color: '#3b82f6', fontWeight: 700 }}>
+                  <AntTag color="default" style={{ borderColor: '#527EA3', color: '#527EA3', fontWeight: 700 }}>
                     {quoteVariants.length} variants
                   </AntTag>
                 </div>

@@ -214,7 +214,7 @@ export const RfqAwardCheckMapping: React.FC = () => {
           <div className="space-y-6">
             <h4 className="text-base font-extrabold text-slate-900 border-b pb-2">Technical Variant Specifications</h4>
             {mappingDetails.groupedVariantSpecs.map(([groupId, group], idx) => {
-              const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
+              const accentColor = ['#527EA3', '#5D9365', '#C9825A', '#8975A8'][idx % 4];
               return (
                 <div
                   key={groupId}

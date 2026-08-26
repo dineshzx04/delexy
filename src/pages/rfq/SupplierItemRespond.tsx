@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Card, Input as AntInput, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Switch, Steps, Result } from 'antd';
 import { SendOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined, ArrowLeftOutlined, ArrowRightOutlined } from '@ant-design/icons';
@@ -365,17 +366,6 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         reqViewValue = values.map((v: any) => v.value_label).join(joiner) || "N/A";
       }
 
-      map.get(groupId).attributes.push({
-        key: proposalKey,
-        attribute_type: ia.attribute_type,
-        group_id: groupId,
-        attribute_id: ia.attribute_id,
-        is_variant: ia.is_variant,
-        attributeName: attributeName,
-        values,
-        reqViewValue,
-      });
-
       const ea = existingAttrMap.get(proposalKey);
       if (ea) {
         initialValues[proposalKey] = {
@@ -389,7 +379,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
           req_value: ea.req_value,
           values: ea.values,
           buyer_accepted: ea.buyer_accepted || false,
-          connector: ea.connector || ia.connector || 'AND'
+          connector: ea.connector || ia.connector || 'OR'
         };
       } else {
         initialValues[proposalKey] = {
@@ -403,18 +393,30 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
           req_value: values,
           values: values,
           buyer_accepted: false,
-          connector: ia.connector || 'AND'
+          connector: ia.connector || 'OR'
         };
       }
+
+      map.get(groupId).attributes.push({
+        key: proposalKey,
+        attribute_type: ia.attribute_type,
+        group_id: groupId,
+        attribute_id: ia.attribute_id,
+        is_variant: ia.is_variant,
+        attributeName: attributeName,
+        description: ia.description,
+        connector: initialValues[proposalKey].connector,
+        values,
+        reqViewValue,
+      });
     });
 
     const entries = [...map.entries()];
     setAttributeGroupsMap(entries);
     setProposalAttributes(initialValues);
 
-    let initialVariants: (SellerQuoteVariant & {
-      [key: string]: any;
-    })[] = [];
+    let initialVariants: (SellerQuoteVariant & { [key: string]: any; })[] = [];
+
     if (existingQuoteVariants && existingQuoteVariants.length > 0) {
       initialVariants = existingQuoteVariants;
     } else {
@@ -638,132 +640,46 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       key: 'attributeName',
       className: "w-[250px] max-w-[250px] align-top",
       render: (text: string, record: any) => {
-        const proposalKey = `${record.group_id}_${record.attribute_id}`;
-        const attributeData = proposalAttributes[proposalKey];
-        const showStatus = existingQuote && ['REVISION_REQUIRED', 'SUBMITTED', 'DRAFT'].includes(existingQuote.status);
-
         return (
-          <div className="flex flex-col gap-0.5">
-            <span className="font-semibold text-slate-800 leading-tight">
-              {text}
+          <div className="flex flex-col gap-1.5 py-0.5">
+            <div className="flex flex-col gap-0.5">
+              <div className="font-semibold text-slate-800 leading-tight">{text}</div>
+              {record.description && (
+                <div className="text-[11px] text-slate-500 leading-tight italic">{record.description}</div>
+              )}
+            </div>
+
+            <div className="flex flex-wrap gap-1 items-center">
               {record.is_variant && (
-                <AntTag color="blue" className="leading-tight italic ml-2" icon={<AntIconCheckCircleOutlined />}>Variant Attribute</AntTag>
+                <AntTag className="m-0 leading-tight bg-slate-50 text-slate-600 border-slate-200" icon={<AntIconCheckCircleOutlined />}>Variant Attribute</AntTag>
               )}
-              {showStatus && attributeData && (
-                attributeData.buyer_accepted ? (
-                  <AntTag color="success" className="font-bold ml-2">APPROVED</AntTag>
-                ) : (
-                  <AntTag color="error" className="font-bold ml-2">REVISION REQUIRED</AntTag>
-                )
-              )}
-            </span>
-            {record.description && (
-              <span className="text-xs text-slate-400 leading-tight italic">{record.description}</span>
-            )}
+            </div>
           </div>
         );
       }
     },
-
     {
       title: 'Requested Value',
       dataIndex: 'reqViewValue',
       key: 'reqViewValue',
       className: "align-top",
-      render: (text: string) => {
-        return <span className="text-slate-600 font-medium">{text}</span>
-      }
-    },
-    {
-      title: 'Variant',
-      dataIndex: 'is_variant',
-      key: 'is_variant',
-      className: "w-[80px] text-center align-top",
-      render: (_: string, attribute: any) => {
-        const proposalKey = `${attribute.group_id}_${attribute.attribute_id}`
-        return (
-          <Switch
-            size='small'
-            disabled={isViewOnly}
-            checked={proposalAttributes[proposalKey]?.is_variant}
-            onChange={(checked) => {
-              setProposalAttributes(prev => {
-                const next = {
-                  ...prev,
-                  [proposalKey]: {
-                    ...prev[proposalKey],
-                    is_variant: checked,
-                    connector: checked ? "OR" : prev[proposalKey].connector
-                  }
-                };
-                recalculateVariants(next);
-                return next;
-              });
-            }}
-          />
-        )
-      }
-    },
-    {
-      title: 'Connector',
-      dataIndex: 'connector',
-      key: 'connector',
-      className: "w-[100px] text-center align-top",
-      render: (_: string, attribute: any) => {
-        const proposalKey = `${attribute.group_id}_${attribute.attribute_id}`
-
-        if (attribute.attribute_id === 'req_quantity') {
-          return "-";
-        }
-
-        const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
-
-        return (
-          <AntSelect
-            className='w-full'
-            size='small'
-            disabled={isViewOnly || proposalAttributes[proposalKey]?.is_variant || forceORDisabled}
-            value={forceORDisabled ? 'OR' : (proposalAttributes[proposalKey]?.connector || 'AND')}
-            onChange={(val) => {
-              setProposalAttributes(prev => ({
-                ...prev,
-                [proposalKey]: {
-                  ...prev[proposalKey],
-                  connector: val
-                }
-              }));
-            }}
-            options={[
-              { label: 'AND', value: 'AND' },
-              { label: 'OR', value: 'OR' }
-            ]}
-          />
-        )
-      }
-    },
-    {
-      title: 'Deviation',
-      dataIndex: 'deviation',
-      key: 'deviation',
-      className: "w-[80px] text-center align-top",
-      render: (_: string, attribute: any) => {
-        const proposalKey = `${attribute.group_id}_${attribute.attribute_id}`
-        return (
-          <Switch
-            size='small'
-            disabled={isViewOnly}
-            checked={proposalAttributes[proposalKey]?.is_deviation}
-            onChange={(checked) => {
-              setProposalAttributes(prev => ({
-                ...prev,
-                [proposalKey]: {
-                  ...prev[proposalKey],
-                  is_deviation: checked
-                }
-              }));
-            }}
-          />
-        )
+      render: (text: string, record: any) => {
+        const proposalKey = `${record.group_id}_${record.attribute_id}`;
+        const attributeData = proposalAttributes[proposalKey];
+        const showStatus = existingQuote && ['REVISION_REQUIRED', 'SUBMITTED', 'DRAFT'].includes(existingQuote.status);
+        return <span className="text-slate-600 font-medium">
+          {text}
+          {showStatus && attributeData && (
+            attributeData.buyer_accepted ? (
+              <AntTag className="m-0 leading-tight bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
+            ) : (
+              <AntTag className="m-0 leading-tight bg-red-50/10 text-red-400 border-red-100">Revision required</AntTag>
+            )
+          )}
+          {proposalAttributes[proposalKey]?.is_deviation && (
+            <AntTag className="mr-0 ml-3 leading-tight bg-amber-50 text-amber-700 border-amber-200">Deviation</AntTag>
+          )}
+        </span>
       }
     },
 
@@ -771,141 +687,129 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       title: 'Proposal Value',
       dataIndex: 'proposalValue',
       key: 'proposalValue',
-      className: "max-w-[400px] align-top",
+      className: "w-110 max-w-110 align-top",
       render: (_: string, attribute: any) => {
         const proposalKey = `${attribute.group_id}_${attribute.attribute_id}`
+        const currentProposalAttr = proposalAttributes[proposalKey];
+
+        const renderCustomTag = ({ label, value, closable, onClose }: any) => {
+          const currentValues = currentProposalAttr?.values?.map((v: any) => v.value_id) || [];
+          const index = currentValues.indexOf(value);
+          const isLast = index === currentValues.length - 1;
+
+          const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
+          const connector = forceORDisabled ? "OR" : (currentProposalAttr?.connector || 'AND');
+          const propJoiner = connector === "OR" ? " | " : " , ";
+
+          return (
+            <span className="inline-flex items-center">
+              <span className="inline-flex items-center gap-1 h-6 pl-2 pr-1 mr-1 my-0.5 bg-slate-100/80 border border-slate-200 rounded text-slate-700 text-[13px] font-medium leading-none">
+                <span>{label}</span>
+                {closable && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); onClose(); }}
+                    className="inline-flex items-center justify-center w-4 h-4 p-0 border-0 rounded-full bg-transparent text-slate-400 hover:bg-slate-200 hover:text-slate-600 cursor-pointer transition-colors"
+                    aria-label={`Remove ${label}`}
+                  >
+                    <Lucide.X size={12} strokeWidth={2.5} />
+                  </button>
+                )}
+              </span>
+              {!isLast && (
+                <span className="mx-0.5 text-emerald-600 font-bold text-[13px] select-none">
+                  {propJoiner}
+                </span>
+              )}
+            </span>
+          );
+        };
+
         let field: any;
+        const isQty = attribute.attribute_id === 'req_quantity';
+        const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
 
-        if (attribute.attribute_type === 'SYSTEM') {
-          switch (attribute.attribute_id) {
-            case "manufacturer":
-              field = (
-                <AntSelect
-                  disabled={isViewOnly}
-                  mode="multiple"
-                  allowClear
-                  placeholder="Select Preferred Manufacturer(s)"
-                  value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
-                  onChange={(val: string[]) => {
-                    const newValues = val.map(id => {
-                      const matched = allManufacturers?.find((v: any) => v.id === id);
-                      return { value_id: id, value_label: matched?.company_name || id };
-                    });
-                    const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
-                    const initValIds = initialAttr?.values?.map(v => v.value_id) || [];
-                    const isChangedFromPrev = initValIds.length !== val.length || !initValIds.every(id => val.includes(id));
+        if (isQty) {
+          field = (
+            <AntInput
+              disabled={isViewOnly}
+              value={proposalAttributes[proposalKey]?.values?.find((i: any) => i.value_id === "req-quantity")?.value_label ?? ''}
+              className="w-100"
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (isNaN(val) || val <= 0) {
+                  antMessage.error('Please enter a valid quantity.');
+                  return;
+                }
+                const unit = attribute?.values?.find((i: any) => i.value_id === "req-quantity-unit");
+                const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
+                const initVal = initialAttr?.values?.find(v => v.value_id === 'req-quantity')?.value_label || '';
+                const isChangedFromPrev = e.target.value !== initVal;
 
-                    setProposalAttributes(prev => {
-                      const next = {
-                        ...prev, [proposalKey]: {
-                          ...prev[proposalKey],
-                          values: newValues,
-                          buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
-                        }
-                      };
-                      if (next[proposalKey].is_variant) {
-                        recalculateVariants(next);
-                      }
-                      return next;
-                    });
-                  }}
-                  className="w-full mt-1"
-                  options={(allManufacturers || []).map((v: any) => ({ label: v.company_name, value: v.id }))}
-                />
-              )
-              break;
-            case "brand":
-              field = (
-                <AntSelect
-                  disabled={isViewOnly}
-                  mode="multiple"
-                  allowClear
-                  placeholder="Select Preferred Brand(s)"
-                  value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
-                  onChange={(val: string[]) => {
-                    const newValues = val.map(id => {
-                      const matched = allBrands?.find((v: any) => v.id === id);
-                      return { value_id: id, value_label: matched?.name || id };
-                    });
-                    const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
-                    const initValIds = initialAttr?.values?.map(v => v.value_id) || [];
-                    const isChangedFromPrev = initValIds.length !== val.length || !initValIds.every(id => val.includes(id));
+                setProposalAttributes(prev => {
+                  const reqValStr = prev[proposalKey]?.req_value?.find((i: any) => i.value_id === "req-quantity")?.value_label || '';
+                  const is_deviation = e.target.value !== reqValStr;
 
-                    setProposalAttributes(prev => {
-                      const next = {
-                        ...prev, [proposalKey]: {
-                          ...prev[proposalKey],
-                          values: newValues,
-                          buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
-                        }
-                      };
-                      if (next[proposalKey].is_variant) {
-                        recalculateVariants(next);
-                      }
-                      return next;
-                    });
-                  }}
-                  className="w-full mt-1"
-                  options={allBrands?.map((v: any) => ({ label: v.name, value: v.id }))}
-                />
-              )
-              break;
-            case "req_quantity":
-              field = (
-                <AntInput
-                  disabled={isViewOnly}
-                  value={proposalAttributes[proposalKey]?.values?.find(i => i.value_id == "req-quantity")?.value_label ?? ''}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (isNaN(val) || val <= 0) {
-                      antMessage.error('Please enter a valid price.');
-                      return;
+                  return {
+                    ...prev, [proposalKey]: {
+                      ...prev[proposalKey],
+                      values: [{ value_id: 'req-quantity', value_label: e.target.value }, unit],
+                      is_deviation: is_deviation,
+                      buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
                     }
-                    const unit = attribute?.values?.find((i: any) => i.value_id == "req-quantity-unit")
-                    const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
-                    const initVal = initialAttr?.values?.find(v => v.value_id === 'req-quantity')?.value_label || '';
-                    const isChangedFromPrev = e.target.value !== initVal;
+                  };
+                });
+              }}
+            />
+          )
+        } else if (attribute.attribute_type === 'SYSTEM' && attribute.attribute_id !== 'manufacturer' && attribute.attribute_id !== 'brand') {
+          field = "Contact System admin";
+        } else {
+          let options: { label: string; value: string }[] = [];
+          let placeholder = `Select ${attribute.attributeName}`;
 
-                    setProposalAttributes(prev => ({
-                      ...prev, [proposalKey]: {
-                        ...prev[proposalKey],
-                        values: [{ value_id: 'req-quantity', value_label: e.target.value }, unit],
-                        buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
-                      }
-                    }));
-                  }}
-                />
-              )
-              break;
-            default:
-              field = "Contact System admin"
-              break;
+          if (attribute.attribute_type === 'SYSTEM' && attribute.attribute_id === 'manufacturer') {
+            options = (allManufacturers || []).map((v: any) => ({ label: v.company_name, value: v.id }));
+            placeholder = "Select Preferred Manufacturer(s)";
+          } else if (attribute.attribute_type === 'SYSTEM' && attribute.attribute_id === 'brand') {
+            options = (allBrands || []).map((v: any) => ({ label: v.name, value: v.id }));
+            placeholder = "Select Preferred Brand(s)";
+          } else {
+            const values = catalogAttributeValues?.filter((v) => v.attributeId === attribute.attribute_id) || [];
+            options = values.map((v: any) => ({ label: v.value || v.label, value: v.id }));
           }
-        }
-        else {
-          const values = catalogAttributeValues?.filter((v) => v.attributeId === attribute.attribute_id) || [];
+
           field = (
             <AntSelect
               disabled={isViewOnly}
               mode="multiple"
               allowClear
-              placeholder={`Select ${attribute.attributeName}`}
-              className="w-full mt-1"
+              tagRender={renderCustomTag}
+              placeholder={placeholder}
+              className="w-100"
               value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
               onChange={(val: string[]) => {
                 const newValues = val.map(id => {
-                  const matched = values.find((v: any) => v.id === id);
-                  return { value_id: id, value_label: matched?.value || matched?.label || id };
+                  const matched = options.find((o: any) => o.value === id);
+                  return { value_id: id, value_label: matched?.label || id };
                 });
+
                 const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
                 const initValIds = initialAttr?.values?.map(v => v.value_id) || [];
                 const isChangedFromPrev = initValIds.length !== val.length || !initValIds.every(id => val.includes(id));
 
                 setProposalAttributes(prev => {
+                  const reqValIds = prev[proposalKey]?.req_value?.map((v: any) => v.value_id) || [];
+                  const sortedReq = [...reqValIds].sort();
+                  const sortedNew = [...val].sort();
+                  const is_deviation = sortedReq.length !== sortedNew.length || !sortedReq.every((v, i) => v === sortedNew[i]);
+
                   const next = {
                     ...prev, [proposalKey]: {
                       ...prev[proposalKey],
                       values: newValues,
+                      is_deviation: is_deviation,
                       buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
                     }
                   };
@@ -915,17 +819,70 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                   return next;
                 });
               }}
-              options={values.map((v: any) => ({ label: v.value || v.label, value: v.id }))}
+              options={options}
             />
-          )
+          );
         }
+
         return (
           <div className="flex gap-2 flex-col">
-            <div className="w-full">{field}</div>
+            <div className="w-full">
+              {!isQty && !forceORDisabled && (
+                <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded px-2 py-1 mb-1.5 w-max">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-500">Connector</span>
+                    <AntSelect
+                      size='small'
+                      disabled={isViewOnly || proposalAttributes[proposalKey]?.is_variant || forceORDisabled}
+                      value={forceORDisabled ? 'OR' : (proposalAttributes[proposalKey]?.connector || 'AND')}
+                      onChange={(val) => {
+                        setProposalAttributes(prev => ({
+                          ...prev,
+                          [proposalKey]: {
+                            ...prev[proposalKey],
+                            connector: val
+                          }
+                        }));
+                      }}
+                      options={[
+                        { label: 'AND', value: 'AND' },
+                        { label: 'OR', value: 'OR' }
+                      ]}
+                      className="w-[65px]"
+                    />
+                  </div>
+                  <div className="w-px h-4 bg-slate-200"></div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] uppercase font-semibold text-slate-500">Variant</span>
+                    <Switch
+                      size='small'
+                      disabled={isViewOnly}
+                      checked={proposalAttributes[proposalKey]?.is_variant}
+                      onChange={(checked) => {
+                        setProposalAttributes(prev => {
+                          const next = {
+                            ...prev,
+                            [proposalKey]: {
+                              ...prev[proposalKey],
+                              is_variant: checked,
+                              connector: checked ? "OR" : prev[proposalKey].connector
+                            }
+                          };
+                          recalculateVariants(next);
+                          return next;
+                        });
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+              {field}
+            </div>
             <div className="flex flex-col">
               {proposalAttributes[proposalKey]?.is_deviation && !isViewOnly && (
                 <div>
                   <AntInput.TextArea
+                    size='small'
                     placeholder="Deviation Reason"
                     value={proposalAttributes[proposalKey]?.deviation_note}
                     rows={1}
@@ -971,64 +928,54 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
   return (
     <div className="space-y-6">
-      {/* Proposal Status Banner */}
-      <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 mb-5 flex flex-wrap gap-6 items-start">
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Reference</span>
-          <AntTag color="purple" className="font-mono font-bold text-sm mt-0.5">{quoteNumber}</AntTag>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Status</span>
+      {/* Request & Quote Details */}
+      <Descriptions title="Request & Quote Details" bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }} className="mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
+        <Descriptions.Item label="Product / Service" span={3}>
+          <strong className="text-slate-800 text-base">{catalogProduct?.name || 'Custom Specifications'}</strong>
+        </Descriptions.Item>
+        <Descriptions.Item label="Quote Reference">
+          <AntTag color="purple" className="font-mono font-bold m-0 text-[13px]">{quoteNumber}</AntTag>
+        </Descriptions.Item>
+        <Descriptions.Item label="Quote Status">
           <AntTag
             color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
-            className="mt-0.5 font-bold"
+            className="font-bold m-0"
           >
             {existingQuote?.status || 'NEW'}
           </AntTag>
-        </div>
-        <div className="flex flex-col gap-0.5">
-          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Round</span>
-          <div className="flex items-center gap-1 mt-0.5">
-            <ReloadOutlined className="text-blue-500 text-xs" />
-            <span className="font-bold text-slate-800 text-sm">Round {existingQuote?.round ?? 1}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Round">
+          <div className="flex items-center gap-1.5">
+            <ReloadOutlined className="text-blue-500 text-[13px]" />
+            <span className="font-bold text-slate-800 text-[13px]">Round {existingQuote?.round ?? 1}</span>
           </div>
-        </div>
-        {existingQuote?.created_at && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Created</span>
-            <span className="text-xs text-slate-600 mt-0.5">{new Date(existingQuote.created_at).toLocaleString()}</span>
-          </div>
-        )}
-        {existingQuote?.updated_at && (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Last Updated</span>
-            <span className="text-xs text-slate-600 mt-0.5">{new Date(existingQuote.updated_at).toLocaleString()}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Requested Item Details */}
-      <Descriptions title="Requested Item Details" bordered size="small" column={2} className="mb-6">
-        <Descriptions.Item label="Product / Service" span={2}>
-          <strong className="text-slate-800">{catalogProduct?.name || 'Custom Specifications'}</strong>
         </Descriptions.Item>
         <Descriptions.Item label="RFQ Number">
           <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
         </Descriptions.Item>
-        <Descriptions.Item label="Category">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</Descriptions.Item>
-        {/* <Descriptions.Item label="Variant">{itemVariant?.sku}</Descriptions.Item> */}
-        <Descriptions.Item label="Requested Quantity">
-          <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+        <Descriptions.Item label="Category">
+          <span className="text-slate-700">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</span>
         </Descriptions.Item>
-        {/* <Descriptions.Item label="Requested Unit Price">
-          {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
-        </Descriptions.Item> */}
+        <Descriptions.Item label="Requested Quantity">
+          <AntTag color="blue" className="font-bold m-0">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+        </Descriptions.Item>
+        {existingQuote?.created_at && (
+          <Descriptions.Item label="Created">
+            <span className="text-slate-600 text-xs">{new Date(existingQuote.created_at).toLocaleString()}</span>
+          </Descriptions.Item>
+        )}
+        {existingQuote?.updated_at && (
+          <Descriptions.Item label="Last Updated" span={2}>
+            <span className="text-slate-600 text-xs">{new Date(existingQuote.updated_at).toLocaleString()}</span>
+          </Descriptions.Item>
+        )}
       </Descriptions>
 
       <div className="space-y-6">
         <h3 className="text-base font-bold text-slate-900 pt-3">Attribute configuration</h3>
         {attributeGroupsMap.map(([groupId, group], idx) => {
-          const accentColor = ['#10b981', '#8b5cf6', '#f59e0b', '#14b8a6', '#ec4899'][idx % 5];
+          const accentColor = ['#527EA3', '#5D9365', '#C9825A', '#8975A8'][idx % 4];
+
           return (
             <div key={groupId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid ${accentColor}` }}>
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `${accentColor}14` }}>
@@ -1045,7 +992,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
               <div className="p-3">
                 <Table
                   dataSource={group.attributes}
-                  columns={groupId === 'system' ? attributesColumns.filter(c => c.key !== 'is_variant') : attributesColumns}
+                  columns={groupId === 'system' ? attributesColumns.filter(c => c.key !== 'is_variant' && c.key !== 'connector') : attributesColumns}
                   pagination={false}
                   size="small"
                   bordered
@@ -1059,10 +1006,10 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
       <div className="space-y-6 mt-6">
         <h3 className="text-base font-bold text-slate-900 pt-3">Variant Configuration</h3>
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #3b82f6` }}>
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#3b82f614` }}>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #527EA3` }}>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#527EA314` }}>
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white bg-blue-500">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#527EA3' }}>
                 V
               </span>
               <h4 className="text-md font-bold text-slate-800">Variant and Price</h4>
@@ -1122,9 +1069,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                           <span className="text-slate-500 italic">Default Variant</span>
                           {showStatus && (
                             record.buyer_accepted ? (
-                              <AntTag color="success" className="font-bold ml-2">APPROVED</AntTag>
+                              <AntTag className="ml-2 bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
                             ) : (
-                              <AntTag color="error" className="font-bold ml-2">REVISION REQUIRED</AntTag>
+                              <AntTag className="ml-2 bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
                             )
                           )}
                         </div>
@@ -1139,9 +1086,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                         })}
                         {showStatus && (
                           record.buyer_accepted ? (
-                            <AntTag color="success" className="font-bold ml-2">APPROVED</AntTag>
+                            <AntTag className="ml-2 bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
                           ) : (
-                            <AntTag color="error" className="font-bold ml-2">REVISION REQUIRED</AntTag>
+                            <AntTag className="ml-2 bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
                           )
                         )}
                       </div>
