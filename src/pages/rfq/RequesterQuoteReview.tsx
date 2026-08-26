@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Card, Button, Tag as AntTag, Table, Descriptions, App as AntApp, Alert, Input, Switch, Checkbox } from 'antd';
-import { CheckOutlined, CloseOutlined, UndoOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined } from '@ant-design/icons';
+import { CheckOutlined, CloseOutlined, UndoOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined } from '@ant-design/icons';
 import { rfqDb, type SellerQuote, type SellerQuoteAttribute, type SellerQuoteComment } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
@@ -518,51 +518,50 @@ export const RequesterQuoteReview: React.FC = () => {
           </div>
         }
       >
-        {/* Proposal Status Banner */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 mb-5 flex flex-wrap gap-6 items-start">
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Reference</span>
-            <AntTag color="purple" className="font-mono font-bold text-sm mt-0.5">{quote.seller_quote_number}</AntTag>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Quote Status</span>
+        {/* Request & Quote Details */}
+        <Descriptions title="Request & Quote Details" bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }} className="mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
+          <Descriptions.Item label="Product / Service" span={3}>
+            <strong className="text-slate-800 text-base">{sellerProduct?.product_name || 'Custom Specifications'}</strong>
+          </Descriptions.Item>
+          <Descriptions.Item label="Quote Reference">
+            <AntTag color="purple" className="font-mono font-bold m-0 text-[13px]">{quote.seller_quote_number}</AntTag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Quote Status">
             <AntTag
               color={quote.status === 'SUBMITTED' ? 'blue' : quote.status === 'DRAFT' ? 'orange' : quote.status === 'DEVIATION_ACCEPTED' ? 'green' : quote.status === 'REJECTED' ? 'red' : 'default'}
-              className="mt-0.5 font-bold"
+              className="font-bold m-0"
             >
               {quote.status}
             </AntTag>
-          </div>
-          <div className="flex flex-col gap-0.5">
-            <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Round</span>
-            <span className="font-bold text-slate-800 text-sm mt-0.5">Round #{quote.round}</span>
-          </div>
-          {quote.created_at && (
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Submitted</span>
-              <span className="text-xs text-slate-600 mt-0.5">{new Date(quote.created_at).toLocaleString()}</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Round">
+            <div className="flex items-center gap-1.5">
+              <ReloadOutlined className="text-blue-500 text-[13px]" />
+              <span className="font-bold text-slate-800 text-[13px]">Round {quote.round ?? 1}</span>
             </div>
-          )}
-        </div>
-
-        {/* Requested Item Details */}
-        <Descriptions title="Requested Item Details" bordered size="small" column={2} className="mb-6">
-          <Descriptions.Item label="Product / Service" span={2}>
-            <strong className="text-slate-800">{sellerProduct?.product_name || 'Custom Specifications'}</strong>
           </Descriptions.Item>
-          <Descriptions.Item label="Catalog Product">
-            {item.catalog_product_id
-              ? catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id
-              : 'N/A'}
+          <Descriptions.Item label="RFQ Number">
+            <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
           </Descriptions.Item>
-          <Descriptions.Item label="Category">{categoryName}</Descriptions.Item>
-          <Descriptions.Item label="Variant">{itemVariant?.sku || 'N/A'}</Descriptions.Item>
+          <Descriptions.Item label="Category">
+            <span className="text-slate-700">{categoryName}</span>
+          </Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
-            <AntTag color="blue" className="font-bold">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+            <AntTag color="blue" className="font-bold m-0">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
           </Descriptions.Item>
-          {/* <Descriptions.Item label="Requested Unit Price">
-            {item.req_unit_price ? <span className="text-emerald-600 font-bold">${item.req_unit_price}</span> : 'N/A'}
-          </Descriptions.Item> */}
+          {item.catalog_product_id && (
+            <Descriptions.Item label="Catalog Product">
+              {catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id}
+            </Descriptions.Item>
+          )}
+          {itemVariant?.sku && (
+            <Descriptions.Item label="Variant">{itemVariant.sku}</Descriptions.Item>
+          )}
+          {quote.created_at && (
+            <Descriptions.Item label="Submitted">
+              <span className="text-slate-600 text-xs">{new Date(quote.created_at).toLocaleString()}</span>
+            </Descriptions.Item>
+          )}
         </Descriptions>
 
         <div className="space-y-6">
