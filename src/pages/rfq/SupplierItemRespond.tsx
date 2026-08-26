@@ -284,8 +284,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   }, [allVariants, item]);
 
   const quoteNumber = React.useMemo(() => {
-    return existingQuote?.seller_quote_number || `SQ-${activePartyId?.replace('pty-', '')}-${rfq?.id?.replace('rfq-', '')}-${itemId?.replace('item-', '')}`;
-  }, [existingQuote, rfq, itemId, activePartyId]);
+    return existingQuote?.seller_quote_number
+  }, [existingQuote]);
 
 
   useEffect(() => {

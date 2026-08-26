@@ -33,20 +33,6 @@ export const mockRfqItemAttributes: RfqItemAttribute[] = [
     created_at: "2026-08-10T09:00:00Z",
     updated_at: "2026-08-10T09:00:00Z",
   },
-  // {
-  //   id: "ia-003",
-  //   rfq_item_id: "item-01",
-  //   attribute_type: "SYSTEM",
-  //   group_id: "system",
-  //   attribute_id: "req_unit_price",
-  //   is_variant: false,
-  //   description: "Sourcing Unit Price",
-  //   values: [
-  //     { value_id: "req-unit-price", value_label: "100" },
-  //   ],
-  //   created_at: "2026-08-10T09:00:00Z",
-  //   updated_at: "2026-08-10T09:00:00Z",
-  // },
   {
     id: "ia-004",
     rfq_item_id: "item-01",

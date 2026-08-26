@@ -194,6 +194,7 @@ export interface ItemAttributeValue {
 }
 
 export type SellerQuoteStatus =
+  | "NOT_SUBMITTED"
   | "DRAFT"
   | "SUBMITTED"
   | "REVISION_REQUIRED"

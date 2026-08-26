@@ -32,14 +32,17 @@ import {
   GlobalOutlined as AntGlobalOutlined,
   ToolOutlined as AntToolOutlined,
   ShopOutlined as AntShopOutlined,
-  CheckOutlined as AntCheckOutlined,
-  FilterOutlined as AntFilterOutlined,
-  EyeOutlined as AntEyeOutlined,
-  InboxOutlined as AntInboxOutlined,
-  DisconnectOutlined as AntDisconnectOutlined,
   AimOutlined as AntAimOutlined,
 } from '@ant-design/icons';
-import { rfqDb, type Rfq, type RfqItem, type RfqItemAttribute, type SellerQuote } from '../../data/rfq';
+import {
+  rfqDb,
+  type Rfq,
+  type RfqItem,
+  type RfqItemAttribute,
+  type SellerQuote,
+  type SellerAssignment,
+  type ItemAttributeValue,
+} from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -59,8 +62,8 @@ export const RfqCreateWizard: React.FC = () => {
   const allParties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
 
   const activeParty = isBusinessContext
-    ? allParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace?.businessId) || allParties[0]
-    : allParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId) || allParties.find((p) => p.id === 'pty-6') || allParties[0];
+    ? allParties.find((p) => p.owner_type === 'BUSINESS' && p.owner_id === activeWorkspace?.businessId)
+    : allParties.find((p) => p.owner_type === 'USER' && p.owner_id === currentUserId);
 
   const activePartyId = activeParty?.id || 'pty-1';
   const activePartyName = activeParty?.display_name || 'Active Party';
@@ -84,7 +87,6 @@ export const RfqCreateWizard: React.FC = () => {
   });
 
   const [items, setItems] = useState<any[]>([]);
-
   const steps = [
     { title: 'Global Details', icon: <AntFileTextOutlined /> },
     { title: 'Line Items', icon: <AntAppstoreOutlined /> },
@@ -92,11 +94,11 @@ export const RfqCreateWizard: React.FC = () => {
   ];
 
   return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+    <div className="  max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <AntButton icon={<AntArrowLeftOutlined />} onClick={() => navigate(basePath)}>
+        {/* <AntButton icon={<AntArrowLeftOutlined />} onClick={() => navigate(basePath)}>
           Back to RFQs
-        </AntButton>
+        </AntButton> */}
         <div className="flex items-center gap-2">
           <h1 className="text-xl font-bold text-slate-900">Create Request for Quotation</h1>
           <AntTag color="purple">Party: {activePartyName}</AntTag>
@@ -118,7 +120,6 @@ export const RfqCreateWizard: React.FC = () => {
       {currentStep === 1 && (
         <RfqLineItemsStep
           initialItems={items}
-          activePartyId={activePartyId}
           onPrev={(data) => {
             setItems(data);
             setCurrentStep(0);
@@ -271,12 +272,11 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
 
 interface RfqLineItemsStepProps {
   initialItems: any[];
-  activePartyId: string;
   onPrev: (items: any[]) => void;
   onNext: (items: any[]) => void;
 }
 
-const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activePartyId, onPrev, onNext }) => {
+const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPrev, onNext }) => {
   const { message: antMessage } = AntApp.useApp();
   const screens = AntGrid.useBreakpoint();
   const descriptionsLayout = screens.sm ? 'horizontal' : 'vertical';
@@ -346,9 +346,9 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
     const newItem = {
       id: `item-${Date.now()}-${items.length + 1}`,
       category_id: undefined,
-      master_product_id: undefined,
+      catalog_product_id: undefined,
       quantity: 1,
-      unit_of_measure: 'Units',
+      unit_of_measure: 'Pcs',
       brand_id: undefined,
       manufacturer_id: undefined,
       selected_dynamic_attributes: [],
@@ -460,14 +460,6 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
       return (
         <div className="flex flex-col h-full">
           <div className="mb-4">
-            {/* <AntButton
-              type="default"
-              icon={<Lucide.ArrowLeft size={16} />}
-              onClick={() => setViewingVariant(null)}
-              className="mt-2 h-10 px-4 rounded-full border-slate-300 text-slate-700 font-medium hover:border-slate-300 hover:text-slate-900"
-            >
-              Back to Results
-            </AntButton> */}
             <h3 className="text-md font-bold text-slate-800 leading-tight mt-3">
               {sellerProduct.product_name}
             </h3>
@@ -712,7 +704,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
     }
     for (let idx = 0; idx < items.length; idx++) {
       const item = items[idx];
-      if (!item.category_id || !item.quantity) {
+      if (!item.category_id || !item.catalog_product_id || !item.quantity) {
         antMessage.error(`Line Item #${idx + 1} requires a Category and Quantity`);
         return;
       }
@@ -753,7 +745,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                 return (
                   <div className="space-y-1">
                     <div>
-                      <AntTag color="blue" icon={<AntAppstoreOutlined />}>Open Spec RFQ</AntTag>
+                      <AntTag color="blue" icon={<AntAppstoreOutlined />}>{record.variant_id ? "Variant Product" : "Open Spec"}</AntTag>
                     </div>
                     <div className="text-[11px]">
                       {hasTargetSellers ? (
@@ -770,13 +762,13 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
               title: 'Item Category & Details',
               render: (_, record) => {
                 const cat = leafCategories.find((c) => c.id === record.category_id);
-                const mProd = allMasterProducts.find((p) => p.id === record.master_product_id);
+                const mProd = allMasterProducts.find((p) => p.id === record.catalog_product_id);
                 return (
                   <div className="space-y-1">
                     <div className="font-bold text-slate-900">{cat?.name || record.category_id || <span className="text-slate-400 italic">No Category</span>}</div>
                     {(mProd) && (
                       <div className="text-xs text-slate-500">
-                        {mProd && <span>Master: {mProd.name}</span>}
+                        {mProd && <span>Product: {mProd.name}</span>}
                       </div>
                     )}
                   </div>
@@ -921,11 +913,10 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                               onChange={(catId) => {
                                 const updated = [...items];
                                 updated[activeDrawerIndex].category_id = catId;
-                                updated[activeDrawerIndex].master_product_id = undefined;
-                                updated[activeDrawerIndex].selected_dynamic_attributes = [];
+                                updated[activeDrawerIndex].catalog_product_id = null;
                                 updated[activeDrawerIndex].variant_id = null;
                                 updated[activeDrawerIndex].product_id = null;
-                                updated[activeDrawerIndex].catalog_product_id = null;
+                                updated[activeDrawerIndex].selected_dynamic_attributes = [];
                                 setItems(updated);
                                 setVariantPage(1);
                               }}
@@ -937,17 +928,16 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                             <AntSelect
                               allowClear
                               placeholder="Select Master Product"
-                              value={item.master_product_id}
+                              value={item.catalog_product_id}
                               onChange={(masterProdId) => {
                                 const updated = [...items];
-                                updated[activeDrawerIndex].master_product_id = masterProdId;
+                                updated[activeDrawerIndex].catalog_product_id = masterProdId;
                                 const mProd = allMasterProducts.find((p) => p.id === masterProdId);
                                 if (mProd) {
                                   updated[activeDrawerIndex].category_id = mProd.categoryId;
                                 }
                                 updated[activeDrawerIndex].variant_id = null;
                                 updated[activeDrawerIndex].product_id = null;
-                                updated[activeDrawerIndex].catalog_product_id = null;
                                 setItems(updated);
                                 setVariantPage(1);
                               }}
@@ -1008,6 +998,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                             <AntDescriptions.Item label="Preferred Brand(s)">
                               <AntSelect
                                 mode="multiple"
+                                variant='underlined'
                                 allowClear
                                 placeholder="Select Preferred Brand(s)"
                                 value={Array.isArray(item.brand_id) ? item.brand_id : item.brand_id ? [item.brand_id] : []}
@@ -1016,7 +1007,6 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                                   updated[activeDrawerIndex].brand_id = val;
                                   updated[activeDrawerIndex].variant_id = null;
                                   updated[activeDrawerIndex].product_id = null;
-                                  updated[activeDrawerIndex].catalog_product_id = null;
                                   setItems(updated);
                                   setVariantPage(1);
                                 }}
@@ -1027,6 +1017,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                             <AntDescriptions.Item label="Preferred Manufacturer(s)">
                               <AntSelect
                                 mode="multiple"
+                                variant='underlined'
                                 allowClear
                                 placeholder="Select Preferred Manufacturer(s)"
                                 value={Array.isArray(item.manufacturer_id) ? item.manufacturer_id : item.manufacturer_id ? [item.manufacturer_id] : []}
@@ -1035,7 +1026,6 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                                   updated[activeDrawerIndex].manufacturer_id = val;
                                   updated[activeDrawerIndex].variant_id = null;
                                   updated[activeDrawerIndex].product_id = null;
-                                  updated[activeDrawerIndex].catalog_product_id = null;
                                   setItems(updated);
                                   setVariantPage(1);
                                 }}
@@ -1112,7 +1102,10 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                                     >
                                       <AntSelect
                                         mode="multiple"
+                                        allowClear
                                         value={selectedValueIds}
+                                        variant='underlined'
+                                        maxTagCount={"responsive"}
                                         placeholder={`Select ${attr.name}`}
                                         onChange={(selectedValIds) => {
                                           const updated = [...items];
@@ -1126,11 +1119,10 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, activ
                                           updated[activeDrawerIndex].selected_dynamic_attributes = dynAttrs;
                                           updated[activeDrawerIndex].variant_id = null;
                                           updated[activeDrawerIndex].product_id = null;
-                                          updated[activeDrawerIndex].catalog_product_id = null;
                                           setItems(updated);
                                         }}
                                         className="w-full"
-                                        options={attr.values.map((v: any) => ({ value: v.id, label: `${v.label} (${v.id})` }))}
+                                        options={attr.values.map((v: any) => ({ value: v.id, label: `${v.label}` }))}
                                       />
                                     </AntDescriptions.Item>
                                   );
@@ -1290,175 +1282,228 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
     marketingConsent: false,
   });
 
+  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
+  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+  const allAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
+  const allCategories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
+  const allMasterProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
+  const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
+
+  const screens = AntGrid.useBreakpoint();
+  const descriptionsLayout = screens.sm ? 'horizontal' : 'vertical';
+
+  const [viewItemIndex, setViewItemIndex] = useState<number | null>(null);
+
   const handleIssueRfq = async () => {
     if (!agreements.termsAgreed || !agreements.shareContact) {
       antMessage.error('You must agree to the terms and consent to share contact details.');
       return;
     }
+    if (!currentUserId) {
+      antMessage.error('You must be logged in to issue an RFQ.');
+      return;
+    }
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx];
+      if (!item.category_id || !item.catalog_product_id) {
+        antMessage.warning(`Line Item #${idx + 1} requires a Category and Product ID.`);
+        return;
+      }
+    }
 
     try {
-      const newRfqId = `rfq-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const newRfq: any = {
+      const now = new Date().toISOString();
+      const newRfqId = `rfq-${Date.now()}`;
+      const rfqNumber = `RFQ-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const newRfq: Rfq = {
         id: newRfqId,
-        rfq_number: `RFQ-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+        rfq_number: rfqNumber,
         title: globalDetails.title,
-        description: globalDetails.description,
+        description: globalDetails.description || undefined,
+        status: 'ISSUED',
         requester_id: activePartyId,
+        requester_name: activePartyName,
         requester_party_id: activePartyId,
         requester_party_type: isBusinessContext ? 'BUSINESS' : 'USER',
-        requester_name: activePartyName,
         created_by_user_id: currentUserId || 'usr-2',
-        contact_email: globalDetails.contact_email,
-        contact_phone: globalDetails.contact_phone,
-        shipping_destination: globalDetails.shipping_destination,
-        status: 'PUBLISHED',
-        published_at: new Date().toISOString(),
-        submission_deadline: new Date(globalDetails.submission_deadline).toISOString(),
-        total_items_count: items.length,
-        currency: globalDetails.currency,
-        timeline: [
-          {
-            id: `tl-${Date.now()}`,
-            rfq_id: newRfqId,
-            event_type: 'ISSUED',
-            actor_name: currentUser?.full_name || 'John Doe',
-            actor_id: currentUserId || 'usr-2',
-            timestamp: new Date().toISOString(),
-            remarks: `RFQ Container published for ${activePartyName} and issued to target suppliers.`,
-          },
-        ],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        contact_email: globalDetails.contact_email || undefined,
+        contact_phone: globalDetails.contact_phone || undefined,
+        shipping_destination: globalDetails.shipping_destination || undefined,
+        submission_deadline: globalDetails.submission_deadline
+          ? new Date(globalDetails.submission_deadline).toISOString()
+          : now,
+        currency: globalDetails.currency || 'USD',
+        created_at: now,
+        updated_at: now,
       };
 
-
-      const newRfqItems: any[] = [];
+      const newRfqItems: RfqItem[] = [];
       const newRfqItemAttributes: RfqItemAttribute[] = [];
       const newQuotes: SellerQuote[] = [];
 
       items.forEach((item, idx) => {
-        const itemId = `rfqi-${newRfqId}-${idx + 1}`;
+        const itemId = `${newRfqId}-rfqi-${idx + 1}`;
+
+        // Determine target sellers for this item
+        const targetSellers: string[] =
+          item.target_seller_party_ids && item.target_seller_party_ids.length > 0
+            ? item.target_seller_party_ids
+            : allParties.filter((p: any) => p.id !== activePartyId).map((p: any) => p.id);
+
+        const sellerAssignments: SellerAssignment[] = targetSellers.map((partyId: string) => ({
+          rfq_item_id: itemId,
+          seller_party_id: partyId,
+          assignment_type: item.target_seller_party_ids && item.target_seller_party_ids.length > 0
+            ? 'DIRECT_INVITATION'
+            : "PUBLIC_MARKETPLACE",
+          assigned_by_user_id: currentUserId,
+          assigned_at: now,
+        }));
 
         newRfqItems.push({
           id: itemId,
-          rfq_id: newRfqId,
           item_index: idx + 1,
+          rfq_id: newRfqId,
+          category_id: item.category_id,
+          catalog_product_id: item.catalog_product_id,
+          product_id: item.product_id || null,
+          variant_id: item.variant_id || null,
+          req_quantity: Number(item.quantity) || 1,
+          req_unit: item.unit_of_measure || 'Pcs',
           status: 'OPEN',
-          category_id: item.category_id || '',
-          catalog_product_id: item.master_product_id || null,
-          product_id: null,
-          variant_id: null,
-          req_quantity: item.quantity || 1,
-          req_unit: item.unit_of_measure || 'Units',
-          seller_assignments: (item.target_seller_party_ids || []).map((partyId: string, sIdx: number) => ({
-            id: `sa-${newRfqId}-${idx + 1}-${sIdx + 1}`,
-            rfq_item_id: itemId,
-            seller_party_id: partyId,
-            assignment_type: 'DIRECT_INVITATION',
-            assigned_by_user_id: currentUserId || 'usr-2',
-            assigned_at: new Date().toISOString(),
-            status: 'ASSIGNED',
-          })),
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          seller_assignments: sellerAssignments,
+          created_at: now,
+          updated_at: now,
         });
 
-        // System Attributes
+        // 1. System Attribute: Brand Selection
         if (item.brand_id && item.brand_id.length > 0) {
+          const brandValues: ItemAttributeValue[] = item.brand_id.map((bId: string) => {
+            const matchedBrand = allBrands.find((b) => b.id === bId);
+            return {
+              value_id: bId,
+              value_label: matchedBrand?.name || bId,
+            };
+          });
+
           newRfqItemAttributes.push({
-            id: `attr-${itemId}-brand`,
+            id: `ia-${itemId}-brand`,
             rfq_item_id: itemId,
             attribute_type: 'SYSTEM',
             group_id: 'system',
             attribute_id: 'brand',
+            description: 'Sourcing Brand Selection',
             connector: 'OR',
-            values: item.brand_id.map((b: string) => ({ value_id: b, value_label: b })),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            values: brandValues,
+            created_at: now,
+            updated_at: now,
           });
         }
-
+        // 2. System Attribute: Manufacturer Selection
         if (item.manufacturer_id && item.manufacturer_id.length > 0) {
+          const mfgValues: ItemAttributeValue[] = item.manufacturer_id.map((mId: string) => {
+            const matchedMfg = allManufacturers.find((m) => m.id === mId);
+            return {
+              value_id: mId,
+              value_label: matchedMfg?.company_name || mId,
+            };
+          });
+
           newRfqItemAttributes.push({
-            id: `attr-${itemId}-mfg`,
+            id: `ia-${itemId}-mfg`,
             rfq_item_id: itemId,
             attribute_type: 'SYSTEM',
             group_id: 'system',
             attribute_id: 'manufacturer',
+            description: 'Sourcing Manufacturer Selection',
             connector: 'OR',
-            values: item.manufacturer_id.map((m: string) => ({ value_id: m, value_label: m })),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            values: mfgValues,
+            created_at: now,
+            updated_at: now,
           });
         }
 
+        // 3. System Attribute: Required Quantity
         newRfqItemAttributes.push({
-          id: `attr-${itemId}-qty`,
+          id: `ia-${itemId}-qty`,
           rfq_item_id: itemId,
           attribute_type: 'SYSTEM',
           group_id: 'system',
           attribute_id: 'req_quantity',
-          connector: 'AND',
+          description: '',
+          connector: 'OR',
           values: [
             { value_id: 'req-quantity', value_label: String(item.quantity || 1) },
-            { value_id: 'req-quantity-unit', value_label: item.unit_of_measure || 'Units' }
+            { value_id: (item.unit_of_measure || 'Pcs').toLowerCase(), value_label: item.unit_of_measure || 'Pcs' },
           ],
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          created_at: now,
+          updated_at: now,
         });
 
-        // Custom Dynamic Attributes
-        if (item.selected_dynamic_attributes) {
+        // 4. Custom Dynamic Attributes
+        if (item.selected_dynamic_attributes && Array.isArray(item.selected_dynamic_attributes)) {
           item.selected_dynamic_attributes.forEach((da: any, daIdx: number) => {
             if (da.selected_value_ids && da.selected_value_ids.length > 0) {
+              const dynamicValues: ItemAttributeValue[] = da.selected_value_ids.map((vid: string) => {
+                const matchedVal = allAttributeValues.find((v) => v.id === vid);
+                return {
+                  value_id: vid,
+                  value_label: matchedVal?.label || vid,
+                };
+              });
+
               newRfqItemAttributes.push({
-                id: `attr-${itemId}-custom-${daIdx}`,
+                id: `ia-${itemId}-custom-${daIdx}`,
                 rfq_item_id: itemId,
                 attribute_type: 'CUSTOM',
                 group_id: da.group_id,
                 attribute_id: da.attribute_id,
-                connector: da.connector || 'OR',
-                values: da.selected_value_ids.map((vid: string) => ({ value_id: vid, value_label: vid })),
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
+                description: '',
+                connector: (da.connector === 'AND' ? 'AND' : 'OR') as 'AND' | 'OR',
+                values: dynamicValues,
+                created_at: now,
+                updated_at: now,
               });
             }
           });
         }
 
-        // Generate Target Seller Quotes
-        const targetSellers = item.target_seller_party_ids && item.target_seller_party_ids.length > 0
-          ? item.target_seller_party_ids
-          : allParties.filter((p: any) => p.id !== activePartyId).map((p: any) => p.id);
-
+        // 5. Generate Initial Target Seller Quotes (DRAFT round 1)
         targetSellers.forEach((sellerPartyId: string) => {
           newQuotes.push({
             id: `q-${itemId}-${sellerPartyId}`,
             rfq_item_id: itemId,
-            seller_party_id: sellerPartyId,
-            seller_quote_number: `SQ-${itemId.replace('rfqi-', '')}-${sellerPartyId.replace('pty-', '')}`,
-            status: 'DRAFT',
             round: 1,
-            offer_quantity: item.quantity,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
+            seller_party_id: sellerPartyId,
+            seller_quote_number: `SQ-${itemId}-${sellerPartyId.replace(/[^a-zA-Z0-9]/g, '')}`,
+            offer_quantity: Number(item.quantity) || 1,
+            offer_unit: item.unit_of_measure || 'Pcs',
+            status: 'NOT_SUBMITTED',
+            created_at: now,
+            updated_at: now,
           });
         });
       });
-
-      await rfqDb.rfqs.put(newRfq as Rfq);
-      await rfqDb.rfq_items.bulkPut(newRfqItems as RfqItem[]);
-      if (newRfqItemAttributes.length > 0) {
-        await rfqDb.rfq_item_attributes.bulkPut(newRfqItemAttributes);
-      }
-      if (newQuotes.length > 0) {
-        await rfqDb.seller_quotes.bulkPut(newQuotes);
-      }
+      await rfqDb.transaction(
+        'rw',
+        [rfqDb.rfqs, rfqDb.rfq_items, rfqDb.rfq_item_attributes, rfqDb.seller_quotes],
+        async () => {
+          await rfqDb.rfqs.put(newRfq);
+          await rfqDb.rfq_items.bulkPut(newRfqItems);
+          if (newRfqItemAttributes.length > 0) {
+            await rfqDb.rfq_item_attributes.bulkPut(newRfqItemAttributes);
+          }
+          if (newQuotes.length > 0) {
+            await rfqDb.seller_quotes.bulkPut(newQuotes);
+          }
+        }
+      );
 
       antMessage.success('RFQ Container issued successfully!');
       onSuccess(newRfqId);
     } catch (err) {
-      console.error(err);
+      console.error('Failed to issue RFQ container:', err);
       antMessage.error('Failed to issue RFQ container');
     }
   };
@@ -1467,11 +1512,13 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
     <div className="space-y-6">
       <AntCard className="shadow-sm border-slate-200">
         <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-slate-800">Review RFQ Details</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <div><span className="text-slate-500">RFQ Title:</span> <div className="font-bold text-slate-900">{globalDetails.title}</div></div>
-          <div><span className="text-slate-500">Deadline:</span> <div className="font-bold text-slate-900">{globalDetails.submission_deadline}</div></div>
-          <div><span className="text-slate-500">Destination:</span> <div className="font-bold text-slate-900">{globalDetails.shipping_destination}</div></div>
-          <div><span className="text-slate-500">Total Items:</span> <div className="font-bold text-blue-600">{items.length} Items</div></div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+          <div><span className="text-slate-500 block text-xs">RFQ Title</span> <div className="font-bold text-slate-900">{globalDetails.title}</div></div>
+          <div><span className="text-slate-500 block text-xs">Deadline</span> <div className="font-bold text-slate-900">{globalDetails.submission_deadline}</div></div>
+          <div><span className="text-slate-500 block text-xs">Destination</span> <div className="font-bold text-slate-900">{globalDetails.shipping_destination}</div></div>
+          <div><span className="text-slate-500 block text-xs">Contact Email</span> <div className="font-bold text-slate-900">{globalDetails.contact_email}</div></div>
+          <div><span className="text-slate-500 block text-xs">Currency</span> <div className="font-bold text-slate-900">{globalDetails.currency}</div></div>
+          <div><span className="text-slate-500 block text-xs">Total Items</span> <div className="font-bold text-blue-600">{items.length} Items</div></div>
         </div>
 
         <AntTable
@@ -1482,9 +1529,34 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
           bordered
           columns={[
             { title: 'Item #', width: 70, render: (_, __, i) => i + 1 },
-            { title: 'Sourcing Mode', width: 140, render: () => <AntTag color="blue">Open Spec</AntTag> },
-            { title: 'Category', render: (_, r) => <span><strong>{r.category_id || 'N/A'}</strong></span> },
+            {
+              title: 'Category & Details',
+              render: (_, r) => {
+                const cat = allCategories.find((c) => c.id === r.category_id);
+                const mProd = allMasterProducts.find((p) => p.id === r.catalog_product_id);
+                return (
+                  <div className="space-y-1">
+                    <div className="font-bold text-slate-900">{cat?.name || r.category_id || <span className="text-slate-400 italic">No Category</span>}</div>
+                    {(mProd) && (
+                      <div className="text-xs text-slate-500">
+                        {mProd && <span>Master: {mProd.name}</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            },
             { title: 'Quantity', width: 120, render: (_, r) => `${r.quantity} ${r.unit_of_measure}` },
+            { title: 'Sourcing Mode', width: 140, render: (_, r) => <AntTag color="blue">{r.variant_id ? "Variant Product" : "Open Spec"}</AntTag> },
+            {
+              title: 'Action',
+              width: 100,
+              render: (_, __, i) => (
+                <AntButton size="small" type="primary" ghost onClick={() => setViewItemIndex(i)}>
+                  View
+                </AntButton>
+              )
+            }
           ]}
         />
 
@@ -1527,6 +1599,141 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
           Submit RFQ Container
         </AntButton>
       </div>
+
+      <AntModal
+        title={
+          <div className="flex items-center gap-2 text-slate-800">
+            <AntAppstoreOutlined className="text-blue-600" />
+            <span>Review Line Item #{viewItemIndex !== null ? viewItemIndex + 1 : ''}</span>
+          </div>
+        }
+        open={viewItemIndex !== null}
+        onCancel={() => setViewItemIndex(null)}
+        footer={[
+          <AntButton key="close" type="primary" className='mt-2' onClick={() => setViewItemIndex(null)}>
+            Close
+          </AntButton>
+        ]}
+        classNames={{
+          container: "pb-2",
+          footer: "border-t border-slate-200"
+        }}
+        width={800}
+        destroyOnClose
+      >
+        {viewItemIndex !== null && items[viewItemIndex] && (() => {
+          const item = items[viewItemIndex];
+          const cat = allCategories.find((c) => c.id === item.category_id);
+          const mProd = allMasterProducts.find((p) => p.id === item.catalog_product_id);
+          return (
+            <div className="space-y-6 mt-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <div className="border-b border-slate-200 px-4 py-3 bg-slate-50 flex items-center gap-2 text-slate-800 font-semibold text-sm">
+                  <AntAppstoreOutlined className="text-blue-600" /> Product Details
+                </div>
+                <div className="p-3">
+                  <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                    <AntDescriptions.Item label="Category">
+                      <span className="text-slate-900">{cat?.name || item.category_id}</span>
+                    </AntDescriptions.Item>
+                    <AntDescriptions.Item label="Master Product">
+                      <span className="text-slate-900">{mProd?.name || item.catalog_product_id || 'N/A'}</span>
+                    </AntDescriptions.Item>
+                    <AntDescriptions.Item label="Quantity">
+                      <span className="text-slate-900">{item.quantity} {item.unit_of_measure}</span>
+                    </AntDescriptions.Item>
+                    <AntDescriptions.Item label="Target Sellers">
+                      <span className="text-slate-900">
+                        {item.target_seller_party_ids?.length ? `${item.target_seller_party_ids.length} Selected` : 'Open Marketplace'}
+                      </span>
+                    </AntDescriptions.Item>
+                  </AntDescriptions>
+                </div>
+              </div>
+
+              {/* Target Brands / Manufacturers */}
+              {(item.brand_id?.length > 0 || item.manufacturer_id?.length > 0) && (
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #2a79adff` }}>
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#2a79ad14` }}>
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white" style={{ backgroundColor: '#2a79adff' }}>
+                        1
+                      </span>
+                      <h4 className="text-xs font-semibold text-slate-800 m-0">Preferred Brand & Manufacturer</h4>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                      {item.brand_id?.length > 0 && (
+                        <AntDescriptions.Item label="Brands">
+                          <div className="flex flex-wrap gap-1">
+                            {item.brand_id.map((bId: string) => {
+                              const b = allBrands.find(b => b.id === bId);
+                              return <AntTag key={bId} color="blue" className="m-0">{b?.name || bId}</AntTag>;
+                            })}
+                          </div>
+                        </AntDescriptions.Item>
+                      )}
+                      {item.manufacturer_id?.length > 0 && (
+                        <AntDescriptions.Item label="Manufacturers">
+                          <div className="flex flex-wrap gap-1">
+                            {item.manufacturer_id.map((mId: string) => {
+                              const m = allManufacturers.find(m => m.id === mId);
+                              return <AntTag key={mId} color="purple" className="m-0">{m?.company_name || mId}</AntTag>;
+                            })}
+                          </div>
+                        </AntDescriptions.Item>
+                      )}
+                    </AntDescriptions>
+                  </div>
+                </div>
+              )}
+
+              {/* Dynamic Attributes */}
+              {item.selected_dynamic_attributes?.length > 0 && (
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #10b981` }}>
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#10b98114` }}>
+                    <div className="flex items-center gap-3">
+                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white" style={{ backgroundColor: '#10b981' }}>
+                        2
+                      </span>
+                      <h4 className="text-xs font-semibold text-slate-800 m-0">Custom Specifications</h4>
+                    </div>
+                  </div>
+                  <div className="p-3">
+                    <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                      {item.selected_dynamic_attributes.map((da: any, idx: number) => {
+                        const attr = allAttributes.find((a: any) => a.id === da.attribute_id);
+                        const valLabels = da.selected_value_ids.map((vId: string) => {
+                          const val = allAttributeValues.find((v: any) => v.id === vId);
+                          return val?.label || vId;
+                        });
+                        return (
+                          <AntDescriptions.Item key={idx} label={<span className="font-semibold">{attr?.name || da.attribute_id}</span>}>
+                            <span className="text-slate-900">
+                              {valLabels.map((vl: string, vIdx: number) => (
+                                <span key={vIdx}>
+                                  {vl}
+                                  {vIdx < valLabels.length - 1 && (
+                                    <span className="mx-1 text-slate-400 font-bold">
+                                      {(da.connector || 'OR') === 'OR' ? '|' : ','}
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </span>
+                          </AntDescriptions.Item>
+                        );
+                      })}
+                    </AntDescriptions>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </AntModal>
     </div>
   );
 };

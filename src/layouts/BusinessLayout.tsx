@@ -304,7 +304,7 @@ const BusinessLayout: React.FC = () => {
           <div className="flex items-center gap-2 sm:gap-4">
             <AntButton
               type="text"
-              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.ChevronLeft size={20} />)}
+              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.Logs size={20} />)}
               onClick={() => {
                 if (isMobile) {
                   setMobileOpen(!mobileOpen);
@@ -396,6 +396,11 @@ const BusinessLayout: React.FC = () => {
         {/* Content Body */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full">
           <div className="mb-3">
+            {breadcrumbItems.length > 0 && (
+              <div className="mb-6">
+                <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />
+              </div>
+            )}
             <AntButton
               type="default"
               icon={<Lucide.ArrowLeft size={16} />}
@@ -405,11 +410,6 @@ const BusinessLayout: React.FC = () => {
               Back to Previous Page
             </AntButton>
           </div>
-          {breadcrumbItems.length > 0 && (
-            <div className="mb-6">
-              <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />
-            </div>
-          )}
           <div className="max-w-7xl w-full mx-auto min-w-0">
             <Outlet />
           </div>
