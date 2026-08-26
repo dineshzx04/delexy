@@ -638,8 +638,11 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       title: 'Attribute',
       dataIndex: 'attributeName',
       key: 'attributeName',
-      className: "w-[250px] max-w-[250px] align-top",
+      className: "min-w-50 align-top",
       render: (text: string, record: any) => {
+        const proposalKey = `${record.group_id}_${record.attribute_id}`;
+        const attributeData = proposalAttributes[proposalKey];
+        const showStatus = existingQuote && ['REVISION_REQUIRED', 'SUBMITTED', 'DRAFT'].includes(existingQuote.status);
         return (
           <div className="flex flex-col gap-1.5 py-0.5">
             <div className="flex flex-col gap-0.5">
@@ -651,9 +654,19 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
             <div className="flex flex-wrap gap-1 items-center">
               {record.is_variant && (
-                <AntTag className="m-0 leading-tight bg-blue-50 text-blue-600 border-blue-200" icon={<AntIconCheckCircleOutlined />}>
-                  Variant Attribute
+                <AntTag className="inline-flex items-center m-0 leading-tight bg-blue-50 min-h-5 text-blue-600 border-blue-200" icon={<AntIconCheckCircleOutlined />}>
+                  Variant
                 </AntTag>
+              )}
+              {proposalAttributes[proposalKey]?.is_deviation && (
+                <AntTag className="inline-flex items-center min-h-5 leading-tight bg-amber-50 text-amber-700 border-amber-200">Deviation</AntTag>
+              )}
+              {showStatus && attributeData && (
+                attributeData.buyer_accepted ? (
+                  <AntTag className="inline-flex items-center min-h-5 m-0 leading-tight bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
+                ) : (
+                  <AntTag className="inline-flex items-center min-h-5 m-0 leading-tight bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
+                )
               )}
             </div>
           </div>
@@ -664,7 +677,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       title: 'Requested Value',
       dataIndex: 'reqViewValue',
       key: 'reqViewValue',
-      className: "align-top",
+      className: "w-90 max-w-90 align-top",
       render: (_: string, record: any) => {
         const isQty = record.attribute_id === 'req_quantity';
         const forceORDisabled = record.attribute_id === 'manufacturer' || record.attribute_id === 'brand';
@@ -708,26 +721,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
           }
         }
 
-        const proposalKey = `${record.group_id}_${record.attribute_id}`;
-        const attributeData = proposalAttributes[proposalKey];
-        const showStatus = existingQuote && ['REVISION_REQUIRED', 'SUBMITTED', 'DRAFT'].includes(existingQuote.status);
         return (
           <span className="text-slate-600 font-medium">
             {requestedContent}
-            <div className="mt-1">
-              {showStatus && attributeData && (
-                attributeData.buyer_accepted ? (
-                  <AntTag className="m-0 leading-tight bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
-                ) : (
-                  <AntTag className="m-0 leading-tight bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
-                )
-              )}
-              <div className="">
-                {proposalAttributes[proposalKey]?.is_deviation && (
-                  <AntTag className="leading-tight bg-amber-50 text-amber-700 border-amber-200">Deviation</AntTag>
-                )}
-              </div>
-            </div>
           </span>
         );
       }
@@ -737,7 +733,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       title: 'Proposal Value',
       dataIndex: 'proposalValue',
       key: 'proposalValue',
-      className: "w-110 max-w-110 align-top",
+      className: "w-90 max-w-90 align-top",
       render: (_: string, attribute: any) => {
         const proposalKey = `${attribute.group_id}_${attribute.attribute_id}`
         const currentProposalAttr = proposalAttributes[proposalKey];
@@ -785,7 +781,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
             <AntInput
               disabled={isViewOnly}
               value={proposalAttributes[proposalKey]?.values?.find((i: any) => i.value_id === "req-quantity")?.value_label ?? ''}
-              className="w-100"
+              className="w-80"
               onChange={(e) => {
                 const val = Number(e.target.value);
                 if (isNaN(val) || val <= 0) {
@@ -837,7 +833,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
               allowClear
               tagRender={renderCustomTag}
               placeholder={placeholder}
-              className="w-100"
+              className="w-80"
               value={proposalAttributes[proposalKey]?.values?.map((v: any) => v.value_id) || []}
               onChange={(val: string[]) => {
                 const newValues = val.map(id => {
@@ -933,6 +929,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                 <div>
                   <AntInput.TextArea
                     size='small'
+                    className="w-80"
                     placeholder="Deviation Reason"
                     value={proposalAttributes[proposalKey]?.deviation_note}
                     rows={1}

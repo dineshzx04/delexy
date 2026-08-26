@@ -380,7 +380,7 @@ export const RequesterQuoteReview: React.FC = () => {
       title: 'Attribute',
       dataIndex: 'attributeName',
       key: 'attributeName',
-      className: "w-[250px] max-w-[250px] align-top",
+      className: "min-w-50 align-top",
       render: (text: string, record: any) => (
         <div className="flex flex-col gap-1.5 py-0.5">
           <div className="flex flex-col gap-0.5">
@@ -389,11 +389,15 @@ export const RequesterQuoteReview: React.FC = () => {
               <div className="text-[11px] text-slate-500 leading-tight italic">{record.description}</div>
             )}
           </div>
-
           <div className="flex flex-wrap gap-1 items-center">
             {(record.is_variant || record.isVariant) && (
-              <AntTag className="m-0 leading-tight bg-blue-50 text-blue-600 border-blue-200" icon={<AntIconCheckCircleOutlined />}>
-                Variant Attribute
+              <AntTag className="inline-flex items-center m-0 leading-tight bg-blue-50 min-h-5 text-blue-600 border-blue-200" icon={<AntIconCheckCircleOutlined />}>
+                Variant
+              </AntTag>
+            )} 
+            {record.is_deviation && (
+              <AntTag className="inline-flex items-center m-0 leading-tight min-h-5 bg-amber-50 text-amber-700 border-amber-200">
+                Deviation
               </AntTag>
             )}
           </div>
@@ -404,7 +408,7 @@ export const RequesterQuoteReview: React.FC = () => {
       title: 'Requested Value',
       dataIndex: 'reqViewValue',
       key: 'reqViewValue',
-      className: "w-[300px] max-w-[300px] align-top",
+      className: "w-90 max-w-90 align-top",
       render: (_: string, attribute: any) => {
         const isQty = attribute.attribute_id === 'req_quantity';
         const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
@@ -428,23 +432,23 @@ export const RequesterQuoteReview: React.FC = () => {
         }
 
         return (
-          <div className="flex flex-wrap items-center gap-y-1">
-            {reqValues.map((v: any, index: number) => {
-              const isLast = index === reqValues.length - 1;
-              return (
-                <div key={v.value_id} className='flex items-center'>
-                  <AntTag className="inline-flex items-center m-0 min-h-6 leading-tight bg-slate-50 text-slate-600 border-slate-200">
-                    {v.value_label}
-                  </AntTag>
-                  {!isLast && (
-                    <span className="mx-1 text-slate-500 font-bold text-[13px] select-none">
-                      {reqJoiner}
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+             <div className="flex flex-wrap items-center">
+              {reqValues.map((v: any, index: number) => {
+                const isLast = index === reqValues.length - 1;
+                return (
+                  <div key={v.value_id} className='flex items-center'>
+                    <AntTag className="inline-flex items-center m-0 min-h-6 leading-tight bg-slate-50 text-slate-600 border-slate-200">
+                      {v.value_label}
+                    </AntTag>
+                    {!isLast && (
+                      <span className="mx-1 text-slate-500 font-bold text-[13px] select-none">
+                        {reqJoiner}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
         );
       }
     },
@@ -452,7 +456,7 @@ export const RequesterQuoteReview: React.FC = () => {
       title: 'Proposal Value & Feedback',
       dataIndex: 'proposalViewValue',
       key: 'proposalValue',
-      className: "max-w-[400px] align-top",
+      className: "w-90 max-w-90 align-top",
       render: (_: string, attribute: any) => {
         const threadComments = existingComments
           .filter((c) => c.group_id === attribute.group_id && c.attribute_id === attribute.attribute_id)
@@ -504,11 +508,6 @@ export const RequesterQuoteReview: React.FC = () => {
             <div className="w-full flex flex-col gap-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 {proposalContent}
-                {attribute.is_deviation && (
-                  <AntTag className="m-0 leading-tight bg-amber-50 text-amber-700 border-amber-200">
-                    Deviation
-                  </AntTag>
-                )}
               </div>
               {attribute.is_deviation && attribute.deviation_note && (
                 <div className="text-[12px] bg-amber-50/50 text-amber-800 border border-amber-100/70 rounded px-2.5 py-1 leading-normal italic mt-0.5">
@@ -561,7 +560,7 @@ export const RequesterQuoteReview: React.FC = () => {
       title: 'Accept',
       dataIndex: 'buyer_accepted',
       key: 'buyer_accepted',
-      className: "w-[80px] text-center align-top",
+      className: "w-10 text-center align-top",
       render: (_: boolean, record: any) => (
         <Checkbox
           checked={!!acceptedAttributes[record.id]}
