@@ -972,15 +972,15 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
           return (
             <div className="h-full grid grid-cols-1 lg:grid-cols-12">
               {/* Left Pane: Attributes Form */}
-              <div className="lg:col-span-7 xl:col-span-8 overflow-y-auto rounded-xl lg:pr-2  ">
-                <div className="w-full max-w-4xl mx-auto space-y-6 ">
-                  <div className="space-y-6">
-                    <div className="overflow-hidden rounded-xl border border-slate-200">
-                      <div className=" border-b border-slate-200 px-4 py-3 bg-slate-50"  >
+              <div className="lg:col-span-7 xl:col-span-8 overflow-y-auto rounded-xl lg:pr-2">
+                <div className="w-full max-w-4xl mx-auto space-y-3.5">
+                  <div className="space-y-3.5">
+                    <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                      <div className="border-b border-slate-200 px-3 py-2 bg-slate-50 text-xs font-semibold text-slate-800 flex items-center gap-2">
                         <AntAppstoreOutlined className="text-blue-600" /> Product Details
                       </div>
-                      <div className="p-3">
-                        <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                      <div className="p-2.5">
+                        <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '35%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
 
                           <AntDescriptions.Item label="Category *">
                             <AntSelect
@@ -1056,21 +1056,21 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                     </div>
 
                     {!!item.category_id && (
-                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #2a79adff` }}>
-                        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#2a79ad14` }}>
-                          <div className="flex items-center gap-3">
-                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: '#2a79adff' }}>
+                      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `3px solid #2a79adff` }}>
+                        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2" style={{ backgroundColor: `#2a79ad14` }}>
+                          <div className="flex items-center gap-2">
+                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: '#2a79adff' }}>
                               1
                             </span>
-                            <h4 className="text-xs font-semibold text-slate-800">Manufacturer & Brand</h4>
+                            <h4 className="text-xs font-semibold text-slate-800 m-0">Manufacturer & Brand</h4>
                           </div>
                           <div className="flex items-center gap-2">
-                            <AntTag color="default" style={{ borderColor: "#2a79adff", color: "#2a79adff", fontWeight: 700 }}>
-                              {(item.preferred_brand_manufacturers || []).length} Manufacturer & Brand Pair(s)
+                            <AntTag color="default" className="text-xs m-0" style={{ borderColor: "#2a79adff", color: "#2a79adff", fontWeight: 700 }}>
+                              {(item.preferred_brand_manufacturers || []).length} Pair(s)
                             </AntTag>
                           </div>
                         </div>
-                        <div className="p-3 space-y-3">
+                        <div className="p-2.5 space-y-2">
                           {(!item.preferred_brand_manufacturers ||
                             item.preferred_brand_manufacturers.length === 0) ? (
                             <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5">
@@ -1111,27 +1111,22 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                                 (mfgBrandPair: ManufacturerBrandMapping, pairIndex: number) => (
                                   <div
                                     key={mfgBrandPair.id || pairIndex}
-                                    className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm"
+                                    className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm space-y-2"
                                   >
-                                    {/* Header */}
-                                    <div className="mb-2 flex items-center justify-between">
-                                      <div className="flex min-w-0 items-center gap-1.5">
-                                        <span className="flex h-5 min-w-5 items-center justify-center rounded bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600">
-                                          {pairIndex + 1}
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="flex h-4 min-w-4 items-center justify-center rounded bg-slate-100 px-1 text-[9px] font-bold text-slate-600">
+                                          #{pairIndex + 1}
                                         </span>
-
-                                        <span className="truncate text-[11px] font-semibold text-slate-700">
-                                          Manufacturer × Brand
-                                        </span>
+                                        <span className="text-[11px] font-semibold text-slate-700">Manufacturer & Brand Pair</span>
                                       </div>
-
                                       {item.preferred_brand_manufacturers.length > 1 && (
                                         <AntButton
                                           type="text"
                                           danger
                                           size="small"
-                                          className="!h-6 !w-6 !p-0"
-                                          icon={<Lucide.Trash2 size={13} />}
+                                          className="!h-5 !w-5 !p-0"
+                                          icon={<Lucide.Trash2 size={12} />}
                                           onClick={() => {
                                             const updated = [...items];
                                             if (updated[activeDrawerIndex].preferred_brand_manufacturers.length > 1) {
@@ -1146,81 +1141,66 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                                       )}
                                     </div>
 
-                                    {/* Manufacturer + Brand */}
-                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                      {/* Manufacturer */}
-                                      <div className="min-w-0">
-                                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                          Manufacturer
-                                        </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      <AntSelect
+                                        allowClear
+                                        showSearch
+                                        optionFilterProp="label"
+                                        placeholder="Select Manufacturer..."
+                                        value={mfgBrandPair.manufacturer_id}
+                                        onChange={(val: string) => {
+                                          const updated = [...items];
+                                          const pair =
+                                            updated[activeDrawerIndex]
+                                              .preferred_brand_manufacturers[pairIndex];
 
-                                        <AntSelect
-                                          allowClear
-                                          showSearch
-                                          optionFilterProp="label"
-                                          placeholder="Select manufacturer"
-                                          value={mfgBrandPair.manufacturer_id}
-                                          onChange={(val: string) => {
-                                            const updated = [...items];
-                                            const pair =
-                                              updated[activeDrawerIndex]
-                                                .preferred_brand_manufacturers[pairIndex];
+                                          pair.manufacturer_id = val;
 
-                                            pair.manufacturer_id = val;
+                                          if (val && pair.brand_id && !isVerifiedManufacturerBrandPair(val, pair.brand_id)) {
+                                            pair.brand_id = undefined;
+                                          }
 
-                                            if (val && pair.brand_id && !isVerifiedManufacturerBrandPair(val, pair.brand_id)) {
-                                              pair.brand_id = undefined;
-                                            }
+                                          updated[activeDrawerIndex].variant_id = null;
+                                          updated[activeDrawerIndex].product_id = null;
 
-                                            updated[activeDrawerIndex].variant_id = null;
-                                            updated[activeDrawerIndex].product_id = null;
+                                          setItems(updated);
+                                        }}
+                                        options={getAvailableManufacturerOptionsForBrand(mfgBrandPair.brand_id)}
+                                        className="w-full text-xs"
+                                        popupMatchSelectWidth={false}
+                                      />
 
-                                            setItems(updated);
-                                          }}
-                                          options={getAvailableManufacturerOptionsForBrand(mfgBrandPair.brand_id)}
-                                          className="w-full"
-                                          popupMatchSelectWidth={false}
-                                        />
-                                      </div>
+                                      <AntSelect
+                                        allowClear
+                                        showSearch
+                                        optionFilterProp="label"
+                                        placeholder="Select Brand..."
+                                        value={mfgBrandPair.brand_id}
+                                        onChange={(val: string) => {
+                                          const updated = [...items];
+                                          const pair =
+                                            updated[activeDrawerIndex]
+                                              .preferred_brand_manufacturers[pairIndex];
 
-                                      {/* Brand */}
-                                      <div className="min-w-0">
-                                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                                          Brand
-                                        </label>
+                                          pair.brand_id = val;
 
-                                        <AntSelect
-                                          allowClear
-                                          showSearch
-                                          optionFilterProp="label"
-                                          placeholder="Select brand"
-                                          value={mfgBrandPair.brand_id}
-                                          onChange={(val: string) => {
-                                            const updated = [...items];
-                                            const pair =
-                                              updated[activeDrawerIndex]
-                                                .preferred_brand_manufacturers[pairIndex];
+                                          if (
+                                            val &&
+                                            pair.manufacturer_id &&
+                                            !isVerifiedManufacturerBrandPair(pair.manufacturer_id, val)
+                                          ) {
+                                            pair.manufacturer_id = undefined;
+                                          }
 
-                                            pair.brand_id = val;
+                                          updated[activeDrawerIndex].variant_id = null;
+                                          updated[activeDrawerIndex].product_id = null;
 
-                                            if (
-                                              val &&
-                                              pair.manufacturer_id &&
-                                              !isVerifiedManufacturerBrandPair(pair.manufacturer_id, val)
-                                            ) {
-                                              pair.manufacturer_id = undefined;
-                                            }
-
-                                            updated[activeDrawerIndex].variant_id = null;
-                                            updated[activeDrawerIndex].product_id = null;
-
-                                            setItems(updated);
-                                          }}
-                                          options={getAvailableBrandOptionsForManufacturer(mfgBrandPair.manufacturer_id)}
-                                          className="w-full"
-                                          popupMatchSelectWidth={false}
-                                        />
-                                      </div>
+                                          setItems(updated);
+                                        }}
+                                        options={getAvailableBrandOptionsForManufacturer(mfgBrandPair.manufacturer_id)}
+                                        className="w-full text-xs"
+                                        popupMatchSelectWidth={false}
+                                      />
                                     </div>
                                   </div>
                                 )
@@ -1306,22 +1286,22 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                       categoryAttributeTree.map((group: any, idx: number) => {
                         const accentColor = ['#527EA3', '#5D9365', '#C9825A', '#8975A8'][(idx + 1) % 4];
                         return (
-                          <div key={group.groupId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid ${accentColor}` }}>
-                            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `${accentColor}14` }}>
-                              <div className="flex items-center gap-3">
-                                <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: accentColor }}>
+                          <div key={group.groupId} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `3px solid ${accentColor}` }}>
+                            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2" style={{ backgroundColor: `${accentColor}14` }}>
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: accentColor }}>
                                   {idx + 2}
                                 </span>
-                                <h4 className="text-xs font-semibold text-slate-800">{group.groupName}</h4>
+                                <h4 className="text-xs font-semibold text-slate-800 m-0">{group.groupName}</h4>
                               </div>
                               <div className="flex items-center gap-2">
-                                <AntTag color="default" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
+                                <AntTag color="default" className="text-xs m-0" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
                                   {group.attributes?.length || 0} attributes
                                 </AntTag>
                               </div>
                             </div>
-                            <div className="p-3">
-                              <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                            <div className="p-2.5">
+                              <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '35%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
                                 {group.attributes.map((attr: any) => {
                                   const existingSelection = (item.selected_dynamic_attributes || []).find((s: any) => s.attribute_id === attr.id);
                                   const selectedValueIds = existingSelection?.selected_value_ids || [];
@@ -1449,21 +1429,21 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                       })
                     )}
                     {!!item.category_id && (
-                      <div className="overflow-hidden rounded-xl border border-slate-200">
-                        <div className=" border-b border-slate-200 px-4 py-3 bg-slate-50 flex items-center justify-between"  >
-                          <div className="flex items-center gap-2">
+                      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                        <div className="border-b border-slate-200 px-3 py-2 bg-slate-50 flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
                             <AntAimOutlined className="text-blue-600" /> Target Sellers
                           </div>
                           {(!item.target_seller_party_ids || item.target_seller_party_ids.length === 0) ? (
-                            <AntTag color="cyan" icon={<AntGlobalOutlined />}>Open RFQ (All Marketplace Sellers)</AntTag>
+                            <AntTag color="cyan" className="text-xs m-0" icon={<AntGlobalOutlined />}>Open RFQ</AntTag>
                           ) : (
-                            <AntTag color="purple">{item.target_seller_party_ids.length} Selected Sellers</AntTag>
+                            <AntTag color="purple" className="text-xs m-0">{item.target_seller_party_ids.length} Selected Sellers</AntTag>
                           )}
                         </div>
-                        <p className="text-xs text-slate-500 px-3 py-2 m-0">
-                          (Leave empty to make this line item an Open RFQ for all verified marketplace suppliers, or select specific target sellers for direct invitations.)
+                        <p className="text-xs text-slate-500 px-3 py-1.5 m-0">
+                          (Leave empty for Open RFQ, or select specific target sellers for direct invitations.)
                         </p>
-                        <div className="px-3 pb-3">
+                        <div className="px-3 pb-2.5">
                           <AntSelect
                             mode="multiple"
                             allowClear
@@ -1603,6 +1583,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
   const allCategories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const allMasterProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
   const allAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
+  const allAttributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
 
   const screens = AntGrid.useBreakpoint();
   const descriptionsLayout = screens.sm ? 'horizontal' : 'vertical';
@@ -1658,7 +1639,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
       const newQuotes: SellerQuote[] = [];
 
       items.forEach((item, idx) => {
-        const itemId = `${newRfqId}-rfqi-${idx + 1}`;
+        const itemId = `${newRfqId}-${idx + 1}`;
 
         // Determine target sellers for this item
         const targetSellers: string[] =
@@ -1756,7 +1737,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
             rfq_item_id: itemId,
             round: 1,
             seller_party_id: sellerPartyId,
-            seller_quote_number: `SQ-${itemId}-${sellerPartyId.replace(/[^a-zA-Z0-9]/g, '')}`,
+            seller_quote_number: `SQ-${sellerPartyId.replace(/[^a-zA-Z0-9]/g, '')}-${itemId}`,
             offer_quantity: Number(item.quantity) || 1,
             offer_unit: item.unit_of_measure || 'Pcs',
             status: 'NOT_SUBMITTED',
@@ -1902,51 +1883,58 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
 
       <AntModal
         title={
-          <div className="flex items-center gap-2 text-slate-800">
+          <div className="flex items-center gap-2 text-slate-800 text-sm font-bold">
             <AntAppstoreOutlined className="text-blue-600" />
-            <span>Review Line Item #{viewItemIndex !== null ? viewItemIndex + 1 : ''}</span>
+            <span>Line Item #{viewItemIndex !== null ? viewItemIndex + 1 : ''} Specifications Review</span>
           </div>
         }
         open={viewItemIndex !== null}
         onCancel={() => setViewItemIndex(null)}
-        footer={[
-          <AntButton key="close" type="primary" className='mt-2' onClick={() => setViewItemIndex(null)}>
-            Close
-          </AntButton>
-        ]}
+        footer={null}
         classNames={{
-          container: "pb-2",
-          footer: "border-t border-slate-200"
+          header: "px-4 py-2 border-b border-slate-200",
+          body: "p-3 max-h-[70vh] overflow-y-auto space-y-3 custom-scrollbar",
+          footer: "px-4 py-2 border-t border-slate-200"
         }}
-        width={800}
+        width={720}
         destroyOnClose
       >
         {viewItemIndex !== null && items[viewItemIndex] && (() => {
           const item = items[viewItemIndex];
           const cat = allCategories.find((c) => c.id === item.category_id);
           const mProd = allMasterProducts.find((p) => p.id === item.catalog_product_id);
-          return (
-            <div className="space-y-6 mt-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
+          const targetSellers = (item.target_seller_party_ids || [])
+            .map((id: string) => allParties.find((p) => p.id === id)?.display_name || id)
+            .filter(Boolean);
 
-              <div className="overflow-hidden rounded-xl border border-slate-200">
-                <div className="border-b border-slate-200 px-4 py-3 bg-slate-50 flex items-center gap-2 text-slate-800 font-semibold text-sm">
-                  <AntAppstoreOutlined className="text-blue-600" /> Product Details
+          return (
+            <div className="space-y-3">
+              {/* Product Details */}
+              <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-3 py-2 bg-slate-50 flex items-center gap-2 text-slate-800 font-semibold text-xs">
+                  <AntAppstoreOutlined className="text-blue-600" /> General Details
                 </div>
-                <div className="p-3">
-                  <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                <div className="p-2.5">
+                  <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '35%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
                     <AntDescriptions.Item label="Category">
-                      <span className="text-slate-900">{cat?.name || item.category_id}</span>
+                      <span className="font-bold text-slate-900 text-xs">{cat?.name || item.category_id || 'N/A'}</span>
                     </AntDescriptions.Item>
                     <AntDescriptions.Item label="Master Product">
-                      <span className="text-slate-900">{mProd?.name || item.catalog_product_id || 'N/A'}</span>
+                      <span className="text-slate-900 text-xs">{mProd?.name || item.catalog_product_id || 'N/A'}</span>
                     </AntDescriptions.Item>
                     <AntDescriptions.Item label="Quantity">
-                      <span className="text-slate-900">{item.quantity} {item.unit_of_measure}</span>
+                      <AntTag color="blue" className="font-bold text-xs m-0">{item.quantity} {item.unit_of_measure}</AntTag>
                     </AntDescriptions.Item>
                     <AntDescriptions.Item label="Target Sellers">
-                      <span className="text-slate-900">
-                        {item.target_seller_party_ids?.length ? `${item.target_seller_party_ids.length} Selected` : 'Open Marketplace'}
-                      </span>
+                      {targetSellers.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {targetSellers.map((sellerName: string, sIdx: number) => (
+                            <AntTag key={sIdx} color="purple" className="text-xs m-0">{sellerName}</AntTag>
+                          ))}
+                        </div>
+                      ) : (
+                        <AntTag color="cyan" className="text-xs m-0" icon={<AntGlobalOutlined />}>Open RFQ (All Marketplace Suppliers)</AntTag>
+                      )}
                     </AntDescriptions.Item>
                   </AntDescriptions>
                 </div>
@@ -1954,40 +1942,32 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
 
               {/* Target Brands / Manufacturers Mappings */}
               {item.preferred_brand_manufacturers && item.preferred_brand_manufacturers.length > 0 && (
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #2a79adff` }}>
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#2a79ad14` }}>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white" style={{ backgroundColor: '#2a79adff' }}>
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `3px solid #2a79adff` }}>
+                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2" style={{ backgroundColor: `#2a79ad14` }}>
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: '#2a79adff' }}>
                         1
                       </span>
                       <h4 className="text-xs font-semibold text-slate-800 m-0">Manufacturer & Brand</h4>
                     </div>
                   </div>
-                  <div className="p-3">
-                    <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
-                      {item.preferred_brand_manufacturers && item.preferred_brand_manufacturers.length > 0 ? (
-                        item.preferred_brand_manufacturers.map((mPair: ManufacturerBrandMapping, pIdx: number) => {
-                          const mfg = allManufacturers.find(m => m.id === mPair.manufacturer_id);
-                          const brand = allBrands.find(b => b.id === mPair.brand_id);
-                          return (
-                            <AntDescriptions.Item key={pIdx} label={`Pair #${pIdx + 1}`}>
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                  <AntTag color="purple" className="m-0">Mfg: {mfg?.company_name || mPair.manufacturer_id || 'Any'}</AntTag>
-                                  <AntTag color="blue" className="m-0">Brand: {brand?.name || mPair.brand_id || 'Any'}</AntTag>
-                                </div>
-                              </div>
-                            </AntDescriptions.Item>
-                          );
-                        })
-                      ) : (
-                        <AntDescriptions.Item label="Mappings">
-                          <span className="text-xs text-slate-500 italic">All Manufacturers & Brands accepted</span>
-                        </AntDescriptions.Item>
-                      )}
+                  <div className="p-2.5">
+                    <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '35%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                      {item.preferred_brand_manufacturers.map((mPair: ManufacturerBrandMapping, pIdx: number) => {
+                        const mfg = allManufacturers.find(m => m.id === mPair.manufacturer_id);
+                        const brand = allBrands.find(b => b.id === mPair.brand_id);
+                        return (
+                          <AntDescriptions.Item key={pIdx} label={`Preferred Pair - ${pIdx + 1}`}>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <AntTag color="purple" className="m-0 text-xs font-medium">Mfg: {mfg?.company_name || mPair.manufacturer_id || 'Any Manufacturer'}</AntTag>
+                              <AntTag color="blue" className="m-0 text-xs font-medium">Brand: {brand?.name || mPair.brand_id || 'Any Brand'}</AntTag>
+                            </div>
+                          </AntDescriptions.Item>
+                        );
+                      })}
                       {item.mfg_brand_description && (
                         <AntDescriptions.Item label="Section Note">
-                          <span className="text-xs text-slate-500 italic">{item.mfg_brand_description}</span>
+                          <span className="text-xs text-slate-600 italic">{item.mfg_brand_description}</span>
                         </AntDescriptions.Item>
                       )}
                     </AntDescriptions>
@@ -1995,53 +1975,87 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
                 </div>
               )}
 
-              {/* Dynamic Attributes */}
-              {item.selected_dynamic_attributes?.length > 0 && (
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #10b981` }}>
-                  <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#10b98114` }}>
-                    <div className="flex items-center gap-3">
-                      <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white" style={{ backgroundColor: '#10b981' }}>
-                        2
-                      </span>
-                      <h4 className="text-xs font-semibold text-slate-800 m-0">Custom Specifications</h4>
-                    </div>
-                  </div>
-                  <div className="p-3">
-                    <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
-                      {item.selected_dynamic_attributes.map((da: any, idx: number) => {
-                        const attr = allAttributes.find((a: any) => a.id === da.attribute_id);
-                        const valLabels = da.selected_value_ids.map((vId: string) => {
-                          const val = allAttributeValues.find((v: any) => v.id === vId);
-                          return val?.label || vId;
-                        });
-                        return (
-                          <AntDescriptions.Item key={idx} label={<span className="font-semibold">{attr?.name || da.attribute_id}</span>}>
-                            <div className="flex flex-col gap-1">
-                              {valLabels.length > 0 && (
-                                <span className="text-slate-900">
-                                  {valLabels.map((vl: string, vIdx: number) => (
-                                    <span key={vIdx}>
-                                      {vl}
-                                      {vIdx < valLabels.length - 1 && (
-                                        <span className="mx-1 text-slate-400 font-bold">
-                                          {(da.connector || 'OR') === 'OR' ? '|' : ','}
-                                        </span>
-                                      )}
-                                    </span>
-                                  ))}
-                                </span>
-                              )}
-                              {da.description?.trim() && (
-                                <span className="text-xs text-slate-500 italic mt-0.5">{da.description}</span>
-                              )}
+              {/* Dynamic Attributes Grouped by Attribute Group */}
+              {(() => {
+                const groupsMap: Record<string, { name: string; attrs: any[] }> = {};
+                (item.selected_dynamic_attributes || []).forEach((da: any) => {
+                  const groupId = da.group_id || 'general';
+                  if (!groupsMap[groupId]) {
+                    const gObj = allAttributeGroups.find((g: any) => g.id === groupId);
+                    groupsMap[groupId] = {
+                      name: gObj?.name || (groupId === 'system' ? 'System Specifications' : 'General Specifications'),
+                      attrs: []
+                    };
+                  }
+                  groupsMap[groupId].attrs.push(da);
+                });
+
+                const sortedGroupKeys = Object.keys(groupsMap).sort((a, b) => {
+                  if (a === 'system') return -1;
+                  if (b === 'system') return 1;
+                  return 0;
+                });
+
+                if (sortedGroupKeys.length === 0) return null;
+
+                return (
+                  <>
+                    {sortedGroupKeys.map((groupId, gIdx) => {
+                      const group = groupsMap[groupId];
+                      const accentColor = ['#527EA3', '#5D9365', '#C9825A', '#8975A8'][gIdx % 4];
+                      return (
+                        <div key={groupId} className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `3px solid ${accentColor}` }}>
+                          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2" style={{ backgroundColor: `${accentColor}14` }}>
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ backgroundColor: accentColor }}>
+                                {gIdx + 2}
+                              </span>
+                              <h4 className="text-xs font-semibold text-slate-800 m-0">{group.name}</h4>
                             </div>
-                          </AntDescriptions.Item>
-                        );
-                      })}
-                    </AntDescriptions>
-                  </div>
-                </div>
-              )}
+                            <AntTag color="default" className="text-xs m-0" style={{ borderColor: accentColor, color: accentColor, fontWeight: 700 }}>
+                              {group.attrs.length} attribute(s)
+                            </AntTag>
+                          </div>
+                          <div className="p-2.5">
+                            <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '35%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
+                              {group.attrs.map((da: any, idx: number) => {
+                                const attr = allAttributes.find((a: any) => a.id === da.attribute_id);
+                                const valLabels = (da.selected_value_ids || []).map((vId: string) => {
+                                  const val = allAttributeValues.find((v: any) => v.id === vId);
+                                  return val?.label || vId;
+                                });
+                                return (
+                                  <AntDescriptions.Item key={idx} label={<span className="font-semibold text-slate-700">{attr?.name || da.attribute_id}</span>}>
+                                    <div className="flex flex-col gap-1">
+                                      {valLabels.length > 0 && (
+                                        <div className="flex flex-wrap items-center gap-0.5 text-xs text-slate-900">
+                                          {valLabels.map((vl: string, vIdx: number) => (
+                                            <React.Fragment key={vIdx}>
+                                              <span className="font-bold text-slate-500">{vl}</span>
+                                              {vIdx < valLabels.length - 1 && (
+                                                <span className="text-[10px] font-bold text-blue-600 px-0.5">
+                                                  {(da.connector || 'OR') === 'OR' ? '|' : ', '}
+                                                </span>
+                                              )}
+                                            </React.Fragment>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {da.description?.trim() && (
+                                        <span className="text-xs text-slate-500 italic mt-0.5">{da.description}</span>
+                                      )}
+                                    </div>
+                                  </AntDescriptions.Item>
+                                );
+                              })}
+                            </AntDescriptions>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </>
+                );
+              })()}
             </div>
           );
         })()}

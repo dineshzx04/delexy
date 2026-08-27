@@ -437,7 +437,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   };
 
   const quoteNumber = React.useMemo(() => {
-    return existingQuote?.seller_quote_number || `SQ-${itemId}-${activePartyId.replace(/[^a-zA-Z0-9]/g, '')}`;
+    return existingQuote?.seller_quote_number;
   }, [existingQuote, itemId, activePartyId]);
 
   const computeSignature = (combinations: any[]): string => {
@@ -1049,25 +1049,23 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                   )}
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 w-full max-w-xl">
                   {pairs.map((mapPair, pairIdx) => (
-                    <div key={mapPair.id || pairIdx} className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
-                      <div className="mb-2 flex items-center justify-between">
-                        <div className="flex min-w-0 items-center gap-1.5">
-                          <span className="flex h-5 min-w-5 items-center justify-center rounded bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600">
-                            {pairIdx + 1}
+                    <div key={mapPair.id || pairIdx} className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="flex h-4 min-w-4 items-center justify-center rounded bg-slate-100 px-1 text-[9px] font-bold text-slate-600">
+                            #{pairIdx + 1}
                           </span>
-                          <span className="truncate text-[11px] font-semibold text-slate-700">
-                            Manufacturer × Brand
-                          </span>
+                          <span className="text-[11px] font-semibold text-slate-700">Manufacturer & Brand Pair</span>
                         </div>
                         {!isViewOnly && (
                           <AntButton
                             type="text"
                             danger
                             size="small"
-                            className="!h-6 !w-6 !p-0"
-                            icon={<Lucide.Trash2 size={13} />}
+                            className="!h-5 !w-5 !p-0"
+                            icon={<Lucide.Trash2 size={12} />}
                             onClick={() => {
                               const newPairs = pairs.filter((_, idx) => idx !== pairIdx);
                               const newVals = pairsToAttributeValues(newPairs);
@@ -1077,58 +1075,48 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                         )}
                       </div>
 
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                        <div className="min-w-0">
-                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                            Manufacturer
-                          </label>
-                          <AntSelect
-                            disabled={isViewOnly}
-                            allowClear
-                            showSearch
-                            optionFilterProp="label"
-                            placeholder="Select manufacturer"
-                            value={mapPair.manufacturer_id}
-                            onChange={(val: string) => {
-                              const newPairs = [...pairs];
-                              newPairs[pairIdx].manufacturer_id = val;
-                              if (val && newPairs[pairIdx].brand_id && !isMappedPair(val, newPairs[pairIdx].brand_id)) {
-                                newPairs[pairIdx].brand_id = undefined;
-                              }
-                              const newVals = pairsToAttributeValues(newPairs);
-                              updateProposalValues(newVals);
-                            }}
-                            options={getRowMfgOptions(mapPair.brand_id)}
-                            className="w-full text-xs"
-                            popupMatchSelectWidth={false}
-                          />
-                        </div>
+                      <div className="space-y-1.5">
+                        <AntSelect
+                          disabled={isViewOnly}
+                          allowClear
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="Select Manufacturer..."
+                          value={mapPair.manufacturer_id}
+                          onChange={(val: string) => {
+                            const newPairs = [...pairs];
+                            newPairs[pairIdx].manufacturer_id = val;
+                            if (val && newPairs[pairIdx].brand_id && !isMappedPair(val, newPairs[pairIdx].brand_id)) {
+                              newPairs[pairIdx].brand_id = undefined;
+                            }
+                            const newVals = pairsToAttributeValues(newPairs);
+                            updateProposalValues(newVals);
+                          }}
+                          options={getRowMfgOptions(mapPair.brand_id)}
+                          className="w-full text-xs"
+                          popupMatchSelectWidth={false}
+                        />
 
-                        <div className="min-w-0">
-                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                            Brand
-                          </label>
-                          <AntSelect
-                            disabled={isViewOnly}
-                            allowClear
-                            showSearch
-                            optionFilterProp="label"
-                            placeholder="Select brand"
-                            value={mapPair.brand_id}
-                            onChange={(val: string) => {
-                              const newPairs = [...pairs];
-                              newPairs[pairIdx].brand_id = val;
-                              if (val && newPairs[pairIdx].manufacturer_id && !isMappedPair(newPairs[pairIdx].manufacturer_id, val)) {
-                                newPairs[pairIdx].manufacturer_id = undefined;
-                              }
-                              const newVals = pairsToAttributeValues(newPairs);
-                              updateProposalValues(newVals);
-                            }}
-                            options={getRowBrandOptions(mapPair.manufacturer_id)}
-                            className="w-full text-xs"
-                            popupMatchSelectWidth={false}
-                          />
-                        </div>
+                        <AntSelect
+                          disabled={isViewOnly}
+                          allowClear
+                          showSearch
+                          optionFilterProp="label"
+                          placeholder="Select Brand..."
+                          value={mapPair.brand_id}
+                          onChange={(val: string) => {
+                            const newPairs = [...pairs];
+                            newPairs[pairIdx].brand_id = val;
+                            if (val && newPairs[pairIdx].manufacturer_id && !isMappedPair(newPairs[pairIdx].manufacturer_id, val)) {
+                              newPairs[pairIdx].manufacturer_id = undefined;
+                            }
+                            const newVals = pairsToAttributeValues(newPairs);
+                            updateProposalValues(newVals);
+                          }}
+                          options={getRowBrandOptions(mapPair.manufacturer_id)}
+                          className="w-full text-xs"
+                          popupMatchSelectWidth={false}
+                        />
                       </div>
                     </div>
                   ))}
@@ -1306,39 +1294,65 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
     }
   ];
 
+  let variantSku = '';
+  if (item?.variant_id && allSellerProducts) {
+    const sp = allSellerProducts.find((p: any) => p.variants?.some((v: any) => v.id === item.variant_id));
+    if (sp) {
+      const v = sp.variants?.find((v: any) => v.id === item.variant_id);
+      variantSku = v?.sku || item.variant_id;
+    } else {
+      variantSku = item.variant_id;
+    }
+  }
+
   return (
     <div className="space-y-6">
 
       {/* Request & Quote Details */}
-      <Descriptions title="Request & Quote Details" bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }} className="mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
-        <Descriptions.Item label="Product / Service" span={3}>
-          <strong className="text-slate-800 text-base">{catalogProduct?.name || 'Custom Specifications'}</strong>
+      <Descriptions
+        title={<span className="text-xs font-bold text-slate-800">Request & Quote Details</span>}
+        bordered
+        size="small"
+        column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }}
+        labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
+        contentStyle={{ fontSize: '12px', color: '#1e293b' }}
+        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden"
+      >
+        <Descriptions.Item label="RFQ Number" span={3}>
+          <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
         </Descriptions.Item>
         <Descriptions.Item label="Quote Reference">
-          <AntTag color="purple" className="font-mono font-bold m-0 text-[13px]">{quoteNumber}</AntTag>
+          <AntTag color="purple" className="font-mono font-bold m-0 text-xs">{quoteNumber}</AntTag>
         </Descriptions.Item>
         <Descriptions.Item label="Quote Status">
           <AntTag
             color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
-            className="font-bold m-0"
+            className="m-0 text-xs"
           >
             {existingQuote?.status || 'NEW'}
           </AntTag>
         </Descriptions.Item>
         <Descriptions.Item label="Round">
           <div className="flex items-center gap-1.5">
-            <ReloadOutlined className="text-blue-500 text-[13px]" />
-            <span className="font-bold text-slate-800 text-[13px]">Round {existingQuote?.round ?? 1}</span>
+            <ReloadOutlined className="text-blue-500 text-xs" />
+            <span className="font-semibold text-slate-800 text-xs">Round {existingQuote?.round ?? 1}</span>
           </div>
         </Descriptions.Item>
-        <Descriptions.Item label="RFQ Number">
-          <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
-        </Descriptions.Item>
         <Descriptions.Item label="Category">
-          <span className="text-slate-700">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</span>
+          <span className="text-slate-700 text-xs">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Product / Service">
+          <span className="text-slate-900 font-semibold text-xs">{catalogProduct?.name || 'Custom Specifications'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="SKU">
+          {item?.variant_id ? (
+            <AntTag color="purple" className="font-mono font-semibold m-0 text-xs">{variantSku || item.variant_id}</AntTag>
+          ) : (
+            <AntTag color="orange" className="font-semibold m-0 text-xs">Custom Product</AntTag>
+          )}
         </Descriptions.Item>
         <Descriptions.Item label="Requested Quantity">
-          <AntTag color="blue" className="font-bold m-0">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+          <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
         </Descriptions.Item>
         {existingQuote?.created_at && (
           <Descriptions.Item label="Created">

@@ -39,6 +39,8 @@ export const SupplierRfqInbox: React.FC = () => {
   const items = useLiveQuery(() => rfqDb.rfq_items.toArray(), []) || [];
   const rfqs = useLiveQuery(() => rfqDb.rfqs.toArray(), []) || [];
   const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
+  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
+  const sellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []) || [];
 
   // Filter items assigned to this seller
   const assignedItems = React.useMemo(() => {
@@ -53,6 +55,24 @@ export const SupplierRfqInbox: React.FC = () => {
       const rfq = rfqs.find((r) => r.id === item.rfq_id);
       const quote = quotes.find((q) => q.rfq_item_id === item.id);
       const product = catalogProducts.find((p) => p.id === item.catalog_product_id);
+      const category = categories.find((c) => c.id === item.category_id);
+
+      let variantSku = '';
+      let matchedSellerProduct = null;
+      if (item.variant_id) {
+        matchedSellerProduct = sellerProducts.find((sp) =>
+          sp.variants?.some((v) => v.id === item.variant_id)
+        );
+        if (matchedSellerProduct) {
+          const v = matchedSellerProduct.variants?.find((v) => v.id === item.variant_id);
+          variantSku = v?.sku || v?.id || item.variant_id;
+        } else {
+          variantSku = item.variant_id;
+        }
+      }
+
+      const isVariantSelected = Boolean(item.variant_id);
+      const isCatalogProduct = Boolean(product || isVariantSelected);
 
       return {
         key: item.id,
@@ -64,22 +84,26 @@ export const SupplierRfqInbox: React.FC = () => {
         quote_number: quote ? quote.seller_quote_number : undefined,
         round: quote ? quote.round : undefined,
         quote_status: quote ? quote.status : 'NOT_SUBMITTED',
-        product_name: product?.name || 'Custom Specifications',
+        category_name: category?.name || item.category_id || '',
+        product_name: product?.name || '',
+        variant_sku: variantSku,
+        is_variant_selected: isVariantSelected,
+        is_catalog_product: isCatalogProduct,
         req_quantity: item.req_quantity,
         req_unit: item.req_unit,
-        // req_unit_price: item.req_unit_price,
         offer_quantity: quote ? quote.offer_quantity : undefined,
         offer_unit: quote ? quote.offer_unit : undefined,
-        // offer_unit_price: quote ? quote.offer_unit_price : undefined,
       };
     });
-  }, [assignedItems, rfqs, quotes]);
+  }, [assignedItems, rfqs, quotes, categories, catalogProducts, sellerProducts]);
 
   const filteredResponses = allResponses.filter((res) => {
     const matchesTab = selectedStatus === 'ALL' || res.quote_status === selectedStatus;
     const matchesSearch =
       res.rfq_number.toLowerCase().includes(searchText.toLowerCase()) ||
       res.product_name.toLowerCase().includes(searchText.toLowerCase()) ||
+      res.category_name.toLowerCase().includes(searchText.toLowerCase()) ||
+      res.variant_sku.toLowerCase().includes(searchText.toLowerCase()) ||
       res.rfq_title.toLowerCase().includes(searchText.toLowerCase());
     return matchesTab && matchesSearch;
   });
@@ -88,8 +112,8 @@ export const SupplierRfqInbox: React.FC = () => {
     <div className="max-w-7xl mx-auto space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">Supplier Sourcing Inbox</h1>
-          <p className="text-xs text-slate-500">RFQ Sourcing items assigned to {activeParty?.display_name || 'your party'}.</p>
+          <h1 className="text-xl font-bold text-slate-900">Seller RFQ Inbox</h1>
+          <p className="text-xs text-slate-500">RFQ items assigned to {activeParty?.display_name || 'your party'}.</p>
         </div>
       </div>
 
@@ -146,10 +170,27 @@ export const SupplierRfqInbox: React.FC = () => {
                 title: 'RFQ Item',
                 key: 'rfq_item',
                 render: (_: any, record: any) => (
-                  <div>
-                    <div className="font-semibold text-slate-700">
-                      <AntTag color={"blue"}>{record.rfq_number} - Item {record.rfq_item_index}</AntTag>
-                      <div className="font-medium text-slate-700"> {record.product_name} </div>
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <AntTag color="blue" className="font-semibold text-xs m-0">
+                        {record.rfq_number} - Item #{record.rfq_item_index}
+                      </AntTag>
+                      {/* {record.is_variant_selected ? (
+                        <AntTag color="purple" className="text-[10px] m-0 font-bold">Specific Catalog SKU Variant</AntTag>
+                      ) : (
+                        <AntTag color="orange" className="text-[10px] m-0 font-bold">Customized Product Specs</AntTag>
+                      )
+                      } */}
+                    </div>
+                    <div className="font-semibold text-slate-800 text-xs flex items-center gap-1.5">
+                      {record.is_variant_selected ? (
+                        <>
+                          <span>{record.product_name || 'Catalog Product'}</span>
+                          <span className="text-[11px] font-mono text-purple-700 bg-purple-50 px-1 rounded border border-purple-200">SKU: {record.variant_sku}</span>
+                        </>
+                      ) : (
+                        <span>{record.category_name ? `${record.category_name} (Custom Specs)` : 'Custom Specifications'}</span>
+                      )}
                     </div>
                   </div>
                 )
@@ -162,33 +203,6 @@ export const SupplierRfqInbox: React.FC = () => {
                   <span className="font-semibold text-slate-700">{record.req_quantity} {record.req_unit}</span>
                 )
               },
-              // {
-              //   title: 'Req.UnitPrice',
-              //   key: 'req_unit_price',
-              //   // width: 120,
-              //   render: (_: any, record: any) => record.req_unit_price ? <span className="font-bold text-slate-600">${record.req_unit_price}</span> : 'N/A'
-              // },
-              // {
-              //   title: 'Offer Price',
-              //   dataIndex: 'offered_price',
-              //   key: 'offered_price',
-              //   // width: 140,
-              //   render: (val: number, record: any) => (
-              //     val ? (
-              //       <div className="space-y-0.5 text-left">
-              //         <span className="font-bold text-emerald-600">${val}</span>
-              //         <div>
-              //           <a
-              //             onClick={() => navigate(`${isBusinessContext ? '/b/supplier' : '/user/supplier'}/rfqs/${record.rfq_id}/items/${record.item_id}/respond`)}
-              //             className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold underline block"
-              //           >
-              //             Ref: {record.quote_number} (Rd {record.round})
-              //           </a>
-              //         </div>
-              //       </div>
-              //     ) : <span className="text-slate-400">No Offer Yet</span>
-              //   )
-              // },
               {
                 title: 'Status',
                 key: 'status',
