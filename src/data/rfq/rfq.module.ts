@@ -95,7 +95,13 @@ export interface SellerQuoteVariant {
   is_default: boolean;
   offer_price: number;
   buyer_accepted?: boolean;
-  combinations: VariantCombination[]
+  combinations: VariantCombination[];
+  option_type?: 'CUSTOM_GENERATED' | 'CATALOG_SKU';
+  catalog_variant_id?: string;
+  sku?: string;
+  satisfaction_status?: 'SATISFIED' | 'CUSTOM';
+  signature?: string;
+  is_selected?: boolean;
 }
 
 export interface SellerQuoteComment {
@@ -130,31 +136,31 @@ export interface SellerQuoteComment {
 //   archived_at?: string;
 // }
 
-export interface RfqAward {
-  id: string;
-  rfq_id: string;
-  rfq_item_id: string;
-  seller_quote_id: string;
-  seller_party_id: string;
-  awarded_quantity: number;
-  variant_id: string;
-  offered_variant_id: string | null;
-  unit_price: number;
-  currency?: string;
-  award_status: AwardStatus;
-  product_mapping_status: ProductMappingStatus;
-  purchase_order_id?: string;
-  awarded_at: string;
-  awarded_by_user_id?: string;
+// export interface RfqAward {
+//   id: string;
+//   rfq_id: string;
+//   rfq_item_id: string;
+//   seller_quote_id: string;
+//   seller_party_id: string;
+//   awarded_quantity: number;
+//   variant_id: string;
+//   offered_variant_id: string | null;
+//   unit_price: number;
+//   currency?: string;
+//   award_status: AwardStatus;
+//   product_mapping_status: ProductMappingStatus;
+//   purchase_order_id?: string;
+//   awarded_at: string;
+//   awarded_by_user_id?: string;
 
-  // Metadata details for PO release & receipt
-  shipping_address?: string;
-  payment_terms?: string;
-  delivery_notes?: string;
-  po_released_at?: string;
-  po_received_at?: string;
-  supplier_acknowledgement_note?: string;
-}
+//   // Metadata details for PO release & receipt
+//   shipping_address?: string;
+//   payment_terms?: string;
+//   delivery_notes?: string;
+//   po_released_at?: string;
+//   po_received_at?: string;
+//   supplier_acknowledgement_note?: string;
+// }
 
 // ============================================================================
 // SECTION 2: NESTED SUB-STRUCTURES, LIFECYCLE ENUMS & VALUE OBJECTS
@@ -191,6 +197,15 @@ export interface SellerAssignment {
 export interface ItemAttributeValue {
   value_id: string;
   value_label: string;
+}
+
+export interface ManufacturerBrandMapping {
+  id: string;
+  manufacturer_id?: string;
+  manufacturer_name?: string;
+  brand_id?: string;
+  brand_name?: string;
+  description?: string;
 }
 
 export type SellerQuoteStatus =

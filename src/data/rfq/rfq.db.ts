@@ -7,7 +7,7 @@ import type {
   SellerQuoteAttribute,
   SellerQuoteVariant,
   SellerQuoteComment,
-  RfqAward,
+  // RfqAward,
 } from "./rfq.module";
 
 export class RfqDatabase extends Dexie {
@@ -18,11 +18,11 @@ export class RfqDatabase extends Dexie {
   seller_quote_attributes!: Table<SellerQuoteAttribute, string>;
   seller_quote_variants!: Table<SellerQuoteVariant, string>;
   seller_quote_comments!: Table<SellerQuoteComment, string>;
-  rfq_awards!: Table<RfqAward, string>;
+  // rfq_awards!: Table<RfqAward, string>;
 
   constructor() {
     super("delexy_rfq_db");
-    this.version(10).stores({
+    this.version(11).stores({
       rfqs: "id, status, requester_id, requester_party_id",
       rfq_items: "id, rfq_id, category_id",
       rfq_item_attributes: "id, rfq_item_id, group_id, attribute_id",
@@ -30,7 +30,7 @@ export class RfqDatabase extends Dexie {
       seller_quote_attributes: "id, seller_quote_id, group_id, attribute_id",
       seller_quote_variants: "id, seller_quote_id",
       seller_quote_comments: "id, seller_quote_id, group_id, attribute_id, actor_id",
-      rfq_awards: "id, rfq_id, rfq_item_id, seller_party_id",
+      // rfq_awards: "id, rfq_id, rfq_item_id, seller_party_id, seller_quote_id",
     });
   }
 }

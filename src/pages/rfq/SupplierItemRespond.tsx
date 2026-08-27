@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Card, Input as AntInput, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Switch, Steps, Result } from 'antd';
-import { SendOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined, ArrowLeftOutlined, ArrowRightOutlined } from '@ant-design/icons';
+import { SendOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined, ArrowLeftOutlined, ArrowRightOutlined, PlusOutlined as AntPlusOutlined } from '@ant-design/icons';
 import { rfqDb, type AttributeType, type ItemAttributeValue, type SellerQuote, type SellerQuoteAttribute, type SellerQuoteVariant, type SellerQuoteComment } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
@@ -199,7 +199,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       rfq,
       itemAttributes,
       allBrands,
+      allBrandParties,
       allManufacturers,
+      allSellerProducts,
       categories,
       catalogAttributes,
       catalogAttributeValues,
@@ -210,7 +212,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       rfqDb.rfqs.get(rfqId),
       rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray(),
       businessDb.brands.toArray(),
+      businessDb.brandParties.toArray(),
       businessDb.manufacturers.toArray(),
+      catalogDb.sellerProducts.toArray(),
       catalogDb.categories.toArray(),
       catalogDb.attributes.toArray(),
       catalogDb.attributeValues.toArray(),
@@ -228,13 +232,6 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       ]);
     }
 
-    let sellerProduct = null;
-    let allVariants: any[] = [];
-    if (item?.product_id) {
-      sellerProduct = await catalogDb.sellerProducts.get(item.product_id);
-      allVariants = sellerProduct?.variants || [];
-    }
-
     let catalogProduct = null;
     if (item?.catalog_product_id) {
       catalogProduct = await catalogDb.products.get(item.catalog_product_id);
@@ -249,13 +246,13 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       itemAttributes,
       rfq: rfq || null,
       allBrands,
+      allBrandParties,
       allManufacturers,
+      allSellerProducts,
       categories,
       catalogAttributes,
       catalogAttributeValues,
       attributeGroups,
-      sellerProduct: sellerProduct || null,
-      allVariants,
       catalogProduct: catalogProduct || null
     };
   }, [itemId, activePartyId, rfqId]);
@@ -269,25 +266,250 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
     itemAttributes,
     rfq,
     allBrands,
+    allBrandParties,
     allManufacturers,
+    allSellerProducts,
     categories,
     catalogAttributes,
     catalogAttributeValues,
     attributeGroups,
-    sellerProduct,
-    allVariants,
     catalogProduct
   } = data || {};
 
-  const itemVariant = React.useMemo(() => {
-    if (!allVariants || !item) return null;
-    return (allVariants as any[]).find((v) => v.id === item.variant_id) || null;
-  }, [allVariants, item]);
+  const parsePairValues = (values: ItemAttributeValue[] = []) => {
+    return values.map((v, idx) => {
+      const parts = (v.value_id || '').split(':');
+      const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+      const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+      return {
+        id: `pair-${idx}-${v.value_id}`,
+        manufacturer_id: mfgId,
+        brand_id: brandId,
+        description: (v as any).description || ''
+      };
+    });
+  };
+
+  const pairsToAttributeValues = (pairs: { manufacturer_id?: string; brand_id?: string; description?: string }[]): ItemAttributeValue[] => {
+    return pairs.map(p => {
+      const mfg = (allManufacturers || []).find((m: any) => m.id === p.manufacturer_id);
+      const brand = (allBrands || []).find((b: any) => b.id === p.brand_id);
+      const mfgLabel = mfg?.company_name || p.manufacturer_id || 'Any Manufacturer';
+      const brandLabel = brand?.name || p.brand_id || 'Any Brand';
+      const noteLabel = p.description ? ` (${p.description})` : '';
+
+      return {
+        value_id: `${p.manufacturer_id || 'any'}:${p.brand_id || 'any'}`,
+        value_label: `${mfgLabel} — ${brandLabel}${noteLabel}`,
+        description: p.description
+      } as any;
+    });
+  };
+
+  const isMappedPair = (mfgId?: string, brandId?: string) => {
+    if (!mfgId || !brandId) return true;
+    const inSellerProducts = (allSellerProducts || []).some(
+      (sp: any) => sp.manufacturer_id === mfgId && sp.brand_id === brandId
+    );
+    if (inSellerProducts) return true;
+
+    const mfgObj = (allManufacturers || []).find((m: any) => m.id === mfgId);
+    if (mfgObj?.manufacturer_party_id) {
+      const inBrandParties = (allBrandParties || []).some(
+        (bp: any) => bp.brand_id === brandId && bp.party_id === mfgObj.manufacturer_party_id
+      );
+      if (inBrandParties) return true;
+    }
+    return false;
+  };
+
+  const getRowMfgOptions = (selectedBrandId?: string) => {
+    const dynamicMfgOptions = [
+      {
+        label: 'Manufacturers',
+        options: (allManufacturers || []).map((m: any) => ({ label: m.company_name, value: m.id }))
+      }
+    ];
+
+    if (!selectedBrandId) return dynamicMfgOptions;
+
+    const mfgIdsForBrand = new Set<string>();
+    (allSellerProducts || []).forEach((sp: any) => {
+      if (sp.brand_id === selectedBrandId && sp.manufacturer_id) {
+        mfgIdsForBrand.add(sp.manufacturer_id);
+      }
+    });
+
+    const brandPartiesForBrand = (allBrandParties || []).filter((bp: any) => bp.brand_id === selectedBrandId);
+    const partyIds = new Set(brandPartiesForBrand.map((bp: any) => bp.party_id));
+    (allManufacturers || []).forEach((m: any) => {
+      if (m.manufacturer_party_id && partyIds.has(m.manufacturer_party_id)) {
+        mfgIdsForBrand.add(m.id);
+      }
+    });
+
+    if (mfgIdsForBrand.size === 0) return dynamicMfgOptions;
+
+    const brandObj = (allBrands || []).find((b: any) => b.id === selectedBrandId);
+    const brandName = brandObj?.name || selectedBrandId;
+
+    const mappedOpts = Array.from(mfgIdsForBrand).map((mId: string) => {
+      const m = (allManufacturers || []).find((mfg: any) => mfg.id === mId);
+      return { label: `${m?.company_name || mId}`, value: mId };
+    });
+
+    const otherOpts = (allManufacturers || [])
+      .filter((m: any) => !mfgIdsForBrand.has(m.id))
+      .map((m: any) => ({ label: m.company_name, value: m.id }));
+
+    return [
+      { label: `Available Manufacturers for ${brandName}`, options: mappedOpts },
+      { label: `Other Manufacturers`, options: otherOpts },
+    ].filter((g) => g.options.length > 0);
+  };
+
+  const getRowBrandOptions = (selectedMfgId?: string) => {
+    const dynamicBrandOptions = [
+      {
+        label: 'Brands',
+        options: (allBrands || []).map((b: any) => ({ label: b.name, value: b.id }))
+      }
+    ];
+
+    if (!selectedMfgId) return dynamicBrandOptions;
+
+    const brandIdsForMfg = new Set<string>();
+    (allSellerProducts || []).forEach((sp: any) => {
+      if (sp.manufacturer_id === selectedMfgId && sp.brand_id) {
+        brandIdsForMfg.add(sp.brand_id);
+      }
+    });
+
+    const selectedMfgObj = (allManufacturers || []).find((m: any) => m.id === selectedMfgId);
+    if (selectedMfgObj?.manufacturer_party_id) {
+      const partyId = selectedMfgObj.manufacturer_party_id;
+      const matchingBrandParties = (allBrandParties || []).filter((bp: any) => bp.party_id === partyId);
+      matchingBrandParties.forEach((bp: any) => {
+        if (bp.brand_id) brandIdsForMfg.add(bp.brand_id);
+      });
+    }
+
+    if (brandIdsForMfg.size === 0) return dynamicBrandOptions;
+
+    const mfgObj = (allManufacturers || []).find((m: any) => m.id === selectedMfgId);
+    const mfgName = mfgObj?.company_name || selectedMfgId;
+
+    const mappedOpts = Array.from(brandIdsForMfg).map((bId: string) => {
+      const b = (allBrands || []).find((brand: any) => brand.id === bId);
+      return { label: `${b?.name || bId}`, value: bId };
+    });
+
+    const otherOpts = (allBrands || [])
+      .filter((b: any) => !brandIdsForMfg.has(b.id))
+      .map((b: any) => ({ label: b.name, value: b.id }));
+
+    return [
+      { label: `Available Brands for ${mfgName}`, options: mappedOpts },
+      { label: `Other Brands`, options: otherOpts },
+    ].filter((g) => g.options.length > 0);
+  };
 
   const quoteNumber = React.useMemo(() => {
     return existingQuote?.seller_quote_number || `SQ-${itemId}-${activePartyId.replace(/[^a-zA-Z0-9]/g, '')}`;
   }, [existingQuote, itemId, activePartyId]);
 
+  const computeSignature = (combinations: any[]): string => {
+    if (!combinations || combinations.length === 0) return 'default';
+    const sortedCombo = [...combinations].sort((a, b) => (a.attribute_id || '').localeCompare(b.attribute_id || ''));
+    return sortedCombo.map(c => `${c.attribute_id}:${c.value_id}`).join('|');
+  };
+
+  const generateVariantsFromAttributes = (
+    currentAttributes: Record<string, ProposalAttribute>,
+    prevVariants: SellerQuoteVariant[] = [],
+    existingQuoteId: string = ''
+  ): SellerQuoteVariant[] => {
+    const variantAttrs = Object.values(currentAttributes).filter(
+      attr => (attr.is_variant || attr.attribute_id === 'mfg_brand_mapping') && attr.values.length > 0
+    );
+
+    let customVariants: SellerQuoteVariant[] = [];
+
+    if (variantAttrs.length === 0) {
+      const existingDefault = prevVariants.find(v => v.combinations.length === 0 && (!v.option_type || v.option_type === 'CUSTOM_GENERATED'));
+      const sig = 'default';
+      customVariants = [{
+        id: existingDefault?.id || crypto.randomUUID(),
+        seller_quote_id: existingQuoteId,
+        is_default: true,
+        offer_price: existingDefault?.offer_price || 0,
+        combinations: [],
+        buyer_accepted: existingDefault?.buyer_accepted || false,
+        option_type: 'CUSTOM_GENERATED',
+        satisfaction_status: 'CUSTOM',
+        signature: sig,
+        is_selected: existingDefault?.is_selected !== undefined ? existingDefault.is_selected : true
+      }];
+    } else {
+      const cartesian = (arrays: any[][]) => {
+        return arrays.reduce((acc, curr) => {
+          return acc.flatMap(c => curr.map(n => [...c, n]));
+        }, [[]]);
+      };
+
+      const arraysToCombine = variantAttrs.map(attr =>
+        attr.values.map(v => ({
+          attribute_id: attr.attribute_id,
+          value_id: v.value_id,
+          value_label: v.value_label,
+          attribute_name: attr.attributeName
+        }))
+      );
+
+      const combinations = cartesian(arraysToCombine);
+
+      customVariants = combinations.map(combo => {
+        const comboSignature = computeSignature(combo);
+
+        const existingMatch = prevVariants.find(v => {
+          const existingSignature = v.signature || computeSignature(v.combinations);
+          return existingSignature === comboSignature;
+        });
+
+        if (existingMatch) {
+          return {
+            ...existingMatch,
+            combinations: combo,
+            signature: comboSignature,
+            is_selected: existingMatch.is_selected !== undefined ? existingMatch.is_selected : false,
+            option_type: 'CUSTOM_GENERATED',
+            satisfaction_status: 'CUSTOM'
+          };
+        }
+
+        return {
+          id: crypto.randomUUID(),
+          seller_quote_id: existingQuoteId,
+          is_default: false,
+          offer_price: 0,
+          combinations: combo,
+          buyer_accepted: false,
+          option_type: 'CUSTOM_GENERATED',
+          satisfaction_status: 'CUSTOM',
+          signature: comboSignature,
+          is_selected: false
+        };
+      });
+    }
+
+    const catalogOptionsInPrev = prevVariants.filter(v => v.option_type === 'CATALOG_SKU').map(v => ({
+      ...v,
+      signature: v.signature || v.catalog_variant_id || v.id,
+      is_selected: v.is_selected !== undefined ? v.is_selected : false
+    }));
+
+    return [...customVariants, ...catalogOptionsInPrev];
+  };
 
   useEffect(() => {
     if (!item || !itemAttributes?.length) return;
@@ -309,6 +531,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
             .filter(v => ids.has(v.id))
             .map(v => ({ value_id: v.id, value_label: v.name || "" }));
 
+        case "mfg_brand_mapping":
+          return (ia.values || []).map((v: any) => ({ value_id: v.value_id, value_label: v.value_label }));
+
         case "req_quantity":
           return [
             { value_id: "req-quantity", value_label: String(item.req_quantity) },
@@ -326,6 +551,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       req_quantity: "Requested Quantity",
       brand: "Brand",
       manufacturer: "Manufacturer",
+      mfg_brand_mapping: "Manufacturer & Brand Mappings",
     };
 
     const map = new Map<string, any>();
@@ -355,6 +581,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       if (ia.attribute_type === "SYSTEM") {
         if (ia.attribute_id === "req_quantity") {
           reqViewValue = `${item.req_quantity} ${item.req_unit}`;
+        } else if (ia.attribute_id === "mfg_brand_mapping") {
+          reqViewValue = values.map((v: any) => v.value_label).join(" | ") || "N/A";
         } else if (ia.attribute_id === "manufacturer" || ia.attribute_id === "brand") {
           reqViewValue = values.map((v: any) => v.value_label).join(" | ") || "N/A";
         } else {
@@ -411,25 +639,53 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       });
 
     });
-    const entries = [...map.entries()];
+
+    if (map.has('system')) {
+      const systemGroup = map.get('system');
+      const order = ['mfg_brand_mapping', 'manufacturer', 'brand', 'req_quantity'];
+      systemGroup.attributes.sort((a: any, b: any) => {
+        const idxA = order.indexOf(a.attribute_id);
+        const idxB = order.indexOf(b.attribute_id);
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return 0;
+      });
+    }
+
+    const entries = [...map.entries()].sort(([aId], [bId]) => {
+      if (aId === 'system') return -1;
+      if (bId === 'system') return 1;
+      return 0;
+    });
+
     setAttributeGroupsMap(entries);
     setProposalAttributes(initialValues);
 
-    let initialVariants: (SellerQuoteVariant & { [key: string]: any; })[] = [];
+    const generated = generateVariantsFromAttributes(initialValues, existingQuoteVariants || [], existingQuote?.id || '');
 
     if (existingQuoteVariants && existingQuoteVariants.length > 0) {
-      initialVariants = existingQuoteVariants;
+      const initialVariants = generated.map(v => {
+        const sig = v.signature || computeSignature(v.combinations);
+        const savedMatch = existingQuoteVariants.find(ev => (ev.signature || computeSignature(ev.combinations)) === sig);
+        if (savedMatch) {
+          return {
+            ...v,
+            ...savedMatch,
+            signature: sig,
+            is_selected: savedMatch.is_selected !== undefined ? savedMatch.is_selected : true
+          };
+        }
+        return {
+          ...v,
+          signature: sig,
+          is_selected: false
+        };
+      });
+      setProposalVariants(initialVariants);
     } else {
-      initialVariants = [{
-        id: crypto.randomUUID(),
-        seller_quote_id: existingQuote?.id || "",
-        is_default: true,
-        offer_price: 0,
-        combinations: [],
-        buyer_accepted: false
-      }];
+      setProposalVariants(generated);
     }
-    setProposalVariants(initialVariants);
 
   }, [item, itemAttributes, attributeGroups, catalogAttributes, catalogAttributeValues, allBrands, allManufacturers, existingQuote, existingQuoteAttributes, existingQuoteVariants]);
 
@@ -450,63 +706,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   const isViewOnly = ['SUBMITTED', "DEVIATION_ACCEPTED", "PRODUCT_SUBMIT_REVISION", "FINAL_ACKNOWLEDGE", 'REJECTED'].includes(existingQuote?.status ?? '');
 
   const recalculateVariants = (currentAttributes: Record<string, ProposalAttribute>) => {
-    const variantAttrs = Object.values(currentAttributes).filter(attr => attr.is_variant && attr.values.length > 0);
-
-    if (variantAttrs.length === 0) {
-      setProposalVariants(prev => {
-        const existingDefault = prev.find(v => v.combinations.length === 0);
-        return [{
-          id: existingDefault?.id || crypto.randomUUID(),
-          seller_quote_id: existingQuote?.id || "",
-          is_default: true,
-          offer_price: existingDefault?.offer_price || 0,
-          combinations: [],
-          buyer_accepted: existingDefault?.buyer_accepted || false
-        }];
-      });
-      return;
-    }
-
-    const cartesian = (arrays: any[][]) => {
-      return arrays.reduce((acc, curr) => {
-        return acc.flatMap(c => curr.map(n => [...c, n]));
-      }, [[]]);
-    };
-
-    const arraysToCombine = variantAttrs.map(attr =>
-      attr.values.map(v => ({ attribute_id: attr.attribute_id, value_id: v.value_id, value_label: v.value_label, attribute_name: attr.attributeName }))
-    );
-
-    const combinations = cartesian(arraysToCombine);
-    setBulkPrice(undefined)
-    setProposalVariants(prev => {
-      return combinations.map(combo => {
-        const sortedCombo = [...combo].sort((a, b) => a.attribute_id.localeCompare(b.attribute_id));
-        const comboSignature = sortedCombo.map(c => `${c.attribute_id}:${c.value_id}`).join('|');
-
-        const existingMatch = prev.find(v => {
-          const sortedExisting = [...v.combinations].sort((a, b) => a.attribute_id.localeCompare(b.attribute_id));
-          const existingSignature = sortedExisting.map(c => `${c.attribute_id}:${c.value_id}`).join('|');
-          return existingSignature === comboSignature;
-        });
-
-        if (existingMatch) {
-          return {
-            ...existingMatch,
-            combinations: combo
-          };
-        }
-
-        return {
-          id: crypto.randomUUID(),
-          seller_quote_id: existingQuote?.id || "",
-          is_default: false,
-          offer_price: 0,
-          combinations: combo,
-          buyer_accepted: false
-        };
-      });
-    });
+    setBulkPrice(undefined);
+    setProposalVariants(prev => generateVariantsFromAttributes(currentAttributes, prev, existingQuote?.id || ''));
   };
 
   const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
@@ -522,10 +723,18 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       // const offerPrice = parseFloat(priceStr);
       const offerQty = parseFloat(qtyStr);
 
+      const selectedVariants = proposalVariants.filter(v => v.is_selected);
+
       if (submitMode === 'SUBMITTED') {
-        const invalidVariants = proposalVariants.filter(v => typeof v.offer_price !== 'number' || isNaN(v.offer_price) || v.offer_price <= 0);
+        if (selectedVariants.length === 0) {
+          antMessage.error('Please select at least one proposal option to include in your offer.');
+          setSubmitting(false);
+          return;
+        }
+
+        const invalidVariants = selectedVariants.filter(v => typeof v.offer_price !== 'number' || isNaN(v.offer_price) || v.offer_price <= 0);
         if (invalidVariants.length > 0) {
-          antMessage.error('Please enter a valid price greater than 0 for all variants.');
+          antMessage.error('Please enter a valid price greater than 0 for all selected variants.');
           setSubmitting(false);
           return;
         }
@@ -592,7 +801,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         }
       });
 
-      const variantsToSave: SellerQuoteVariant[] = proposalVariants.map(v => ({
+      const variantsToSave: SellerQuoteVariant[] = selectedVariants.map(v => ({
         ...v,
         seller_quote_id: quoteId,
       }));
@@ -694,6 +903,32 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
               {qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A'}
             </span>
           );
+        } else if (record.attribute_id === 'mfg_brand_mapping') {
+          const reqValues = record.values || [];
+          if (reqValues.length === 0) {
+            requestedContent = <span className="text-slate-400 italic">No manufacturer-brand mapping</span>;
+          } else {
+            requestedContent = (
+              <div className="space-y-1.5">
+                {reqValues.map((v: any, index: number) => {
+                  const parts = (v.value_id || '').split(':');
+                  const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                  const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                  const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                  const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                  const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Manufacturer');
+                  const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                  return (
+                    <div key={v.value_id || index} className="flex flex-wrap items-center gap-1 bg-slate-50 border border-slate-200 rounded p-1.5 text-xs">
+                      <AntTag color="purple" className="m-0 text-[11px]">Mfg: {mfgName}</AntTag>
+                      <span className="text-slate-400 font-bold">×</span>
+                      <AntTag color="blue" className="m-0 text-[11px]">Brand: {brandName}</AntTag>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
         } else {
           const reqValues = record.values || [];
           if (reqValues.length === 0) {
@@ -743,7 +978,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
           const index = currentValues.indexOf(value);
           const isLast = index === currentValues.length - 1;
 
-          const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
+          const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand' || attribute.attribute_id === 'mfg_brand_mapping';
           const connector = forceORDisabled ? "OR" : (currentProposalAttr?.connector || 'AND');
           const propJoiner = connector === "OR" ? " | " : " , ";
 
@@ -774,7 +1009,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
         let field: any;
         const isQty = attribute.attribute_id === 'req_quantity';
-        const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
+        const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand' || attribute.attribute_id === 'mfg_brand_mapping';
 
         if (isQty) {
           field = (
@@ -809,6 +1044,177 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
               }}
             />
           )
+        } else if (attribute.attribute_type === 'SYSTEM' && attribute.attribute_id === 'mfg_brand_mapping') {
+          const currentValues = proposalAttributes[proposalKey]?.values || [];
+          const pairs = parsePairValues(currentValues);
+
+          const updateProposalValues = (newValues: ItemAttributeValue[]) => {
+            const initialAttr = existingQuoteAttributes?.find(ea => ea.group_id === attribute.group_id && ea.attribute_id === attribute.attribute_id);
+            const initValIds = initialAttr?.values?.map(v => v.value_id) || [];
+            const newValIds = newValues.map(v => v.value_id);
+            const isChangedFromPrev = initValIds.length !== newValIds.length || !initValIds.every(id => newValIds.includes(id));
+
+            setProposalAttributes(prev => {
+              const reqValIds = prev[proposalKey]?.req_value?.map((v: any) => v.value_id) || [];
+              const sortedReq = [...reqValIds].sort();
+              const sortedNew = [...newValIds].sort();
+              const is_deviation = sortedReq.length !== sortedNew.length || !sortedReq.every((v, i) => v === sortedNew[i]);
+
+              const next = {
+                ...prev,
+                [proposalKey]: {
+                  ...prev[proposalKey],
+                  values: newValues,
+                  is_deviation: is_deviation,
+                  buyer_accepted: isChangedFromPrev ? false : (initialAttr?.buyer_accepted ?? false)
+                }
+              };
+              recalculateVariants(next);
+              return next;
+            });
+          };
+
+          field = (
+            <div className="space-y-2 w-full max-w-lg">
+              {pairs.length === 0 ? (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-slate-600">No manufacturer-brand mapping offered</div>
+                    <div className="truncate text-[10px] text-slate-400">All manufacturers and brands accepted</div>
+                  </div>
+                  {!isViewOnly && (
+                    <AntButton
+                      size="small"
+                      type="dashed"
+                      icon={<AntPlusOutlined />}
+                      onClick={() => {
+                        const newPairs = [...pairs, { id: `bm-${Date.now()}`, manufacturer_id: undefined, brand_id: undefined, description: '' }];
+                        const newVals = pairsToAttributeValues(newPairs);
+                        updateProposalValues(newVals);
+                      }}
+                    >
+                      Add Pair
+                    </AntButton>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pairs.map((mapPair, pairIdx) => (
+                    <div key={mapPair.id || pairIdx} className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm">
+                      <div className="mb-2 flex items-center justify-between">
+                        <div className="flex min-w-0 items-center gap-1.5">
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600">
+                            {pairIdx + 1}
+                          </span>
+                          <span className="truncate text-[11px] font-semibold text-slate-700">
+                            Manufacturer × Brand
+                          </span>
+                        </div>
+                        {!isViewOnly && (
+                          <AntButton
+                            type="text"
+                            danger
+                            size="small"
+                            className="!h-6 !w-6 !p-0"
+                            icon={<Lucide.Trash2 size={13} />}
+                            onClick={() => {
+                              const newPairs = pairs.filter((_, idx) => idx !== pairIdx);
+                              const newVals = pairsToAttributeValues(newPairs);
+                              updateProposalValues(newVals);
+                            }}
+                          />
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <div className="min-w-0">
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Manufacturer
+                          </label>
+                          <AntSelect
+                            disabled={isViewOnly}
+                            allowClear
+                            showSearch
+                            optionFilterProp="label"
+                            placeholder="Select manufacturer"
+                            value={mapPair.manufacturer_id}
+                            onChange={(val: string) => {
+                              const newPairs = [...pairs];
+                              newPairs[pairIdx].manufacturer_id = val;
+                              if (val && newPairs[pairIdx].brand_id && !isMappedPair(val, newPairs[pairIdx].brand_id)) {
+                                newPairs[pairIdx].brand_id = undefined;
+                              }
+                              const newVals = pairsToAttributeValues(newPairs);
+                              updateProposalValues(newVals);
+                            }}
+                            options={getRowMfgOptions(mapPair.brand_id)}
+                            className="w-full text-xs"
+                            popupMatchSelectWidth={false}
+                          />
+                        </div>
+
+                        <div className="min-w-0">
+                          <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                            Brand
+                          </label>
+                          <AntSelect
+                            disabled={isViewOnly}
+                            allowClear
+                            showSearch
+                            optionFilterProp="label"
+                            placeholder="Select brand"
+                            value={mapPair.brand_id}
+                            onChange={(val: string) => {
+                              const newPairs = [...pairs];
+                              newPairs[pairIdx].brand_id = val;
+                              if (val && newPairs[pairIdx].manufacturer_id && !isMappedPair(newPairs[pairIdx].manufacturer_id, val)) {
+                                newPairs[pairIdx].manufacturer_id = undefined;
+                              }
+                              const newVals = pairsToAttributeValues(newPairs);
+                              updateProposalValues(newVals);
+                            }}
+                            options={getRowBrandOptions(mapPair.manufacturer_id)}
+                            className="w-full text-xs"
+                            popupMatchSelectWidth={false}
+                          />
+                        </div>
+                      </div>
+
+                      {/* <AntInput
+                        disabled={isViewOnly}
+                        size="small"
+                        placeholder="Optional note..."
+                        value={mapPair.description || ''}
+                        onChange={(e) => {
+                          const newPairs = [...pairs];
+                          newPairs[pairIdx].description = e.target.value;
+                          const newVals = pairsToAttributeValues(newPairs);
+                          updateProposalValues(newVals);
+                        }}
+                        className="mt-2 !text-[11px]"
+                      /> */}
+                    </div>
+                  ))}
+
+                  {!isViewOnly && (
+                    <AntButton
+                      type="dashed"
+                      size="small"
+                      icon={<AntPlusOutlined />}
+                      className="!h-8 w-full !text-xs"
+                      onClick={() => {
+                        const newPairs = [...pairs, { id: `bm-${Date.now()}`, manufacturer_id: undefined, brand_id: undefined, description: '' }];
+                        const newVals = pairsToAttributeValues(newPairs);
+                        updateProposalValues(newVals);
+                      }}
+                    >
+                      Add Pair
+                    </AntButton>
+                  )}
+                </div>
+              )}
+            </div>
+          );
         } else if (attribute.attribute_type === 'SYSTEM' && attribute.attribute_id !== 'manufacturer' && attribute.attribute_id !== 'brand') {
           field = "Contact System admin";
         } else {
@@ -873,7 +1279,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         return (
           <div className="flex gap-2 flex-col">
             <div className="w-full">
-              {!isQty && !forceORDisabled && (
+              {!isQty && (
                 <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded px-2 py-1 mb-1.5 w-max">
                   <div className="flex items-center gap-1.5">
                     <span className="text-[10px] uppercase font-semibold text-slate-500">Connector</span>
@@ -1051,49 +1457,52 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         })}
       </div>
 
-      <div className="space-y-6 mt-6">
-        <h3 className="text-base font-bold text-slate-900 pt-3">Variant Configuration</h3>
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #527EA3` }}>
-          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#527EA314` }}>
+      {/* Section 1: Auto-Generated Combinations Pool */}
+      <div className="space-y-6 mt-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-slate-900">1. Auto-Generated Option Combinations Matrix</h3>
+            <p className="text-xs text-slate-500">
+              System auto-generates option combinations based on configured variant attributes and manufacturer/brand pairs. Choose which options to include in your quote offer.
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #6366f1` }}>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 bg-indigo-50/40">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#527EA3' }}>
-                V
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white bg-indigo-600">
+                M
               </span>
-              <h4 className="text-md font-bold text-slate-800">Variant and Price</h4>
+              <h4 className="text-md font-bold text-slate-800">Generated Combinations Matrix</h4>
             </div>
-            {!isViewOnly && (
-              <div className="flex items-center gap-2">
-                <AntInput
-                  type="number"
-                  size="small"
-                  placeholder="Bulk Price"
-                  prefix="$"
-                  value={bulkPrice}
-                  onChange={(e) => setBulkPrice(e.target.value ? Number(e.target.value) : undefined)}
-                  className="w-32"
-                />
-                <AntButton
-                  size="small"
-                  type="primary"
-                  onClick={() => {
-                    if (bulkPrice !== undefined && bulkPrice >= 0) {
-                      setProposalVariants(prev => prev.map(v => ({ ...v, offer_price: bulkPrice })));
-                      antMessage.success(`Bulk price applied to all variants`);
-                    } else {
-                      antMessage.error(`Please enter a valid price to apply`);
-                    }
-                  }}
-                >
-                  Apply to All
-                </AntButton>
-              </div>
-            )}
+            <div className="inline-flex gap-2">
+              {!isViewOnly && (
+                <div className="flex gap-2">
+                  <AntButton size="small" type="default" onClick={() => {
+                    setProposalVariants(prev => prev.map(v => ({ ...v, is_selected: true })));
+                    antMessage.success('Included all generated options');
+                  }}>
+                    Select All Options
+                  </AntButton>
+                  <AntButton size="small" danger onClick={() => {
+                    setProposalVariants(prev => prev.map(v => ({ ...v, is_selected: false })));
+                    antMessage.info('Deselected all options');
+                  }}>
+                    Deselect All
+                  </AntButton>
+                </div>
+              )}
+              <AntTag color="indigo" className="font-bold">
+                {proposalVariants.length} {proposalVariants.length === 1 ? 'combination' : 'combinations'}
+              </AntTag>
+            </div>
           </div>
           <div className="p-3">
             <Table
               dataSource={proposalVariants}
-              rowKey="id"
-              pagination={{ pageSize: 10, showSizeChanger: true }}
+              rowKey={(r) => r.signature || r.id}
+              pagination={{ pageSize: 5, showSizeChanger: true }}
               size="small"
               bordered
               columns={[
@@ -1104,68 +1513,245 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                   render: (_: string, __: any, index: number) => <span className='pl-1.5'>{index + 1}</span>
                 },
                 {
-                  title: 'Variant Combinations',
+                  title: 'Option Combinations & Specifications',
                   key: 'combinations',
                   className: "align-top",
                   render: (_: string, record: SellerQuoteVariant) => {
-                    const showStatus = existingQuote && ['REVISION_REQUIRED', 'SUBMITTED', 'DRAFT'].includes(existingQuote.status);
-
                     if (!record.combinations || record.combinations.length === 0) {
-                      return (
-                        <div className="flex items-center">
-                          <span className="text-slate-500 italic">Default Variant</span>
-                          {showStatus && (
-                            record.buyer_accepted ? (
-                              <AntTag className="ml-2 bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
-                            ) : (
-                              <AntTag className="ml-2 bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
-                            )
-                          )}
-                        </div>
-                      );
+                      return <span className="text-slate-500 italic">Default Option</span>;
                     }
                     return (
-                      <div className="flex justify-between items-center">
-                        <div className="flex flex-wrap gap-2">
-                          {record.combinations.map((c, i) => {
-                            return <AntTag key={i} color="blue">
-                              {/* {c.attribute_name}: */}
-                              {c.value_label}</AntTag>
-                          })}
-                        </div>
-                        <div className="">
-                          {showStatus && (
-                            record.buyer_accepted ? (
-                              <AntTag className="bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
-                            ) : (
-                              <AntTag className="bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
-                            )
-                          )}
-                        </div>
+                      <div className="flex flex-wrap gap-2">
+                        {record.combinations.map((c: any, i: number) => {
+                          if (c.attribute_id === 'mfg_brand_mapping') {
+                            const parts = (c.value_id || '').split(':');
+                            const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                            const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                            const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                            const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                            const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
+                            const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                            return (
+                              <AntTag key={i} color="purple">
+                                Mfg: {mfgName} × Brand: {brandName}
+                              </AntTag>
+                            );
+                          }
+                          return (
+                            <AntTag key={i} color="blue">
+                              {c.value_label}
+                            </AntTag>
+                          );
+                        })}
                       </div>
                     );
                   }
                 },
                 {
-                  title: 'Unit Price',
-                  key: 'offer_price',
-                  className: "w-[250px] max-w-[250px] align-top",
-                  render: (_: string, record: SellerQuoteVariant) => (
-                    <AntInput
-                      type="number"
-                      disabled={isViewOnly}
-                      value={record.offer_price || ''}
-                      onChange={(e) => {
-                        const val = Number(e.target.value);
-                        setProposalVariants(prev => prev.map(v => v.id === record.id ? { ...v, offer_price: val } : v));
-                      }}
-                      prefix="$"
-                      placeholder="Enter price"
-                    />
-                  )
+                  title: 'Status',
+                  key: 'status',
+                  className: "w-[150px] max-w-[150px] align-top",
+                  render: (_: string, record: SellerQuoteVariant) => {
+                    return record.is_selected ? (
+                      <AntTag color="emerald" className="font-semibold">Included in Quote</AntTag>
+                    ) : (
+                      <AntTag color="default" className="font-normal">Not Included</AntTag>
+                    );
+                  }
+                },
+                {
+                  title: 'Action',
+                  key: 'action',
+                  className: "w-[140px] max-w-[140px] align-top text-center",
+                  render: (_: string, record: SellerQuoteVariant) => {
+                    if (isViewOnly) return null;
+                    return (
+                      <AntButton
+                        size="small"
+                        type={record.is_selected ? "default" : "primary"}
+                        danger={record.is_selected}
+                        onClick={() => {
+                          setProposalVariants(prev => prev.map(v => v.id === record.id ? { ...v, is_selected: !record.is_selected } : v));
+                        }}
+                      >
+                        {record.is_selected ? "Remove Option" : "Include in Quote"}
+                      </AntButton>
+                    );
+                  }
                 }
               ]}
             />
+          </div>
+        </div>
+      </div>
+
+      {/* Section 2: Selected Offered Options & Pricing Matrix */}
+      <div className="space-y-6 mt-8">
+        <div>
+          <h3 className="text-base font-bold text-slate-900">2. Selected Offered Proposal Options & Prices</h3>
+          <p className="text-xs text-slate-500">
+            Only these selected proposal options will be submitted to the buyer. Enter your offer price ($) for each option.
+          </p>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #527EA3` }}>
+          <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#527EA314` }}>
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#527EA3' }}>
+                $
+              </span>
+              <h4 className="text-md font-bold text-slate-800">Offered Options & Unit Offer Prices</h4>
+            </div>
+            <div className="flex items-center gap-3">
+              {!isViewOnly && (
+                <div className="flex items-center gap-2">
+                  <AntInput
+                    type="number"
+                    size="small"
+                    placeholder="Bulk Price"
+                    prefix="$"
+                    value={bulkPrice}
+                    onChange={(e) => setBulkPrice(e.target.value ? Number(e.target.value) : undefined)}
+                    className="w-32"
+                  />
+                  <AntButton
+                    size="small"
+                    type="primary"
+                    onClick={() => {
+                      if (bulkPrice !== undefined && bulkPrice >= 0) {
+                        setProposalVariants(prev => prev.map(v => v.is_selected ? { ...v, offer_price: bulkPrice } : v));
+                        antMessage.success(`Bulk price applied to all selected options`);
+                      } else {
+                        antMessage.error(`Please enter a valid price to apply`);
+                      }
+                    }}
+                  >
+                    Apply to All
+                  </AntButton>
+                </div>
+              )}
+              <AntTag color="default" style={{ borderColor: '#527EA3', color: '#527EA3', fontWeight: 700 }}>
+                {proposalVariants.filter(v => v.is_selected).length} {proposalVariants.filter(v => v.is_selected).length === 1 ? 'selected option' : 'selected options'}
+              </AntTag>
+            </div>
+          </div>
+          <div className="p-3">
+            {proposalVariants.filter(v => v.is_selected).length === 0 ? (
+              <div className="p-8 text-center text-slate-400 italic">
+                No proposal options selected. Please include options from the matrix above to submit your offer to the buyer.
+              </div>
+            ) : (
+              <Table
+                dataSource={proposalVariants.filter(v => v.is_selected)}
+                rowKey="id"
+                pagination={{ pageSize: 10, showSizeChanger: true }}
+                size="small"
+                bordered
+                columns={[
+                  {
+                    title: 'S.No',
+                    key: 'sno',
+                    className: "w-[50px] max-w-[50px] align-top",
+                    render: (_: string, __: any, index: number) => <span className='pl-1.5'>{index + 1}</span>
+                  },
+                  {
+                    title: 'Offered Option Combinations & Specifications',
+                    key: 'combinations',
+                    className: "align-top",
+                    render: (_: string, record: SellerQuoteVariant) => {
+                      const showStatus = existingQuote && ['REVISION_REQUIRED', 'SUBMITTED', 'DRAFT'].includes(existingQuote.status);
+
+                      if (!record.combinations || record.combinations.length === 0) {
+                        return (
+                          <div className="flex items-center">
+                            <span className="text-slate-500 italic">Default Option</span>
+                            {showStatus && (
+                              record.buyer_accepted ? (
+                                <AntTag className="ml-2 bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
+                              ) : (
+                                <AntTag className="ml-2 bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
+                              )
+                            )}
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="flex justify-between items-center">
+                          <div className="flex flex-wrap gap-2">
+                            {record.combinations.map((c, i) => {
+                              if (c.attribute_id === 'mfg_brand_mapping') {
+                                const parts = (c.value_id || '').split(':');
+                                const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                                const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                                const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                                const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                                const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
+                                const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                                return (
+                                  <AntTag key={i} color="purple">
+                                    Mfg: {mfgName} × Brand: {brandName}
+                                  </AntTag>
+                                );
+                              }
+                              return (
+                                <AntTag key={i} color="blue">
+                                  {c.value_label}
+                                </AntTag>
+                              );
+                            })}
+                          </div>
+                          <div className="">
+                            {showStatus && (
+                              record.buyer_accepted ? (
+                                <AntTag className="bg-emerald-50/50 text-emerald-600 border-emerald-100">Approved</AntTag>
+                              ) : (
+                                <AntTag className="bg-red-50/10 text-red-400 border-red-100">Not Accepted</AntTag>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                  },
+                  {
+                    title: 'Unit Offer Price',
+                    key: 'offer_price',
+                    className: "w-[180px] max-w-[180px] align-top",
+                    render: (_: string, record: SellerQuoteVariant) => (
+                      <AntInput
+                        type="number"
+                        disabled={isViewOnly}
+                        value={record.offer_price || ''}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          setProposalVariants(prev => prev.map(v => v.id === record.id ? { ...v, offer_price: val } : v));
+                        }}
+                        prefix="$"
+                        placeholder="Enter price"
+                      />
+                    )
+                  },
+                  {
+                    title: 'Action',
+                    key: 'action',
+                    className: "w-[70px] max-w-[70px] align-top text-center",
+                    render: (_: string, record: SellerQuoteVariant) => {
+                      if (isViewOnly) return null;
+                      return (
+                        <AntButton
+                          type="text"
+                          danger
+                          size="small"
+                          icon={<Lucide.Trash2 size={14} />}
+                          onClick={() => {
+                            setProposalVariants(prev => prev.map(v => v.id === record.id ? { ...v, is_selected: false } : v));
+                          }}
+                        />
+                      );
+                    }
+                  }
+                ]}
+              />
+            )}
           </div>
         </div>
       </div>
@@ -1187,18 +1773,251 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
 
 const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyId: string }> = ({ rfqId, itemId, activePartyId }) => {
+  const { message: antMessage } = AntApp.useApp();
+  const navigate = useNavigate();
+  const { activeWorkspace } = useWorkspace();
+  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
+
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+
+  const data = useLiveQuery(async () => {
+    if (!itemId || !activePartyId || !rfqId) return undefined;
+
+    const [
+      existingQuote,
+      item,
+      rfq,
+      allBrands,
+      allManufacturers,
+      categories,
+      catalogAttributes,
+      catalogAttributeValues
+    ] = await Promise.all([
+      rfqDb.seller_quotes.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first(),
+      rfqDb.rfq_items.get(itemId),
+      rfqDb.rfqs.get(rfqId),
+      businessDb.brands.toArray(),
+      businessDb.manufacturers.toArray(),
+      catalogDb.categories.toArray(),
+      catalogDb.attributes.toArray(),
+      catalogDb.attributeValues.toArray()
+    ]);
+
+    let existingQuoteAttributes: SellerQuoteAttribute[] = [];
+    let existingQuoteVariants: SellerQuoteVariant[] = [];
+    if (existingQuote?.id) {
+      [existingQuoteAttributes, existingQuoteVariants] = await Promise.all([
+        rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray(),
+        rfqDb.seller_quote_variants.where('seller_quote_id').equals(existingQuote.id).toArray()
+      ]);
+    }
+
+    let sellerProducts: any[] = [];
+    let allVariants: any[] = [];
+    if (item?.catalog_product_id) {
+      sellerProducts = await catalogDb.sellerProducts.where('catalog_product_id').equals(item.catalog_product_id).toArray();
+      allVariants = sellerProducts.flatMap((sp) => sp.variants || []) || [];
+    }
+
+    let catalogProduct = null;
+    if (item?.catalog_product_id) {
+      catalogProduct = await catalogDb.products.get(item.catalog_product_id);
+    }
+
+    let award = null;
+    // if (itemId && activePartyId) {
+    //   award = await rfqDb.rfq_awards.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first() || null;
+    // }
+
+    return {
+      existingQuote: existingQuote || null,
+      existingQuoteAttributes,
+      existingQuoteVariants,
+      item: item || null,
+      rfq: rfq || null,
+      allBrands,
+      allManufacturers,
+      categories,
+      catalogAttributes,
+      catalogAttributeValues,
+      sellerProducts,
+      allVariants,
+      catalogProduct: catalogProduct || null,
+      award: award || null
+    };
+  }, [itemId, activePartyId, rfqId]);
+
+  const {
+    existingQuote,
+    existingQuoteAttributes,
+    existingQuoteVariants,
+    allVariants,
+    catalogProduct,
+    award
+  } = data || {};
+
+  useEffect(() => {
+    // if (award?.variant_id) {
+    //   setSelectedVariantId(award.variant_id);
+    // } else if (existingQuoteVariants?.find(v => v.catalog_variant_id)) {
+    //   setSelectedVariantId(existingQuoteVariants.find(v => v.catalog_variant_id)!.catalog_variant_id!);
+    // }
+  }, [award, existingQuoteVariants]);
+
+  const checkVariantSatisfaction = (catalogVariant: any) => {
+    if (!catalogVariant || !existingQuoteAttributes) return { isSatisfied: false, matchCount: 0, totalCount: 0 };
+    const comboValues = catalogVariant.combination_values || catalogVariant.specifications || [];
+    let matchCount = 0;
+    let totalCount = 0;
+
+    existingQuoteAttributes.forEach((attr) => {
+      if (attr.attribute_type !== 'SYSTEM' && attr.values && attr.values.length > 0) {
+        totalCount++;
+        const reqValIds = new Set(attr.values.map(v => v.value_id));
+        const matchedInVariant = comboValues.some((cv: any) => cv.attribute_id === attr.attribute_id && reqValIds.has(cv.value_id));
+        if (matchedInVariant) matchCount++;
+      }
+    });
+
+    const isSatisfied = totalCount === 0 || matchCount >= totalCount;
+    return { isSatisfied, matchCount, totalCount };
+  };
+
+  const handleSaveProductMapping = async () => {
+    if (!selectedVariantId) {
+      antMessage.error('Please select a catalog SKU to map.');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      if (existingQuote) {
+        await rfqDb.seller_quotes.update(existingQuote.id, {
+          status: 'PRODUCT_SUBMIT_REVISION',
+          updated_at: new Date().toISOString()
+        });
+      }
+
+      // if (award) {
+      //   await rfqDb.rfq_awards.update(award.id, {
+      //     variant_id: selectedVariantId,
+      //     product_mapping_status: 'SUBMITTED'
+      //   });
+      // }
+
+      antMessage.success('Catalog Product SKU mapped successfully!');
+      navigate(basePath);
+    } catch (err) {
+      console.error(err);
+      antMessage.error('Failed to submit product mapping.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (!data) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <h2 className="text-xl font-bold text-slate-800 font-sans animate-pulse">Loading Product Mapping Workspace...</h2>
+      </div>
+    );
+  }
+
   return (
-    <div className="p-8">
-      <Result
-        status="info"
-        title="Product Mapping & Creation"
-        subTitle="This step is for mapping the negotiated item to your catalog product or creating a new product based on the accepted specifications."
-        extra={[
-          <AntButton type="primary" key="map">
-            Map / Create Product
-          </AntButton>
-        ]}
-      />
+    <div className="space-y-6">
+      {/* Accepted Specs Overview */}
+      <Card title={<span className="font-bold text-slate-800 text-base">Negotiated Quote & Accepted Specifications</span>} className="shadow-sm border-slate-200">
+        <Descriptions bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }}>
+          <Descriptions.Item label="Target Catalog Product" span={3}>
+            <strong className="text-slate-800 text-base">{catalogProduct?.name || 'Custom Product'}</strong>
+          </Descriptions.Item>
+          <Descriptions.Item label="Quote Reference">
+            <AntTag color="purple" className="font-mono font-bold m-0">{existingQuote?.seller_quote_number || 'N/A'}</AntTag>
+          </Descriptions.Item>
+          <Descriptions.Item label="Quote Status">
+            <AntTag color="emerald" className="font-bold m-0">{existingQuote?.status || 'DEVIATION_ACCEPTED'}</AntTag>
+          </Descriptions.Item>
+          {/* <Descriptions.Item label="Mapping Status">
+            <AntTag color={award?.product_mapping_status === 'SUBMITTED' ? 'blue' : 'amber'} className="font-bold m-0">
+              {award?.product_mapping_status || 'PENDING'}
+            </AntTag>
+          </Descriptions.Item> */}
+        </Descriptions>
+      </Card>
+
+      {/* Catalog SKU Selection & Spec Inspector Workspace */}
+      <Card title={<span className="font-bold text-slate-800 text-base">Select Existing Catalog Product SKU</span>} className="shadow-sm border-slate-200">
+        <p className="text-xs text-slate-500 mb-4">
+          Select an existing catalog SKU to fulfill the negotiated RFQ item. SKUs are validated against accepted quote specifications in real time.
+        </p>
+
+        {(allVariants || []).length === 0 ? (
+          <div className="p-8 text-center text-slate-400 italic">
+            No existing catalog product variants found for this category/product.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {(allVariants || []).map((cv: any) => {
+              const satisfaction = checkVariantSatisfaction(cv);
+              const isSelected = selectedVariantId === cv.id;
+
+              return (
+                <div
+                  key={cv.id}
+                  onClick={() => setSelectedVariantId(cv.id)}
+                  className={`p-4 border rounded-xl bg-white shadow-sm cursor-pointer transition-all ${isSelected ? 'border-2 border-indigo-600 bg-indigo-50/20' : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="catalog_sku_selection"
+                        checked={isSelected}
+                        onChange={() => setSelectedVariantId(cv.id)}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="font-bold text-slate-800 text-sm font-mono">{cv.sku || cv.id}</span>
+                    </div>
+                    {satisfaction.isSatisfied ? (
+                      <AntTag color="emerald" className="m-0 font-medium">Satisfies Specs (100% Match)</AntTag>
+                    ) : (
+                      <AntTag color="amber" className="m-0 font-medium">Partial Match ({satisfaction.matchCount}/{satisfaction.totalCount})</AntTag>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap gap-1 mb-3">
+                    {(cv.combination_values || cv.specifications || []).map((v: any, idx: number) => (
+                      <AntTag key={idx} color="blue" className="text-[11px] m-0">{v.value_label || v.value_id}</AntTag>
+                    ))}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                    <span className="font-semibold text-slate-600">List Price: ${cv.price || 0}</span>
+                    {isSelected && <span className="font-bold text-indigo-600">Selected for Mapping</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </Card>
+
+      <div className="pt-4 flex justify-end gap-3">
+        <AntButton onClick={() => navigate(basePath)}>Cancel</AntButton>
+        <AntButton
+          type="primary"
+          icon={<SendOutlined />}
+          onClick={handleSaveProductMapping}
+          loading={submitting}
+          disabled={!selectedVariantId}
+          className="bg-indigo-600 hover:bg-indigo-700 font-semibold"
+        >
+          Submit Product Mapping
+        </AntButton>
+      </div>
     </div>
   );
 };

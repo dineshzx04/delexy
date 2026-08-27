@@ -10,101 +10,101 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const RfqAwardReleasePo: React.FC = () => {
-  const { rfqId, itemId, quoteId } = useParams<{ rfqId: string; itemId: string; quoteId: string }>();
-  const navigate = useNavigate();
-  const { activeWorkspace } = useWorkspace();
-  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
-  const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
-  const { message: antMessage } = AntApp.useApp();
+  // const { rfqId, itemId, quoteId } = useParams<{ rfqId: string; itemId: string; quoteId: string }>();
+  // const navigate = useNavigate();
+  // const { activeWorkspace } = useWorkspace();
+  // const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  // const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
+  // const { message: antMessage } = AntApp.useApp();
 
-  const [submittingPo, setSubmittingPo] = useState(false);
-  const [acknowledging, setAcknowledging] = useState(false);
-  const [form] = Form.useForm();
+  // const [submittingPo, setSubmittingPo] = useState(false);
+  // const [acknowledging, setAcknowledging] = useState(false);
+  // const [form] = Form.useForm();
 
-  const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
-  const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
-  const quote = useLiveQuery(() => (quoteId ? rfqDb.seller_quotes.get(quoteId) : undefined), [quoteId]);
-  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
-  const sellerProduct = useLiveQuery(
-    async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
-    [item?.product_id]
-  );
+  // const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
+  // const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
+  // const quote = useLiveQuery(() => (quoteId ? rfqDb.seller_quotes.get(quoteId) : undefined), [quoteId]);
+  // const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  // const sellerProduct = useLiveQuery(
+  //   async () => item?.product_id ? await catalogDb.sellerProducts.get(item.product_id) : undefined,
+  //   [item?.product_id]
+  // );
 
-  const award = useLiveQuery(
-    async () => {
-      if (!itemId || !quoteId) return undefined;
-      const awds = await rfqDb.rfq_awards.where('rfq_item_id').equals(itemId).toArray();
-      return awds.find((a) => a.seller_quote_id === quoteId);
-    },
-    [itemId, quoteId]
-  );
+  // const award = useLiveQuery(
+  //   async () => {
+  //     if (!itemId || !quoteId) return undefined;
+  //     const awds = await rfqDb.rfq_awards.where('rfq_item_id').equals(itemId).toArray();
+  //     return awds.find((a) => a.seller_quote_id === quoteId);
+  //   },
+  //   [itemId, quoteId]
+  // );
 
-  const supplierPartyName = React.useMemo(() => {
-    if (!quote || parties.length === 0) return '';
-    return parties.find((p) => p.id === quote.seller_party_id)?.display_name || quote.seller_party_id;
-  }, [quote, parties]);
+  // const supplierPartyName = React.useMemo(() => {
+  //   if (!quote || parties.length === 0) return '';
+  //   return parties.find((p) => p.id === quote.seller_party_id)?.display_name || quote.seller_party_id;
+  // }, [quote, parties]);
 
-  const breadcrumbs = React.useMemo(() => [
-    { title: <a onClick={() => navigate(basePath)}>Sourcing</a> },
-    { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || 'RFQ Details'}</a> },
-    { title: <a onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}`)}>{sellerProduct?.product_name || 'Item details'}</a> },
-    { title: <span className="text-slate-800 font-semibold">Release Purchase Order</span> }
-  ], [basePath, rfqId, itemId, rfq?.rfq_number, sellerProduct?.product_name, navigate]);
+  // const breadcrumbs = React.useMemo(() => [
+  //   { title: <a onClick={() => navigate(basePath)}>Sourcing</a> },
+  //   { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || 'RFQ Details'}</a> },
+  //   { title: <a onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}`)}>{sellerProduct?.product_name || 'Item details'}</a> },
+  //   { title: <span className="text-slate-800 font-semibold">Release Purchase Order</span> }
+  // ], [basePath, rfqId, itemId, rfq?.rfq_number, sellerProduct?.product_name, navigate]);
 
-  useBreadcrumb(breadcrumbs);
+  // useBreadcrumb(breadcrumbs);
 
-  const handleAcknowledgeMapping = async () => {
-    if (!award) return;
-    setAcknowledging(true);
-    try {
-      await rfqDb.rfq_awards.update(award.id, {
-        product_mapping_status: 'ACKNOWLEDGED'
-      });
-      antMessage.success('Supplier catalog mapping details acknowledged successfully!');
-    } catch (err) {
-      console.error(err);
-      antMessage.error('Failed to acknowledge variant specifications.');
-    } finally {
-      setAcknowledging(false);
-    }
-  };
+  // const handleAcknowledgeMapping = async () => {
+  //   if (!award) return;
+  //   setAcknowledging(true);
+  //   try {
+  //     await rfqDb.rfq_awards.update(award.id, {
+  //       product_mapping_status: 'ACKNOWLEDGED'
+  //     });
+  //     antMessage.success('Supplier catalog mapping details acknowledged successfully!');
+  //   } catch (err) {
+  //     console.error(err);
+  //     antMessage.error('Failed to acknowledge variant specifications.');
+  //   } finally {
+  //     setAcknowledging(false);
+  //   }
+  // };
 
-  const handleReleasePoSubmit = async (values: any) => {
-    if (!award) return;
-    setSubmittingPo(true);
-    try {
-      const poId = `po-${award.id}-${Date.now()}`;
-      await rfqDb.rfq_awards.update(award.id, {
-        award_status: 'PO_CREATED',
-        purchase_order_id: poId,
-        shipping_address: values.shipping_address,
-        payment_terms: values.payment_terms,
-        delivery_notes: values.delivery_notes,
-        po_released_at: new Date().toISOString()
-      });
-      antMessage.success(`Purchase Order ${poId} released successfully!`);
-      navigate(`${basePath}/${rfqId}/items/${itemId}`);
-    } catch (err) {
-      console.error(err);
-      antMessage.error('Failed to release Purchase Order.');
-    } finally {
-      setSubmittingPo(false);
-    }
-  };
+  // const handleReleasePoSubmit = async (values: any) => {
+  //   if (!award) return;
+  //   setSubmittingPo(true);
+  //   try {
+  //     const poId = `po-${award.id}-${Date.now()}`;
+  //     await rfqDb.rfq_awards.update(award.id, {
+  //       award_status: 'PO_CREATED',
+  //       purchase_order_id: poId,
+  //       shipping_address: values.shipping_address,
+  //       payment_terms: values.payment_terms,
+  //       delivery_notes: values.delivery_notes,
+  //       po_released_at: new Date().toISOString()
+  //     });
+  //     antMessage.success(`Purchase Order ${poId} released successfully!`);
+  //     navigate(`${basePath}/${rfqId}/items/${itemId}`);
+  //   } catch (err) {
+  //     console.error(err);
+  //     antMessage.error('Failed to release Purchase Order.');
+  //   } finally {
+  //     setSubmittingPo(false);
+  //   }
+  // };
 
-  if (!rfq || !item || !quote || !award) {
-    return (
-      <div className="p-12 text-center text-slate-500">
-        <p>Loading award and PO context details...</p>
-      </div>
-    );
-  }
+  // if (!rfq || !item || !quote || !award) {
+  //   return (
+  //     <div className="p-12 text-center text-slate-500">
+  //       <p>Loading award and PO context details...</p>
+  //     </div>
+  //   );
+  // }
 
-  const mapStatus = award.product_mapping_status;
+  // const mapStatus = award.product_mapping_status;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-
+      {/* 
       <Card className="shadow-md border-slate-200">
         <div className="flex items-center justify-between">
           <div>
@@ -225,7 +225,7 @@ export const RfqAwardReleasePo: React.FC = () => {
             </p>
           </Card>
         )}
-      </Card>
+      </Card> */}
     </div>
   );
 };

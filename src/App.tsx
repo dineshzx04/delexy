@@ -177,7 +177,7 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/release-po" element={<RfqAwardReleasePo />} />
                 <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
-                <Route path="seller/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
+                {/* <Route path="seller/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} /> */}
                 <Route path="seller/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
 
                 <Route path="*" element={<NotFound scope="business" />} />

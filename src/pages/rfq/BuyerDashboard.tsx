@@ -41,7 +41,7 @@ export const BuyerDashboard: React.FC = () => {
   ) || [];
 
   const responses = useLiveQuery(() => rfqDb.seller_quotes.toArray(), []) || [];
-  const awards = useLiveQuery(() => rfqDb.rfq_awards.toArray(), []) || [];
+  // const awards = useLiveQuery(() => rfqDb.rfq_awards.toArray(), []) || [];
 
   const breadcrumbs = React.useMemo(() => [
     { title: <span className="text-slate-800 font-semibold">Sourcing Dashboard</span> }
@@ -49,10 +49,10 @@ export const BuyerDashboard: React.FC = () => {
   useBreadcrumb(breadcrumbs);
 
   const activeRfqs = partyRfqs.filter((r) => r.status === 'ISSUED' || r.status === 'IN_PROGRESS');
-  const totalAwardedAmount = awards.reduce(
-    (acc: number, a: any) => acc + ((a.awarded_quantity || 0) * (a.unit_price || 0)),
-    0
-  );
+  // const totalAwardedAmount = awards.reduce(
+  //   (acc: number, a: any) => acc + ((a.awarded_quantity || 0) * (a.unit_price || 0)),
+  //   0
+  // );
   const pendingReviewsCount = responses.filter((r: any) => r.status === 'SUBMITTED').length;
 
   const columns = [
@@ -166,11 +166,11 @@ export const BuyerDashboard: React.FC = () => {
           </Card>
         </Col>
 
-        <Col xs={24} sm={12} lg={6}>
+        {/* <Col xs={24} sm={12} lg={6}>
           <Card className="shadow-sm border-slate-200 hover:shadow-md transition-shadow">
             <Statistic title="Total Awarded" value={totalAwardedAmount} prefix="$" valueStyle={{ color: '#059669' }} />
           </Card>
-        </Col>
+        </Col> */}
       </Row>
 
       <Card

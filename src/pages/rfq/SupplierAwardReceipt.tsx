@@ -10,129 +10,129 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const SupplierAwardReceipt: React.FC = () => {
-  const { rfqId, itemId, awardId } = useParams<{ rfqId: string; itemId: string; awardId: string }>();
-  const navigate = useNavigate();
-  const { activeWorkspace } = useWorkspace();
-  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
-  const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
-  const { message: antMessage } = AntApp.useApp();
+  // const { rfqId, itemId, awardId } = useParams<{ rfqId: string; itemId: string; awardId: string }>();
+  // const navigate = useNavigate();
+  // const { activeWorkspace } = useWorkspace();
+  // const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  // const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
+  // const { message: antMessage } = AntApp.useApp();
 
-  const [confirmingPo, setConfirmingPo] = useState(false);
-  const [poAckNote, setPoAckNote] = useState('');
+  // const [confirmingPo, setConfirmingPo] = useState(false);
+  // const [poAckNote, setPoAckNote] = useState('');
 
-  const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
-  const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
-  const award = useLiveQuery(() => (awardId ? rfqDb.rfq_awards.get(awardId) : undefined), [awardId]);
-  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
-  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
-  const quote = useLiveQuery(() => (award?.seller_quote_id ? rfqDb.seller_quotes.get(award.seller_quote_id) : undefined), [award?.seller_quote_id]);
-  const sellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []) || [];
-  const catalogBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
-  const catalogManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
-  const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
-  const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
-  const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
+  // const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
+  // const item = useLiveQuery(() => (itemId ? rfqDb.rfq_items.get(itemId) : undefined), [itemId]);
+  // const award = useLiveQuery(() => (awardId ? rfqDb.rfq_awards.get(awardId) : undefined), [awardId]);
+  // const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  // const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
+  // const quote = useLiveQuery(() => (award?.seller_quote_id ? rfqDb.seller_quotes.get(award.seller_quote_id) : undefined), [award?.seller_quote_id]);
+  // const sellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []) || [];
+  // const catalogBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
+  // const catalogManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+  // const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
+  // const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
+  // const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
 
-  const mappingDetails = React.useMemo(() => {
-    if (!award || !sellerProducts.length) {
-      return {
-        mappedProduct: undefined,
-        mappedVariant: undefined,
-        brandName: undefined,
-        manufacturerName: undefined,
-        groupedVariantSpecs: []
-      };
-    }
+  // const mappingDetails = React.useMemo(() => {
+  //   if (!award || !sellerProducts.length) {
+  //     return {
+  //       mappedProduct: undefined,
+  //       mappedVariant: undefined,
+  //       brandName: undefined,
+  //       manufacturerName: undefined,
+  //       groupedVariantSpecs: []
+  //     };
+  //   }
 
-    const mappedProduct = sellerProducts.find((p) =>
-      p.variants && p.variants.some((v: any) => v.id === award.variant_id)
-    );
-    const mappedVariant = mappedProduct?.variants?.find((v: any) => v.id === award.variant_id);
+  //   const mappedProduct = sellerProducts.find((p) =>
+  //     p.variants && p.variants.some((v: any) => v.id === award.variant_id)
+  //   );
+  //   const mappedVariant = mappedProduct?.variants?.find((v: any) => v.id === award.variant_id);
 
-    const brandName = mappedProduct ? catalogBrands.find((b) => b.id === mappedProduct.brand_id)?.name : undefined;
-    const manufacturerName = mappedProduct ? catalogManufacturers.find((m) => m.id === mappedProduct.manufacturer_id)?.company_name : undefined;
+  //   const brandName = mappedProduct ? catalogBrands.find((b) => b.id === mappedProduct.brand_id)?.name : undefined;
+  //   const manufacturerName = mappedProduct ? catalogManufacturers.find((m) => m.id === mappedProduct.manufacturer_id)?.company_name : undefined;
 
-    const groupsMap: Record<string, { name: string; rows: any[] }> = {};
-    if (mappedVariant && mappedVariant.combination_values) {
-      mappedVariant.combination_values.forEach((cv: any) => {
-        const groupId = cv.group_id || 'ungrouped';
-        if (!groupsMap[groupId]) {
-          const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
-          groupsMap[groupId] = { name: groupName, rows: [] };
-        }
+  //   const groupsMap: Record<string, { name: string; rows: any[] }> = {};
+  //   if (mappedVariant && mappedVariant.combination_values) {
+  //     mappedVariant.combination_values.forEach((cv: any) => {
+  //       const groupId = cv.group_id || 'ungrouped';
+  //       if (!groupsMap[groupId]) {
+  //         const groupName = attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications';
+  //         groupsMap[groupId] = { name: groupName, rows: [] };
+  //       }
 
-        const attrName = catalogAttributes.find((a) => a.id === cv.attribute_id)?.name || cv.attribute_id;
-        const valLabel = catalogAttributeValues.find((v) => v.id === cv.value_id)?.label || cv.value_label || cv.value_id;
+  //       const attrName = catalogAttributes.find((a) => a.id === cv.attribute_id)?.name || cv.attribute_id;
+  //       const valLabel = catalogAttributeValues.find((v) => v.id === cv.value_id)?.label || cv.value_label || cv.value_id;
 
-        groupsMap[groupId].rows.push({
-          key: cv.attribute_id,
-          specification: attrName,
-          value: valLabel
-        });
-      });
-    }
+  //       groupsMap[groupId].rows.push({
+  //         key: cv.attribute_id,
+  //         specification: attrName,
+  //         value: valLabel
+  //       });
+  //     });
+  //   }
 
-    return {
-      mappedProduct,
-      mappedVariant,
-      brandName,
-      manufacturerName,
-      groupedVariantSpecs: Object.entries(groupsMap)
-    };
-  }, [award, sellerProducts, catalogBrands, catalogManufacturers, attributeGroups, catalogAttributes, catalogAttributeValues]);
+  //   return {
+  //     mappedProduct,
+  //     mappedVariant,
+  //     brandName,
+  //     manufacturerName,
+  //     groupedVariantSpecs: Object.entries(groupsMap)
+  //   };
+  // }, [award, sellerProducts, catalogBrands, catalogManufacturers, attributeGroups, catalogAttributes, catalogAttributeValues]);
 
-  const buyerPartyName = React.useMemo(() => {
-    if (!rfq || parties.length === 0) return '';
-    return parties.find((p) => p.id === rfq.requester_party_id)?.display_name || rfq.requester_name;
-  }, [rfq, parties]);
+  // const buyerPartyName = React.useMemo(() => {
+  //   if (!rfq || parties.length === 0) return '';
+  //   return parties.find((p) => p.id === rfq.requester_party_id)?.display_name || rfq.requester_name;
+  // }, [rfq, parties]);
 
-  const sellerPartyName = React.useMemo(() => {
-    if (!award || parties.length === 0) return '';
-    return parties.find((p) => p.id === award.seller_party_id)?.display_name || award.seller_party_id;
-  }, [award, parties]);
+  // const sellerPartyName = React.useMemo(() => {
+  //   if (!award || parties.length === 0) return '';
+  //   return parties.find((p) => p.id === award.seller_party_id)?.display_name || award.seller_party_id;
+  // }, [award, parties]);
 
-  const categoryName = React.useMemo(() => {
-    if (!item || categories.length === 0) return 'Custom Category';
-    return categories.find((c) => c.id === item.category_id)?.name || 'Custom Category';
-  }, [item, categories]);
+  // const categoryName = React.useMemo(() => {
+  //   if (!item || categories.length === 0) return 'Custom Category';
+  //   return categories.find((c) => c.id === item.category_id)?.name || 'Custom Category';
+  // }, [item, categories]);
 
-  const breadcrumbs = React.useMemo(() => [
-    { title: <a onClick={() => navigate(basePath)}>Supplier Inbox</a> },
-    { title: <span className="text-slate-800 font-semibold">Confirm PO Receipt</span> }
-  ], [basePath, navigate]);
+  // const breadcrumbs = React.useMemo(() => [
+  //   { title: <a onClick={() => navigate(basePath)}>Supplier Inbox</a> },
+  //   { title: <span className="text-slate-800 font-semibold">Confirm PO Receipt</span> }
+  // ], [basePath, navigate]);
 
-  useBreadcrumb(breadcrumbs);
+  // useBreadcrumb(breadcrumbs);
 
-  const handleConfirmPoReceipt = async () => {
-    if (!award) return;
-    setConfirmingPo(true);
-    try {
-      await rfqDb.rfq_awards.update(award.id, {
-        award_status: 'PO_RECEIVED',
-        po_received_at: new Date().toISOString(),
-        supplier_acknowledgement_note: poAckNote
-      });
-      antMessage.success('Purchase Order receipt confirmed! Sourcing contract is now converted to an active Order.');
-      navigate(basePath);
-    } catch (err) {
-      console.error(err);
-      antMessage.error('Failed to confirm Purchase Order receipt.');
-    } finally {
-      setConfirmingPo(false);
-    }
-  };
+  // const handleConfirmPoReceipt = async () => {
+  //   if (!award) return;
+  //   setConfirmingPo(true);
+  //   try {
+  //     await rfqDb.rfq_awards.update(award.id, {
+  //       award_status: 'PO_RECEIVED',
+  //       po_received_at: new Date().toISOString(),
+  //       supplier_acknowledgement_note: poAckNote
+  //     });
+  //     antMessage.success('Purchase Order receipt confirmed! Sourcing contract is now converted to an active Order.');
+  //     navigate(basePath);
+  //   } catch (err) {
+  //     console.error(err);
+  //     antMessage.error('Failed to confirm Purchase Order receipt.');
+  //   } finally {
+  //     setConfirmingPo(false);
+  //   }
+  // };
 
-  if (!rfq || !item || !award) {
-    return (
-      <div className="p-12 text-center text-slate-500">
-        <p>Loading award and PO details...</p>
-      </div>
-    );
-  }
+  // if (!rfq || !item || !award) {
+  //   return (
+  //     <div className="p-12 text-center text-slate-500">
+  //       <p>Loading award and PO details...</p>
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-
+      {/* 
       <Card className="shadow-md border-slate-200">
         <div className="flex items-center justify-between">
           <div>
@@ -294,7 +294,7 @@ export const SupplierAwardReceipt: React.FC = () => {
             </div>
           )}
         </div>
-      </Card>
+      </Card> */}
     </div>
   );
 };

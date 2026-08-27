@@ -42,6 +42,7 @@ import {
   type SellerQuote,
   type SellerAssignment,
   type ItemAttributeValue,
+  type ManufacturerBrandMapping,
 } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
@@ -291,6 +292,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
 
 
   const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
+  const allBrandParties = useLiveQuery(() => businessDb.brandParties.toArray(), []) || [];
   const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
   const allCategories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
   const allMasterProducts = useLiveQuery(() => catalogDb.products.toArray(), []) || [];
@@ -349,6 +351,9 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
       catalog_product_id: undefined,
       quantity: 1,
       unit_of_measure: 'Pcs',
+      preferred_brand_manufacturers: [
+        { id: `bm-${Date.now()}-1`, manufacturer_id: undefined, brand_id: undefined, description: '' }
+      ],
       brand_id: undefined,
       manufacturer_id: undefined,
       selected_dynamic_attributes: [],
@@ -366,7 +371,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
       return;
     }
     const item = items[activeDrawerIndex];
-    if (!item.category_id) {
+    if (!item || !item.category_id) {
       setSearchResults(null);
       return;
     }
@@ -377,9 +382,20 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
       allSellerProducts.forEach(sp => {
         if (sp.category_id !== item.category_id) return;
 
-        const hasBrand = (item.brand_id && item.brand_id.length > 0) ? item.brand_id.includes(sp.brand_id) : true;
-        const hasMfg = (item.manufacturer_id && item.manufacturer_id.length > 0) ? item.manufacturer_id.includes(sp.manufacturer_id) : true;
-        if (!hasBrand || !hasMfg) return;
+        const mappings: ManufacturerBrandMapping[] = (item.preferred_brand_manufacturers || []).filter(
+          (m: any) => m.manufacturer_id || m.brand_id
+        );
+
+        let mfgBrandMatch = true;
+        if (mappings.length > 0) {
+          mfgBrandMatch = mappings.some((m: any) => {
+            const mfgMatch = !m.manufacturer_id || m.manufacturer_id === sp.manufacturer_id;
+            const brandMatch = !m.brand_id || m.brand_id === sp.brand_id;
+            return mfgMatch && brandMatch;
+          });
+        }
+
+        if (!mfgBrandMatch) return;
 
         sp.variants?.forEach((variant: any) => {
           let variantMatches = true;
@@ -419,6 +435,14 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
     current.catalog_product_id = sellerProduct.catalog_product_id;
     current.product_id = sellerProduct.id;
     current.variant_id = variant.id;
+    current.preferred_brand_manufacturers = [
+      {
+        id: `bm-${Date.now()}`,
+        manufacturer_id: sellerProduct.manufacturer_id,
+        brand_id: sellerProduct.brand_id,
+        description: 'Mapped from catalog product selection'
+      }
+    ];
     current.brand_id = sellerProduct.brand_id ? [sellerProduct.brand_id] : [];
     current.manufacturer_id = sellerProduct.manufacturer_id ? [sellerProduct.manufacturer_id] : [];
 
@@ -891,6 +915,100 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
             },
           ].filter((g) => g.options.length > 0);
 
+          const isMappedPair = (mfgId?: string, brandId?: string) => {
+            if (!mfgId || !brandId) return true;
+            const inSellerProducts = allSellerProducts.some(
+              (sp: any) => sp.manufacturer_id === mfgId && sp.brand_id === brandId
+            );
+            if (inSellerProducts) return true;
+
+            const mfgObj = allManufacturers.find((m: any) => m.id === mfgId);
+            if (mfgObj?.manufacturer_party_id) {
+              const inBrandParties = allBrandParties.some(
+                (bp: any) => bp.brand_id === brandId && bp.party_id === mfgObj.manufacturer_party_id
+              );
+              if (inBrandParties) return true;
+            }
+            return false;
+          };
+
+          const getRowMfgOptions = (selectedBrandId?: string) => {
+            if (!selectedBrandId) return dynamicMfgOptions;
+
+            const mfgIdsForBrand = new Set<string>();
+            allSellerProducts.forEach((sp: any) => {
+              if (sp.brand_id === selectedBrandId && sp.manufacturer_id) {
+                mfgIdsForBrand.add(sp.manufacturer_id);
+              }
+            });
+
+            const brandPartiesForBrand = allBrandParties.filter((bp: any) => bp.brand_id === selectedBrandId);
+            const partyIds = new Set(brandPartiesForBrand.map((bp: any) => bp.party_id));
+            allManufacturers.forEach((m: any) => {
+              if (m.manufacturer_party_id && partyIds.has(m.manufacturer_party_id)) {
+                mfgIdsForBrand.add(m.id);
+              }
+            });
+
+            if (mfgIdsForBrand.size === 0) return dynamicMfgOptions;
+
+            const brandObj = allBrands.find((b: any) => b.id === selectedBrandId);
+            const brandName = brandObj?.name || selectedBrandId;
+
+            const mappedOpts = Array.from(mfgIdsForBrand).map((mId: string) => {
+              const m = allManufacturers.find((mfg: any) => mfg.id === mId);
+              return { label: `${m?.company_name || mId}`, value: mId };
+            });
+
+            const otherOpts = allManufacturers
+              .filter((m: any) => !mfgIdsForBrand.has(m.id))
+              .map((m: any) => ({ label: m.company_name, value: m.id }));
+
+            return [
+              { label: `Available Manufacturers for ${brandName}`, options: mappedOpts },
+              { label: `Other Manufacturers`, options: otherOpts },
+            ].filter((g) => g.options.length > 0);
+          };
+
+          const getRowBrandOptions = (selectedMfgId?: string) => {
+            if (!selectedMfgId) return dynamicBrandOptions;
+
+            const brandIdsForMfg = new Set<string>();
+            allSellerProducts.forEach((sp: any) => {
+              if (sp.manufacturer_id === selectedMfgId && sp.brand_id) {
+                brandIdsForMfg.add(sp.brand_id);
+              }
+            });
+
+            const selectedMfgObj = allManufacturers.find((m: any) => m.id === selectedMfgId);
+            if (selectedMfgObj?.manufacturer_party_id) {
+              const partyId = selectedMfgObj.manufacturer_party_id;
+              const matchingBrandParties = allBrandParties.filter((bp: any) => bp.party_id === partyId);
+              matchingBrandParties.forEach((bp: any) => {
+                if (bp.brand_id) brandIdsForMfg.add(bp.brand_id);
+              });
+            }
+
+            if (brandIdsForMfg.size === 0) return dynamicBrandOptions;
+
+            const mfgObj = allManufacturers.find((m: any) => m.id === selectedMfgId);
+            const mfgName = mfgObj?.company_name || selectedMfgId;
+
+            const mappedOpts = Array.from(brandIdsForMfg).map((bId: string) => {
+              const b = allBrands.find((brand: any) => brand.id === bId);
+              return { label: `${b?.name || bId}`, value: bId };
+            });
+
+            const otherOpts = allBrands
+              .filter((b: any) => !brandIdsForMfg.has(b.id))
+              .map((b: any) => ({ label: b.name, value: b.id }));
+
+            return [
+              { label: `Available Brands for ${mfgName}`, options: mappedOpts },
+              { label: `Other Brands`, options: otherOpts },
+            ].filter((g) => g.options.length > 0);
+          };
+
           return (
             <div className="h-full grid grid-cols-1 lg:grid-cols-12">
               {/* Left Pane: Attributes Form */}
@@ -985,137 +1103,359 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                             <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white" style={{ backgroundColor: '#2a79adff' }}>
                               1
                             </span>
-                            <h4 className="text-xs font-semibold text-slate-800">Brand & Manufacturer</h4>
+                            <h4 className="text-xs font-semibold text-slate-800">Manufacturer & Brand Mappings</h4>
                           </div>
                           <div className="flex items-center gap-2">
                             <AntTag color="default" style={{ borderColor: "#2a79adff", color: "#2a79adff", fontWeight: 700 }}>
-                              2 attributes
+                              {(item.preferred_brand_manufacturers || []).length} mapped pair(s)
                             </AntTag>
                           </div>
                         </div>
-                        <div className="p-3">
-                          <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
-                            <AntDescriptions.Item label="Preferred Brand(s)">
-                              <div className="flex flex-col gap-2">
-                                <AntSelect
-                                  mode="multiple"
-                                  variant='underlined'
-                                  allowClear
-                                  placeholder="Select Preferred Brand(s)"
-                                  value={Array.isArray(item.brand_id) ? item.brand_id : item.brand_id ? [item.brand_id] : []}
-                                  onChange={(val: string[]) => {
-                                    const updated = [...items];
-                                    updated[activeDrawerIndex].brand_id = val;
-                                    updated[activeDrawerIndex].variant_id = null;
-                                    updated[activeDrawerIndex].product_id = null;
-                                    setItems(updated);
-                                    setVariantPage(1);
-                                  }}
-                                  className="w-full"
-                                  options={dynamicBrandOptions}
-                                />
-                                {(item.brand_show_description || item.brand_description) ? (
-                                  <div className="flex items-start gap-2 mt-1">
-                                    <AntInput
-                                      key={`desc-brand-${activeDrawerIndex}`}
-                                      placeholder={`Add optional note/description for brands...`}
-                                      defaultValue={item.brand_description || ''}
-                                      onBlur={(e) => {
-                                        const updated = [...items];
-                                        updated[activeDrawerIndex].brand_description = e.target.value;
-                                        setItems(updated);
-                                      }}
-                                      size="small"
-                                      className="text-xs bg-slate-50 border-slate-200"
-                                    />
+                        <div className="p-3 space-y-3">
+                          {/* <div className="text-[11px] text-slate-500">
+                            Pair specific Manufacturers with Brands to define acceptable product sourcing options.
+                          </div>
+                          {(!item.preferred_brand_manufacturers || item.preferred_brand_manufacturers.length === 0) ? (
+                            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-500 italic flex items-center justify-between">
+                              <span>No Manufacturer & Brand pairs added (All manufacturers and brands accepted).</span>
+                              <AntButton
+                                size="small"
+                                type="dashed"
+                                icon={<AntPlusOutlined />}
+                                onClick={() => {
+                                  const updated = [...items];
+                                  if (!updated[activeDrawerIndex].preferred_brand_manufacturers) {
+                                    updated[activeDrawerIndex].preferred_brand_manufacturers = [];
+                                  }
+                                  updated[activeDrawerIndex].preferred_brand_manufacturers.push({
+                                    id: `bm-${Date.now()}`,
+                                    manufacturer_id: undefined,
+                                    brand_id: undefined,
+                                    description: ''
+                                  });
+                                  setItems(updated);
+                                }}
+                              >
+                                Add Mapped Pair
+                              </AntButton>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {item.preferred_brand_manufacturers.map((mapPair: ManufacturerBrandMapping, pairIdx: number) => (
+                                <div key={mapPair.id || pairIdx} className="p-3 border border-slate-200 rounded-xl bg-slate-50/50 space-y-2 relative">
+                                  <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                                    <span className="text-xs font-bold text-slate-700">Mapping Pair #{pairIdx + 1}</span>
                                     <AntButton
                                       type="text"
-                                      size="small"
                                       danger
+                                      size="small"
                                       icon={<Lucide.Trash2 size={14} />}
                                       onClick={() => {
                                         const updated = [...items];
-                                        updated[activeDrawerIndex].brand_description = '';
-                                        updated[activeDrawerIndex].brand_show_description = false;
+                                        updated[activeDrawerIndex].preferred_brand_manufacturers = updated[activeDrawerIndex].preferred_brand_manufacturers.filter(
+                                          (_: any, idx: number) => idx !== pairIdx
+                                        );
                                         setItems(updated);
                                       }}
                                     />
                                   </div>
-                                ) : (
-                                  <div
-                                    className="text-[10px] text-blue-600 cursor-pointer hover:underline self-start font-medium flex items-center gap-1 mt-0.5"
-                                    onClick={() => {
-                                      const updated = [...items];
-                                      updated[activeDrawerIndex].brand_show_description = true;
-                                      setItems(updated);
-                                    }}
-                                  >
-                                    <AntPlusOutlined /> Add Note / Description
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Manufacturer</label>
+                                      <AntSelect
+                                        allowClear
+                                        placeholder="Select Manufacturer"
+                                        value={mapPair.manufacturer_id}
+                                        onChange={(val: string) => {
+                                          const updated = [...items];
+                                          const pair = updated[activeDrawerIndex].preferred_brand_manufacturers[pairIdx];
+                                          pair.manufacturer_id = val;
+                                          if (val && pair.brand_id) {
+                                            if (!isMappedPair(val, pair.brand_id)) {
+                                              pair.brand_id = undefined;
+                                            }
+                                          }
+                                          updated[activeDrawerIndex].variant_id = null;
+                                          updated[activeDrawerIndex].product_id = null;
+                                          setItems(updated);
+                                        }}
+                                        className="w-full text-xs"
+                                        options={getRowMfgOptions(mapPair.brand_id)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">Brand</label>
+                                      <AntSelect
+                                        allowClear
+                                        placeholder="Select Brand"
+                                        value={mapPair.brand_id}
+                                        onChange={(val: string) => {
+                                          const updated = [...items];
+                                          const pair = updated[activeDrawerIndex].preferred_brand_manufacturers[pairIdx];
+                                          pair.brand_id = val;
+                                          if (val && pair.manufacturer_id) {
+                                            if (!isMappedPair(pair.manufacturer_id, val)) {
+                                              pair.manufacturer_id = undefined;
+                                            }
+                                          }
+                                          updated[activeDrawerIndex].variant_id = null;
+                                          updated[activeDrawerIndex].product_id = null;
+                                          setItems(updated);
+                                        }}
+                                        className="w-full text-xs"
+                                        options={getRowBrandOptions(mapPair.manufacturer_id)}
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <AntInput
+                                        size="small"
+                                        placeholder="Optional pair note/description (e.g. Model series or warranty requirement)..."
+                                        value={mapPair.description || ''}
+                                        onChange={(e) => {
+                                          const updated = [...items];
+                                          updated[activeDrawerIndex].preferred_brand_manufacturers[pairIdx].description = e.target.value;
+                                          setItems(updated);
+                                        }}
+                                        className="text-xs bg-white"
+                                      />
+                                    </div>
                                   </div>
-                                )}
+                                </div>
+                              ))}
+                              <AntButton
+                                type="dashed"
+                                icon={<AntPlusOutlined />}
+                                size="small"
+                                className="w-full mt-2"
+                                onClick={() => {
+                                  const updated = [...items];
+                                  if (!updated[activeDrawerIndex].preferred_brand_manufacturers) {
+                                    updated[activeDrawerIndex].preferred_brand_manufacturers = [];
+                                  }
+                                  updated[activeDrawerIndex].preferred_brand_manufacturers.push({
+                                    id: `bm-${Date.now()}`,
+                                    manufacturer_id: undefined,
+                                    brand_id: undefined,
+                                    description: ''
+                                  });
+                                  setItems(updated);
+                                }}
+                              >
+                                Add Another Manufacturer & Brand Pair
+                              </AntButton>
+                            </div>
+                          )} */}
+                          {(!item.preferred_brand_manufacturers ||
+                            item.preferred_brand_manufacturers.length === 0) ? (
+                            <div className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2.5">
+                              <div className="min-w-0">
+                                <div className="text-xs font-medium text-slate-600">
+                                  No manufacturer-brand mapping
+                                </div>
+                                <div className="truncate text-[10px] text-slate-400">
+                                  All manufacturers and brands accepted
+                                </div>
                               </div>
-                            </AntDescriptions.Item>
-                            <AntDescriptions.Item label="Preferred Manufacturer(s)">
-                              <div className="flex flex-col gap-2">
-                                <AntSelect
-                                  mode="multiple"
-                                  variant='underlined'
-                                  allowClear
-                                  placeholder="Select Preferred Manufacturer(s)"
-                                  value={Array.isArray(item.manufacturer_id) ? item.manufacturer_id : item.manufacturer_id ? [item.manufacturer_id] : []}
-                                  onChange={(val: string[]) => {
-                                    const updated = [...items];
-                                    updated[activeDrawerIndex].manufacturer_id = val;
-                                    updated[activeDrawerIndex].variant_id = null;
-                                    updated[activeDrawerIndex].product_id = null;
-                                    setItems(updated);
-                                    setVariantPage(1);
-                                  }}
-                                  className="w-100"
-                                  options={dynamicMfgOptions}
-                                />
-                                {(item.manufacturer_show_description || item.manufacturer_description) ? (
-                                  <div className="flex items-start gap-2 mt-1">
+
+                              <AntButton
+                                size="small"
+                                type="dashed"
+                                icon={<AntPlusOutlined />}
+                                className="shrink-0"
+                                onClick={() => {
+                                  const updated = [...items];
+
+                                  updated[activeDrawerIndex].preferred_brand_manufacturers ??= [];
+
+                                  updated[activeDrawerIndex].preferred_brand_manufacturers.push({
+                                    id: `bm-${Date.now()}`,
+                                    manufacturer_id: undefined,
+                                    brand_id: undefined,
+                                    description: ''
+                                  });
+
+                                  setItems(updated);
+                                }}
+                              >
+                                Add Pair
+                              </AntButton>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {item.preferred_brand_manufacturers.map(
+                                (mapPair: ManufacturerBrandMapping, pairIdx: number) => (
+                                  <div
+                                    key={mapPair.id || pairIdx}
+                                    className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm"
+                                  >
+                                    {/* Header */}
+                                    <div className="mb-2 flex items-center justify-between">
+                                      <div className="flex min-w-0 items-center gap-1.5">
+                                        <span className="flex h-5 min-w-5 items-center justify-center rounded bg-slate-100 px-1.5 text-[10px] font-bold text-slate-600">
+                                          {pairIdx + 1}
+                                        </span>
+
+                                        <span className="truncate text-[11px] font-semibold text-slate-700">
+                                          Manufacturer × Brand
+                                        </span>
+                                      </div>
+
+                                      <AntButton
+                                        type="text"
+                                        danger
+                                        size="small"
+                                        className="!h-6 !w-6 !p-0"
+                                        icon={<Lucide.Trash2 size={13} />}
+                                        onClick={() => {
+                                          const updated = [...items];
+
+                                          updated[activeDrawerIndex].preferred_brand_manufacturers =
+                                            updated[
+                                              activeDrawerIndex
+                                            ].preferred_brand_manufacturers.filter(
+                                              (_: any, idx: number) => idx !== pairIdx
+                                            );
+
+                                          setItems(updated);
+                                        }}
+                                      />
+                                    </div>
+
+                                    {/* Manufacturer + Brand */}
+                                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                      {/* Manufacturer */}
+                                      <div className="min-w-0">
+                                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                          Manufacturer
+                                        </label>
+
+                                        <AntSelect
+                                          allowClear
+                                          showSearch
+                                          optionFilterProp="label"
+                                          placeholder="Select manufacturer"
+                                          value={mapPair.manufacturer_id}
+                                          onChange={(val: string) => {
+                                            const updated = [...items];
+                                            const pair =
+                                              updated[activeDrawerIndex]
+                                                .preferred_brand_manufacturers[pairIdx];
+
+                                            pair.manufacturer_id = val;
+
+                                            if (val && pair.brand_id && !isMappedPair(val, pair.brand_id)) {
+                                              pair.brand_id = undefined;
+                                            }
+
+                                            updated[activeDrawerIndex].variant_id = null;
+                                            updated[activeDrawerIndex].product_id = null;
+
+                                            setItems(updated);
+                                          }}
+                                          options={getRowMfgOptions(mapPair.brand_id)}
+                                          className="w-full"
+                                          popupMatchSelectWidth={false}
+                                        // styles={{
+                                        //   selector: {
+                                        //     fontSize: 11,
+                                        //     height: 30
+                                        //   }
+                                        // }}
+                                        />
+                                      </div>
+
+                                      {/* Brand */}
+                                      <div className="min-w-0">
+                                        <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                                          Brand
+                                        </label>
+
+                                        <AntSelect
+                                          allowClear
+                                          showSearch
+                                          optionFilterProp="label"
+                                          placeholder="Select brand"
+                                          value={mapPair.brand_id}
+                                          onChange={(val: string) => {
+                                            const updated = [...items];
+                                            const pair =
+                                              updated[activeDrawerIndex]
+                                                .preferred_brand_manufacturers[pairIdx];
+
+                                            pair.brand_id = val;
+
+                                            if (
+                                              val &&
+                                              pair.manufacturer_id &&
+                                              !isMappedPair(pair.manufacturer_id, val)
+                                            ) {
+                                              pair.manufacturer_id = undefined;
+                                            }
+
+                                            updated[activeDrawerIndex].variant_id = null;
+                                            updated[activeDrawerIndex].product_id = null;
+
+                                            setItems(updated);
+                                          }}
+                                          options={getRowBrandOptions(mapPair.manufacturer_id)}
+                                          className="w-full"
+                                          popupMatchSelectWidth={false}
+                                        // styles={{
+                                        //   selector: {
+                                        //     fontSize: 11,
+                                        //     height: 30
+                                        //   }
+                                        // }}
+                                        />
+                                      </div>
+                                    </div>
+
+                                    {/* Description */}
                                     <AntInput
-                                      key={`desc-mfg-${activeDrawerIndex}`}
-                                      placeholder={`Add optional note/description for manufacturers...`}
-                                      defaultValue={item.manufacturer_description || ''}
-                                      onBlur={(e) => {
+                                      size="small"
+                                      placeholder="Optional note..."
+                                      value={mapPair.description || ''}
+                                      onChange={(e) => {
                                         const updated = [...items];
-                                        updated[activeDrawerIndex].manufacturer_description = e.target.value;
+
+                                        updated[
+                                          activeDrawerIndex
+                                        ].preferred_brand_manufacturers[pairIdx].description =
+                                          e.target.value;
+
                                         setItems(updated);
                                       }}
-                                      size="small"
-                                      className="text-xs bg-slate-50 border-slate-200"
-                                    />
-                                    <AntButton
-                                      type="text"
-                                      size="small"
-                                      danger
-                                      icon={<Lucide.Trash2 size={14} />}
-                                      onClick={() => {
-                                        const updated = [...items];
-                                        updated[activeDrawerIndex].manufacturer_description = '';
-                                        updated[activeDrawerIndex].manufacturer_show_description = false;
-                                        setItems(updated);
-                                      }}
+                                      className="mt-2 !text-[11px]"
                                     />
                                   </div>
-                                ) : (
-                                  <div
-                                    className="text-[10px] text-blue-600 cursor-pointer hover:underline self-start font-medium flex items-center gap-1 mt-0.5"
-                                    onClick={() => {
-                                      const updated = [...items];
-                                      updated[activeDrawerIndex].manufacturer_show_description = true;
-                                      setItems(updated);
-                                    }}
-                                  >
-                                    <AntPlusOutlined /> Add Note / Description
-                                  </div>
-                                )}
-                              </div>
-                            </AntDescriptions.Item>
-                          </AntDescriptions>
+                                )
+                              )}
+
+                              {/* Add button */}
+                              <AntButton
+                                type="dashed"
+                                size="small"
+                                icon={<AntPlusOutlined />}
+                                className="!h-8 w-full !text-xs"
+                                onClick={() => {
+                                  const updated = [...items];
+
+                                  updated[activeDrawerIndex].preferred_brand_manufacturers ??= [];
+
+                                  updated[activeDrawerIndex].preferred_brand_manufacturers.push({
+                                    id: `bm-${Date.now()}`,
+                                    manufacturer_id: undefined,
+                                    brand_id: undefined,
+                                    description: ''
+                                  });
+
+                                  setItems(updated);
+                                }}
+                              >
+                                Add Pair
+                              </AntButton>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
@@ -1518,51 +1858,82 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
           updated_at: now,
         });
 
-        // 1. System Attribute: Brand Selection
-        if ((item.brand_id && item.brand_id.length > 0) || (item.brand_description && item.brand_description.trim() !== '')) {
-          const brandValues: ItemAttributeValue[] = (item.brand_id || []).map((bId: string) => {
-            const matchedBrand = allBrands.find((b) => b.id === bId);
+        // 1. System Attribute: Manufacturer & Brand Mapped Pairs
+        const mappings: ManufacturerBrandMapping[] = item.preferred_brand_manufacturers || [];
+        if (mappings.length > 0 || (item.brand_id && item.brand_id.length > 0) || (item.manufacturer_id && item.manufacturer_id.length > 0)) {
+          const mappingValues: ItemAttributeValue[] = mappings.map((m: any) => {
+            const matchedMfg = allManufacturers.find((mfg) => mfg.id === m.manufacturer_id);
+            const matchedBrand = allBrands.find((b) => b.id === m.brand_id);
+            const mfgLabel = matchedMfg?.company_name || m.manufacturer_name || m.manufacturer_id || 'Any Manufacturer';
+            const brandLabel = matchedBrand?.name || m.brand_name || m.brand_id || 'Any Brand';
+            const noteLabel = m.description ? ` (${m.description})` : '';
+
             return {
-              value_id: bId,
-              value_label: matchedBrand?.name || bId,
+              value_id: `${m.manufacturer_id || 'any'}:${m.brand_id || 'any'}`,
+              value_label: `${mfgLabel} — ${brandLabel}${noteLabel}`,
             };
           });
 
           newRfqItemAttributes.push({
-            id: `ia-${itemId}-brand`,
+            id: `ia-${itemId}-mfg-brand-mapping`,
             rfq_item_id: itemId,
             attribute_type: 'SYSTEM',
             group_id: 'system',
-            attribute_id: 'brand',
-            description: item.brand_description || 'Sourcing Brand Selection',
+            attribute_id: 'mfg_brand_mapping',
+            description: 'Preferred Manufacturer & Brand Mapped Pairs',
             connector: 'OR',
-            values: brandValues,
+            values: mappingValues,
             created_at: now,
             updated_at: now,
-          });
-        }
-        // 2. System Attribute: Manufacturer Selection
-        if ((item.manufacturer_id && item.manufacturer_id.length > 0) || (item.manufacturer_description && item.manufacturer_description.trim() !== '')) {
-          const mfgValues: ItemAttributeValue[] = (item.manufacturer_id || []).map((mId: string) => {
-            const matchedMfg = allManufacturers.find((m) => m.id === mId);
-            return {
-              value_id: mId,
-              value_label: matchedMfg?.company_name || mId,
-            };
           });
 
-          newRfqItemAttributes.push({
-            id: `ia-${itemId}-mfg`,
-            rfq_item_id: itemId,
-            attribute_type: 'SYSTEM',
-            group_id: 'system',
-            attribute_id: 'manufacturer',
-            description: item.manufacturer_description || 'Sourcing Manufacturer Selection',
-            connector: 'OR',
-            values: mfgValues,
-            created_at: now,
-            updated_at: now,
-          });
+          // // Legacy Brand system attribute compatibility
+          // const brandIds = Array.from(new Set([
+          //   ...mappings.map((m: any) => m.brand_id).filter(Boolean),
+          //   ...(item.brand_id || [])
+          // ]));
+          // if (brandIds.length > 0 || item.brand_description) {
+          //   const brandValues: ItemAttributeValue[] = brandIds.map((bId: any) => {
+          //     const matchedBrand = allBrands.find((b) => b.id === bId);
+          //     return { value_id: bId, value_label: matchedBrand?.name || bId };
+          //   });
+          //   newRfqItemAttributes.push({
+          //     id: `ia-${itemId}-brand`,
+          //     rfq_item_id: itemId,
+          //     attribute_type: 'SYSTEM',
+          //     group_id: 'system',
+          //     attribute_id: 'brand',
+          //     description: item.brand_description || 'Sourcing Brand Selection',
+          //     connector: 'OR',
+          //     values: brandValues,
+          //     created_at: now,
+          //     updated_at: now,
+          //   });
+          // }
+
+          // // Legacy Manufacturer system attribute compatibility
+          // const mfgIds = Array.from(new Set([
+          //   ...mappings.map((m: any) => m.manufacturer_id).filter(Boolean),
+          //   ...(item.manufacturer_id || [])
+          // ]));
+          // if (mfgIds.length > 0 || item.manufacturer_description) {
+          //   const mfgValues: ItemAttributeValue[] = mfgIds.map((mId: any) => {
+          //     const matchedMfg = allManufacturers.find((m) => m.id === mId);
+          //     return { value_id: mId, value_label: matchedMfg?.company_name || mId };
+          //   });
+          //   newRfqItemAttributes.push({
+          //     id: `ia-${itemId}-mfg`,
+          //     rfq_item_id: itemId,
+          //     attribute_type: 'SYSTEM',
+          //     group_id: 'system',
+          //     attribute_id: 'manufacturer',
+          //     description: item.manufacturer_description || 'Sourcing Manufacturer Selection',
+          //     connector: 'OR',
+          //     values: mfgValues,
+          //     created_at: now,
+          //     updated_at: now,
+          //   });
+          // }
         }
 
         // 3. System Attribute: Required Quantity
@@ -1626,6 +1997,14 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
           });
         });
       });
+
+      // console.log('RFQs Data: ', {
+      //   newRfq,
+      //   newRfqItems,
+      //   newRfqItemAttributes,
+      //   newQuotes
+      // });
+      // return;
       await rfqDb.transaction(
         'rw',
         [rfqDb.rfqs, rfqDb.rfq_items, rfqDb.rfq_item_attributes, rfqDb.seller_quotes],
@@ -1793,51 +2172,40 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
                 </div>
               </div>
 
-              {/* Target Brands / Manufacturers */}
-              {(item.brand_id?.length > 0 || item.manufacturer_id?.length > 0 || item.brand_description?.trim() || item.manufacturer_description?.trim()) && (
+              {/* Target Brands / Manufacturers Mappings */}
+              {((item.preferred_brand_manufacturers && item.preferred_brand_manufacturers.length > 0) || item.brand_id?.length > 0 || item.manufacturer_id?.length > 0) && (
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #2a79adff` }}>
                   <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#2a79ad14` }}>
                     <div className="flex items-center gap-3">
                       <span className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] text-white" style={{ backgroundColor: '#2a79adff' }}>
                         1
                       </span>
-                      <h4 className="text-xs font-semibold text-slate-800 m-0">Preferred Brand & Manufacturer</h4>
+                      <h4 className="text-xs font-semibold text-slate-800 m-0">Manufacturer & Brand Mappings</h4>
                     </div>
                   </div>
                   <div className="p-3">
                     <AntDescriptions layout={descriptionsLayout} bordered size="small" column={1} labelStyle={{ width: '40%', backgroundColor: '#f8fafc', fontWeight: 600, fontSize: '12px', color: '#475569' }} contentStyle={{ backgroundColor: '#ffffff' }}>
-                      {(item.brand_id?.length > 0 || item.brand_description?.trim()) && (
-                        <AntDescriptions.Item label="Brands">
-                          <div className="flex flex-col gap-1">
-                            {item.brand_id?.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {item.brand_id.map((bId: string) => {
-                                  const b = allBrands.find(b => b.id === bId);
-                                  return <AntTag key={bId} color="blue" className="m-0">{b?.name || bId}</AntTag>;
-                                })}
+                      {item.preferred_brand_manufacturers && item.preferred_brand_manufacturers.length > 0 ? (
+                        item.preferred_brand_manufacturers.map((mPair: ManufacturerBrandMapping, pIdx: number) => {
+                          const mfg = allManufacturers.find(m => m.id === mPair.manufacturer_id);
+                          const brand = allBrands.find(b => b.id === mPair.brand_id);
+                          return (
+                            <AntDescriptions.Item key={pIdx} label={`Pair #${pIdx + 1}`}>
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <AntTag color="purple" className="m-0">Mfg: {mfg?.company_name || mPair.manufacturer_id || 'Any'}</AntTag>
+                                  <AntTag color="blue" className="m-0">Brand: {brand?.name || mPair.brand_id || 'Any'}</AntTag>
+                                </div>
+                                {mPair.description && (
+                                  <span className="text-xs text-slate-500 italic">{mPair.description}</span>
+                                )}
                               </div>
-                            )}
-                            {item.brand_description?.trim() && (
-                              <span className="text-xs text-slate-500 italic mt-0.5">{item.brand_description}</span>
-                            )}
-                          </div>
-                        </AntDescriptions.Item>
-                      )}
-                      {(item.manufacturer_id?.length > 0 || item.manufacturer_description?.trim()) && (
-                        <AntDescriptions.Item label="Manufacturers">
-                          <div className="flex flex-col gap-1">
-                            {item.manufacturer_id?.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {item.manufacturer_id.map((mId: string) => {
-                                  const m = allManufacturers.find(m => m.id === mId);
-                                  return <AntTag key={mId} color="purple" className="m-0">{m?.company_name || mId}</AntTag>;
-                                })}
-                              </div>
-                            )}
-                            {item.manufacturer_description?.trim() && (
-                              <span className="text-xs text-slate-500 italic mt-0.5">{item.manufacturer_description}</span>
-                            )}
-                          </div>
+                            </AntDescriptions.Item>
+                          );
+                        })
+                      ) : (
+                        <AntDescriptions.Item label="Mappings">
+                          <span className="text-xs text-slate-500 italic">All Manufacturers & Brands accepted</span>
                         </AntDescriptions.Item>
                       )}
                     </AntDescriptions>

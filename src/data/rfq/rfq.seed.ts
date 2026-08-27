@@ -5,7 +5,7 @@ import { mockRfqItemAttributes } from "./rfqItemAttributes";
 import { mockSellerQuotes } from "./sellerQuotes";
 import { mockSellerQuoteAttributes } from "./sellerQuoteAttributes";
 import { mockSellerQuoteComments } from "./sellerQuoteComments";
-import { mockRfqAwards } from "./rfqAwards";
+// import { mockRfqAwards } from "./rfqAwards";
 
 const runBulkSeed = async () => {
   await rfqDb.rfqs.clear();
@@ -14,7 +14,7 @@ const runBulkSeed = async () => {
   await rfqDb.seller_quotes.clear();
   await rfqDb.seller_quote_attributes.clear();
   await rfqDb.seller_quote_comments.clear();
-  await rfqDb.rfq_awards.clear();
+  // await rfqDb.rfq_awards.clear();
 
   await rfqDb.rfqs.bulkPut(mockRfqs);
   await rfqDb.rfq_items.bulkPut(mockRfqItems);
@@ -22,7 +22,7 @@ const runBulkSeed = async () => {
   await rfqDb.seller_quotes.bulkPut(mockSellerQuotes);
   await rfqDb.seller_quote_attributes.bulkPut(mockSellerQuoteAttributes);
   await rfqDb.seller_quote_comments.bulkPut(mockSellerQuoteComments);
-  await rfqDb.rfq_awards.bulkPut(mockRfqAwards);
+  // await rfqDb.rfq_awards.bulkPut(mockRfqAwards);
 };
 
 

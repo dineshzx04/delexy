@@ -56,6 +56,8 @@ export const RequesterQuoteReview: React.FC = () => {
   const catalogProducts = useLiveQuery(() => catalogDb.products.toArray(), []);
   const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []);
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []);
+  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []);
+  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []);
 
   const sellerProduct = useLiveQuery(
     async () => {
@@ -133,7 +135,9 @@ export const RequesterQuoteReview: React.FC = () => {
     attributeGroups === undefined ||
     sellerProduct === undefined ||
     allVariants === undefined ||
-    itemAttributes === undefined;
+    itemAttributes === undefined ||
+    allManufacturers === undefined ||
+    allBrands === undefined;
 
   const allAccepted = React.useMemo(() => {
     if (!quoteAttributes || quoteAttributes.length === 0) return false;
@@ -149,20 +153,6 @@ export const RequesterQuoteReview: React.FC = () => {
     { title: <span className="text-slate-800 font-semibold">Quote Review</span> }
   ], [navigate, basePath, rfqId, itemId, rfq?.rfq_number]);
   useBreadcrumb(breadcrumbs);
-
-  // // Load existing buyer comments if any
-  // React.useEffect(() => {
-  //   if (existingComments && existingComments.length > 0) {
-  //     const initialComments: Record<string, string> = {};
-  //     existingComments
-  //       .filter((c) => c.actor_type === 'BUYER')
-  //       .forEach((c) => {
-  //         const key = `${c.group_id}_${c.attribute_id}`;
-  //         initialComments[key] = c.comment || '';
-  //       });
-  //     setBuyerComments(initialComments);
-  //   }
-  // }, [existingComments]);
 
   // Initialize accepted attributes state from DB
   React.useEffect(() => {
@@ -209,6 +199,7 @@ export const RequesterQuoteReview: React.FC = () => {
       if (qa.attribute_id === 'req_quantity') attrName = 'Requested Quantity';
       else if (qa.attribute_id === 'brand') attrName = 'Brand';
       else if (qa.attribute_id === 'manufacturer') attrName = 'Manufacturer';
+      else if (qa.attribute_id === 'mfg_brand_mapping') attrName = 'Manufacturer & Brand Mappings';
       else {
         attrName = catalogAttributes?.find(a => a.id === qa.attribute_id)?.name || qa.attribute_id;
       }
@@ -255,7 +246,7 @@ export const RequesterQuoteReview: React.FC = () => {
     // Sort attributes within each group (especially system group)
     Object.keys(map).forEach(groupId => {
       if (groupId === 'system') {
-        const order = ['manufacturer', 'brand', 'req_quantity'];
+        const order = ['mfg_brand_mapping', 'manufacturer', 'brand', 'req_quantity'];
         map[groupId].attributes.sort((a, b) => {
           return order.indexOf(a.attribute_id) - order.indexOf(b.attribute_id);
         });
@@ -394,7 +385,7 @@ export const RequesterQuoteReview: React.FC = () => {
               <AntTag className="inline-flex items-center m-0 leading-tight bg-blue-50 min-h-5 text-blue-600 border-blue-200" icon={<AntIconCheckCircleOutlined />}>
                 Variant
               </AntTag>
-            )} 
+            )}
             {record.is_deviation && (
               <AntTag className="inline-flex items-center m-0 leading-tight min-h-5 bg-amber-50 text-amber-700 border-amber-200">
                 Deviation
@@ -424,6 +415,31 @@ export const RequesterQuoteReview: React.FC = () => {
               {qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A'}
             </span>
           );
+        } else if (attribute.attribute_id === 'mfg_brand_mapping') {
+          const reqValues = attribute.req_value || [];
+          if (reqValues.length === 0) {
+            return <span className="text-slate-400 italic">No manufacturer-brand mapping</span>;
+          }
+          return (
+            <div className="space-y-1.5">
+              {reqValues.map((v: any, index: number) => {
+                const parts = (v.value_id || '').split(':');
+                const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Manufacturer');
+                const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                return (
+                  <div key={v.value_id || index} className="flex flex-wrap items-center gap-1 bg-slate-50 border border-slate-200 rounded p-1.5 text-xs">
+                    <AntTag color="purple" className="m-0 text-[11px]">Mfg: {mfgName}</AntTag>
+                    <span className="text-slate-400 font-bold">×</span>
+                    <AntTag color="blue" className="m-0 text-[11px]">Brand: {brandName}</AntTag>
+                  </div>
+                );
+              })}
+            </div>
+          );
         }
 
         const reqValues = attribute.req_value || [];
@@ -432,23 +448,23 @@ export const RequesterQuoteReview: React.FC = () => {
         }
 
         return (
-             <div className="flex flex-wrap items-center">
-              {reqValues.map((v: any, index: number) => {
-                const isLast = index === reqValues.length - 1;
-                return (
-                  <div key={v.value_id} className='flex items-center'>
-                    <AntTag className="inline-flex items-center m-0 min-h-6 leading-tight bg-slate-50 text-slate-600 border-slate-200">
-                      {v.value_label}
-                    </AntTag>
-                    {!isLast && (
-                      <span className="mx-1 text-slate-500 font-bold text-[13px] select-none">
-                        {reqJoiner}
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+          <div className="flex flex-wrap items-center">
+            {reqValues.map((v: any, index: number) => {
+              const isLast = index === reqValues.length - 1;
+              return (
+                <div key={v.value_id} className='flex items-center'>
+                  <AntTag className="inline-flex items-center m-0 min-h-6 leading-tight bg-slate-50 text-slate-600 border-slate-200">
+                    {v.value_label}
+                  </AntTag>
+                  {!isLast && (
+                    <span className="mx-1 text-slate-500 font-bold text-[13px] select-none">
+                      {reqJoiner}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         );
       }
     },
@@ -476,6 +492,32 @@ export const RequesterQuoteReview: React.FC = () => {
               {qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A'}
             </span>
           );
+        } else if (attribute.attribute_id === 'mfg_brand_mapping') {
+          const valuesArray = attribute.values || [];
+          if (valuesArray.length === 0) {
+            proposalContent = <span className="text-slate-400 italic">No manufacturer-brand mapping offered</span>;
+          } else {
+            proposalContent = (
+              <div className="space-y-1.5">
+                {valuesArray.map((v: any, index: number) => {
+                  const parts = (v.value_id || '').split(':');
+                  const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                  const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                  const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                  const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                  const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Manufacturer');
+                  const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                  return (
+                    <div key={v.value_id || index} className="flex flex-wrap items-center gap-1 bg-slate-50/50 border border-slate-200/70 rounded p-1.5 text-xs">
+                      <AntTag color="purple" className="m-0 text-[11px]">Mfg: {mfgName}</AntTag>
+                      <span className="text-slate-400 font-bold">×</span>
+                      <AntTag color="blue" className="m-0 text-[11px]">Brand: {brandName}</AntTag>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          }
         } else {
           const valuesArray = attribute.values || [];
           if (valuesArray.length === 0) {
@@ -732,15 +774,20 @@ export const RequesterQuoteReview: React.FC = () => {
         </div>
 
         {quoteVariants && quoteVariants.length > 0 && (
-          <div className="space-y-6 mt-6">
-            <h3 className="text-base font-bold text-slate-900 pt-3">Variant Configuration</h3>
+          <div className="space-y-6 mt-8">
+            <div>
+              <h3 className="text-base font-bold text-slate-900">Offered Proposal Options & Prices</h3>
+              <p className="text-xs text-slate-500">
+                Review the specific proposal options offered by the supplier along with unit offer prices. Mark options for acceptance.
+              </p>
+            </div>
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #527EA3` }}>
               <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3" style={{ backgroundColor: `#527EA314` }}>
                 <div className="flex items-center gap-3">
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-white" style={{ backgroundColor: '#527EA3' }}>
-                    V
+                    $
                   </span>
-                  <h4 className="text-md font-bold text-slate-800">Variant and Price</h4>
+                  <h4 className="text-md font-bold text-slate-800">Offered Proposal Options & Unit Prices</h4>
                 </div>
                 <div className="flex items-center gap-2">
                   {quote?.status === 'SUBMITTED' && (
@@ -764,7 +811,7 @@ export const RequesterQuoteReview: React.FC = () => {
                     </div>
                   )}
                   <AntTag color="default" style={{ borderColor: '#527EA3', color: '#527EA3', fontWeight: 700 }}>
-                    {quoteVariants.length} variants
+                    {quoteVariants.length} {quoteVariants.length === 1 ? 'offered option' : 'offered options'}
                   </AntTag>
                 </div>
               </div>
@@ -775,6 +822,7 @@ export const RequesterQuoteReview: React.FC = () => {
                   pagination={{ pageSize: 10, showSizeChanger: true }}
                   size="small"
                   bordered
+                  scroll={{ x: 768 }}
                   columns={[
                     {
                       title: 'S.No',
@@ -783,36 +831,54 @@ export const RequesterQuoteReview: React.FC = () => {
                       render: (_: string, __: any, index: number) => <span className='pl-1.5'>{index + 1}</span>
                     },
                     {
-                      title: 'Variant Combinations',
+                      title: 'Offered Option Combinations & Specifications',
                       key: 'combinations',
                       className: "align-top",
                       render: (_: string, record: any) => {
                         if (!record.combinations || record.combinations.length === 0) {
-                          return <span className="text-slate-500 italic">Default Variant</span>;
+                          return <span className="text-slate-500 italic">Default Option</span>;
                         }
                         return (
                           <div className="flex flex-wrap gap-2">
-                            {record.combinations.map((c: any, i: number) => (
-                              <AntTag key={i} color="blue">{c.value_label}</AntTag>
-                            ))}
+                            {record.combinations.map((c: any, i: number) => {
+                              if (c.attribute_id === 'mfg_brand_mapping') {
+                                const parts = (c.value_id || '').split(':');
+                                const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                                const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                                const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                                const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                                const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
+                                const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                                return (
+                                  <AntTag key={i} color="purple">
+                                    Mfg: {mfgName} × Brand: {brandName}
+                                  </AntTag>
+                                );
+                              }
+                              return (
+                                <AntTag key={i} color="blue">
+                                  {c.value_label}
+                                </AntTag>
+                              );
+                            })}
                           </div>
                         );
                       }
                     },
                     {
-                      title: 'Unit Price',
+                      title: 'Unit Offer Price',
                       dataIndex: 'offer_price',
                       key: 'offer_price',
-                      className: "w-[250px] max-w-[250px] align-top",
+                      className: "w-35 max-w-35 align-top",
                       render: (price: number) => (
-                        <span className="font-bold text-emerald-600">${price}</span>
+                        <div className="text-end pr-2 font-bold text-emerald-600">${price}</div>
                       )
                     },
                     {
-                      title: 'Accept',
+                      title: 'Accept Option',
                       dataIndex: 'buyer_accepted',
                       key: 'buyer_accepted',
-                      className: "w-[80px] text-center align-top",
+                      className: "w-30 text-center align-top",
                       render: (_: boolean, record: any) => (
                         <Checkbox
                           checked={!!acceptedVariants[record.id]}
