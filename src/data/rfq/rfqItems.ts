@@ -1,37 +1,37 @@
 import type { RfqItem } from "./rfq.module";
 
 export const mockRfqItems: RfqItem[] = [
-  {
-    id: "item-01",
-    rfq_id: "rfq-01",
-    category_id: "c-3-1-1",
-    catalog_product_id: "prod-2",
-    product_id: "sprod-1",
-    variant_id: "sprod-1-v1",
-    req_quantity: 10,
-    req_unit: "Pcs",
-    // req_unit_price: 100,
-    item_index: 1,
-    created_at: "2026-08-10T09:00:00Z",
-    updated_at: "2026-08-10T09:00:00Z",
-    status: "OPEN",
-    seller_assignments: [
-      {
-        rfq_item_id: "item-01",
-        seller_party_id: "pty-2",
-        assignment_type: "DIRECT_INVITATION",
-        assigned_by_user_id: "usr-2",
-        assigned_at: "2026-08-01T10:00:00Z",
-      },
-      {
-        rfq_item_id: "item-02",
-        seller_party_id: "pty-4",
-        assignment_type: "DIRECT_INVITATION",
-        assigned_by_user_id: "usr-2",
-        assigned_at: "2026-08-01T10:00:00Z",
-      },
-    ],
-  },
+  // {
+  //   id: "item-01",
+  //   rfq_id: "rfq-01",
+  //   category_id: "c-3-1-1",
+  //   catalog_product_id: "prod-2",
+  //   product_id: "sprod-1",
+  //   variant_id: "sprod-1-v1",
+  //   req_quantity: 10,
+  //   req_unit: "Pcs",
+  //   // req_unit_price: 100,
+  //   item_index: 1,
+  //   created_at: "2026-08-10T09:00:00Z",
+  //   updated_at: "2026-08-10T09:00:00Z",
+  //   status: "OPEN",
+  //   seller_assignments: [
+  //     {
+  //       rfq_item_id: "item-01",
+  //       seller_party_id: "pty-2",
+  //       assignment_type: "DIRECT_INVITATION",
+  //       assigned_by_user_id: "usr-2",
+  //       assigned_at: "2026-08-01T10:00:00Z",
+  //     },
+  //     {
+  //       rfq_item_id: "item-02",
+  //       seller_party_id: "pty-4",
+  //       assignment_type: "DIRECT_INVITATION",
+  //       assigned_by_user_id: "usr-2",
+  //       assigned_at: "2026-08-01T10:00:00Z",
+  //     },
+  //   ],
+  // },
   // {
   //   id: "item-02",
   //   rfq_id: "rfq-01",
