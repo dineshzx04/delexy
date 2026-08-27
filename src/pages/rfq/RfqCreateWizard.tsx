@@ -33,6 +33,7 @@ import {
   ToolOutlined as AntToolOutlined,
   ShopOutlined as AntShopOutlined,
   AimOutlined as AntAimOutlined,
+  EyeOutlined as AntEyeOutlined,
 } from '@ant-design/icons';
 import {
   rfqDb,
@@ -107,7 +108,20 @@ export const RfqCreateWizard: React.FC = () => {
         </div>
       </div>
 
-      <AntSteps current={currentStep} items={steps} className="mb-8" />
+      <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+        <AntSteps current={currentStep} items={steps} size="small" />
+        <div className="pt-2 border-t border-slate-100 mt-3 text-center">
+          {currentStep === 0 && (
+            <p className="text-xs text-slate-500 m-0">Set up base sourcing parameters, submission deadline, and contact terms.</p>
+          )}
+          {currentStep === 1 && (
+            <p className="text-xs text-slate-500 m-0">Define required product attributes, specifications, and supplier assignments.</p>
+          )}
+          {currentStep === 2 && (
+            <p className="text-xs text-slate-500 m-0">Inspect complete RFQ structure and line items before publishing.</p>
+          )}
+        </div>
+      </div>
 
       {currentStep === 0 && (
         <RfqGlobalDetailsStep
@@ -175,27 +189,23 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
   };
 
   return (
-    <div className="space-y-6">
-      <AntCard className="shadow-sm border-slate-200">
-        <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-slate-800">RFQ Global Settings</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <div className="space-y-4">
+      <AntCard size="small" className="shadow-sm border-slate-200" title={<span className="font-bold text-slate-800 text-sm">RFQ Details</span>}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
           <div>
-            <label className="text-xs font-semibold text-slate-600">RFQ Title *</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">RFQ Title *</label>
             <AntInput
-              size="large"
               placeholder="e.g. Q4 Enterprise Hardware Sourcing"
               value={details.title}
               onChange={(e) => setDetails({ ...details, title: e.target.value })}
-              className="mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600">Currency *</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Currency *</label>
             <AntSelect
-              size="large"
               value={details.currency}
               onChange={(val) => setDetails({ ...details, currency: val })}
-              className="w-full mt-1"
+              className="w-full"
               options={[
                 { label: 'USD ($)', value: 'USD' },
                 { label: 'EUR (€)', value: 'EUR' },
@@ -204,62 +214,52 @@ const RfqGlobalDetailsStep: React.FC<RfqGlobalDetailsStepProps> = ({ initialData
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600">Submission Deadline *</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Submission Deadline *</label>
             <AntInput
               type="date"
-              size="large"
               value={details.submission_deadline}
               onChange={(e) => setDetails({ ...details, submission_deadline: e.target.value })}
-              className="mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600">Contact Email *</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Contact Email *</label>
             <AntInput
               type="email"
-              size="large"
               placeholder="buyer@example.com"
               value={details.contact_email}
               onChange={(e) => setDetails({ ...details, contact_email: e.target.value })}
-              className="mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600">Contact Mobile / Phone</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Contact Mobile / Phone</label>
             <AntInput
-              size="large"
               placeholder="+1-555-0199"
               value={details.contact_phone}
               onChange={(e) => setDetails({ ...details, contact_phone: e.target.value })}
-              className="mt-1"
             />
           </div>
           <div>
-            <label className="text-xs font-semibold text-slate-600">Shipping Destination *</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Shipping Destination *</label>
             <AntInput
-              size="large"
               placeholder="e.g. Warehouse 4, Central Procurement HQ"
               value={details.shipping_destination}
               onChange={(e) => setDetails({ ...details, shipping_destination: e.target.value })}
-              className="mt-1"
             />
           </div>
           <div className="md:col-span-2">
-            <label className="text-xs font-semibold text-slate-600">Detailed Sourcing Specification / General Instructions</label>
+            <label className="text-xs font-semibold text-slate-700 block mb-1">Detailed Sourcing Specification / General Instructions</label>
             <AntInput.TextArea
-              rows={4}
+              rows={3}
               value={details.description}
               onChange={(e) => setDetails({ ...details, description: e.target.value })}
-              className="mt-1"
               placeholder="Detailed global sourcing terms, standard specifications or delivery instructions..."
             />
           </div>
         </div>
       </AntCard>
 
-      <div className="flex justify-between">
-        <div />
-        <AntButton type="primary" size="large" className="bg-blue-600 font-bold" onClick={handleNext}>
+      <div className="flex justify-end">
+        <AntButton type="primary" className="bg-blue-600 font-bold" onClick={handleNext}>
           Next Step →
         </AntButton>
       </div>
@@ -560,48 +560,6 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                 }
               />
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="text-xs font-bold text-slate-800 px-4 py-3 bg-slate-50 border-b border-slate-200">Variant Specifications</div>
-              <AntTable
-                showHeader={false}
-                pagination={false}
-                size="small"
-                className="w-full"
-                classNames={{ body: { cell: "text-xs" } }}
-                columns={[
-                  { dataIndex: 'label', key: 'label', width: '40%', render: (text: React.ReactNode) => <span className="text-slate-500">{text}</span> },
-                  { dataIndex: 'value', key: 'value', render: (text: React.ReactNode) => <span className="font-semibold text-slate-800">{text}</span> }
-                ]}
-                dataSource={
-                  variant.combination_values?.map((c: any, cIdx: number) => ({
-                    key: cIdx,
-                    label: c.attribute_name,
-                    value: c.label
-                  })) || []
-                }
-              />
-            </div>
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-              <div className="text-xs font-bold text-slate-800 px-4 py-3 bg-slate-50 border-b border-slate-200">Variant Specifications</div>
-              <AntTable
-                showHeader={false}
-                pagination={false}
-                size="small"
-                className="w-full"
-                classNames={{ body: { cell: "text-xs" } }}
-                columns={[
-                  { dataIndex: 'label', key: 'label', width: '40%', render: (text: React.ReactNode) => <span className="text-slate-500">{text}</span> },
-                  { dataIndex: 'value', key: 'value', render: (text: React.ReactNode) => <span className="font-semibold text-slate-800">{text}</span> }
-                ]}
-                dataSource={
-                  variant.combination_values?.map((c: any, cIdx: number) => ({
-                    key: cIdx,
-                    label: c.attribute_name,
-                    value: c.label
-                  })) || []
-                }
-              />
-            </div>
 
             {sellerProduct.specifications && sellerProduct.specifications.length > 0 && (
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -740,45 +698,51 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
   };
 
   return (
-    <div className="space-y-6">
-      <AntCard className="shadow-sm border-slate-200">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-800 m-0">Line Items ({items.length})</h3>
-            <p className="text-xs text-slate-500">Configure item-wise static specs, dynamic category attributes, targeted catalog SKUs, or open RFQ seller assignments.</p>
+    <div className="space-y-4">
+      <AntCard
+        size="small"
+        className="shadow-sm border-slate-200"
+        title={
+          <div className="flex flex-wrap items-center justify-between gap-3 py-1">
+            <div>
+              <span className="font-bold text-slate-800 text-sm">Line Items ({items.length})</span>
+              <p className="text-xs text-slate-500 font-normal m-0 mt-0.5">Configure item-wise static specs, dynamic category attributes, targeted catalog SKUs, or open RFQ seller assignments.</p>
+            </div>
+            <AntButton type="primary" size="small" onClick={handleAddItem} icon={<AntPlusOutlined />} className="bg-blue-600 font-semibold">
+              Add Item
+            </AntButton>
           </div>
-          <AntButton type="primary" onClick={handleAddItem} icon={<AntPlusOutlined />} className="bg-blue-600">
-            Add Item
-          </AntButton>
-        </div>
-
+        }
+      >
         <AntTable
           dataSource={items}
           rowKey="id"
+          size="small"
+          scroll={{ x: 650 }}
           pagination={{ pageSize: 5 }}
           bordered
           locale={{ emptyText: 'No line items added yet. Click "Add Item" to add your first line item.' }}
           columns={[
             {
               title: '#',
-              width: 60,
-              render: (_, __, index) => <span className="font-bold text-slate-600">#{index + 1}</span>,
+              width: 50,
+              render: (_, __, index) => <span className="font-bold text-slate-600 text-xs">#{index + 1}</span>,
             },
             {
               title: 'Sourcing Mode & Scope',
-              width: 200,
+              width: 180,
               render: (_, record) => {
                 const hasTargetSellers = record.target_seller_party_ids && record.target_seller_party_ids.length > 0;
                 return (
                   <div className="space-y-1">
                     <div>
-                      <AntTag color="blue" icon={<AntAppstoreOutlined />}>{record.variant_id ? "Variant Product" : "Open Spec"}</AntTag>
+                      <AntTag color="blue" className="text-xs font-semibold m-0" icon={<AntAppstoreOutlined />}>{record.variant_id ? "Variant Product" : "Open Spec"}</AntTag>
                     </div>
                     <div className="text-[11px]">
                       {hasTargetSellers ? (
-                        <AntTag color="purple">{record.target_seller_party_ids.length} Direct Sellers</AntTag>
+                        <AntTag color="purple" className="text-xs m-0">{record.target_seller_party_ids.length} Direct Sellers</AntTag>
                       ) : (
-                        <AntTag color="cyan" icon={<AntGlobalOutlined />}>Open Marketplace</AntTag>
+                        <AntTag color="cyan" className="text-xs m-0" icon={<AntGlobalOutlined />}>Open Marketplace</AntTag>
                       )}
                     </div>
                   </div>
@@ -791,11 +755,11 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
                 const cat = leafCategories.find((c) => c.id === record.category_id);
                 const mProd = allMasterProducts.find((p) => p.id === record.catalog_product_id);
                 return (
-                  <div className="space-y-1">
-                    <div className="font-bold text-slate-900">{cat?.name || record.category_id || <span className="text-slate-400 italic">No Category</span>}</div>
+                  <div className="space-y-0.5">
+                    <div className="font-bold text-slate-900 text-xs">{cat?.name || record.category_id || <span className="text-slate-400 italic font-normal">No Category Selected</span>}</div>
                     {(mProd) && (
                       <div className="text-xs text-slate-500">
-                        {mProd && <span>Product: {mProd.name}</span>}
+                        <span>Product: {mProd.name}</span>
                       </div>
                     )}
                   </div>
@@ -804,11 +768,9 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
             },
             {
               title: 'Quantity',
-              width: 160,
+              width: 130,
               render: (_, record) => (
-                <div>
-                  <div className="font-bold text-slate-800">{record.quantity || 0} {record.unit_of_measure}</div>
-                </div>
+                <div className="font-bold text-slate-800 text-xs">{record.quantity || 0} {record.unit_of_measure}</div>
               ),
             },
             {
@@ -817,7 +779,7 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
               render: (_, __, index) => (
                 <div className="flex items-center gap-2">
                   <AntButton size="small" type="dashed" icon={<AntSettingOutlined />} onClick={() => { setActiveDrawerIndex(index); setVariantPage(1); }}>
-                    Add Specifications
+                    Specifications
                   </AntButton>
                   <AntPopconfirm title="Remove this line item?" onConfirm={() => handleRemoveItem(index)}>
                     <AntButton size="small" danger type="text" icon={<AntDeleteOutlined />} />
@@ -830,10 +792,10 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
       </AntCard>
 
       <div className="flex justify-between">
-        <AntButton size="large" onClick={() => onPrev(items)}>
+        <AntButton onClick={() => onPrev(items)}>
           Back
         </AntButton>
-        <AntButton type="primary" size="large" className="bg-blue-600 font-bold" onClick={handleNext}>
+        <AntButton type="primary" className="bg-blue-600 font-bold" onClick={handleNext}>
           Next Step →
         </AntButton>
       </div>
@@ -841,27 +803,22 @@ const RfqLineItemsStep: React.FC<RfqLineItemsStepProps> = ({ initialItems, onPre
       {/* ITEM CONFIGURATION DRAWER */}
       <AntDrawer
         title={
-          <div className="flex items-center justify-between px-8">
-            <span className="font-bold text-slate-900">
-              #{activeDrawerIndex !== null ? activeDrawerIndex + 1 : ''} - Configure Line Item Specifications
+          <div className="flex items-center justify-between px-2">
+            <span className="font-bold text-slate-900 text-sm">
+              Line Item #{activeDrawerIndex !== null ? activeDrawerIndex + 1 : ''} Specifications
             </span>
-            {/* {activeDrawerIndex !== null && items[activeDrawerIndex]?.variant_id && (
-              <AntTag color="green" icon={<AntAimOutlined />}>Product Selected</AntTag>
-            )} */}
           </div>
         }
         size={1200}
         onClose={() => setActiveDrawerIndex(null)}
+        closable={false}
         open={activeDrawerIndex !== null}
         destroyOnHidden
-        closable={false}
-        classNames={{ body: "p-3", header: "p-2" }}
+        classNames={{ body: "p-3", header: "p-2 px-3 border-b border-slate-200" }}
         extra={
-          <div className="pr-3">
-            <AntButton type="primary" onClick={() => setActiveDrawerIndex(null)} className="bg-blue-600">
-              Done
-            </AntButton>
-          </div>
+          <AntButton type="primary" onClick={() => setActiveDrawerIndex(null)} className="bg-blue-600 font-semibold">
+            Done
+          </AntButton>
         }
       >
         {activeDrawerIndex !== null && (() => {
@@ -1841,59 +1798,71 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
   };
 
   return (
-    <div className="space-y-6">
-      <AntCard className="shadow-sm border-slate-200">
-        <h3 className="text-lg font-semibold mb-4 border-b pb-2 text-slate-800">Review RFQ Details</h3>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm mb-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
-          <div><span className="text-slate-500 block text-xs">RFQ Title</span> <div className="font-bold text-slate-900">{globalDetails.title}</div></div>
-          <div><span className="text-slate-500 block text-xs">Deadline</span> <div className="font-bold text-slate-900">{globalDetails.submission_deadline}</div></div>
-          <div><span className="text-slate-500 block text-xs">Destination</span> <div className="font-bold text-slate-900">{globalDetails.shipping_destination}</div></div>
-          <div><span className="text-slate-500 block text-xs">Contact Email</span> <div className="font-bold text-slate-900">{globalDetails.contact_email}</div></div>
-          <div><span className="text-slate-500 block text-xs">Currency</span> <div className="font-bold text-slate-900">{globalDetails.currency}</div></div>
-          <div><span className="text-slate-500 block text-xs">Total Items</span> <div className="font-bold text-blue-600">{items.length} Items</div></div>
+    <div className="space-y-4">
+      <AntCard
+        size="small"
+        className="shadow-sm border-slate-200"
+        title={<span className="font-bold text-slate-800 text-sm">Review RFQ Details</span>}
+      >
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 text-xs mb-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+          <div><span className="text-slate-500 block text-[11px]">RFQ Title</span> <div className="font-bold text-slate-900 truncate">{globalDetails.title}</div></div>
+          <div><span className="text-slate-500 block text-[11px]">Deadline</span> <div className="font-bold text-slate-900">{globalDetails.submission_deadline}</div></div>
+          <div><span className="text-slate-500 block text-[11px]">Destination</span> <div className="font-bold text-slate-900 truncate">{globalDetails.shipping_destination}</div></div>
+          <div><span className="text-slate-500 block text-[11px]">Contact Email</span> <div className="font-bold text-slate-900 truncate">{globalDetails.contact_email}</div></div>
+          <div><span className="text-slate-500 block text-[11px]">Currency</span> <div className="font-bold text-slate-900">{globalDetails.currency}</div></div>
+          <div><span className="text-slate-500 block text-[11px]">Total Items</span> <div className="font-bold text-blue-600">{items.length} Items</div></div>
         </div>
 
         <AntTable
           dataSource={items}
           rowKey="id"
-          pagination={{ pageSize: 5 }}
           size="small"
+          scroll={{ x: 650 }}
+          pagination={false}
           bordered
           columns={[
-            { title: 'Item #', width: 70, render: (_, __, i) => i + 1 },
             {
-              title: 'Category & Details',
-              render: (_, r) => {
-                const cat = allCategories.find((c) => c.id === r.category_id);
-                const mProd = allMasterProducts.find((p) => p.id === r.catalog_product_id);
-                return (
-                  <div className="space-y-1">
-                    <div className="font-bold text-slate-900">{cat?.name || r.category_id || <span className="text-slate-400 italic">No Category</span>}</div>
-                    {(mProd) && (
-                      <div className="text-xs text-slate-500">
-                        {mProd && <span>Master: {mProd.name}</span>}
-                      </div>
-                    )}
-                  </div>
-                );
-              }
+              title: '#',
+              width: 50,
+              render: (_, __, index) => <span className="font-bold text-slate-600 text-xs">#{index + 1}</span>,
             },
-            { title: 'Quantity', width: 120, render: (_, r) => `${r.quantity} ${r.unit_of_measure}` },
-            { title: 'Sourcing Mode', width: 140, render: (_, r) => <AntTag color="blue">{r.variant_id ? "Variant Product" : "Open Spec"}</AntTag> },
+            {
+              title: 'Item Category',
+              render: (_, record) => {
+                const cat = allCategories.find((c) => c.id === record.category_id);
+                return <span className="font-bold text-slate-900 text-xs">{cat?.name || record.category_id}</span>;
+              },
+            },
+            {
+              title: 'Quantity',
+              width: 130,
+              render: (_, record) => <span className="font-bold text-slate-800 text-xs">{record.quantity} {record.unit_of_measure}</span>,
+            },
+            {
+              title: 'Direct Sellers',
+              width: 140,
+              render: (_, record) => {
+                const count = record.target_seller_party_ids?.length || 0;
+                return count > 0 ? (
+                  <AntTag color="purple" className="text-xs m-0">{count} Target Sellers</AntTag>
+                ) : (
+                  <AntTag color="cyan" className="text-xs m-0" icon={<AntGlobalOutlined />}>Open RFQ</AntTag>
+                );
+              },
+            },
             {
               title: 'Action',
-              width: 100,
-              render: (_, __, i) => (
-                <AntButton size="small" type="primary" ghost onClick={() => setViewItemIndex(i)}>
-                  View
+              width: 130,
+              render: (_, __, index) => (
+                <AntButton size="small" type="dashed" icon={<AntEyeOutlined />} onClick={() => setViewItemIndex(index)}>
+                  Review Specs
                 </AntButton>
-              )
-            }
+              ),
+            },
           ]}
         />
 
-        <div className="mt-8 space-y-3 bg-slate-50 p-6 rounded-xl border border-slate-200">
-          <h4 className="font-bold text-slate-800 mb-2">Confirm and Submit</h4>
+        <div className="mt-4 pt-3 border-t border-slate-200 space-y-2 text-xs">
           <AntCheckbox
             checked={agreements.termsAgreed}
             onChange={(e) => setAgreements({ ...agreements, termsAgreed: e.target.checked })}
@@ -1918,13 +1887,12 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
       </AntCard>
 
       <div className="flex justify-between">
-        <AntButton size="large" onClick={onPrev}>
+        <AntButton onClick={onPrev}>
           Back
         </AntButton>
         <AntButton
           type="primary"
-          size="large"
-          className="bg-emerald-600 hover:bg-emerald-700 font-bold px-8"
+          className="bg-emerald-600 hover:bg-emerald-700 font-bold px-6"
           onClick={handleIssueRfq}
           icon={<AntSendOutlined />}
         >
