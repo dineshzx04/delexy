@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Card, Table, Button, Input, Tabs, Tag } from 'antd';
+import { Card, Table, Button, Input, Select, Tag as AntTag } from 'antd';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
-import { PlusOutlined, SearchOutlined, FolderOpenOutlined, ClockCircleOutlined, BankOutlined, UserOutlined } from '@ant-design/icons';
+import { PlusOutlined, SearchOutlined, FolderOpenOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
@@ -35,10 +35,10 @@ export const RfqList: React.FC = () => {
     [activePartyId]
   ) || [];
 
-  const breadcrumbs = React.useMemo(() => [
-    { title: <span className="text-slate-800 font-semibold">RFQ Sourcing</span> }
-  ], []);
-  useBreadcrumb(breadcrumbs);
+  // const breadcrumbs = React.useMemo(() => [
+  //   { title: <span className="text-slate-800 font-semibold">RFQ Sourcing</span> }
+  // ], []);
+  // useBreadcrumb(breadcrumbs);
 
   const filteredRfqs = partyRfqs.filter((r) => {
     const matchesTab = activeTab === 'ALL' || r.status === activeTab;
@@ -55,49 +55,31 @@ export const RfqList: React.FC = () => {
       dataIndex: 'title',
       key: 'title',
       render: (text: string, record: any) => (
-        <div>
+        <div className="flex flex-col gap-0.5">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-900 text-sm">{record.rfq_number}</span>
-            <span className="text-slate-700 font-medium text-sm">• {text}</span>
+            <span className="font-bold font-mono text-slate-900 text-xs">{record.rfq_number}</span>
+            <span className="text-slate-800 font-semibold text-xs">• {text}</span>
           </div>
           {record.description && (
-            <div className="text-xs text-slate-500 line-clamp-1">{record.description}</div>
+            <div className="text-[11px] text-slate-500 truncate max-w-lg">{record.description}</div>
           )}
-          <div className="text-[11px] text-slate-400 mt-0.5">
+          <div className="text-[11px] text-slate-400">
             Requester: <span className="font-medium text-slate-600">{record.requester_name}</span> ({record.requester_party_id})
           </div>
         </div>
       ),
     },
-    
-    // {
-    //   title: 'Items & Budget',
-    //   key: 'items_budget',
-    //   width: 160,
-    //   render: (_: any, record: any) => (
-    //     <div className="space-y-1">
-    //       <div className="font-bold text-slate-900 text-sm">
-    //         ${(record.total_estimated_budget || 0).toLocaleString()}
-    //       </div>
-    //       <div>
-    //         <Tag color="blue" className="font-semibold text-xs py-0 px-1.5">
-    //           {record.total_items_count} Items
-    //         </Tag>
-    //       </div>
-    //     </div>
-    //   ),
-    // },
     {
       title: 'Status & Deadline',
       key: 'status_deadline',
-      width: 180,
+      width: 170,
       render: (_: any, record: any) => (
-        <div className="space-y-1">
+        <div className="flex flex-col gap-1">
           <div>
             <RfqStatusBadge status={record.status} />
           </div>
-          <div className="text-xs text-slate-500">
-            <ClockCircleOutlined className="mr-1 text-slate-400" />
+          <div className="text-[11px] text-slate-500 flex items-center gap-1">
+            <ClockCircleOutlined className="text-slate-400" />
             {new Date(record.submission_deadline).toLocaleDateString()}
           </div>
         </div>
@@ -106,7 +88,7 @@ export const RfqList: React.FC = () => {
     {
       title: 'Action',
       key: 'actions',
-      width: 130,
+      width: 110,
       align: 'right' as const,
       render: (_: any, record: any) => (
         <Button
@@ -123,46 +105,58 @@ export const RfqList: React.FC = () => {
   ];
 
   return (
-    <div className=" max-w-7xl mx-auto space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="max-w-7xl mx-auto space-y-3">
+      {/* Professional Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-bold text-slate-900">RFQ Sourcing Containers</h1>
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">RFQ Sourcing Containers</h1>
+            <span className="bg-blue-50 text-blue-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-blue-200">
+              {partyRfqs.length} Total
+            </span>
           </div>
-          <p className="text-xs text-slate-500">Party-centric sourcing view for {activePartyName}.</p>
+          <p className="text-xs text-slate-500 mt-0.5 m-0">
+            Sourcing workspace and seller quotation containers for <strong className="text-slate-700">{activePartyName}</strong>
+          </p>
         </div>
+
         <Button
           type="primary"
           onClick={() => navigate(`${basePath}/create`)}
           icon={<PlusOutlined />}
-          className="bg-blue-600 hover:bg-blue-700 font-semibold shadow-sm"
+          className="bg-blue-600 hover:bg-blue-700 font-semibold shadow-sm text-xs px-3 h-8 rounded-lg flex items-center"
         >
           Create RFQ
         </Button>
       </div>
 
-      <Card className="shadow-sm border-slate-200" bodyStyle={{ padding: '12px 16px' }}>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-2">
-          <Tabs
-            activeKey={activeTab}
-            onChange={setActiveTab}
-            size="small"
-            items={[
-              { key: 'ALL', label: `All (${partyRfqs.length})` },
-              { key: 'DRAFT', label: 'Draft' },
-              { key: 'ISSUED', label: 'Issued' },
-              { key: 'IN_PROGRESS', label: 'In Progress' },
-              { key: 'CLOSED', label: 'Closed' },
-              { key: 'CANCELLED', label: 'Cancelled' },
-            ]}
-          />
+      {/* Main Content Card */}
+      <Card size="small" className="shadow-sm border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600">Filter Status:</span>
+            <Select
+              value={activeTab}
+              onChange={setActiveTab}
+              size="small"
+              className="w-48"
+              options={[
+                { value: 'ALL', label: `All Statuses (${partyRfqs.length})` },
+                { value: 'DRAFT', label: 'Draft' },
+                { value: 'ISSUED', label: 'Issued' },
+                { value: 'IN_PROGRESS', label: 'In Progress' },
+                { value: 'CLOSED', label: 'Closed' },
+                { value: 'CANCELLED', label: 'Cancelled' },
+              ]}
+            />
+          </div>
 
           <Input
             placeholder="Search RFQs..."
             prefix={<SearchOutlined className="text-slate-400" />}
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            className="w-full md:w-64"
+            className="w-full sm:w-56"
             size="small"
             allowClear
           />
@@ -173,11 +167,10 @@ export const RfqList: React.FC = () => {
           columns={columns}
           rowKey="id"
           size="small"
+          scroll={{ x: 600 }}
           pagination={{ pageSize: 10, size: 'small' }}
         />
       </Card>
     </div>
   );
 };
-
-

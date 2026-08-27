@@ -588,18 +588,27 @@ export const RequesterQuoteReview: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <Card
-        className="shadow-md border-slate-200"
-        title={
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col">
-              <span className="font-extrabold text-slate-900 leading-tight">Review Sourcing Quote Proposal</span>
-              <span className="text-xs text-slate-500 font-normal">{quote.seller_quote_number} &bull; Supplier: {sellerParty?.display_name || quote.seller_party_id}</span>
-            </div>
+    <div className="max-w-7xl mx-auto space-y-3">
+      {/* Professional Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Review Sourcing Quote Proposal</h1>
+            <AntTag color="purple" className="font-mono font-bold text-xs m-0">{quote.seller_quote_number}</AntTag>
+            <AntTag
+              color={quote.status === 'SUBMITTED' ? 'blue' : quote.status === 'DRAFT' ? 'orange' : quote.status === 'DEVIATION_ACCEPTED' ? 'green' : quote.status === 'REJECTED' ? 'red' : 'default'}
+              className="font-bold text-xs m-0"
+            >
+              {quote.status}
+            </AntTag>
           </div>
-        }
-      >
+          <p className="text-xs text-slate-500 mt-0.5 m-0">
+            Supplier: <strong className="text-slate-700">{sellerParty?.display_name || quote.seller_party_id}</strong> &bull; RFQ: <span className="font-mono font-bold text-slate-700">{rfq?.rfq_number}</span>
+          </p>
+        </div>
+      </div>
+
+      <Card size="small" className="shadow-sm border-slate-200">
         {/* Request & Quote Details */}
         <Descriptions title="Request & Quote Details" bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }} className="mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
           <Descriptions.Item label="Product / Service" span={3}>

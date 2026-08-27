@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Tabs, Tag as AntTag, Button, Table, Drawer } from 'antd';
+import { Card, Tabs, Tag as AntTag, Button, Table, Drawer, Descriptions, Grid as AntGrid } from 'antd';
 import {
   AppstoreOutlined,
   FolderOpenOutlined,
@@ -11,13 +11,14 @@ import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { RfqStatusBadge, RfqItemStatusBadge } from './RfqStatusBadge';
-
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 export const RfqWorkspace: React.FC = () => {
   const { rfqId } = useParams<{ rfqId: string }>();
   const navigate = useNavigate();
+  const screens = AntGrid.useBreakpoint();
+  const descriptionsLayout = screens.md ? 'horizontal' : 'vertical';
   const { activeWorkspace, currentUserId } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
@@ -35,20 +36,19 @@ export const RfqWorkspace: React.FC = () => {
   const activePartyId = activeParty?.id || '';
 
   const rfq = useLiveQuery(() => (rfqId ? rfqDb.rfqs.get(rfqId) : undefined), [rfqId]);
-  const items = useLiveQuery(() => (rfqId ? rfqDb.rfq_items.where('rfq_id').equals(rfqId).toArray() : []), [rfqId]) || [];
-  const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
 
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
     { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number ? `${rfq.rfq_number}` : 'RFQ Workspace'}</span> }
-  ], [navigate, basePath, rfq?.rfq_number, rfq?.title]);
+  ], [navigate, basePath, rfq?.rfq_number]);
+
   useBreadcrumb(breadcrumbs);
 
   if (!rfq || rfq.requester_id !== activePartyId) {
     return (
-      <div className="p-12 text-center text-slate-500">
-        <h2 className="text-xl font-bold text-slate-800">RFQ Container Not Found</h2>
-        <Button className="mt-4" onClick={() => navigate(basePath)}>
+      <div className="p-8 text-center text-slate-500">
+        <h2 className="text-lg font-bold text-slate-800">RFQ Container Not Found</h2>
+        <Button size="small" className="mt-3" onClick={() => navigate(basePath)}>
           Back to RFQs List
         </Button>
       </div>
@@ -56,35 +56,35 @@ export const RfqWorkspace: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <Card className="shadow-md border-slate-200 bg-white">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-xl font-black text-slate-700 flex items-center">
-                <AntTag color={"processing"} className='mr-2'>{rfq.rfq_number}</AntTag>
-                <span>{rfq.title}</span>
-                <RfqStatusBadge status={rfq.status} />
-              </h1>
-            </div>
-            <p className="text-slate-600 text-sm mt-1">{rfq.description}</p>
-            <div className="flex items-center gap-6 mt-3 text-xs text-slate-500">
-              <div>Requester: <strong className="text-slate-800">{rfq.requester_name}</strong></div>
-              <div>Deadline: <strong className="text-slate-800">{new Date(rfq.submission_deadline).toLocaleDateString()}</strong></div>
-            </div>
+    <div className="max-w-7xl mx-auto space-y-3">
+      {/* Professional Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">{rfq.title}</h1>
+            <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+              {rfq.rfq_number}
+            </span>
+            <RfqStatusBadge status={rfq.status} />
           </div>
+          <p className="text-xs text-slate-500 mt-0.5 m-0">
+            Requester: <strong className="text-slate-700">{rfq.requester_name}</strong> &bull; Deadline: <strong className="text-slate-700">{new Date(rfq.submission_deadline).toLocaleDateString()}</strong>
+            {rfq.description && <span className="ml-2 text-slate-400 font-normal italic">({rfq.description})</span>}
+          </p>
         </div>
-      </Card>
+      </div>
 
-      <Card className="shadow-sm border-slate-200">
+      {/* Tabs Container */}
+      <Card size="small" className="shadow-sm border-slate-200">
         <Tabs
+          size="small"
           activeKey={activeTab}
           onChange={setActiveTab}
           items={[
             {
               key: 'items',
               label: (
-                <span className="font-bold flex items-center gap-2">
+                <span className="font-semibold flex items-center gap-1.5 text-xs">
                   <AppstoreOutlined /> Sourcing Items
                 </span>
               ),
@@ -93,7 +93,7 @@ export const RfqWorkspace: React.FC = () => {
             {
               key: 'suppliers',
               label: (
-                <span className="font-bold flex items-center gap-2">
+                <span className="font-semibold flex items-center gap-1.5 text-xs">
                   <TeamOutlined /> Suppliers
                 </span>
               ),
@@ -105,6 +105,15 @@ export const RfqWorkspace: React.FC = () => {
     </div>
   );
 };
+
+
+
+
+
+
+
+
+
 
 const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
   const navigate = useNavigate();
@@ -121,8 +130,8 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
       title: 'S.No.',
       dataIndex: 'item_index',
       key: 'item_index',
-      width: 60,
-      render: (val: number, _: any, index: number) => <span className="font-bold text-slate-500">{val || index + 1}</span>,
+      width: 50,
+      render: (val: number, _: any, index: number) => <span className="font-semibold text-slate-500 text-xs">{val || index + 1}</span>,
     },
     {
       title: 'Item Title & Category',
@@ -131,10 +140,9 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
         const catName = categories.find((c) => c.id === record.category_id)?.name;
         const cprod = catalogProducts.find(p => p.id === record.catalog_product_id);
 
-        let productName = '';
+        let productName = cprod?.name || record.catalog_product_id || 'Line Item';
         let variantName = '';
 
-        productName = cprod?.name || record.catalog_product_id;
         if (record.product_id) {
           const sprod = sellerProducts.find(p => p.id === record.product_id);
           if (record.variant_id) {
@@ -144,9 +152,15 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
         }
 
         return (
-          <div>
-            <div className="font-bold text-slate-900">{productName} {variantName && <span className="text-slate-500 font-normal">({variantName})</span>}</div>
-            <div className="text-xs text-slate-500">Category: <AntTag color="purple">{catName}</AntTag></div>
+          <div className="flex flex-col gap-0.5">
+            <div className="font-semibold text-slate-900 text-xs">
+              {productName} {variantName && <span className="text-slate-500 font-normal">({variantName})</span>}
+            </div>
+            {catName && (
+              <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                Category: <AntTag color="purple" className="text-[10px] m-0 leading-tight px-1">{catName}</AntTag>
+              </div>
+            )}
           </div>
         );
       },
@@ -155,35 +169,29 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
       title: 'Req.Qty',
       dataIndex: 'req_quantity',
       key: 'req_quantity',
-      width: 160,
+      width: 120,
       render: (val: number, record: any) => (
-        <span className="font-semibold text-slate-800">{val} {record.unit}</span>
+        <span className="font-semibold text-slate-800 text-xs">{val} {record.req_unit}</span>
       ),
     },
-    // {
-    //   title: 'UnitPrice',
-    //   dataIndex: 'unit_price',
-    //   key: 'unit_price',
-    //   width: 140,
-    //   render: (val: number) => <span className="font-bold text-emerald-600">${val || 0}</span>,
-    // },
     {
       title: 'Item Status',
       dataIndex: 'status',
       key: 'status',
-      width: 170,
+      width: 140,
       render: (status: any) => <RfqItemStatusBadge status={status} />,
     },
     {
       title: 'Action',
       key: 'action',
-      width: 160,
+      width: 130,
       render: (_: any, record: any) => (
         <Button
           type="primary"
+          size="small"
           onClick={() => navigate(`${basePath}/${rfqId}/items/${record.id}`)}
           icon={<FolderOpenOutlined />}
-          className="bg-blue-600 font-semibold"
+          className="bg-blue-600 text-xs font-semibold"
         >
           Manage Item
         </Button>
@@ -192,14 +200,29 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
   ];
 
   return (
-    <div className="space-y-4">
-      <Table dataSource={items} columns={itemColumns} rowKey="id" pagination={false} />
-    </div>
+    <Table
+      dataSource={items}
+      columns={itemColumns}
+      rowKey="id"
+      pagination={false}
+      size="small"
+      scroll={{ x: 600 }}
+    />
   );
 };
 
+
+
+
+
+
+
+
+
+
 const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
   const navigate = useNavigate();
+  const screens = AntGrid.useBreakpoint();
   const { activeWorkspace } = useWorkspace();
   const basePath = activeWorkspace?.type === 'BUSINESS' ? '/b/rfqs' : '/user/rfqs';
 
@@ -240,32 +263,33 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
     {
       title: 'S.No.',
       key: 'sno',
-      width: 60,
-      render: (_: any, __: any, index: number) => <span className="font-bold text-slate-500">{index + 1}</span>,
+      width: 50,
+      render: (_: any, __: any, index: number) => <span className="font-semibold text-slate-500 text-xs">{index + 1}</span>,
     },
     {
       title: 'Supplier Name',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string) => <span className="font-bold text-slate-800">{text}</span>,
+      render: (text: string) => <span className="font-semibold text-slate-800 text-xs">{text}</span>,
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (text: string) => <AntTag color={text === 'ACTIVE' ? 'success' : 'default'}>{text}</AntTag>,
+      render: (text: string) => <AntTag color={text === 'ACTIVE' ? 'success' : 'default'} className="text-[10px] font-bold">{text}</AntTag>,
     },
     {
       title: 'Items Assigned',
       dataIndex: 'itemsAssigned',
       key: 'itemsAssigned',
-      render: (val: number) => <span className="font-semibold text-slate-600">{val}</span>,
+      render: (val: number) => <span className="font-semibold text-slate-700 text-xs">{val}</span>,
     },
     {
       title: 'Action',
       key: 'action',
+      width: 120,
       render: (_: any, record: any) => (
-        <Button onClick={() => setSelectedSellerId(record.seller_party_id)}>
+        <Button size="small" className="text-xs" onClick={() => setSelectedSellerId(record.seller_party_id)}>
           View Items
         </Button>
       ),
@@ -284,8 +308,8 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
       title: 'S.No.',
       dataIndex: 'item_index',
       key: 'item_index',
-      width: 60,
-      render: (val: number, _: any, index: number) => <span className="font-bold text-slate-500">{val || index + 1}</span>,
+      width: 50,
+      render: (val: number, _: any, index: number) => <span className="font-semibold text-slate-500 text-xs">{val || index + 1}</span>,
     },
     {
       title: 'Item Title & Category',
@@ -312,36 +336,32 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
         }
 
         return (
-          <div>
-            <div className="font-bold text-slate-900">{productName} {variantName && <span className="text-slate-500 font-normal">({variantName})</span>}</div>
-            <div className="text-xs text-slate-500">Category: <AntTag color="purple">{catName}</AntTag></div>
+          <div className="flex flex-col gap-0.5">
+            <div className="font-semibold text-slate-900 text-xs">{productName} {variantName && <span className="text-slate-500 font-normal">({variantName})</span>}</div>
+            {catName && <div className="text-[11px] text-slate-500">Category: <AntTag color="purple" className="text-[10px] m-0 px-1">{catName}</AntTag></div>}
           </div>
         );
       },
     },
     {
       title: 'Req.Qty',
-      dataIndex: 'quantity',
-      key: 'quantity',
+      dataIndex: 'req_quantity',
+      key: 'req_quantity',
+      width: 110,
       render: (val: number, record: any) => (
-        <span className="font-semibold text-slate-800">{val} {record.unit}</span>
+        <span className="font-semibold text-slate-800 text-xs">{val || record.quantity} {record.req_unit || record.unit}</span>
       ),
     },
-    // {
-    //   title: 'UnitPrice',
-    //   dataIndex: 'unit_price',
-    //   key: 'unit_price',
-    //   render: (val: number) => <span className="font-bold text-emerald-600">${val || 0}</span>,
-    // },
     {
       title: 'Action',
       key: 'action',
+      width: 120,
       render: (_: any, record: any) => (
         <Button
           type="primary"
           onClick={() => navigate(`${basePath}/${rfqId}/items/${record.id}`)}
           icon={<FolderOpenOutlined />}
-          className="bg-blue-600 font-semibold"
+          className="bg-blue-600 text-xs font-semibold"
           size="small"
         >
           Manage Item
@@ -353,16 +373,30 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
   const selectedSupplierName = uniqueSuppliers.find(s => s.seller_party_id === selectedSellerId)?.name;
 
   return (
-    <div className="space-y-4">
-      <Table dataSource={uniqueSuppliers} columns={supplierColumns} rowKey="seller_party_id" pagination={false} />
+    <div className="space-y-3">
+      <Table
+        dataSource={uniqueSuppliers}
+        columns={supplierColumns}
+        rowKey="seller_party_id"
+        pagination={false}
+        size="small"
+        scroll={{ x: 500 }}
+      />
       <Drawer
         title={`Items Assigned to ${selectedSupplierName}`}
         placement="right"
-        width={720}
+        width={screens.md ? 640 : '100%'}
         onClose={() => setSelectedSellerId(null)}
         open={!!selectedSellerId}
       >
-        <Table dataSource={sellerItems} columns={sellerItemColumns} rowKey="id" pagination={false} />
+        <Table
+          dataSource={sellerItems}
+          columns={sellerItemColumns}
+          rowKey="id"
+          pagination={false}
+          size="small"
+          scroll={{ x: 500 }}
+        />
       </Drawer>
     </div>
   );

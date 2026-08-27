@@ -110,30 +110,50 @@ export const SupplierItemRespond: React.FC = () => {
 
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <Card
-        className="shadow-md border-slate-200"
-        title={
-          <div className="flex items-center gap-3">
-            <div className="flex flex-col">
-              <span className="font-extrabold text-slate-900 leading-tight">RFQ Item Proposal Wizard</span>
-              <span className="text-xs text-slate-500 font-normal">{rfq.rfq_number} &bull; From: {rfq.requester_name || 'N/A'}</span>
-            </div>
+    <div className="max-w-7xl mx-auto space-y-3">
+      {/* Professional Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">RFQ Item Proposal Wizard</h1>
+            <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+              {rfq.rfq_number}
+            </span>
           </div>
-        }
-      >
-        <div className="mb-10 px-8">
+          <p className="text-xs text-slate-500 mt-0.5 m-0">
+            Sourcing proposal and offer response for <strong className="text-slate-700">{rfq.requester_name || 'Requester'}</strong>
+          </p>
+        </div>
+      </div>
+
+      <Card size="small" className="shadow-sm border-slate-200">
+        <div className="pt-2 px-2">
           <Steps
             current={viewStep}
             onChange={(step) => setViewStep(step)}
+            titlePlacement="vertical"
+            ellipsis
             items={[
-              { title: 'Quote Proposal', description: 'Submit or revise your offer specifications.' },
-              { title: 'Product Mapping', description: 'Map negotiated item to product catalog.' },
-              { title: 'Final Approval', description: 'Final sign-off by both parties.' },
+              { title: 'Quote Proposal' },
+              { title: 'Product Mapping' },
+              { title: 'Final Approval' },
             ]}
           />
-          <div className="flex justify-between mt-6">
+          <div className="py-2.5 border-b border-slate-100 text-center">
+            {viewStep === 0 && (
+              <p className="text-xs text-slate-500 m-0">Submit or revise your offer specifications and proposal pricing options.</p>
+            )}
+            {viewStep === 1 && (
+              <p className="text-xs text-slate-500 m-0">Map negotiated item to your product catalog SKU.</p>
+            )}
+            {viewStep === 2 && (
+              <p className="text-xs text-slate-500 m-0">Final sign-off by both parties.</p>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between py-3 mb-2">
             <AntButton
+              size="small"
               disabled={viewStep === 0}
               onClick={() => setViewStep(v => v - 1)}
               icon={<ArrowLeftOutlined />}
@@ -141,6 +161,7 @@ export const SupplierItemRespond: React.FC = () => {
               Previous Step
             </AntButton>
             <AntButton
+              size="small"
               disabled={viewStep === 2}
               onClick={() => setViewStep(v => v + 1)}
             >
@@ -148,6 +169,7 @@ export const SupplierItemRespond: React.FC = () => {
             </AntButton>
           </div>
         </div>
+
 
         {viewStep === 0 && <StepQuoteProposal rfqId={rfqId!} itemId={itemId!} activePartyId={activePartyId} />}
         {viewStep === 1 && <StepProductMapping rfqId={rfqId!} itemId={itemId!} activePartyId={activePartyId} />}
@@ -528,7 +550,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
     };
 
     const names: Record<string, string> = {
-      mfg_brand_mapping: "Manufacturer & Brand Mappings",
+      mfg_brand_mapping: "Manufacturer & Brand",
     };
 
     const map = new Map<string, any>();
@@ -615,7 +637,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
     if (map.has('system')) {
       const systemGroup = map.get('system');
-      const order = ['mfg_brand_mapping', 'manufacturer', 'brand', 'req_quantity'];
+      const order = ['mfg_brand_mapping'];
       systemGroup.attributes.sort((a: any, b: any) => {
         const idxA = order.indexOf(a.attribute_id);
         const idxB = order.indexOf(b.attribute_id);
@@ -694,20 +716,24 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
       const selectedVariants = proposalVariants.filter(v => v.is_selected);
 
+      // Validation 1: Minimum one selected variant required
+      if (selectedVariants.length === 0) {
+        antMessage.error('Please select at least one proposal option to include in your offer.');
+        setSubmitting(false);
+        return;
+      }
+
+      // Validation 2: Price for each selected variant option must be strictly greater than zero
+      const invalidVariants = selectedVariants.filter(
+        v => typeof v.offer_price !== 'number' || isNaN(v.offer_price) || v.offer_price <= 0
+      );
+      if (invalidVariants.length > 0) {
+        antMessage.error('Price for all selected proposal options must be greater than 0.');
+        setSubmitting(false);
+        return;
+      }
+
       if (submitMode === 'SUBMITTED') {
-        if (selectedVariants.length === 0) {
-          antMessage.error('Please select at least one proposal option to include in your offer.');
-          setSubmitting(false);
-          return;
-        }
-
-        const invalidVariants = selectedVariants.filter(v => typeof v.offer_price !== 'number' || isNaN(v.offer_price) || v.offer_price <= 0);
-        if (invalidVariants.length > 0) {
-          antMessage.error('Please enter a valid price greater than 0 for all selected variants.');
-          setSubmitting(false);
-          return;
-        }
-
         if (isNaN(offerQty) || offerQty <= 0) {
           antMessage.error('Please enter a valid quantity.');
           setSubmitting(false);
@@ -933,12 +959,12 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         const proposalKey = `${attribute.group_id}_${attribute.attribute_id}`
         const currentProposalAttr = proposalAttributes[proposalKey];
 
+        const forceORDisabled = attribute.attribute_id === 'mfg_brand_mapping';
         const renderCustomTag = ({ label, value, closable, onClose }: any) => {
           const currentValues = currentProposalAttr?.values?.map((v: any) => v.value_id) || [];
           const index = currentValues.indexOf(value);
           const isLast = index === currentValues.length - 1;
 
-          const forceORDisabled = attribute.attribute_id === 'mfg_brand_mapping';
           const connector = forceORDisabled ? "OR" : (currentProposalAttr?.connector || 'AND');
           const propJoiner = connector === "OR" ? " | " : " , ";
 
@@ -968,7 +994,6 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         };
 
         let field: any;
-        const forceORDisabled = attribute.attribute_id === 'mfg_brand_mapping';
 
         if (attribute.attribute_type === 'SYSTEM' && attribute.attribute_id === 'mfg_brand_mapping') {
           const currentValues = proposalAttributes[proposalKey]?.values || [];
@@ -1105,20 +1130,6 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                           />
                         </div>
                       </div>
-
-                      {/* <AntInput
-                        disabled={isViewOnly}
-                        size="small"
-                        placeholder="Optional note..."
-                        value={mapPair.description || ''}
-                        onChange={(e) => {
-                          const newPairs = [...pairs];
-                          newPairs[pairIdx].description = e.target.value;
-                          const newVals = pairsToAttributeValues(newPairs);
-                          updateProposalValues(newVals);
-                        }}
-                        className="mt-2 !text-[11px]"
-                      /> */}
                     </div>
                   ))}
 
@@ -1193,53 +1204,57 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         return (
           <div className="flex gap-2 flex-col">
             <div className="w-full">
-              <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded px-2 py-1 mb-1.5 w-max">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] uppercase font-semibold text-slate-500">Connector</span>
-                    <AntSelect
-                      size='small'
-                      disabled={isViewOnly || proposalAttributes[proposalKey]?.is_variant || forceORDisabled}
-                      value={forceORDisabled ? 'OR' : (proposalAttributes[proposalKey]?.connector || 'AND')}
-                      onChange={(val) => {
-                        setProposalAttributes(prev => ({
-                          ...prev,
-                          [proposalKey]: {
-                            ...prev[proposalKey],
-                            connector: val
-                          }
-                        }));
-                      }}
-                      options={[
-                        { label: 'AND', value: 'AND' },
-                        { label: 'OR', value: 'OR' }
-                      ]}
-                      className="w-[65px]"
-                    />
-                  </div>
-                  <div className="w-px h-4 bg-slate-200"></div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] uppercase font-semibold text-slate-500">Variant</span>
-                    <Switch
-                      size='small'
-                      disabled={isViewOnly}
-                      checked={proposalAttributes[proposalKey]?.is_variant}
-                      onChange={(checked) => {
-                        setProposalAttributes(prev => {
-                          const next = {
+              {
+                !forceORDisabled && (
+                  <div className="flex items-center gap-4 bg-slate-50 border border-slate-200 rounded px-2 py-1 mb-1.5 w-max">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-semibold text-slate-500">Connector</span>
+                      <AntSelect
+                        size='small'
+                        disabled={isViewOnly || proposalAttributes[proposalKey]?.is_variant || forceORDisabled}
+                        value={forceORDisabled ? 'OR' : (proposalAttributes[proposalKey]?.connector || 'AND')}
+                        onChange={(val) => {
+                          setProposalAttributes(prev => ({
                             ...prev,
                             [proposalKey]: {
                               ...prev[proposalKey],
-                              is_variant: checked,
-                              connector: checked ? "OR" : prev[proposalKey].connector
+                              connector: val
                             }
-                          };
-                          recalculateVariants(next);
-                          return next;
-                        });
-                      }}
-                    />
+                          }));
+                        }}
+                        options={[
+                          { label: 'AND', value: 'AND' },
+                          { label: 'OR', value: 'OR' }
+                        ]}
+                        className="w-[65px]"
+                      />
+                    </div>
+                    <div className="w-px h-4 bg-slate-200"></div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] uppercase font-semibold text-slate-500">Variant</span>
+                      <Switch
+                        size='small'
+                        disabled={isViewOnly}
+                        checked={proposalAttributes[proposalKey]?.is_variant}
+                        onChange={(checked) => {
+                          setProposalAttributes(prev => {
+                            const next = {
+                              ...prev,
+                              [proposalKey]: {
+                                ...prev[proposalKey],
+                                is_variant: checked,
+                                connector: checked ? "OR" : prev[proposalKey].connector
+                              }
+                            };
+                            recalculateVariants(next);
+                            return next;
+                          });
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
+                )
+              }
               {field}
             </div>
             <div className="flex flex-col">
@@ -1293,6 +1308,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
   return (
     <div className="space-y-6">
+
       {/* Request & Quote Details */}
       <Descriptions title="Request & Quote Details" bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }} className="mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
         <Descriptions.Item label="Product / Service" span={3}>
@@ -1817,6 +1833,7 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
 
   return (
     <div className="space-y-6">
+
       {/* Accepted Specs Overview */}
       <Card title={<span className="font-bold text-slate-800 text-base">Negotiated Quote & Accepted Specifications</span>} className="shadow-sm border-slate-200">
         <Descriptions bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }}>
@@ -1914,7 +1931,8 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
 
 const StepFinalAcknowledgement: React.FC<{ rfqId: string; itemId: string; activePartyId: string }> = ({ rfqId, itemId, activePartyId }) => {
   return (
-    <div className="p-8">
+    <div className="p-4">
+
       <Result
         status="success"
         title="Final Acknowledgement"

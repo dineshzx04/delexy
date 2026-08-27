@@ -93,14 +93,17 @@ export const RfqCreateWizard: React.FC = () => {
   ];
 
   return (
-    <div className="  max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        {/* <AntButton icon={<AntArrowLeftOutlined />} onClick={() => navigate(basePath)}>
-          Back to RFQs
-        </AntButton> */}
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold text-slate-900">Create Request for Quotation</h1>
-          <AntTag color="purple">Party: {activePartyName}</AntTag>
+    <div className="max-w-6xl mx-auto space-y-4">
+      {/* Professional Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Create Request for Quotation</h1>
+            <AntTag color="purple" className="font-semibold text-xs m-0">Party: {activePartyName}</AntTag>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5 m-0">
+            Configure global sourcing terms, line item specifications, and seller assignments
+          </p>
         </div>
       </div>
 
@@ -1805,6 +1808,14 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
           });
         });
       });
+
+      // console.log({
+      //   newRfq,
+      //   newRfqItems,
+      //   newRfqItemAttributes,
+      //   newQuotes,
+      // });
+      // return;
 
       await rfqDb.transaction(
         'rw',
