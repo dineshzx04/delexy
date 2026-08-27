@@ -181,6 +181,10 @@ export const RequesterQuoteReview: React.FC = () => {
     const map: Record<string, { name: string; attributes: any[] }> = {};
 
     quoteAttributes.forEach(qa => {
+      if (qa.attribute_type === 'SYSTEM' && qa.attribute_id !== 'mfg_brand_mapping') {
+        return;
+      }
+
       const groupId = qa.group_id;
       const isVariant = qa.attribute_id.startsWith('var-') || (qa as any).is_variant || false;
 
@@ -196,36 +200,19 @@ export const RequesterQuoteReview: React.FC = () => {
       }
 
       let attrName = "";
-      if (qa.attribute_id === 'req_quantity') attrName = 'Requested Quantity';
-      else if (qa.attribute_id === 'brand') attrName = 'Brand';
-      else if (qa.attribute_id === 'manufacturer') attrName = 'Manufacturer';
-      else if (qa.attribute_id === 'mfg_brand_mapping') attrName = 'Manufacturer & Brand Mappings';
+      if (qa.attribute_id === 'mfg_brand_mapping') attrName = 'Manufacturer & Brand Mappings';
       else {
         attrName = catalogAttributes?.find(a => a.id === qa.attribute_id)?.name || qa.attribute_id;
       }
 
-      // Determine what the buyer requested for comparison (taken from the snapshotted req_value)
-      let reqViewValue = 'N/A';
-      if (qa.attribute_id === 'req_quantity') {
-        const qtyVal = qa.req_value?.find(v => v.value_id === 'req-quantity')?.value_label || '';
-        const qtyUnit = qa.req_value?.find(v => v.value_id === 'req-quantity-unit')?.value_label || '';
-        reqViewValue = qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A';
-      } else {
-        const ia = itemAttributes?.find((a: any) => a.group_id === qa.group_id && a.attribute_id === qa.attribute_id);
-        const reqJoiner = ia?.connector === "AND" ? " , " : ia?.connector === "OR" ? " | " : ", ";
-        reqViewValue = (qa.req_value || []).map(v => v.value_label).join(reqJoiner) || 'N/A';
-      }
+      // Determine what the buyer requested for comparison
+      const ia = itemAttributes?.find((a: any) => a.group_id === qa.group_id && a.attribute_id === qa.attribute_id);
+      const reqJoiner = ia?.connector === "AND" ? " , " : ia?.connector === "OR" ? " | " : ", ";
+      const reqViewValue = (qa.req_value || []).map(v => v.value_label).join(reqJoiner) || 'N/A';
 
       // Determine what the supplier proposed for comparison
-      let proposalViewValue = 'N/A';
-      if (qa.attribute_id === 'req_quantity') {
-        const qtyVal = qa.values?.find(v => v.value_id === 'req-quantity')?.value_label || '';
-        const qtyUnit = qa.values?.find(v => v.value_id === 'req-quantity-unit')?.value_label || '';
-        proposalViewValue = qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A';
-      } else {
-        const propJoiner = (qa as any).connector === "AND" ? " , " : (qa as any).connector === "OR" ? " | " : ", ";
-        proposalViewValue = (qa.values || []).map(v => v.value_label).join(propJoiner) || '—';
-      }
+      const propJoiner = (qa as any).connector === "AND" ? " , " : (qa as any).connector === "OR" ? " | " : ", ";
+      const proposalViewValue = (qa.values || []).map(v => v.value_label).join(propJoiner) || '—';
 
       const proposalKey = `${qa.group_id}_${qa.attribute_id}`;
 
@@ -401,21 +388,12 @@ export const RequesterQuoteReview: React.FC = () => {
       key: 'reqViewValue',
       className: "w-90 max-w-90 align-top",
       render: (_: string, attribute: any) => {
-        const isQty = attribute.attribute_id === 'req_quantity';
-        const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
+        const forceORDisabled = attribute.attribute_id === 'mfg_brand_mapping';
         const ia = itemAttributes?.find((a: any) => a.group_id === attribute.group_id && a.attribute_id === attribute.attribute_id);
         const reqConnector = forceORDisabled ? "OR" : (ia?.connector || 'AND');
         const reqJoiner = reqConnector === "OR" ? " | " : " , ";
 
-        if (isQty) {
-          const qtyVal = attribute.req_value?.find((v: any) => v.value_id === 'req-quantity')?.value_label || '';
-          const qtyUnit = attribute.req_value?.find((v: any) => v.value_id === 'req-quantity-unit')?.value_label || '';
-          return (
-            <span className="text-slate-700 font-bold text-[14px]">
-              {qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A'}
-            </span>
-          );
-        } else if (attribute.attribute_id === 'mfg_brand_mapping') {
+        if (attribute.attribute_id === 'mfg_brand_mapping') {
           const reqValues = attribute.req_value || [];
           if (reqValues.length === 0) {
             return <span className="text-slate-400 italic">No manufacturer-brand mapping</span>;
@@ -478,21 +456,12 @@ export const RequesterQuoteReview: React.FC = () => {
           .filter((c) => c.group_id === attribute.group_id && c.attribute_id === attribute.attribute_id)
           .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-        const isQty = attribute.attribute_id === 'req_quantity';
-        const forceORDisabled = attribute.attribute_id === 'manufacturer' || attribute.attribute_id === 'brand';
+        const forceORDisabled = attribute.attribute_id === 'mfg_brand_mapping';
         const connector = forceORDisabled ? "OR" : (attribute.connector || 'AND');
         const propJoiner = connector === "OR" ? " | " : " , ";
 
         let proposalContent: React.ReactNode;
-        if (isQty) {
-          const qtyVal = attribute.values?.find((v: any) => v.value_id === 'req-quantity')?.value_label || '';
-          const qtyUnit = attribute.values?.find((v: any) => v.value_id === 'req-quantity-unit')?.value_label || '';
-          proposalContent = (
-            <span className="text-emerald-700 font-bold text-[14px]">
-              {qtyVal ? `${qtyVal} ${qtyUnit}`.trim() : 'N/A'}
-            </span>
-          );
-        } else if (attribute.attribute_id === 'mfg_brand_mapping') {
+        if (attribute.attribute_id === 'mfg_brand_mapping') {
           const valuesArray = attribute.values || [];
           if (valuesArray.length === 0) {
             proposalContent = <span className="text-slate-400 italic">No manufacturer-brand mapping offered</span>;

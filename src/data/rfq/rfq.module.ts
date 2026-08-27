@@ -199,15 +199,6 @@ export interface ItemAttributeValue {
   value_label: string;
 }
 
-export interface ManufacturerBrandMapping {
-  id: string;
-  manufacturer_id?: string;
-  manufacturer_name?: string;
-  brand_id?: string;
-  brand_name?: string;
-  description?: string;
-}
-
 export type SellerQuoteStatus =
   | "NOT_SUBMITTED"
   | "DRAFT"
