@@ -322,12 +322,12 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
       dataIndex: 'seller_quote_number',
       key: 'seller_quote_number',
       render: (text: string, record: any) => (
-        <a
-          onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}/quotes/${record.id}/review`)}
-          className="font-bold text-xs text-blue-600 hover:text-blue-800"
+        <span
+          // onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}/quotes/${record.id}/review`)}
+          className="font-bold text-xs"
         >
           {text}
-        </a>
+        </span>
       )
     },
     {
@@ -350,7 +350,7 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
       dataIndex: 'status',
       key: 'status',
       render: (status: string) => (
-        <AntTag color={status === 'DEVIATION_ACCEPTED' ? 'success' : 'default'} className="text-[10px] font-bold">
+        <AntTag color={status === 'DEVIATION_ACCEPTED' ? 'success' : 'default'} className="text-[10px] font-semibold">
           {status}
         </AntTag>
       )

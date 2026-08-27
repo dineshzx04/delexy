@@ -610,44 +610,51 @@ export const RequesterQuoteReview: React.FC = () => {
 
       <Card size="small" className="shadow-sm border-slate-200">
         {/* Request & Quote Details */}
-        <Descriptions title="Request & Quote Details" bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }} className="mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
-          <Descriptions.Item label="Product / Service" span={3}>
-            <strong className="text-slate-800 text-base">{sellerProduct?.product_name || 'Custom Specifications'}</strong>
+        <Descriptions
+          title={<span className="text-xs font-bold text-slate-800">Request & Quote Details</span>}
+          bordered
+          size="small"
+          column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }}
+          labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
+          contentStyle={{ fontSize: '12px', color: '#1e293b' }}
+          className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden"
+        >
+          <Descriptions.Item label="RFQ Number" span={3}>
+            <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
           </Descriptions.Item>
           <Descriptions.Item label="Quote Reference">
-            <AntTag color="purple" className="font-mono font-bold m-0 text-[13px]">{quote.seller_quote_number}</AntTag>
+            <AntTag color="purple" className="font-mono font-bold m-0 text-xs">{quote.seller_quote_number}</AntTag>
           </Descriptions.Item>
           <Descriptions.Item label="Quote Status">
             <AntTag
               color={quote.status === 'SUBMITTED' ? 'blue' : quote.status === 'DRAFT' ? 'orange' : quote.status === 'DEVIATION_ACCEPTED' ? 'green' : quote.status === 'REJECTED' ? 'red' : 'default'}
-              className="font-bold m-0"
+              className="m-0 text-xs"
             >
               {quote.status}
             </AntTag>
           </Descriptions.Item>
           <Descriptions.Item label="Round">
             <div className="flex items-center gap-1.5">
-              <ReloadOutlined className="text-blue-500 text-[13px]" />
-              <span className="font-bold text-slate-800 text-[13px]">Round {quote.round ?? 1}</span>
+              <ReloadOutlined className="text-blue-500 text-xs" />
+              <span className="font-semibold text-slate-800 text-xs">Round {quote.round ?? 1}</span>
             </div>
           </Descriptions.Item>
-          <Descriptions.Item label="RFQ Number">
-            <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span>
-          </Descriptions.Item>
           <Descriptions.Item label="Category">
-            <span className="text-slate-700">{categoryName}</span>
+            <span className="text-slate-700 text-xs">{categoryName}</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Product / Service">
+            <span className="text-slate-900 font-semibold text-xs">{sellerProduct?.product_name || catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || 'Custom Specifications'}</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="SKU">
+            {itemVariant?.sku || item?.variant_id ? (
+              <AntTag color="purple" className="font-mono font-semibold m-0 text-xs">{itemVariant?.sku || item.variant_id}</AntTag>
+            ) : (
+              <AntTag color="orange" className="font-semibold m-0 text-xs">Custom Product</AntTag>
+            )}
           </Descriptions.Item>
           <Descriptions.Item label="Requested Quantity">
-            <AntTag color="blue" className="font-bold m-0">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+            <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
           </Descriptions.Item>
-          {item.catalog_product_id && (
-            <Descriptions.Item label="Catalog Product">
-              {catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || item.catalog_product_id}
-            </Descriptions.Item>
-          )}
-          {itemVariant?.sku && (
-            <Descriptions.Item label="Variant">{itemVariant.sku}</Descriptions.Item>
-          )}
           {quote.created_at && (
             <Descriptions.Item label="Submitted">
               <span className="text-slate-600 text-xs">{new Date(quote.created_at).toLocaleString()}</span>

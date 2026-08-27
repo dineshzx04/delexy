@@ -153,12 +153,21 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
 
         return (
           <div className="flex flex-col gap-0.5">
-            <div className="font-semibold text-slate-900 text-xs">
-              {productName} {variantName && <span className="text-slate-500 font-normal">({variantName})</span>}
+            <div className="font-semibold text-slate-900 text-xs flex items-center flex-wrap gap-1">
+              <span>{productName}</span>
+              {variantName ? (
+                <AntTag color="purple" className="font-mono font-normal text-[10px] m-0 leading-tight px-1">
+                  SKU: {variantName}
+                </AntTag>
+              ) : (
+                <AntTag color="orange" className="font-normal text-[10px] m-0 leading-tight px-1">
+                  Custom Product
+                </AntTag>
+              )}
             </div>
             {catName && (
               <div className="text-[11px] text-slate-500 flex items-center gap-1">
-                Category: <AntTag color="purple" className="text-[10px] m-0 leading-tight px-1">{catName}</AntTag>
+                Category: <AntTag color="blue" className="font-normal text-[10px] m-0 leading-tight px-1">{catName}</AntTag>
               </div>
             )}
           </div>
