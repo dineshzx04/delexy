@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Input as AntInput, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Switch, Steps, Result } from 'antd';
+import { Card, Input as AntInput, Button as AntButton, Select as AntSelect, Tag as AntTag, Table, Descriptions, App as AntApp, Switch, Steps, Result, Checkbox as AntCheckbox, Drawer as AntDrawer } from 'antd';
 import { SendOutlined, ReloadOutlined, CheckCircleOutlined as AntIconCheckCircleOutlined, ArrowLeftOutlined, ArrowRightOutlined, PlusOutlined as AntPlusOutlined } from '@ant-design/icons';
 import { rfqDb, type AttributeType, type ItemAttributeValue, type SellerQuote, type SellerQuoteAttribute, type SellerQuoteVariant, type SellerQuoteComment } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
@@ -1795,7 +1795,8 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
   const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
 
   const [submitting, setSubmitting] = useState(false);
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+  const [selectedSubmittedVariantIds, setSelectedSubmittedVariantIds] = useState<string[]>([]);
+  const [selectedSuggestedVariantIds, setSelectedSuggestedVariantIds] = useState<string[]>([]);
 
   const data = useLiveQuery(async () => {
     if (!itemId || !activePartyId || !rfqId) return undefined;
@@ -1804,20 +1805,24 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
       existingQuote,
       item,
       rfq,
+      itemAttributes,
       allBrands,
       allManufacturers,
       categories,
       catalogAttributes,
-      catalogAttributeValues
+      catalogAttributeValues,
+      attributeGroups
     ] = await Promise.all([
       rfqDb.seller_quotes.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first(),
       rfqDb.rfq_items.get(itemId),
       rfqDb.rfqs.get(rfqId),
+      rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray(),
       businessDb.brands.toArray(),
       businessDb.manufacturers.toArray(),
       catalogDb.categories.toArray(),
       catalogDb.attributes.toArray(),
-      catalogDb.attributeValues.toArray()
+      catalogDb.attributeValues.toArray(),
+      catalogDb.attributeGroups.toArray()
     ]);
 
     let existingQuoteAttributes: SellerQuoteAttribute[] = [];
@@ -1831,10 +1836,31 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
 
     let sellerProducts: any[] = [];
     let allVariants: any[] = [];
+    const myProducts = await catalogDb.sellerProducts.where('party_id').equals(activePartyId).toArray();
     if (item?.catalog_product_id) {
-      sellerProducts = await catalogDb.sellerProducts.where('catalog_product_id').equals(item.catalog_product_id).toArray();
-      allVariants = sellerProducts.flatMap((sp) => sp.variants || []) || [];
+      sellerProducts = myProducts.filter((sp) => sp.catalog_product_id === item.catalog_product_id);
     }
+    allVariants = sellerProducts.flatMap((sp) => {
+      const mfgBrandPair = sp.manufacturer_id && sp.brand_id ? [{
+        attribute_id: 'mfg_brand_mapping',
+        value_id: `${sp.manufacturer_id}:${sp.brand_id}`,
+        value_label: undefined
+      }] : [];
+
+      return (sp.variants || []).map((v: any) => {
+        const comboVals = v.combination_values || v.specifications || [];
+        const parentSpecs = sp.specifications || [];
+        const allSpecs = [...mfgBrandPair, ...comboVals, ...parentSpecs];
+        return {
+          ...v,
+          seller_product_id: sp.id,
+          manufacturer_id: sp.manufacturer_id,
+          brand_id: sp.brand_id,
+          combination_values: allSpecs,
+          combinations: allSpecs
+        };
+      });
+    }) || [];
 
     let catalogProduct = null;
     if (item?.catalog_product_id) {
@@ -1846,12 +1872,14 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
       existingQuoteAttributes,
       existingQuoteVariants,
       item: item || null,
+      itemAttributes,
       rfq: rfq || null,
       allBrands,
       allManufacturers,
       categories,
       catalogAttributes,
       catalogAttributeValues,
+      attributeGroups,
       sellerProducts,
       allVariants,
       catalogProduct: catalogProduct || null
@@ -1863,11 +1891,38 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
     existingQuoteAttributes,
     existingQuoteVariants,
     item,
+    itemAttributes,
     rfq,
+    allManufacturers,
+    allBrands,
     categories,
+    catalogAttributes,
+    catalogAttributeValues,
+    attributeGroups,
     allVariants,
     catalogProduct
   } = data || {};
+
+  const [compareDrawerVisible, setCompareDrawerVisible] = useState(false);
+
+  useEffect(() => {
+    if (existingQuoteVariants && existingQuoteVariants.length > 0) {
+      const selectedOffered = existingQuoteVariants.filter(v => v.is_selected).map(v => v.id);
+      setSelectedSubmittedVariantIds(selectedOffered);
+    }
+  }, [existingQuoteVariants]);
+
+  const toggleSubmittedVariantSelection = (id: string) => {
+    setSelectedSubmittedVariantIds(prev =>
+      prev.includes(id) ? prev.filter(vId => vId !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSuggestedVariantSelection = (id: string) => {
+    setSelectedSuggestedVariantIds(prev =>
+      prev.includes(id) ? prev.filter(vId => vId !== id) : [...prev, id]
+    );
+  };
 
   const checkVariantSatisfaction = (catalogVariant: any) => {
     if (!catalogVariant || !existingQuoteAttributes) return { isSatisfied: false, matchCount: 0, totalCount: 0 };
@@ -1888,9 +1943,11 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
     return { isSatisfied, matchCount, totalCount };
   };
 
+  const totalSelected = selectedSubmittedVariantIds.length + selectedSuggestedVariantIds.length;
+
   const handleSaveProductMapping = async () => {
-    if (!selectedVariantId) {
-      antMessage.error('Please select a catalog SKU to map.');
+    if (totalSelected === 0) {
+      antMessage.error('Please select at least one proposal option or catalog SKU.');
       return;
     }
 
@@ -1903,11 +1960,11 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
         });
       }
 
-      antMessage.success('Catalog Product SKU mapped successfully!');
+      antMessage.success('Proposal options revision submitted successfully!');
       navigate(basePath);
     } catch (err) {
       console.error(err);
-      antMessage.error('Failed to submit product mapping.');
+      antMessage.error('Failed to submit proposal options revision.');
     } finally {
       setSubmitting(false);
     }
@@ -1920,6 +1977,9 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
       </div>
     );
   }
+
+  const offeredVariants = (existingQuoteVariants || []).filter(v => v.is_selected);
+
 
   return (
     <div className="space-y-6">
@@ -1983,74 +2043,361 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
         )}
       </Descriptions>
 
-      <Card title={<span className="font-bold text-slate-800 text-base">Select Existing Catalog Product SKU</span>} className="shadow-sm border-slate-200">
-        <p className="text-xs text-slate-500 mb-4">
-          Select an existing catalog SKU to fulfill the negotiated RFQ item. SKUs are validated against accepted quote specifications in real time.
+      {/* Section 1: Previously Submitted Proposal Options */}
+      <Card
+        title={
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-base">1. Previously Submitted Proposal Options</span>
+            <AntTag color="purple" className="font-bold">{offeredVariants.length} items</AntTag>
+          </div>
+        }
+        className="shadow-sm border-slate-200"
+      >
+        <p className="text-xs text-slate-500 mb-3">
+          Selected by default from your current quote proposal options. Uncheck any option you wish to exclude from this revision.
         </p>
 
-        {(allVariants || []).length === 0 ? (
-          <div className="p-8 text-center text-slate-400 italic">
-            No existing catalog product variants found for this category/product.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {(allVariants || []).map((cv: any) => {
-              const satisfaction = checkVariantSatisfaction(cv);
-              const isSelected = selectedVariantId === cv.id;
-
-              return (
-                <div
-                  key={cv.id}
-                  onClick={() => setSelectedVariantId(cv.id)}
-                  className={`p-4 border rounded-xl bg-white shadow-sm cursor-pointer transition-all ${isSelected ? 'border-2 border-indigo-600 bg-indigo-50/20' : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="catalog_sku_selection"
-                        checked={isSelected}
-                        onChange={() => setSelectedVariantId(cv.id)}
-                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span className="font-bold text-slate-800 text-sm font-mono">{cv.sku || cv.id}</span>
-                    </div>
-                    {satisfaction.isSatisfied ? (
-                      <AntTag color="emerald" className="m-0 font-medium">Satisfies Specs (100% Match)</AntTag>
+        <Table
+          dataSource={offeredVariants}
+          rowKey="id"
+          pagination={false}
+          size="small"
+          bordered
+          scroll={{ x: 768 }}
+          columns={[
+            {
+              title: 'Select',
+              key: 'select',
+              className: 'w-[60px] text-center align-top',
+              render: (_: any, record: SellerQuoteVariant) => (
+                <AntCheckbox
+                  checked={selectedSubmittedVariantIds.includes(record.id)}
+                  onChange={() => toggleSubmittedVariantSelection(record.id)}
+                />
+              )
+            },
+            {
+              title: 'Offered Specifications & Remarks',
+              key: 'details',
+              className: 'align-top',
+              render: (_: any, record: SellerQuoteVariant) => (
+                <div className="space-y-1">
+                  <div className="flex flex-wrap gap-1">
+                    {(!record.combinations || record.combinations.length === 0) ? (
+                      <span className="text-xs text-slate-500 italic">Default Specifications</span>
                     ) : (
-                      <AntTag color="amber" className="m-0 font-medium">Partial Match ({satisfaction.matchCount}/{satisfaction.totalCount})</AntTag>
+                      record.combinations.map((c: any, idx: number) => {
+                        if (c.attribute_id === 'mfg_brand_mapping') {
+                          const parts = (c.value_id || '').split(':');
+                          const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                          const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                          const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                          const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                          const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
+                          const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                          return (
+                            <AntTag key={idx} color="purple" className="text-[11px] m-0">
+                              Mfg: {mfgName} × Brand: {brandName}
+                            </AntTag>
+                          );
+                        }
+                        return (
+                          <AntTag key={idx} color="blue" className="text-[11px] m-0">
+                            {c.value_label || c.value_id}
+                          </AntTag>
+                        );
+                      })
                     )}
                   </div>
+                  {record.seller_note && (
+                    <div className="text-[11px] text-slate-600 italic">
+                      <strong className="not-italic text-slate-700">[Remarks]:</strong> {record.seller_note}
+                    </div>
+                  )}
+                  {record.buyer_note && (
+                    <div className="text-[11px] text-blue-700 italic">
+                      <strong className="not-italic text-blue-800">[Buyer Note]:</strong> {record.buyer_note}
+                    </div>
+                  )}
+                </div>
+              )
+            },
+            {
+              title: 'Offer Price',
+              key: 'price',
+              className: 'w-[120px] max-w-[120px] align-top text-right',
+              render: (_: any, record: SellerQuoteVariant) => (
+                <div className="pr-2">
+                  <div className="font-bold text-slate-800 text-xs">${record.offer_price}</div>
+                  <div className="text-[10px] text-slate-400">Offer Price</div>
+                </div>
+              )
+            },
+            {
+              title: 'Status',
+              key: 'status',
+              className: 'w-[160px] max-w-[160px] align-top text-center',
+              render: (_: any, record: SellerQuoteVariant) => (
+                <AntTag color={record.buyer_accepted ? 'emerald' : 'blue'} className="m-0 font-medium text-xs">
+                  {record.buyer_accepted ? 'Approved by Buyer' : 'Offered Option'}
+                </AntTag>
+              )
+            }
+          ]}
+        />
+      </Card>
 
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {(cv.combination_values || cv.specifications || []).map((v: any, idx: number) => (
-                      <AntTag key={idx} color="blue" className="text-[11px] m-0">{v.value_label || v.value_id}</AntTag>
+      {/* Section 2: Suggested Existing Catalog Products */}
+      <Card
+        title={
+          <div className="flex items-center justify-between">
+            <span className="font-bold text-slate-800 text-base">2. Suggested Existing Catalog Products</span>
+            <AntTag color="indigo" className="font-bold">{(allVariants || []).length} available</AntTag>
+          </div>
+        }
+        className="shadow-sm border-slate-200"
+      >
+        <p className="text-xs text-slate-500 mb-3">
+          Select suggested catalog SKUs from your existing catalog products matching product attributes to include in this proposal revision.
+        </p>
+
+        <Table
+          dataSource={allVariants || []}
+          rowKey="id"
+          pagination={{ pageSize: 10, showSizeChanger: true }}
+          size="small"
+          bordered
+          scroll={{ x: 768 }}
+          columns={[
+            {
+              title: 'Select',
+              key: 'select',
+              className: 'w-[60px] text-center align-top',
+              render: (_: any, record: any) => (
+                <AntCheckbox
+                  checked={selectedSuggestedVariantIds.includes(record.id)}
+                  onChange={() => toggleSuggestedVariantSelection(record.id)}
+                />
+              )
+            },
+            {
+              title: 'SKU & Specifications',
+              key: 'details',
+              className: 'align-top',
+              render: (_: any, record: any) => (
+                <div className="space-y-1">
+                  <div className="font-mono font-bold text-xs text-slate-800 mb-1">SKU: {record.sku || record.id}</div>
+                  <div className="flex flex-wrap gap-1">
+                    {(record.combination_values || []).map((v: any, idx: number) => (
+                      <AntTag key={idx} color="blue" className="text-[11px] m-0">{v.label}</AntTag>
                     ))}
                   </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
-                    <span className="font-semibold text-slate-600">List Price: ${cv.price || 0}</span>
-                    {isSelected && <span className="font-bold text-indigo-600">Selected for Mapping</span>}
-                  </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              )
+            },
+            {
+              title: 'List Price',
+              key: 'price',
+              className: 'w-[120px] max-w-[120px] align-top text-right',
+              render: (_: any, record: any) => (
+                <div className="pr-2">
+                  <div className="font-bold text-slate-800 text-xs">${record.price || 0}</div>
+                  <div className="text-[10px] text-slate-400">List Price</div>
+                </div>
+              )
+            },
+            {
+              title: 'Spec Match',
+              key: 'status',
+              className: 'w-[170px] max-w-[170px] align-top text-center',
+              render: (_: any, record: any) => {
+                const satisfaction = checkVariantSatisfaction(record);
+                if (satisfaction?.isSatisfied) {
+                  return <AntTag color="emerald" className="m-0 font-medium text-xs">Satisfies Specs (100%)</AntTag>;
+                }
+                return <AntTag color="amber" className="m-0 font-medium text-xs">Partial Match ({satisfaction?.matchCount}/{satisfaction?.totalCount})</AntTag>;
+              }
+            }
+          ]}
+        />
       </Card>
+
+      {/* Group-wise Attribute Comparison Drawer */}
+      {(() => {
+        const selectedSubmittedVariants = offeredVariants.filter(v => selectedSubmittedVariantIds.includes(v.id));
+        const selectedSuggestedVariants = (allVariants || []).filter(cv => selectedSuggestedVariantIds.includes(cv.id));
+
+        const selectedComparisonItems = [
+          ...selectedSubmittedVariants.map(v => ({
+            id: v.id,
+            title: 'Proposal Variant',
+            typeBadge: <AntTag color="purple" className="font-semibold text-xs m-0">Proposal Variant</AntTag>,
+            price: v.offer_price,
+            priceLabel: 'Offer Price',
+            combinations: v.combinations || [],
+            seller_note: v.seller_note,
+            buyer_note: v.buyer_note
+          })),
+          ...selectedSuggestedVariants.map(cv => ({
+            id: cv.id,
+            title: cv.sku || cv.id,
+            typeBadge: <AntTag color="indigo" className="font-semibold text-xs m-0">Suggested Catalog SKU</AntTag>,
+            price: cv.price || 0,
+            priceLabel: 'List Price',
+            combinations: cv.combination_values || cv.specifications || [],
+            seller_note: undefined,
+            buyer_note: undefined
+          }))
+        ];
+
+        const comparisonGroups = (() => {
+          if (!itemAttributes || !itemAttributes.length) return [];
+          const groups = new Map((attributeGroups || []).map(g => [g.id, g.name]));
+          const attrs = new Map((catalogAttributes || []).map(a => [a.id, a.name]));
+
+          const groupMap = new Map<string, { id: string; name: string; attributes: { id: string; name: string }[] }>();
+
+          itemAttributes.forEach((ia: any) => {
+            if (ia.attribute_type === 'SYSTEM' && ia.attribute_id !== 'mfg_brand_mapping') return;
+            const groupId = ia.group_id;
+            const groupName = groupId === 'system' ? 'System Specifications' : (groups.get(groupId) || groupId);
+            const attrName = ia.attribute_id === 'mfg_brand_mapping' ? 'Manufacturer & Brand' : (attrs.get(ia.attribute_id) || ia.attribute_id);
+
+            if (!groupMap.has(groupId)) {
+              groupMap.set(groupId, { id: groupId, name: groupName, attributes: [] });
+            }
+            groupMap.get(groupId)!.attributes.push({ id: ia.attribute_id, name: attrName });
+          });
+
+          const groupList = Array.from(groupMap.values());
+          groupList.sort((a, b) => {
+            if (a.id === 'system' || a.attributes.some(at => at.id === 'mfg_brand_mapping')) return -1;
+            if (b.id === 'system' || b.attributes.some(at => at.id === 'mfg_brand_mapping')) return 1;
+            return 0;
+          });
+
+          return groupList;
+        })();
+
+        return (
+          <AntDrawer
+            title={
+              <div className="flex items-center justify-between pr-6">
+                <div>
+                  <h3 className="font-bold text-slate-800 text-base m-0">Group-wise Attribute Comparison Matrix</h3>
+                  <p className="text-xs text-slate-500 m-0">Side-by-side comparison of selected proposal options and suggested catalog SKUs</p>
+                </div>
+                <AntTag color="blue" className="font-bold">{selectedComparisonItems.length} options selected</AntTag>
+              </div>
+            }
+            placement="right"
+            width="85%"
+            onClose={() => setCompareDrawerVisible(false)}
+            open={compareDrawerVisible}
+            destroyOnClose
+          >
+            <div className="space-y-6 overflow-x-auto pb-4">
+              {/* Header Row: Selected Options Overview Cards */}
+              <div className="grid gap-3 min-w-max px-3" style={{ gridTemplateColumns: `240px repeat(${selectedComparisonItems.length}, 260px)` }}>
+                <div className="p-3 bg-slate-100/70 rounded-lg border border-slate-200 flex flex-col justify-center w-[240px]">
+                  <span className="font-bold text-slate-700 text-xs uppercase tracking-wider">Option Attributes</span>
+                  <span className="text-[11px] text-slate-500">Grouped Specifications</span>
+                </div>
+                {selectedComparisonItems.map((colItem) => (
+                  <div key={colItem.id} className="p-3 bg-white rounded-lg border border-slate-200 shadow-sm space-y-1.5 w-[260px]">
+                    <div className="flex items-center justify-between">
+                      {colItem.typeBadge}
+                      <span className="font-bold text-emerald-600 text-xs">${colItem.price}</span>
+                    </div>
+                    <div className="font-mono font-bold text-slate-800 text-xs truncate">{colItem.title}</div>
+                    {colItem.seller_note && (
+                      <div className="text-[11px] text-slate-500 italic truncate">[Remarks]: {colItem.seller_note}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Grouped Attribute Matrix Rows */}
+              {comparisonGroups.map((group, groupIdx) => {
+                const accentColor = ['#527EA3', '#5D9365', '#C9825A', '#8975A8'][groupIdx % 4];
+
+                return (
+                  <div key={group.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm min-w-max" style={{ borderLeft: `4px solid ${accentColor}` }}>
+                    <div className="border-b border-slate-200 px-4 py-2 bg-slate-50/80 font-bold text-slate-800 text-xs">
+                      {group.name}
+                    </div>
+                    <div className="divide-y divide-slate-100">
+                      {group.attributes.map((attr) => (
+                        <div
+                          key={attr.id}
+                          className="grid gap-3 p-3 text-xs items-center hover:bg-slate-50/50"
+                          style={{ gridTemplateColumns: `240px repeat(${selectedComparisonItems.length}, 260px)` }}
+                        >
+                          <div className="font-semibold text-slate-700 w-[240px] truncate">{attr.name}</div>
+                          {selectedComparisonItems.map((colItem) => {
+                            const comboVals = colItem.combinations || [];
+                            const matchedCombo = comboVals.find((c: any) => c.attribute_id === attr.id);
+
+                            if (attr.id === 'mfg_brand_mapping') {
+                              if (!matchedCombo) return <span key={colItem.id} className="text-slate-400 italic w-[260px]">—</span>;
+                              const parts = (matchedCombo.value_id || '').split(':');
+                              const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                              const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                              const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                              const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                              const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
+                              const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                              return (
+                                <div key={colItem.id} className="flex flex-wrap gap-1 w-[260px]">
+                                  <AntTag color="purple" className="text-[11px] m-0">Mfg: {mfgName} × Brand: {brandName}</AntTag>
+                                </div>
+                              );
+                            }
+
+                            if (!matchedCombo) {
+                              return <span key={colItem.id} className="text-slate-400 italic w-[260px]">—</span>;
+                            }
+
+                            const valLabel = catalogAttributeValues?.find((v: any) => v.id === matchedCombo.value_id)?.value
+                              || matchedCombo.value_label
+                              || matchedCombo.label
+                              || matchedCombo.value_id;
+
+                            return (
+                              <div key={colItem.id} className="w-[260px]">
+                                <AntTag color="blue" className="text-[11px] m-0">{valLabel}</AntTag>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </AntDrawer>
+        );
+      })()}
 
       <div className="pt-4 flex justify-end gap-3">
         <AntButton onClick={() => navigate(basePath)}>Cancel</AntButton>
+        <AntButton
+          icon={<Lucide.Columns size={15} />}
+          onClick={() => setCompareDrawerVisible(true)}
+          disabled={totalSelected === 0}
+        >
+          Compare Selected ({totalSelected})
+        </AntButton>
         <AntButton
           type="primary"
           icon={<SendOutlined />}
           onClick={handleSaveProductMapping}
           loading={submitting}
-          disabled={!selectedVariantId}
+          disabled={totalSelected === 0}
           className="bg-indigo-600 hover:bg-indigo-700 font-semibold"
         >
-          Submit Product Mapping
+          Submit Proposal Revision {totalSelected > 0 ? `(${totalSelected} Selected)` : ''}
         </AntButton>
       </div>
     </div>
