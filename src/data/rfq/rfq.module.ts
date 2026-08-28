@@ -102,6 +102,8 @@ export interface SellerQuoteVariant {
   satisfaction_status?: 'SATISFIED' | 'CUSTOM';
   signature?: string;
   is_selected?: boolean;
+  seller_note?: string;
+  buyer_note?: string;
 }
 
 export interface SellerQuoteComment {

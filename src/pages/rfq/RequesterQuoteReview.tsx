@@ -165,13 +165,18 @@ export const RequesterQuoteReview: React.FC = () => {
     }
   }, [quoteAttributes]);
 
+  const [buyerVariantNotes, setBuyerVariantNotes] = React.useState<Record<string, string>>({});
+
   React.useEffect(() => {
     if (quoteVariants && quoteVariants.length > 0) {
       const initialAccepted: Record<string, boolean> = {};
+      const initialNotes: Record<string, string> = {};
       quoteVariants.forEach((v) => {
         initialAccepted[v.id] = !!v.buyer_accepted;
+        initialNotes[v.id] = v.buyer_note || '';
       });
       setAcceptedVariants(initialAccepted);
+      setBuyerVariantNotes(initialNotes);
     }
   }, [quoteVariants]);
 
@@ -274,13 +279,16 @@ export const RequesterQuoteReview: React.FC = () => {
     if (!quote || !rfq) return;
     setProcessing(true);
     try {
-      // 0. Persist buyer_accepted status of attributes in DB
+      // 0. Persist buyer_accepted and buyer_note status of attributes & variants in DB
       await rfqDb.transaction('rw', [rfqDb.seller_quote_attributes, rfqDb.seller_quote_variants], async () => {
         for (const [attrId, accepted] of Object.entries(acceptedAttributes)) {
           await rfqDb.seller_quote_attributes.update(attrId, { buyer_accepted: accepted });
         }
         for (const [variantId, accepted] of Object.entries(acceptedVariants)) {
-          await rfqDb.seller_quote_variants.update(variantId, { buyer_accepted: accepted });
+          await rfqDb.seller_quote_variants.update(variantId, {
+            buyer_accepted: accepted,
+            buyer_note: buyerVariantNotes[variantId] || ''
+          });
         }
       });
 
@@ -614,12 +622,12 @@ export const RequesterQuoteReview: React.FC = () => {
           title={<span className="text-xs font-bold text-slate-800">Request & Quote Details</span>}
           bordered
           size="small"
-          column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }}
+          column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
           labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
           contentStyle={{ fontSize: '12px', color: '#1e293b' }}
           className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden"
         >
-          <Descriptions.Item label="RFQ Number" span={3}>
+          <Descriptions.Item label="RFQ Number" >
             <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
           </Descriptions.Item>
           <Descriptions.Item label="Quote Reference">
@@ -639,11 +647,11 @@ export const RequesterQuoteReview: React.FC = () => {
               <span className="font-semibold text-slate-800 text-xs">Round {quote.round ?? 1}</span>
             </div>
           </Descriptions.Item>
-          <Descriptions.Item label="Category">
-            <span className="text-slate-700 text-xs">{categoryName}</span>
-          </Descriptions.Item>
           <Descriptions.Item label="Product / Service">
             <span className="text-slate-900 font-semibold text-xs">{sellerProduct?.product_name || catalogProducts.find((p) => p.id === item.catalog_product_id)?.name || 'Custom Specifications'}</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Category">
+            <span className="text-slate-700 text-xs">{categoryName}</span>
           </Descriptions.Item>
           <Descriptions.Item label="SKU">
             {itemVariant?.sku || item?.variant_id ? (
@@ -655,11 +663,11 @@ export const RequesterQuoteReview: React.FC = () => {
           <Descriptions.Item label="Requested Quantity">
             <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
           </Descriptions.Item>
-          {quote.created_at && (
+          {/* {quote.created_at && (
             <Descriptions.Item label="Submitted">
               <span className="text-slate-600 text-xs">{new Date(quote.created_at).toLocaleString()}</span>
             </Descriptions.Item>
-          )}
+          )} */}
         </Descriptions>
 
         <div className="space-y-6">
@@ -816,36 +824,39 @@ export const RequesterQuoteReview: React.FC = () => {
                       render: (_: string, __: any, index: number) => <span className='pl-1.5'>{index + 1}</span>
                     },
                     {
-                      title: 'Offered Option Combinations & Specifications',
+                      title: 'Offered Option',
                       key: 'combinations',
                       className: "align-top",
                       render: (_: string, record: any) => {
-                        if (!record.combinations || record.combinations.length === 0) {
-                          return <span className="text-slate-500 italic">Default Option</span>;
-                        }
                         return (
-                          <div className="flex flex-wrap gap-2">
-                            {record.combinations.map((c: any, i: number) => {
-                              if (c.attribute_id === 'mfg_brand_mapping') {
-                                const parts = (c.value_id || '').split(':');
-                                const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
-                                const brandId = parts[1] !== 'any' ? parts[1] : undefined;
-                                const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
-                                const brand = (allBrands || []).find((b: any) => b.id === brandId);
-                                const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
-                                const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
-                                return (
-                                  <AntTag key={i} color="purple">
-                                    Mfg: {mfgName} × Brand: {brandName}
-                                  </AntTag>
-                                );
-                              }
-                              return (
-                                <AntTag key={i} color="blue">
-                                  {c.value_label}
-                                </AntTag>
-                              );
-                            })}
+                          <div className="flex flex-col gap-1">
+                            {!record.combinations || record.combinations.length === 0 ? (
+                              <span className="text-slate-500 italic text-xs">Default Option</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-2">
+                                {record.combinations.map((c: any, i: number) => {
+                                  if (c.attribute_id === 'mfg_brand_mapping') {
+                                    const parts = (c.value_id || '').split(':');
+                                    const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+                                    const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+                                    const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+                                    const brand = (allBrands || []).find((b: any) => b.id === brandId);
+                                    const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
+                                    const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+                                    return (
+                                      <AntTag key={i} color="purple">
+                                        Mfg: {mfgName} × Brand: {brandName}
+                                      </AntTag>
+                                    );
+                                  }
+                                  return (
+                                    <AntTag key={i} color="blue">
+                                      {c.value_label}
+                                    </AntTag>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       }
@@ -858,6 +869,36 @@ export const RequesterQuoteReview: React.FC = () => {
                       render: (price: number) => (
                         <div className="text-end pr-2 font-bold text-emerald-600">${price}</div>
                       )
+                    },
+                    {
+                      title: 'Remarks',
+                      key: 'buyer_note',
+                      className: "w-[240px] max-w-[240px] align-top",
+                      render: (_: string, record: any) => {
+                        return <>
+                          {quote?.status === 'SUBMITTED' &&
+                            <Input.TextArea
+                              size="small"
+                              className="text-xs"
+                              placeholder="Add remarks..."
+                              value={buyerVariantNotes[record.id] || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setBuyerVariantNotes((prev) => ({ ...prev, [record.id]: val }));
+                              }}
+                            />
+                          }
+                          {record.buyer_note && (
+                            <span className="text-xs text-slate-700 italic">{record.buyer_note}</span>
+                          )}
+                          {record.seller_note && (
+                            <div className="mt-1 text-[11px] bg-emerald-50 text-emerald-800 border border-emerald-100 rounded px-2 py-0.5 leading-tight italic">
+                              <span className="font-bold not-italic mr-1 text-[10px] uppercase text-emerald-700">[Seller]:</span>
+                              {record.seller_note}
+                            </div>
+                          )}
+                        </>;
+                      }
                     },
                     {
                       title: 'Accept Option',

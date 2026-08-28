@@ -209,6 +209,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   const [submitting, setSubmitting] = useState(false);
   const [attributeGroupsMap, setAttributeGroupsMap] = useState<any[]>([]);
   const [proposalAttributes, setProposalAttributes] = useState<Record<string, ProposalAttribute>>({});
+  const [dbVariants, setDbVariants] = useState<SellerQuoteVariant[]>([]);
   const [proposalVariants, setProposalVariants] = useState<SellerQuoteVariant[]>([]);
   const [bulkPrice, setBulkPrice] = useState<number | undefined>();
 
@@ -449,6 +450,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   const generateVariantsFromAttributes = (
     currentAttributes: Record<string, ProposalAttribute>,
     prevVariants: SellerQuoteVariant[] = [],
+    storedVariants: SellerQuoteVariant[] = [],
     existingQuoteId: string = ''
   ): SellerQuoteVariant[] => {
     const variantAttrs = Object.values(currentAttributes).filter(
@@ -458,7 +460,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
     let customVariants: SellerQuoteVariant[] = [];
 
     if (variantAttrs.length === 0) {
-      const existingDefault = prevVariants.find(v => v.combinations.length === 0 && (!v.option_type || v.option_type === 'CUSTOM_GENERATED'));
+      const existingDefault = prevVariants.find(v => v.combinations.length === 0 && (!v.option_type || v.option_type === 'CUSTOM_GENERATED'))
+        || storedVariants.find(v => v.combinations.length === 0 && (!v.option_type || v.option_type === 'CUSTOM_GENERATED'));
       const sig = 'default';
       customVariants = [{
         id: existingDefault?.id || crypto.randomUUID(),
@@ -496,6 +499,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         const existingMatch = prevVariants.find(v => {
           const existingSignature = v.signature || computeSignature(v.combinations);
           return existingSignature === comboSignature;
+        }) || storedVariants.find(v => {
+          const existingSignature = v.signature || computeSignature(v.combinations);
+          return existingSignature === comboSignature;
         });
 
         if (existingMatch) {
@@ -504,8 +510,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
             combinations: combo,
             signature: comboSignature,
             is_selected: existingMatch.is_selected !== undefined ? existingMatch.is_selected : false,
-            option_type: 'CUSTOM_GENERATED',
-            satisfaction_status: 'CUSTOM'
+            option_type: existingMatch.option_type || 'CUSTOM_GENERATED',
+            satisfaction_status: existingMatch.satisfaction_status || 'CUSTOM'
           };
         }
 
@@ -524,7 +530,10 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       });
     }
 
-    const catalogOptionsInPrev = prevVariants.filter(v => v.option_type === 'CATALOG_SKU').map(v => ({
+    const catalogOptionsInPrev = [
+      ...prevVariants.filter(v => v.option_type === 'CATALOG_SKU'),
+      ...storedVariants.filter(sv => sv.option_type === 'CATALOG_SKU' && !prevVariants.some(pv => pv.id === sv.id))
+    ].map(v => ({
       ...v,
       signature: v.signature || v.catalog_variant_id || v.id,
       is_selected: v.is_selected !== undefined ? v.is_selected : false
@@ -654,15 +663,22 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
       return 0;
     });
 
+    const storedInDb = existingQuoteVariants || [];
+    setDbVariants(storedInDb);
     setAttributeGroupsMap(entries);
     setProposalAttributes(initialValues);
 
-    const generated = generateVariantsFromAttributes(initialValues, existingQuoteVariants || [], existingQuote?.id || '');
+    const generated = generateVariantsFromAttributes(
+      initialValues,
+      storedInDb,
+      storedInDb,
+      existingQuote?.id || ''
+    );
 
-    if (existingQuoteVariants && existingQuoteVariants.length > 0) {
+    if (storedInDb.length > 0) {
       const initialVariants = generated.map(v => {
         const sig = v.signature || computeSignature(v.combinations);
-        const savedMatch = existingQuoteVariants.find(ev => (ev.signature || computeSignature(ev.combinations)) === sig);
+        const savedMatch = storedInDb.find(ev => (ev.signature || computeSignature(ev.combinations)) === sig);
         if (savedMatch) {
           return {
             ...v,
@@ -702,7 +718,12 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
   const recalculateVariants = (currentAttributes: Record<string, ProposalAttribute>) => {
     setBulkPrice(undefined);
-    setProposalVariants(prev => generateVariantsFromAttributes(currentAttributes, prev, existingQuote?.id || ''));
+    setProposalVariants(prev => generateVariantsFromAttributes(
+      currentAttributes,
+      prev,
+      dbVariants,
+      existingQuote?.id || ''
+    ));
   };
 
   const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
@@ -746,7 +767,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         rfq_item_id: item.id,
         round: existingQuote?.round || 1,
         seller_party_id: activePartyId,
-        seller_quote_number: quoteNumber,
+        seller_quote_number: quoteNumber || existingQuote?.seller_quote_number || 'SQ-DRAFT',
         // offer_unit_price: offerPrice || 0,
         offer_quantity: offerQty || 0,
         offer_unit: qtyUnit,
@@ -796,10 +817,20 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         }
       });
 
-      const variantsToSave: SellerQuoteVariant[] = selectedVariants.map(v => ({
-        ...v,
-        seller_quote_id: quoteId,
-      }));
+      const variantsToSave: SellerQuoteVariant[] = selectedVariants.map(v => {
+        const sig = v.signature || computeSignature(v.combinations);
+        const dbMatch = dbVariants.find(dbV => dbV.id === v.id || (dbV.signature || computeSignature(dbV.combinations)) === sig);
+        return {
+          ...dbMatch,
+          ...v,
+          id: dbMatch?.id || v.id,
+          seller_quote_id: quoteId,
+          offer_price: v.offer_price,
+          seller_note: v.seller_note || '',
+          buyer_note: v.buyer_note || dbMatch?.buyer_note || '',
+          is_selected: true
+        };
+      });
 
       await rfqDb.transaction('rw', rfqDb.seller_quotes, rfqDb.seller_quote_attributes, rfqDb.seller_quote_variants, rfqDb.seller_quote_comments, async () => {
         await rfqDb.seller_quotes.put(quoteToSave);
@@ -1308,17 +1339,20 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   return (
     <div className="space-y-6">
 
-      {/* Request & Quote Details */}
+      {/* Request & Proposal Details */}
       <Descriptions
-        title={<span className="text-xs font-bold text-slate-800">Request & Quote Details</span>}
+        title={<span className="text-sm font-bold text-slate-800 px-3">Request & Proposal Details</span>}
         bordered
         size="small"
-        column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }}
+        column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
         labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
         contentStyle={{ fontSize: '12px', color: '#1e293b' }}
-        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden"
+        classNames={{
+          header: "mb-1"
+        }}
+        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200"
       >
-        <Descriptions.Item label="RFQ Number" span={3}>
+        <Descriptions.Item label="RFQ Number" >
           <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
         </Descriptions.Item>
         <Descriptions.Item label="Quote Reference">
@@ -1338,11 +1372,11 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
             <span className="font-semibold text-slate-800 text-xs">Round {existingQuote?.round ?? 1}</span>
           </div>
         </Descriptions.Item>
-        <Descriptions.Item label="Category">
-          <span className="text-slate-700 text-xs">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</span>
-        </Descriptions.Item>
         <Descriptions.Item label="Product / Service">
           <span className="text-slate-900 font-semibold text-xs">{catalogProduct?.name || 'Custom Specifications'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Category">
+          <span className="text-slate-700 text-xs">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</span>
         </Descriptions.Item>
         <Descriptions.Item label="SKU">
           {item?.variant_id ? (
@@ -1360,7 +1394,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
           </Descriptions.Item>
         )}
         {existingQuote?.updated_at && (
-          <Descriptions.Item label="Last Updated" span={2}>
+          <Descriptions.Item label="Last Updated">
             <span className="text-slate-600 text-xs">{new Date(existingQuote.updated_at).toLocaleString()}</span>
           </Descriptions.Item>
         )}
@@ -1657,7 +1691,7 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                   {
                     title: 'Unit Offer Price',
                     key: 'offer_price',
-                    className: "w-[180px] max-w-[180px] align-top",
+                    className: "w-[160px] max-w-[160px] align-top",
                     render: (_: string, record: SellerQuoteVariant) => (
                       <AntInput
                         type="number"
@@ -1671,6 +1705,45 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
                         placeholder="Enter price"
                       />
                     )
+                  },
+                  {
+                    title: 'Remark',
+                    key: 'seller_note',
+                    className: "w-[220px] max-w-[220px] align-top",
+                    render: (_: string, record: SellerQuoteVariant) => {
+                      const sig = record.signature || computeSignature(record.combinations);
+                      const dbMatch = dbVariants.find(dbV => dbV.id === record.id || (dbV.signature || computeSignature(dbV.combinations)) === sig);
+
+                      return (
+                        <div className="space-y-1">
+                          {!isViewOnly && (
+                            <AntInput.TextArea
+                              placeholder="Add Remarks..."
+                              size="small"
+                              disabled={isViewOnly}
+                              className="text-xs"
+                              value={record.seller_note || ''}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setProposalVariants(prev => prev.map(v => v.id === record.id ? { ...v, seller_note: val } : v));
+                              }}
+                            />
+                          )}
+                          {dbMatch?.seller_note && (
+                            <div className="mt-1 text-[11px] bg-blue-50 text-blue-800 border border-blue-100 rounded px-1.5 py-0.5 leading-tight italic">
+                              <span className="font-bold not-italic mr-1 text-[9px] text-blue-700">[You]:</span>
+                              {dbMatch.seller_note}
+                            </div>
+                          )}
+                          {dbMatch?.buyer_note && (
+                            <div className="text-[10px] bg-blue-50 text-blue-800 border border-blue-100 rounded px-1.5 py-0.5 leading-tight italic">
+                              <span className="font-bold not-italic mr-1 text-[9px] text-blue-700">[Buyer]:</span>
+                              {dbMatch.buyer_note}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
                   },
                   {
                     title: 'Action',
@@ -1789,6 +1862,9 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
     existingQuote,
     existingQuoteAttributes,
     existingQuoteVariants,
+    item,
+    rfq,
+    categories,
     allVariants,
     catalogProduct
   } = data || {};
@@ -1847,23 +1923,66 @@ const StepProductMapping: React.FC<{ rfqId: string; itemId: string; activePartyI
 
   return (
     <div className="space-y-6">
+      <Descriptions
+        title={<span className="text-sm font-bold text-slate-800 px-3">Request & Proposal Details</span>}
+        bordered
+        size="small"
+        column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
+        labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
+        contentStyle={{ fontSize: '12px', color: '#1e293b' }}
+        classNames={{
+          header: "mb-1"
+        }}
+        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200"
+      >
+        <Descriptions.Item label="RFQ Number" >
+          <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Quote Reference">
+          <AntTag color="purple" className="font-mono font-bold m-0 text-xs">{existingQuote?.seller_quote_number || 'N/A'}</AntTag>
+        </Descriptions.Item>
+        <Descriptions.Item label="Quote Status">
+          <AntTag
+            color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
+            className="m-0 text-xs"
+          >
+            {existingQuote?.status || 'NEW'}
+          </AntTag>
+        </Descriptions.Item>
+        <Descriptions.Item label="Round">
+          <div className="flex items-center gap-1.5">
+            <ReloadOutlined className="text-blue-500 text-xs" />
+            <span className="font-semibold text-slate-800 text-xs">Round {existingQuote?.round ?? 1}</span>
+          </div>
+        </Descriptions.Item>
+        <Descriptions.Item label="Product / Service">
+          <span className="text-slate-900 font-semibold text-xs">{catalogProduct?.name || 'Custom Specifications'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Category">
+          <span className="text-slate-700 text-xs">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="SKU">
+          {item?.variant_id ? (
+            <AntTag color="purple" className="font-mono font-semibold m-0 text-xs">{item.variant_id}</AntTag>
+          ) : (
+            <AntTag color="orange" className="font-semibold m-0 text-xs">Custom Product</AntTag>
+          )}
+        </Descriptions.Item>
+        <Descriptions.Item label="Requested Quantity">
+          <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+        </Descriptions.Item>
+        {existingQuote?.created_at && (
+          <Descriptions.Item label="Created">
+            <span className="text-slate-600 text-xs">{new Date(existingQuote.created_at).toLocaleString()}</span>
+          </Descriptions.Item>
+        )}
+        {existingQuote?.updated_at && (
+          <Descriptions.Item label="Last Updated">
+            <span className="text-slate-600 text-xs">{new Date(existingQuote.updated_at).toLocaleString()}</span>
+          </Descriptions.Item>
+        )}
+      </Descriptions>
 
-      {/* Accepted Specs Overview */}
-      <Card title={<span className="font-bold text-slate-800 text-base">Negotiated Quote & Accepted Specifications</span>} className="shadow-sm border-slate-200">
-        <Descriptions bordered size="small" column={{ xxl: 3, xl: 3, lg: 2, md: 1, sm: 1, xs: 1 }}>
-          <Descriptions.Item label="Target Catalog Product" span={3}>
-            <strong className="text-slate-800 text-base">{catalogProduct?.name || 'Custom Product'}</strong>
-          </Descriptions.Item>
-          <Descriptions.Item label="Quote Reference">
-            <AntTag color="purple" className="font-mono font-bold m-0">{existingQuote?.seller_quote_number || 'N/A'}</AntTag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Quote Status">
-            <AntTag color="emerald" className="font-bold m-0">{existingQuote?.status || 'DEVIATION_ACCEPTED'}</AntTag>
-          </Descriptions.Item>
-        </Descriptions>
-      </Card>
-
-      {/* Catalog SKU Selection & Spec Inspector Workspace */}
       <Card title={<span className="font-bold text-slate-800 text-base">Select Existing Catalog Product SKU</span>} className="shadow-sm border-slate-200">
         <p className="text-xs text-slate-500 mb-4">
           Select an existing catalog SKU to fulfill the negotiated RFQ item. SKUs are validated against accepted quote specifications in real time.
