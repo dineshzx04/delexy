@@ -180,759 +180,6 @@ export const SupplierItemRespond: React.FC = () => {
 
 
 
-
-
-
-/* ============================================================================
- * PARENT STEP COMPONENT: StepQuoteProposal
- * Orchestrates subcomponents, state initialization & DB mutations
- * ============================================================================ */
-const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId: string }> = ({ rfqId, itemId, activePartyId }) => {
-  const { message: antMessage } = AntApp.useApp();
-  const navigate = useNavigate();
-  const { activeWorkspace } = useWorkspace();
-  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
-  const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
-
-  const [submitting, setSubmitting] = useState(false);
-  const [proposalAttributes, setProposalAttributes] = useState<Record<string, ProposalAttribute>>({});
-  const [dbVariants, setDbVariants] = useState<SellerQuoteVariant[]>([]);
-  const [proposalVariants, setProposalVariants] = useState<SellerQuoteVariant[]>([]);
-  const [proposalSuggestedVariants, setProposalSuggestedVariants] = useState<SellerQuoteSuggestedVariant[]>([]);
-  const [attributeComments, setAttributeComments] = useState<SellerQuoteAttributeComment[]>([]);
-  const [variantComments, setVariantComments] = useState<SellerQuoteVariantComment[]>([]);
-  const [newAttributeComments, setNewAttributeComments] = useState<Record<string, string>>({});
-  const [newVariantComments, setNewVariantComments] = useState<Record<string, string>>({});
-  const [bulkPrice, setBulkPrice] = useState<number | undefined>();
-  const [compareModalVisible, setCompareModalVisible] = useState(false);
-
-  const data = useLiveQuery(async () => {
-    if (!itemId || !activePartyId || !rfqId) return undefined;
-
-    const [
-      existingQuote,
-      item,
-      rfq,
-      itemAttributes,
-      allSellerProducts,
-      categories,
-      catalogAttributes,
-      catalogAttributeValues
-    ] = await Promise.all([
-      rfqDb.seller_quotes.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first(),
-      rfqDb.rfq_items.get(itemId),
-      rfqDb.rfqs.get(rfqId),
-      rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray(),
-      catalogDb.sellerProducts.toArray(),
-      catalogDb.categories.toArray(),
-      catalogDb.attributes.toArray(),
-      catalogDb.attributeValues.toArray()
-    ]);
-
-    let existingQuoteAttributes: SellerQuoteAttribute[] = [];
-    let existingQuoteVariants: SellerQuoteVariant[] = [];
-    let existingQuoteSuggestedVariants: SellerQuoteSuggestedVariant[] = [];
-    let existingQuoteAttributeComments: SellerQuoteAttributeComment[] = [];
-    let existingQuoteVariantComments: SellerQuoteVariantComment[] = [];
-
-    if (existingQuote?.id) {
-      const [attrs, vars, sVars, attrComms, varComms, oldComms] = await Promise.all([
-        rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray(),
-        rfqDb.seller_quote_variants.where('seller_quote_id').equals(existingQuote.id).toArray(),
-        rfqDb.seller_quote_suggested_variants.where('seller_quote_id').equals(existingQuote.id).toArray(),
-        rfqDb.seller_quote_attribute_comments.where('seller_quote_id').equals(existingQuote.id).toArray(),
-        rfqDb.seller_quote_variant_comments.where('seller_quote_id').equals(existingQuote.id).toArray(),
-        rfqDb.seller_quote_comments.where('seller_quote_id').equals(existingQuote.id).toArray()
-      ]);
-
-      existingQuoteAttributes = attrs;
-      existingQuoteVariants = vars;
-      existingQuoteSuggestedVariants = sVars;
-      existingQuoteAttributeComments = attrComms.length > 0 ? attrComms : oldComms;
-      existingQuoteVariantComments = varComms;
-    }
-
-    let catalogProduct = null;
-    if (item?.catalog_product_id) {
-      catalogProduct = await catalogDb.products.get(item.catalog_product_id);
-    }
-
-    return {
-      existingQuote: existingQuote || null,
-      existingQuoteAttributes,
-      existingQuoteVariants,
-      existingQuoteSuggestedVariants,
-      existingQuoteAttributeComments,
-      existingQuoteVariantComments,
-      item: item || null,
-      itemAttributes,
-      rfq: rfq || null,
-      allSellerProducts,
-      categories,
-      catalogAttributes,
-      catalogAttributeValues,
-      catalogProduct: catalogProduct || null
-    };
-  }, [itemId, activePartyId, rfqId]);
-
-  const {
-    existingQuote,
-    existingQuoteAttributes,
-    existingQuoteVariants,
-    existingQuoteSuggestedVariants,
-    existingQuoteAttributeComments,
-    existingQuoteVariantComments,
-    item,
-    itemAttributes,
-    rfq,
-    allSellerProducts,
-    categories,
-    catalogAttributes,
-    catalogAttributeValues,
-    catalogProduct
-  } = data || {};
-
-  const quoteNumber = React.useMemo(() => {
-    return existingQuote?.seller_quote_number;
-  }, [existingQuote]);
-
-  const computeSignature = (combinations: any[]): string => {
-    if (!combinations || combinations.length === 0) return 'default';
-    const sortedCombo = [...combinations].sort((a, b) => (a.attribute_id || '').localeCompare(b.attribute_id || ''));
-    return sortedCombo.map(c => `${c.attribute_id}:${c.value_id}`).join('|');
-  };
-
-  const generateVariantsFromAttributes = (
-    currentAttributes: Record<string, ProposalAttribute>,
-    prevVariants: SellerQuoteVariant[] = []
-  ): SellerQuoteVariant[] => {
-    const variantAttrs = Object.values(currentAttributes).filter(
-      attr => (attr.is_variant || attr.attribute_id === 'mfg_brand_mapping') && attr.values.length > 0
-    ).sort((a, b) => {
-      if (a.attribute_id === 'mfg_brand_mapping') return -1;
-      if (b.attribute_id === 'mfg_brand_mapping') return 1;
-      return 0;
-    });
-
-    const quoteId = existingQuote?.id || '';
-
-    if (variantAttrs.length === 0) {
-      const existingDefault = prevVariants.find(v => v.combinations.length === 0);
-      return [{
-        id: existingDefault?.id || crypto.randomUUID(),
-        seller_quote_id: quoteId,
-        is_default: true,
-        offer_price: existingDefault?.offer_price || 0,
-        combinations: [],
-        buyer_accepted: existingDefault?.buyer_accepted || false,
-        signature: 'default',
-        is_selected: existingDefault?.is_selected !== undefined ? existingDefault.is_selected : true
-      }];
-    }
-
-    const variantMap = new Map<string, SellerQuoteVariant>();
-    prevVariants.forEach(v => {
-      const sig = v.signature || computeSignature(v.combinations);
-      variantMap.set(sig, v);
-    });
-
-    const cartesian = (arrays: any[][]) =>
-      arrays.reduce((acc, curr) => acc.flatMap(c => curr.map(n => [...c, n])), [[]]);
-
-    const arraysToCombine = variantAttrs.map(attr =>
-      attr.values.map(v => ({
-        group_id: attr.group_id,
-        attribute_id: attr.attribute_id,
-        attribute_name: attr.attributeName,
-        value_id: v.value_id,
-        value_label: v.value_label,
-        values: [{ value_id: v.value_id, value_label: v.value_label }]
-      }))
-    );
-
-    const combinations = cartesian(arraysToCombine);
-
-    return combinations.map(combo => {
-      const sig = computeSignature(combo);
-      const existingMatch = variantMap.get(sig);
-
-      if (existingMatch) {
-        return {
-          ...existingMatch,
-          combinations: combo,
-          signature: sig,
-          is_selected: existingMatch.is_selected !== undefined ? existingMatch.is_selected : false
-        };
-      }
-
-      return {
-        id: crypto.randomUUID(),
-        seller_quote_id: quoteId,
-        is_default: false,
-        offer_price: 0,
-        combinations: combo,
-        buyer_accepted: false,
-        signature: sig,
-        is_selected: false
-      };
-    });
-  };
-
-  useEffect(() => {
-    if (!item || !itemAttributes?.length) return;
-
-    const attrs = new Map((catalogAttributes || []).map(a => [a.id, a.name]));
-
-    const getValues = (ia: any) => {
-      if (ia.attribute_id === "mfg_brand_mapping") {
-        return (ia.values || []).map((v: any) => ({ value_id: v.value_id, value_label: v.value_label }));
-      }
-      const ids = new Set((ia.values || []).map((v: any) => v.value_id));
-      return (catalogAttributeValues || [])
-        .filter(v => ids.has(v.id))
-        .map(v => ({ value_id: v.id, value_label: v.value || v.label || "" }));
-    };
-
-    const names: Record<string, string> = {
-      mfg_brand_mapping: "Manufacturer & Brand",
-    };
-
-    const existingAttrMap = new Map();
-    const initialValues: Record<string, ProposalAttribute> = {};
-
-    if (existingQuote && existingQuoteAttributes) {
-      existingQuoteAttributes.forEach(ea => existingAttrMap.set(`${ea.group_id}_${ea.attribute_id}`, ea));
-    }
-
-    itemAttributes.forEach((ia: any) => {
-      if (ia.attribute_type === 'SYSTEM' && ia.attribute_id !== 'mfg_brand_mapping') return;
-
-      const groupId = ia.group_id;
-      const values = getValues(ia);
-      const proposalKey = `${groupId}_${ia.attribute_id}`;
-      const attributeName = names[ia.attribute_id] || attrs.get(ia.attribute_id) || "";
-
-      const ea = existingAttrMap.get(proposalKey);
-      if (ea) {
-        initialValues[proposalKey] = {
-          attribute_type: ea.attribute_type as AttributeType,
-          group_id: ea.group_id,
-          attribute_id: ea.attribute_id,
-          attributeName: attributeName,
-          is_deviation: ea.is_deviation,
-          deviation_note: "",
-          is_variant: ea.is_variant,
-          req_value: ea.req_value,
-          values: ea.values,
-          buyer_accepted: ea.buyer_accepted || false,
-          connector: ea.connector || ia.connector || 'OR'
-        };
-      } else {
-        initialValues[proposalKey] = {
-          attribute_type: ia.attribute_type,
-          group_id: groupId,
-          attribute_id: ia.attribute_id,
-          attributeName: attributeName,
-          is_deviation: false,
-          deviation_note: "",
-          is_variant: ia.is_variant,
-          req_value: values,
-          values: values,
-          buyer_accepted: false,
-          connector: ia.connector || 'OR'
-        };
-      }
-    });
-
-    const storedInDb = existingQuoteVariants || [];
-    setDbVariants(storedInDb);
-    setProposalAttributes(initialValues);
-    setAttributeComments(existingQuoteAttributeComments || []);
-    setVariantComments(existingQuoteVariantComments || []);
-
-    const generated = generateVariantsFromAttributes(initialValues, storedInDb);
-
-    if (storedInDb.length > 0) {
-      const initialVariants = generated.map(v => {
-        const sig = v.signature || computeSignature(v.combinations);
-        const savedMatch = storedInDb.find(ev => (ev.signature || computeSignature(ev.combinations)) === sig);
-        if (savedMatch) {
-          return {
-            ...v,
-            ...savedMatch,
-            signature: sig,
-            is_selected: savedMatch.is_selected !== undefined ? savedMatch.is_selected : true
-          };
-        }
-        return {
-          ...v,
-          signature: sig,
-          is_selected: false
-        };
-      });
-      setProposalVariants(initialVariants);
-    } else {
-      setProposalVariants(generated);
-    }
-
-    // Catalog Suggested Variants
-    const myProducts = (allSellerProducts || []).filter((sp: any) => sp.party_id === activePartyId);
-    let filteredSellerProducts: any[] = [];
-    if (item?.catalog_product_id) {
-      const matching = myProducts.filter((sp: any) => sp.catalog_product_id === item.catalog_product_id);
-      if (matching.length > 0) filteredSellerProducts = matching;
-    }
-
-    const catalogVariants = filteredSellerProducts.flatMap((sp: any) => {
-      const mfgBrandPair = sp.manufacturer_id && sp.brand_id ? [{
-        attribute_id: 'mfg_brand_mapping',
-        group_id: "system",
-        attribute_name: "Manufacturer & Brand",
-        value_id: `${sp.manufacturer_id || "any"}:${sp.brand_id || "any"}`,
-        value_label: undefined
-      }] : [];
-
-      return (sp.variants || []).map((v: any) => {
-        const comboVals = [...mfgBrandPair, ...(v.combination_values || [])];
-        const sortedComboVals = [...comboVals].sort((a: any, b: any) => {
-          if (a.attribute_id === 'mfg_brand_mapping') return -1;
-          if (b.attribute_id === 'mfg_brand_mapping') return 1;
-          return 0;
-        });
-        const combinations = sortedComboVals.map((cv: any) => ({ ...cv, values: [{ value_label: cv.label, value_id: cv.value_id }] }));
-        const parentSpecs = sp.specifications || [];
-
-        const savedMatch = (existingQuoteSuggestedVariants || []).find((sv: any) => sv.variant_id === v.id);
-
-        return {
-          id: savedMatch?.id || crypto.randomUUID(),
-          seller_quote_id: existingQuote?.id || '',
-          seller_product_id: sp.id,
-          variant_id: v.id,
-          sku: v.sku || v.id,
-          list_price: v.price || 0,
-          offer_price: savedMatch?.offer_price ?? (v.price || 0),
-          combinations: combinations,
-          specifications: parentSpecs,
-          product_attributes: [...combinations, ...parentSpecs],
-          is_selected: savedMatch ? savedMatch.is_selected : false,
-          buyer_accepted: savedMatch ? savedMatch.buyer_accepted : false
-        };
-      });
-    }) || [];
-
-    setProposalSuggestedVariants(catalogVariants);
-
-  }, [item, itemAttributes, catalogAttributes, catalogAttributeValues, allSellerProducts, existingQuote, existingQuoteAttributes, existingQuoteVariants, existingQuoteSuggestedVariants, existingQuoteAttributeComments, existingQuoteVariantComments]);
-
-  const isLoading = data === undefined;
-
-  if (isLoading) {
-    return (
-      <div className="p-12 text-center text-slate-500">
-        <h2 className="text-xl font-bold text-slate-800 font-sans animate-pulse">Loading Quote Workspace...</h2>
-      </div>
-    );
-  }
-
-  if (!rfq || !item) {
-    return null;
-  }
-
-  const isViewOnly = ['SUBMITTED', "DEVIATION_ACCEPTED", "PRODUCT_SUBMIT_REVISION", "FINAL_ACKNOWLEDGE", 'REJECTED'].includes(existingQuote?.status ?? '');
-
-  const recalculateVariants = (currentAttributes: Record<string, ProposalAttribute>) => {
-    setBulkPrice(undefined);
-    setProposalVariants(prev => generateVariantsFromAttributes(currentAttributes, prev));
-  };
-
-  const totalSelectedCustom = proposalVariants.filter(v => v.is_selected).length;
-  const totalSelectedSuggested = proposalSuggestedVariants.filter(sv => sv.is_selected).length;
-  const totalSelected = totalSelectedCustom + totalSelectedSuggested;
-
-  const selectedOfferedItems = [
-    ...proposalVariants.filter(v => v.is_selected).map(v => ({
-      id: v.id,
-      type: 'CUSTOM' as const,
-      title: 'Custom Option Combination',
-      sku: undefined,
-      list_price: undefined,
-      offer_price: v.offer_price,
-      combinations: v.combinations,
-      product_attributes: (v as any).product_attributes || [],
-      buyer_accepted: v.buyer_accepted
-    })),
-    ...proposalSuggestedVariants.filter(sv => sv.is_selected).map(sv => ({
-      id: sv.id,
-      type: 'SUGGESTED' as const,
-      title: sv.sku || sv.id,
-      sku: sv.sku,
-      list_price: sv.list_price,
-      offer_price: sv.offer_price,
-      combinations: sv.combinations,
-      product_attributes: (sv as any).product_attributes || [],
-      buyer_accepted: sv.buyer_accepted
-    }))
-  ];
-
-  const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
-    if (!item || !rfq || !activePartyId) return;
-
-    setSubmitting(true);
-    try {
-      const quoteId = existingQuote?.id || crypto.randomUUID();
-      const offerQty = item.req_quantity || 0;
-      const qtyUnit = item.req_unit || 'pcs';
-
-      const selectedCustomVariants = proposalVariants.filter(v => v.is_selected);
-      const selectedSuggestedVariants = proposalSuggestedVariants.filter(sv => sv.is_selected);
-
-      if (totalSelected === 0) {
-        antMessage.error('Please select at least one proposal option or catalog SKU to include in your offer.');
-        setSubmitting(false);
-        return;
-      }
-
-      const invalidCustom = selectedCustomVariants.filter(v => typeof v.offer_price !== 'number' || isNaN(v.offer_price) || v.offer_price <= 0);
-      const invalidSuggested = selectedSuggestedVariants.filter(sv => typeof sv.offer_price !== 'number' || isNaN(sv.offer_price) || sv.offer_price <= 0);
-
-      if (invalidCustom.length > 0 || invalidSuggested.length > 0) {
-        antMessage.error('Offer price for all selected options must be greater than $0.');
-        setSubmitting(false);
-        return;
-      }
-
-      if (submitMode === 'SUBMITTED') {
-        if (isNaN(offerQty) || offerQty <= 0) {
-          antMessage.error('Please enter a valid quantity.');
-          setSubmitting(false);
-          return;
-        }
-      }
-
-      const quoteToSave: SellerQuote = {
-        id: quoteId,
-        rfq_item_id: item.id,
-        round: existingQuote?.round || 1,
-        seller_party_id: activePartyId,
-        seller_quote_number: quoteNumber || existingQuote?.seller_quote_number || 'SQ-DRAFT',
-        offer_quantity: offerQty || 0,
-        offer_unit: qtyUnit,
-        status: submitMode,
-        created_at: existingQuote?.created_at || new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      const attributesToSave: SellerQuoteAttribute[] = [];
-      Object.entries(proposalAttributes).forEach(([key, attributeData]) => {
-        if (attributeData) {
-          attributesToSave.push({
-            id: crypto.randomUUID(),
-            seller_quote_id: quoteId,
-            attribute_type: attributeData.attribute_type,
-            group_id: attributeData.group_id,
-            attribute_id: attributeData.attribute_id,
-            is_variant: attributeData.is_variant,
-            req_value: attributeData.req_value || [],
-            values: attributeData.values || [],
-            is_deviation: attributeData.is_deviation,
-            deviation_note: attributeData.deviation_note || '',
-            buyer_accepted: attributeData.buyer_accepted || false,
-            connector: attributeData.connector || 'AND'
-          });
-        }
-      });
-
-      const attributeCommentsToSave: SellerQuoteAttributeComment[] = [];
-      attributesToSave.forEach((attr) => {
-        const key = `${attr.group_id}_${attr.attribute_id}`;
-        const newCommText = newAttributeComments[key]?.trim();
-        if (newCommText) {
-          attributeCommentsToSave.push({
-            id: crypto.randomUUID(),
-            seller_quote_id: quoteId,
-            round: existingQuote?.round || 1,
-            attribute_type: attr.attribute_type,
-            group_id: attr.group_id,
-            attribute_id: attr.attribute_id,
-            comment: newCommText,
-            actor_type: "SELLER",
-            actor_id: activePartyId,
-            created_at: new Date().toISOString(),
-          });
-        }
-      });
-
-      const variantsToSave: SellerQuoteVariant[] = selectedCustomVariants.map(v => {
-        const sig = v.signature || computeSignature(v.combinations);
-        const dbMatch = dbVariants.find(dbV => dbV.id === v.id || (dbV.signature || computeSignature(dbV.combinations)) === sig);
-        return {
-          ...dbMatch,
-          ...v,
-          id: dbMatch?.id || v.id,
-          seller_quote_id: quoteId,
-          offer_price: v.offer_price,
-          is_selected: true
-        };
-      });
-
-      const suggestedVariantsToSave: SellerQuoteSuggestedVariant[] = selectedSuggestedVariants.map(sv => ({
-        id: sv.id || crypto.randomUUID(),
-        seller_quote_id: quoteId,
-        seller_product_id: sv.seller_product_id,
-        variant_id: sv.variant_id,
-        sku: sv.sku,
-        list_price: sv.list_price,
-        offer_price: sv.offer_price,
-        combinations: sv.combinations,
-        specifications: sv.specifications,
-        is_selected: true,
-        buyer_accepted: sv.buyer_accepted || false
-      }));
-
-      const variantCommentsToSave: SellerQuoteVariantComment[] = [];
-      selectedOfferedItems.forEach((opt) => {
-        const newCommText = newVariantComments[opt.id]?.trim();
-        if (newCommText) {
-          variantCommentsToSave.push({
-            id: crypto.randomUUID(),
-            seller_quote_id: quoteId,
-            round: existingQuote?.round || 1,
-            variant_id: opt.id,
-            variant_type: opt.type,
-            comment: newCommText,
-            actor_type: "SELLER",
-            actor_id: activePartyId,
-            created_at: new Date().toISOString(),
-          });
-        }
-      });
-
-      await rfqDb.transaction('rw', [
-        rfqDb.seller_quotes,
-        rfqDb.seller_quote_attributes,
-        rfqDb.seller_quote_variants,
-        rfqDb.seller_quote_suggested_variants,
-        rfqDb.seller_quote_attribute_comments,
-        rfqDb.seller_quote_variant_comments,
-        rfqDb.seller_quote_comments
-      ], async () => {
-        await rfqDb.seller_quotes.put(quoteToSave);
-
-        const oldAttrs = await rfqDb.seller_quote_attributes.where('seller_quote_id').equals(quoteId).toArray();
-        await rfqDb.seller_quote_attributes.bulkDelete(oldAttrs.map(a => a.id));
-        if (attributesToSave.length > 0) {
-          await rfqDb.seller_quote_attributes.bulkAdd(attributesToSave);
-        }
-
-        const oldVariants = await rfqDb.seller_quote_variants.where('seller_quote_id').equals(quoteId).toArray();
-        await rfqDb.seller_quote_variants.bulkDelete(oldVariants.map(v => v.id));
-        if (variantsToSave.length > 0) {
-          await rfqDb.seller_quote_variants.bulkAdd(variantsToSave);
-        }
-
-        const oldSuggested = await rfqDb.seller_quote_suggested_variants.where('seller_quote_id').equals(quoteId).toArray();
-        await rfqDb.seller_quote_suggested_variants.bulkDelete(oldSuggested.map(sv => sv.id));
-        if (suggestedVariantsToSave.length > 0) {
-          await rfqDb.seller_quote_suggested_variants.bulkAdd(suggestedVariantsToSave);
-        }
-
-        if (attributeCommentsToSave.length > 0) {
-          await rfqDb.seller_quote_attribute_comments.bulkAdd(attributeCommentsToSave);
-          await rfqDb.seller_quote_comments.bulkAdd(attributeCommentsToSave);
-        }
-
-        if (variantCommentsToSave.length > 0) {
-          await rfqDb.seller_quote_variant_comments.bulkAdd(variantCommentsToSave);
-        }
-      });
-
-      antMessage.success(submitMode === 'SUBMITTED' ? 'Proposal submitted successfully!' : 'Draft saved successfully!');
-      navigate(basePath);
-    } catch (err) {
-      console.error(err);
-      antMessage.error('Failed to save proposal');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  let variantSku = '';
-  if (item?.variant_id && allSellerProducts) {
-    const sp = allSellerProducts.find((p: any) => p.variants?.some((v: any) => v.id === item.variant_id));
-    if (sp) {
-      const v = sp.variants?.find((v: any) => v.id === item.variant_id);
-      variantSku = v?.sku || item.variant_id;
-    } else {
-      variantSku = item.variant_id;
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-
-      {/* Request & Proposal Details */}
-      <Descriptions
-        title={
-          <div className="flex items-center justify-between px-3 w-full">
-            <span className="text-sm font-bold text-slate-800">Request & Proposal Details</span>
-            <AntButton
-              size="small"
-              icon={<Lucide.Columns size={14} />}
-              onClick={() => setCompareModalVisible(true)}
-              disabled={totalSelected === 0}
-              className="bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-semibold"
-            >
-              Compare Selected ({totalSelected})
-            </AntButton>
-          </div>
-        }
-        bordered
-        size="small"
-        column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
-        labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
-        contentStyle={{ fontSize: '12px', color: '#1e293b' }}
-        classNames={{ header: "mb-1" }}
-        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200"
-      >
-        <Descriptions.Item label="RFQ Number">
-          <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
-        </Descriptions.Item>
-        <Descriptions.Item label="Quote Reference">
-          <AntTag color="purple" className="font-mono font-bold m-0 text-xs">
-            {quoteNumber || 'N/A'}{existingQuote?.id ? ` | ${existingQuote.id}` : ''}
-          </AntTag>
-        </Descriptions.Item>
-        <Descriptions.Item label="Quote Status">
-          <AntTag
-            color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
-            className="m-0 text-xs"
-          >
-            {existingQuote?.status || 'NEW'}
-          </AntTag>
-        </Descriptions.Item>
-        <Descriptions.Item label="Round">
-          <div className="flex items-center gap-1.5">
-            <ReloadOutlined className="text-blue-500 text-xs" />
-            <span className="font-semibold text-slate-800 text-xs">Round {existingQuote?.round ?? 1}</span>
-          </div>
-        </Descriptions.Item>
-        <Descriptions.Item label="Product / Service">
-          <span className="text-slate-900 font-semibold text-xs">{catalogProduct?.name || 'Custom Specifications'}</span>
-        </Descriptions.Item>
-        <Descriptions.Item label="Category">
-          <span className="text-slate-700 text-xs">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</span>
-        </Descriptions.Item>
-        <Descriptions.Item label="SKU">
-          {item?.variant_id ? (
-            <AntTag color="purple" className="font-mono font-semibold m-0 text-xs">{variantSku || item.variant_id}</AntTag>
-          ) : (
-            <AntTag color="orange" className="font-semibold m-0 text-xs">Custom Product</AntTag>
-          )}
-        </Descriptions.Item>
-        <Descriptions.Item label="Requested Quantity">
-          <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
-        </Descriptions.Item>
-        {existingQuote?.created_at && (
-          <Descriptions.Item label="Created">
-            <span className="text-slate-600 text-xs">{new Date(existingQuote.created_at).toLocaleString()}</span>
-          </Descriptions.Item>
-        )}
-        {existingQuote?.updated_at && (
-          <Descriptions.Item label="Last Updated">
-            <span className="text-slate-600 text-xs">{new Date(existingQuote.updated_at).toLocaleString()}</span>
-          </Descriptions.Item>
-        )}
-      </Descriptions>
-      {/* Section 1: Attribute Configuration & Specifications */}
-      <Section1AttributeConfig
-        rfqId={rfqId}
-        itemId={itemId}
-        activePartyId={activePartyId}
-        isViewOnly={isViewOnly}
-        proposalAttributes={proposalAttributes}
-        setProposalAttributes={setProposalAttributes}
-        recalculateVariants={recalculateVariants}
-        attributeComments={attributeComments}
-        newAttributeComments={newAttributeComments}
-        setNewAttributeComments={setNewAttributeComments}
-        existingQuote={existingQuote || null}
-        existingQuoteAttributes={existingQuoteAttributes || []}
-      />
-
-      {/* Section 2: Auto-Generated Combinations Pool */}
-      <Section2CombinationsMatrix
-        isViewOnly={isViewOnly}
-        proposalVariants={proposalVariants}
-        setProposalVariants={setProposalVariants}
-      />
-
-      {/* Section 3: Suggested Catalog Product Variants */}
-      <Section3SuggestedCatalog
-        itemId={itemId}
-        activePartyId={activePartyId}
-        isViewOnly={isViewOnly}
-        proposalSuggestedVariants={proposalSuggestedVariants}
-        setProposalSuggestedVariants={setProposalSuggestedVariants}
-      />
-
-      {/* Section 4: Selected Offered Proposal Options & Pricing Matrix */}
-      <Section4OfferedPricing
-        isViewOnly={isViewOnly}
-        selectedOfferedItems={selectedOfferedItems}
-        proposalVariants={proposalVariants}
-        setProposalVariants={setProposalVariants}
-        proposalSuggestedVariants={proposalSuggestedVariants}
-        setProposalSuggestedVariants={setProposalSuggestedVariants}
-        variantComments={variantComments}
-        newVariantComments={newVariantComments}
-        setNewVariantComments={setNewVariantComments}
-        bulkPrice={bulkPrice}
-        setBulkPrice={setBulkPrice}
-        existingQuote={existingQuote || null}
-      />
-
-      {/* Comparison Modal */}
-      <ComparisonMatrixModal
-        visible={compareModalVisible}
-        onCancel={() => setCompareModalVisible(false)}
-        itemId={itemId}
-        selectedOfferedItems={selectedOfferedItems}
-      />
-
-      {!isViewOnly && (
-        <div className="pt-6 flex justify-end gap-3 mt-6 border-t border-slate-200">
-          <AntButton onClick={() => navigate(basePath)}>Cancel</AntButton>
-          <AntButton
-            icon={<Lucide.Columns size={15} />}
-            onClick={() => setCompareModalVisible(true)}
-            disabled={totalSelected === 0}
-          >
-            Compare Selected ({totalSelected})
-          </AntButton>
-          <AntButton
-            type="primary"
-            icon={<SendOutlined />}
-            onClick={() => handleSave('SUBMITTED')}
-            loading={submitting}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            Submit Proposal
-          </AntButton>
-        </div>
-      )}
-    </div>
-  );
-};
-
-
-
-
-
-
-
-
-
 /* ============================================================================
  * SUBCOMPONENT 1: Section1AttributeConfig
  * 1. Attribute Configuration & Specifications
@@ -2571,6 +1818,757 @@ const ComparisonMatrixModal: React.FC<ComparisonModalProps> = ({
         />
       </div>
     </AntModal>
+  );
+};
+
+
+/* ============================================================================
+ * PARENT STEP COMPONENT: StepQuoteProposal
+ * Orchestrates subcomponents, state initialization & DB mutations
+ * ============================================================================ */
+const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId: string }> = ({ rfqId, itemId, activePartyId }) => {
+  // 1. Context & Routing Navigation
+  const { message: antMessage } = AntApp.useApp();
+  const navigate = useNavigate();
+  const { activeWorkspace } = useWorkspace();
+  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
+
+  // 2. Component State Declarations
+  const [submitting, setSubmitting] = useState(false);
+  const [compareModalVisible, setCompareModalVisible] = useState(false);
+  const [bulkPrice, setBulkPrice] = useState<number | undefined>();
+
+  const [proposalAttributes, setProposalAttributes] = useState<Record<string, ProposalAttribute>>({});
+  const [dbVariants, setDbVariants] = useState<SellerQuoteVariant[]>([]);
+  const [proposalVariants, setProposalVariants] = useState<SellerQuoteVariant[]>([]);
+  const [proposalSuggestedVariants, setProposalSuggestedVariants] = useState<SellerQuoteSuggestedVariant[]>([]);
+
+  const [attributeComments, setAttributeComments] = useState<SellerQuoteAttributeComment[]>([]);
+  const [variantComments, setVariantComments] = useState<SellerQuoteVariantComment[]>([]);
+  const [newAttributeComments, setNewAttributeComments] = useState<Record<string, string>>({});
+  const [newVariantComments, setNewVariantComments] = useState<Record<string, string>>({});
+
+  // 3. Data Layer: Dexie Live Queries
+  const data = useLiveQuery(async () => {
+    if (!itemId || !activePartyId || !rfqId) return undefined;
+
+    const [
+      existingQuote,
+      item,
+      rfq,
+      itemAttributes,
+      allSellerProducts,
+      categories,
+      catalogAttributes,
+      catalogAttributeValues
+    ] = await Promise.all([
+      rfqDb.seller_quotes.where({ rfq_item_id: itemId, seller_party_id: activePartyId }).first(),
+      rfqDb.rfq_items.get(itemId),
+      rfqDb.rfqs.get(rfqId),
+      rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray(),
+      catalogDb.sellerProducts.toArray(),
+      catalogDb.categories.toArray(),
+      catalogDb.attributes.toArray(),
+      catalogDb.attributeValues.toArray()
+    ]);
+
+    let existingQuoteAttributes: SellerQuoteAttribute[] = [];
+    let existingQuoteVariants: SellerQuoteVariant[] = [];
+    let existingQuoteSuggestedVariants: SellerQuoteSuggestedVariant[] = [];
+    let existingQuoteAttributeComments: SellerQuoteAttributeComment[] = [];
+    let existingQuoteVariantComments: SellerQuoteVariantComment[] = [];
+
+    if (existingQuote?.id) {
+      const [attrs, vars, sVars, attrComms, varComms, oldComms] = await Promise.all([
+        rfqDb.seller_quote_attributes.where('seller_quote_id').equals(existingQuote.id).toArray(),
+        rfqDb.seller_quote_variants.where('seller_quote_id').equals(existingQuote.id).toArray(),
+        rfqDb.seller_quote_suggested_variants.where('seller_quote_id').equals(existingQuote.id).toArray(),
+        rfqDb.seller_quote_attribute_comments.where('seller_quote_id').equals(existingQuote.id).toArray(),
+        rfqDb.seller_quote_variant_comments.where('seller_quote_id').equals(existingQuote.id).toArray(),
+        rfqDb.seller_quote_comments.where('seller_quote_id').equals(existingQuote.id).toArray()
+      ]);
+
+      existingQuoteAttributes = attrs;
+      existingQuoteVariants = vars;
+      existingQuoteSuggestedVariants = sVars;
+      existingQuoteAttributeComments = attrComms.length > 0 ? attrComms : oldComms;
+      existingQuoteVariantComments = varComms;
+    }
+
+    let catalogProduct = null;
+    if (item?.catalog_product_id) {
+      catalogProduct = await catalogDb.products.get(item.catalog_product_id);
+    }
+
+    return {
+      existingQuote: existingQuote || null,
+      existingQuoteAttributes,
+      existingQuoteVariants,
+      existingQuoteSuggestedVariants,
+      existingQuoteAttributeComments,
+      existingQuoteVariantComments,
+      item: item || null,
+      itemAttributes,
+      rfq: rfq || null,
+      allSellerProducts,
+      categories,
+      catalogAttributes,
+      catalogAttributeValues,
+      catalogProduct: catalogProduct || null
+    };
+  }, [itemId, activePartyId, rfqId]);
+
+  const {
+    existingQuote,
+    existingQuoteAttributes,
+    existingQuoteVariants,
+    existingQuoteSuggestedVariants,
+    existingQuoteAttributeComments,
+    existingQuoteVariantComments,
+    item,
+    itemAttributes,
+    rfq,
+    allSellerProducts,
+    categories,
+    catalogAttributes,
+    catalogAttributeValues,
+    catalogProduct
+  } = data || {};
+
+  // 4. Helper Utility Functions
+  const computeSignature = (combinations: any[]): string => {
+    if (!combinations || combinations.length === 0) return 'default';
+    const sortedCombo = [...combinations].sort((a, b) => (a.attribute_id || '').localeCompare(b.attribute_id || ''));
+    return sortedCombo.map(c => `${c.attribute_id}:${c.value_id}`).join('|');
+  };
+
+  const generateVariantsFromAttributes = (
+    currentAttributes: Record<string, ProposalAttribute>,
+    prevVariants: SellerQuoteVariant[] = []
+  ): SellerQuoteVariant[] => {
+    const variantAttrs = Object.values(currentAttributes).filter(
+      attr => (attr.is_variant || attr.attribute_id === 'mfg_brand_mapping') && attr.values.length > 0
+    ).sort((a, b) => {
+      if (a.attribute_id === 'mfg_brand_mapping') return -1;
+      if (b.attribute_id === 'mfg_brand_mapping') return 1;
+      return 0;
+    });
+
+    const quoteId = existingQuote?.id || '';
+
+    if (variantAttrs.length === 0) {
+      const existingDefault = prevVariants.find(v => v.combinations.length === 0);
+      return [{
+        id: existingDefault?.id || crypto.randomUUID(),
+        seller_quote_id: quoteId,
+        is_default: true,
+        offer_price: existingDefault?.offer_price || 0,
+        combinations: [],
+        buyer_accepted: existingDefault?.buyer_accepted || false,
+        signature: 'default',
+        is_selected: existingDefault?.is_selected !== undefined ? existingDefault.is_selected : true
+      }];
+    }
+
+    const variantMap = new Map<string, SellerQuoteVariant>();
+    prevVariants.forEach(v => {
+      const sig = v.signature || computeSignature(v.combinations);
+      variantMap.set(sig, v);
+    });
+
+    const cartesian = (arrays: any[][]) =>
+      arrays.reduce((acc, curr) => acc.flatMap(c => curr.map(n => [...c, n])), [[]]);
+
+    const arraysToCombine = variantAttrs.map(attr =>
+      attr.values.map(v => ({
+        group_id: attr.group_id,
+        attribute_id: attr.attribute_id,
+        attribute_name: attr.attributeName,
+        value_id: v.value_id,
+        value_label: v.value_label,
+        values: [{ value_id: v.value_id, value_label: v.value_label }]
+      }))
+    );
+
+    const combinations = cartesian(arraysToCombine);
+
+    return combinations.map(combo => {
+      const sig = computeSignature(combo);
+      const existingMatch = variantMap.get(sig);
+
+      if (existingMatch) {
+        return {
+          ...existingMatch,
+          combinations: combo,
+          signature: sig,
+          is_selected: existingMatch.is_selected !== undefined ? existingMatch.is_selected : false
+        };
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        seller_quote_id: quoteId,
+        is_default: false,
+        offer_price: 0,
+        combinations: combo,
+        buyer_accepted: false,
+        signature: sig,
+        is_selected: false
+      };
+    });
+  };
+
+  // 5. State Hydration Effect
+  useEffect(() => {
+    if (!item || !itemAttributes?.length) return;
+
+    const attrs = new Map((catalogAttributes || []).map(a => [a.id, a.name]));
+
+    const getValues = (ia: any) => {
+      if (ia.attribute_id === "mfg_brand_mapping") {
+        return (ia.values || []).map((v: any) => ({ value_id: v.value_id, value_label: v.value_label }));
+      }
+      const ids = new Set((ia.values || []).map((v: any) => v.value_id));
+      return (catalogAttributeValues || [])
+        .filter(v => ids.has(v.id))
+        .map(v => ({ value_id: v.id, value_label: v.value || v.label || "" }));
+    };
+
+    const names: Record<string, string> = {
+      mfg_brand_mapping: "Manufacturer & Brand",
+    };
+
+    const existingAttrMap = new Map();
+    const initialValues: Record<string, ProposalAttribute> = {};
+
+    if (existingQuote && existingQuoteAttributes) {
+      existingQuoteAttributes.forEach(ea => existingAttrMap.set(`${ea.group_id}_${ea.attribute_id}`, ea));
+    }
+
+    itemAttributes.forEach((ia: any) => {
+      if (ia.attribute_type === 'SYSTEM' && ia.attribute_id !== 'mfg_brand_mapping') return;
+
+      const groupId = ia.group_id;
+      const values = getValues(ia);
+      const proposalKey = `${groupId}_${ia.attribute_id}`;
+      const attributeName = names[ia.attribute_id] || attrs.get(ia.attribute_id) || "";
+
+      const ea = existingAttrMap.get(proposalKey);
+      if (ea) {
+        initialValues[proposalKey] = {
+          attribute_type: ea.attribute_type as AttributeType,
+          group_id: ea.group_id,
+          attribute_id: ea.attribute_id,
+          attributeName: attributeName,
+          is_deviation: ea.is_deviation,
+          deviation_note: "",
+          is_variant: ea.is_variant,
+          req_value: ea.req_value,
+          values: ea.values,
+          buyer_accepted: ea.buyer_accepted || false,
+          connector: ea.connector || ia.connector || 'OR'
+        };
+      } else {
+        initialValues[proposalKey] = {
+          attribute_type: ia.attribute_type,
+          group_id: groupId,
+          attribute_id: ia.attribute_id,
+          attributeName: attributeName,
+          is_deviation: false,
+          deviation_note: "",
+          is_variant: ia.is_variant,
+          req_value: values,
+          values: values,
+          buyer_accepted: false,
+          connector: ia.connector || 'OR'
+        };
+      }
+    });
+
+    const storedInDb = existingQuoteVariants || [];
+    setDbVariants(storedInDb);
+    setProposalAttributes(initialValues);
+    setAttributeComments(existingQuoteAttributeComments || []);
+    setVariantComments(existingQuoteVariantComments || []);
+
+    const generated = generateVariantsFromAttributes(initialValues, storedInDb);
+
+    if (storedInDb.length > 0) {
+      const initialVariants = generated.map(v => {
+        const sig = v.signature || computeSignature(v.combinations);
+        const savedMatch = storedInDb.find(ev => (ev.signature || computeSignature(ev.combinations)) === sig);
+        if (savedMatch) {
+          return {
+            ...v,
+            ...savedMatch,
+            signature: sig,
+            is_selected: savedMatch.is_selected !== undefined ? savedMatch.is_selected : true
+          };
+        }
+        return {
+          ...v,
+          signature: sig,
+          is_selected: false
+        };
+      });
+      setProposalVariants(initialVariants);
+    } else {
+      setProposalVariants(generated);
+    }
+
+    // Catalog Suggested Variants
+    const myProducts = (allSellerProducts || []).filter((sp: any) => sp.party_id === activePartyId);
+    let filteredSellerProducts: any[] = [];
+    if (item?.catalog_product_id) {
+      const matching = myProducts.filter((sp: any) => sp.catalog_product_id === item.catalog_product_id);
+      if (matching.length > 0) filteredSellerProducts = matching;
+    }
+
+    const catalogVariants = filteredSellerProducts.flatMap((sp: any) => {
+      const mfgBrandPair = sp.manufacturer_id && sp.brand_id ? [{
+        attribute_id: 'mfg_brand_mapping',
+        group_id: "system",
+        attribute_name: "Manufacturer & Brand",
+        value_id: `${sp.manufacturer_id || "any"}:${sp.brand_id || "any"}`,
+        value_label: undefined
+      }] : [];
+
+      return (sp.variants || []).map((v: any) => {
+        const comboVals = [...mfgBrandPair, ...(v.combination_values || [])];
+        const sortedComboVals = [...comboVals].sort((a: any, b: any) => {
+          if (a.attribute_id === 'mfg_brand_mapping') return -1;
+          if (b.attribute_id === 'mfg_brand_mapping') return 1;
+          return 0;
+        });
+        const combinations = sortedComboVals.map((cv: any) => ({ ...cv, values: [{ value_label: cv.label, value_id: cv.value_id }] }));
+        const parentSpecs = sp.specifications || [];
+
+        const savedMatch = (existingQuoteSuggestedVariants || []).find((sv: any) => sv.variant_id === v.id);
+
+        return {
+          id: savedMatch?.id || crypto.randomUUID(),
+          seller_quote_id: existingQuote?.id || '',
+          seller_product_id: sp.id,
+          variant_id: v.id,
+          sku: v.sku || v.id,
+          list_price: v.price || 0,
+          offer_price: savedMatch?.offer_price ?? (v.price || 0),
+          combinations: combinations,
+          specifications: parentSpecs,
+          product_attributes: [...combinations, ...parentSpecs],
+          is_selected: savedMatch ? savedMatch.is_selected : false,
+          buyer_accepted: savedMatch ? savedMatch.buyer_accepted : false
+        };
+      });
+    }) || [];
+
+    setProposalSuggestedVariants(catalogVariants);
+
+  }, [item, itemAttributes, catalogAttributes, catalogAttributeValues, allSellerProducts, existingQuote, existingQuoteAttributes, existingQuoteVariants, existingQuoteSuggestedVariants, existingQuoteAttributeComments, existingQuoteVariantComments]);
+
+  // 6. Derived Selectors & Memos
+
+  const isViewOnly = ['SUBMITTED', "DEVIATION_ACCEPTED", "PRODUCT_SUBMIT_REVISION", "FINAL_ACKNOWLEDGE", 'REJECTED'].includes(existingQuote?.status ?? '');
+
+  const totalSelectedCustom = proposalVariants.filter(v => v.is_selected).length;
+  const totalSelectedSuggested = proposalSuggestedVariants.filter(sv => sv.is_selected).length;
+  const totalSelected = totalSelectedCustom + totalSelectedSuggested;
+
+  const selectedOfferedItems = [
+    ...proposalVariants.filter(v => v.is_selected).map(v => ({
+      id: v.id,
+      type: 'CUSTOM' as const,
+      title: 'Custom Option Combination',
+      sku: undefined,
+      list_price: undefined,
+      offer_price: v.offer_price,
+      combinations: v.combinations,
+      product_attributes: (v as any).product_attributes || [],
+      buyer_accepted: v.buyer_accepted
+    })),
+    ...proposalSuggestedVariants.filter(sv => sv.is_selected).map(sv => ({
+      id: sv.id,
+      type: 'SUGGESTED' as const,
+      title: sv.sku || sv.id,
+      sku: sv.sku,
+      list_price: sv.list_price,
+      offer_price: sv.offer_price,
+      combinations: sv.combinations,
+      product_attributes: (sv as any).product_attributes || [],
+      buyer_accepted: sv.buyer_accepted
+    }))
+  ];
+
+  const variantSku = React.useMemo(() => {
+    if (item?.variant_id && allSellerProducts) {
+      const sp = allSellerProducts.find((p: any) => p.variants?.some((v: any) => v.id === item.variant_id));
+      if (sp) {
+        const v = sp.variants?.find((v: any) => v.id === item.variant_id);
+        return v?.sku || item.variant_id;
+      }
+      return item.variant_id;
+    }
+    return '';
+  }, [item?.variant_id, allSellerProducts]);
+
+  // 7. Action Handlers
+  const recalculateVariants = (currentAttributes: Record<string, ProposalAttribute>) => {
+    setBulkPrice(undefined);
+    setProposalVariants(prev => generateVariantsFromAttributes(currentAttributes, prev));
+  };
+
+  const handleSave = async (submitMode: 'DRAFT' | 'SUBMITTED') => {
+    if (!item || !rfq || !activePartyId) return;
+
+    setSubmitting(true);
+    try {
+      const quoteId = existingQuote?.id || crypto.randomUUID();
+      const offerQty = item.req_quantity || 0;
+      const qtyUnit = item.req_unit || 'pcs';
+
+      const selectedCustomVariants = proposalVariants.filter(v => v.is_selected);
+      const selectedSuggestedVariants = proposalSuggestedVariants.filter(sv => sv.is_selected);
+
+      if (totalSelected === 0) {
+        antMessage.error('Please select at least one proposal option or catalog SKU to include in your offer.');
+        setSubmitting(false);
+        return;
+      }
+
+      const invalidCustom = selectedCustomVariants.filter(v => typeof v.offer_price !== 'number' || isNaN(v.offer_price) || v.offer_price <= 0);
+      const invalidSuggested = selectedSuggestedVariants.filter(sv => typeof sv.offer_price !== 'number' || isNaN(sv.offer_price) || sv.offer_price <= 0);
+
+      if (invalidCustom.length > 0 || invalidSuggested.length > 0) {
+        antMessage.error('Offer price for all selected options must be greater than $0.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (submitMode === 'SUBMITTED') {
+        if (isNaN(offerQty) || offerQty <= 0) {
+          antMessage.error('Please enter a valid quantity.');
+          setSubmitting(false);
+          return;
+        }
+      }
+
+      const quoteToSave: SellerQuote = {
+        id: quoteId,
+        rfq_item_id: item.id,
+        round: existingQuote?.round || 1,
+        seller_party_id: activePartyId,
+        seller_quote_number: existingQuote?.seller_quote_number || 'SQ-DRAFT',
+        offer_quantity: offerQty || 0,
+        offer_unit: qtyUnit,
+        status: submitMode,
+        created_at: existingQuote?.created_at || new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      const attributesToSave: SellerQuoteAttribute[] = [];
+      Object.entries(proposalAttributes).forEach(([key, attributeData]) => {
+        if (attributeData) {
+          attributesToSave.push({
+            id: crypto.randomUUID(),
+            seller_quote_id: quoteId,
+            attribute_type: attributeData.attribute_type,
+            group_id: attributeData.group_id,
+            attribute_id: attributeData.attribute_id,
+            is_variant: attributeData.is_variant,
+            req_value: attributeData.req_value || [],
+            values: attributeData.values || [],
+            is_deviation: attributeData.is_deviation,
+            deviation_note: attributeData.deviation_note || '',
+            buyer_accepted: attributeData.buyer_accepted || false,
+            connector: attributeData.connector || 'AND'
+          });
+        }
+      });
+
+      const attributeCommentsToSave: SellerQuoteAttributeComment[] = [];
+      attributesToSave.forEach((attr) => {
+        const key = `${attr.group_id}_${attr.attribute_id}`;
+        const newCommText = newAttributeComments[key]?.trim();
+        if (newCommText) {
+          attributeCommentsToSave.push({
+            id: crypto.randomUUID(),
+            seller_quote_id: quoteId,
+            round: existingQuote?.round || 1,
+            attribute_type: attr.attribute_type,
+            group_id: attr.group_id,
+            attribute_id: attr.attribute_id,
+            comment: newCommText,
+            actor_type: "SELLER",
+            actor_id: activePartyId,
+            created_at: new Date().toISOString(),
+          });
+        }
+      });
+
+      const variantsToSave: SellerQuoteVariant[] = selectedCustomVariants.map(v => {
+        const sig = v.signature || computeSignature(v.combinations);
+        const dbMatch = dbVariants.find(dbV => dbV.id === v.id || (dbV.signature || computeSignature(dbV.combinations)) === sig);
+        return {
+          ...dbMatch,
+          ...v,
+          id: dbMatch?.id || v.id,
+          seller_quote_id: quoteId,
+          offer_price: v.offer_price,
+          is_selected: true
+        };
+      });
+
+      const suggestedVariantsToSave: SellerQuoteSuggestedVariant[] = selectedSuggestedVariants.map(sv => ({
+        id: sv.id || crypto.randomUUID(),
+        seller_quote_id: quoteId,
+        seller_product_id: sv.seller_product_id,
+        variant_id: sv.variant_id,
+        sku: sv.sku,
+        list_price: sv.list_price,
+        offer_price: sv.offer_price,
+        combinations: sv.combinations,
+        specifications: sv.specifications,
+        is_selected: true,
+        buyer_accepted: sv.buyer_accepted || false
+      }));
+
+      const variantCommentsToSave: SellerQuoteVariantComment[] = [];
+      selectedOfferedItems.forEach((opt) => {
+        const newCommText = newVariantComments[opt.id]?.trim();
+        if (newCommText) {
+          variantCommentsToSave.push({
+            id: crypto.randomUUID(),
+            seller_quote_id: quoteId,
+            round: existingQuote?.round || 1,
+            variant_id: opt.id,
+            variant_type: opt.type,
+            comment: newCommText,
+            actor_type: "SELLER",
+            actor_id: activePartyId,
+            created_at: new Date().toISOString(),
+          });
+        }
+      });
+
+      await rfqDb.transaction('rw', [
+        rfqDb.seller_quotes,
+        rfqDb.seller_quote_attributes,
+        rfqDb.seller_quote_variants,
+        rfqDb.seller_quote_suggested_variants,
+        rfqDb.seller_quote_attribute_comments,
+        rfqDb.seller_quote_variant_comments,
+        rfqDb.seller_quote_comments
+      ], async () => {
+        await rfqDb.seller_quotes.put(quoteToSave);
+
+        const oldAttrs = await rfqDb.seller_quote_attributes.where('seller_quote_id').equals(quoteId).toArray();
+        await rfqDb.seller_quote_attributes.bulkDelete(oldAttrs.map(a => a.id));
+        if (attributesToSave.length > 0) {
+          await rfqDb.seller_quote_attributes.bulkAdd(attributesToSave);
+        }
+
+        const oldVariants = await rfqDb.seller_quote_variants.where('seller_quote_id').equals(quoteId).toArray();
+        await rfqDb.seller_quote_variants.bulkDelete(oldVariants.map(v => v.id));
+        if (variantsToSave.length > 0) {
+          await rfqDb.seller_quote_variants.bulkAdd(variantsToSave);
+        }
+
+        const oldSuggested = await rfqDb.seller_quote_suggested_variants.where('seller_quote_id').equals(quoteId).toArray();
+        await rfqDb.seller_quote_suggested_variants.bulkDelete(oldSuggested.map(sv => sv.id));
+        if (suggestedVariantsToSave.length > 0) {
+          await rfqDb.seller_quote_suggested_variants.bulkAdd(suggestedVariantsToSave);
+        }
+
+        if (attributeCommentsToSave.length > 0) {
+          await rfqDb.seller_quote_attribute_comments.bulkAdd(attributeCommentsToSave);
+          await rfqDb.seller_quote_comments.bulkAdd(attributeCommentsToSave);
+        }
+
+        if (variantCommentsToSave.length > 0) {
+          await rfqDb.seller_quote_variant_comments.bulkAdd(variantCommentsToSave);
+        }
+      });
+
+      antMessage.success(submitMode === 'SUBMITTED' ? 'Proposal submitted successfully!' : 'Draft saved successfully!');
+      navigate(basePath);
+    } catch (err) {
+      console.error(err);
+      antMessage.error('Failed to save proposal');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 8. Render Loading & Auth Guards
+  const isLoading = data === undefined;
+
+  if (isLoading) {
+    return (
+      <div className="p-12 text-center text-slate-500">
+        <h2 className="text-xl font-bold text-slate-800 font-sans animate-pulse">Loading Quote Workspace...</h2>
+      </div>
+    );
+  }
+
+  if (!rfq || !item) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-6">
+
+      {/* Request & Proposal Details */}
+      <Descriptions
+        title={
+          <div className="flex items-center justify-between px-3 w-full">
+            <span className="text-sm font-bold text-slate-800">Request & Proposal Details</span>
+            <AntButton
+              size="small"
+              icon={<Lucide.Columns size={14} />}
+              onClick={() => setCompareModalVisible(true)}
+              disabled={totalSelected === 0}
+              className="bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 font-semibold"
+            >
+              Compare Selected ({totalSelected})
+            </AntButton>
+          </div>
+        }
+        bordered
+        size="small"
+        column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
+        labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
+        contentStyle={{ fontSize: '12px', color: '#1e293b' }}
+        classNames={{ header: "mb-1" }}
+        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200"
+      >
+        <Descriptions.Item label="RFQ Number">
+          <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Quote Reference">
+          <AntTag color="purple" className="font-mono font-bold m-0 text-xs">
+            {existingQuote?.seller_quote_number || 'N/A'}{existingQuote?.id ? ` | ${existingQuote.id}` : ''}
+          </AntTag>
+        </Descriptions.Item>
+        <Descriptions.Item label="Quote Status">
+          <AntTag
+            color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
+            className="m-0 text-xs"
+          >
+            {existingQuote?.status || 'NEW'}
+          </AntTag>
+        </Descriptions.Item>
+        <Descriptions.Item label="Round">
+          <div className="flex items-center gap-1.5">
+            <ReloadOutlined className="text-blue-500 text-xs" />
+            <span className="font-semibold text-slate-800 text-xs">Round {existingQuote?.round ?? 1}</span>
+          </div>
+        </Descriptions.Item>
+        <Descriptions.Item label="Product / Service">
+          <span className="text-slate-900 font-semibold text-xs">{catalogProduct?.name || 'Custom Specifications'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Category">
+          <span className="text-slate-700 text-xs">{categories?.find((c) => c.id === item.category_id)?.name || 'Unknown'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="SKU">
+          {item?.variant_id ? (
+            <AntTag color="purple" className="font-mono font-semibold m-0 text-xs">{variantSku || item.variant_id}</AntTag>
+          ) : (
+            <AntTag color="orange" className="font-semibold m-0 text-xs">Custom Product</AntTag>
+          )}
+        </Descriptions.Item>
+        <Descriptions.Item label="Requested Quantity">
+          <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+        </Descriptions.Item>
+        {existingQuote?.created_at && (
+          <Descriptions.Item label="Created">
+            <span className="text-slate-600 text-xs">{new Date(existingQuote.created_at).toLocaleString()}</span>
+          </Descriptions.Item>
+        )}
+        {existingQuote?.updated_at && (
+          <Descriptions.Item label="Last Updated">
+            <span className="text-slate-600 text-xs">{new Date(existingQuote.updated_at).toLocaleString()}</span>
+          </Descriptions.Item>
+        )}
+      </Descriptions>
+      {/* Section 1: Attribute Configuration & Specifications */}
+      <Section1AttributeConfig
+        rfqId={rfqId}
+        itemId={itemId}
+        activePartyId={activePartyId}
+        isViewOnly={isViewOnly}
+        proposalAttributes={proposalAttributes}
+        setProposalAttributes={setProposalAttributes}
+        recalculateVariants={recalculateVariants}
+        attributeComments={attributeComments}
+        newAttributeComments={newAttributeComments}
+        setNewAttributeComments={setNewAttributeComments}
+        existingQuote={existingQuote || null}
+        existingQuoteAttributes={existingQuoteAttributes || []}
+      />
+
+      {/* Section 2: Auto-Generated Combinations Pool */}
+      <Section2CombinationsMatrix
+        isViewOnly={isViewOnly}
+        proposalVariants={proposalVariants}
+        setProposalVariants={setProposalVariants}
+      />
+
+      {/* Section 3: Suggested Catalog Product Variants */}
+      <Section3SuggestedCatalog
+        itemId={itemId}
+        activePartyId={activePartyId}
+        isViewOnly={isViewOnly}
+        proposalSuggestedVariants={proposalSuggestedVariants}
+        setProposalSuggestedVariants={setProposalSuggestedVariants}
+      />
+
+      {/* Section 4: Selected Offered Proposal Options & Pricing Matrix */}
+      <Section4OfferedPricing
+        isViewOnly={isViewOnly}
+        selectedOfferedItems={selectedOfferedItems}
+        proposalVariants={proposalVariants}
+        setProposalVariants={setProposalVariants}
+        proposalSuggestedVariants={proposalSuggestedVariants}
+        setProposalSuggestedVariants={setProposalSuggestedVariants}
+        variantComments={variantComments}
+        newVariantComments={newVariantComments}
+        setNewVariantComments={setNewVariantComments}
+        bulkPrice={bulkPrice}
+        setBulkPrice={setBulkPrice}
+        existingQuote={existingQuote || null}
+      />
+
+      {/* Comparison Modal */}
+      <ComparisonMatrixModal
+        visible={compareModalVisible}
+        onCancel={() => setCompareModalVisible(false)}
+        itemId={itemId}
+        selectedOfferedItems={selectedOfferedItems}
+      />
+
+      {!isViewOnly && (
+        <div className="pt-6 flex justify-end gap-3 mt-6 border-t border-slate-200">
+          <AntButton onClick={() => navigate(basePath)}>Cancel</AntButton>
+          <AntButton
+            icon={<Lucide.Columns size={15} />}
+            onClick={() => setCompareModalVisible(true)}
+            disabled={totalSelected === 0}
+          >
+            Compare Selected ({totalSelected})
+          </AntButton>
+          <AntButton
+            type="primary"
+            icon={<SendOutlined />}
+            onClick={() => handleSave('SUBMITTED')}
+            loading={submitting}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            Submit Proposal
+          </AntButton>
+        </div>
+      )}
+    </div>
   );
 };
 
