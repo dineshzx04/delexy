@@ -3,12 +3,13 @@ import {
   Button as AntButton,
   Tag as AntTag,
   Popconfirm as AntPopconfirm,
-  message as antMessage,
   Card as AntCard,
-  Spin
+  Spin,
+  App as AntApp
 } from 'antd';
 import * as Lucide from 'lucide-react';
 import { userDb } from '../../data/user';
+import { businessDb } from '../../data/business';
 import { catalogDb } from '../../data/catalog';
 import { seedDatabase } from '../../data/seed';
 
@@ -24,6 +25,7 @@ export interface StorageItem {
 }
 
 const IndexedDbManager: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const [databases, setDatabases] = useState<IDBInfo[]>([]);
   const [localStorageItems, setLocalStorageItems] = useState<StorageItem[]>([]);
   const [sessionStorageItems, setSessionStorageItems] = useState<StorageItem[]>([]);
@@ -207,6 +209,12 @@ const IndexedDbManager: React.FC = () => {
         await userDb.open();
       }
       for (const t of userDb.tables) {
+        await t.clear();
+      }
+      if (!businessDb.isOpen()) {
+        await businessDb.open();
+      }
+      for (const t of businessDb.tables) {
         await t.clear();
       }
       if (!catalogDb.isOpen()) {

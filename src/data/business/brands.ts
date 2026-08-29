@@ -5,7 +5,8 @@ export const mockBrands: Brand[] = [
     id: "brd-1",
     name: "Samsung",
     slug: "samsung",
-    logo_url: "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=150",
+    logo_url:
+      "https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=150",
     is_verified: true,
     is_active: true,
     created_at: "2026-01-15T08:00:00.000Z",
@@ -15,7 +16,8 @@ export const mockBrands: Brand[] = [
     id: "brd-2",
     name: "ASUS",
     slug: "asus",
-    logo_url: "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=150",
+    logo_url:
+      "https://images.unsplash.com/photo-1588872657578-7efd1f1555ed?w=150",
     is_verified: true,
     is_active: true,
     created_at: "2026-01-15T08:00:00.000Z",
@@ -25,7 +27,8 @@ export const mockBrands: Brand[] = [
     id: "brd-3",
     name: "Sony",
     slug: "sony",
-    logo_url: "https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=150",
+    logo_url:
+      "https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=150",
     is_verified: true,
     is_active: true,
     created_at: "2026-01-15T08:00:00.000Z",
@@ -36,7 +39,7 @@ export const mockBrands: Brand[] = [
     name: "ASICS",
     slug: "asics",
     logo_url: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=150",
-    is_verified: false,
+    is_verified: true,
     is_active: true,
     created_at: "2026-05-10T08:00:00.000Z",
     updated_at: "2026-05-10T08:00:00.000Z",
@@ -45,7 +48,8 @@ export const mockBrands: Brand[] = [
     id: "brd-5",
     name: "Logitech",
     slug: "logitech",
-    logo_url: "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150",
+    logo_url:
+      "https://images.unsplash.com/photo-1615663245857-ac93bb7c39e7?w=150",
     is_verified: true,
     is_active: true,
     created_at: "2026-03-15T08:00:00.000Z",

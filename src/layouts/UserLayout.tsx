@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate, Navigate } from 'react-router-dom';
-import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Modal as AntModal, Input as AntInput, message as antMessage, Tag as AntTag } from 'antd';
+import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Modal as AntModal, Input as AntInput, Tag as AntTag, App as AntApp } from 'antd';
 import type { MenuProps } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useWorkspace, type DynamicWorkspace } from '../contexts/WorkspaceContext';
@@ -8,6 +8,7 @@ import { useBreadcrumbContext } from '../contexts/BreadcrumbContext';
 import { cn } from '../lib/utils';
 
 const UserLayout: React.FC = () => {
+    const { message: antMessage } = AntApp.useApp();
     const [collapsed, setCollapsed] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -24,7 +25,7 @@ const UserLayout: React.FC = () => {
 
     useEffect(() => {
         const handleResize = () => {
-            const mobile = window.innerWidth < 768;
+            const mobile = window.innerWidth < 1200;
             setIsMobile(mobile);
             if (!mobile) setMobileOpen(false);
         };
@@ -79,6 +80,14 @@ const UserLayout: React.FC = () => {
         } else {
             antMessage.error('Invalid secondary switch password.');
         }
+    };
+
+    const handleGoBack = () => {
+        if (window.history.length > 1) {
+            navigate(-1);
+            return;
+        }
+        navigate('/user/dashboard');
     };
 
     const breadcrumbItems = customBreadcrumbs || [];
@@ -154,7 +163,29 @@ const UserLayout: React.FC = () => {
                     {
                         key: '/user/seller-products',
                         icon: <Lucide.Package size={18} />,
-                        label: <Link to="/user/seller-products">Sell My Products</Link>,
+                        label: <Link to="/user/seller-products">My Products</Link>,
+                    },
+                ],
+            },
+            {
+                key: 'user-sourcing-group',
+                type: 'group',
+                label: collapsed ? null : 'Enterprise Sourcing (RFQs)',
+                children: [
+                    {
+                        key: '/user/rfqs/dashboard',
+                        icon: <Lucide.BarChart3 size={18} />,
+                        label: <Link to="/user/rfqs/dashboard">Sourcing Dashboard</Link>,
+                    },
+                    {
+                        key: '/user/rfqs',
+                        icon: <Lucide.FileText size={18} />,
+                        label: <Link to="/user/rfqs">My RFQs</Link>,
+                    },
+                    {
+                        key: '/user/seller/rfqs',
+                        icon: <Lucide.Inbox size={18} />,
+                        label: <Link to="/user/seller/rfqs">Seller RFQ Opportunities</Link>,
                     },
                 ],
             },
@@ -164,9 +195,9 @@ const UserLayout: React.FC = () => {
                 label: collapsed ? null : 'Business Actions',
                 children: [
                     {
-                        key: '/user/create-business',
-                        icon: <Lucide.PlusCircle size={18} />,
-                        label: <Link to="/user/create-business">Create Business</Link>,
+                        key: '/user/business-submissions',
+                        icon: <Lucide.FileCheck size={18} />,
+                        label: <Link to="/user/business-submissions">Business Applications</Link>,
                     },
                 ],
             },
@@ -352,6 +383,16 @@ const UserLayout: React.FC = () => {
 
                 {/* Main Body */}
                 <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full">
+                    <div className="mb-3">
+                        <AntButton
+                            type="default"
+                            icon={<Lucide.ArrowLeft size={16} />}
+                            onClick={handleGoBack}
+                            className="h-9 px-3 rounded-md border-slate-300 text-slate-700 font-medium hover:border-slate-400 hover:text-slate-900"
+                        >
+                            Back to Previous Page
+                        </AntButton>
+                    </div>
                     {breadcrumbItems.length > 0 && (
                         <div className="mb-6">
                             <AntBreadcrumb

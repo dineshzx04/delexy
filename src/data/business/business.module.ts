@@ -52,3 +52,109 @@ export interface Manufacturer {
   created_at: string;
   updated_at: string;
 }
+
+export interface BusinessSubmissionSectionItem {
+  field_key: string;
+  field_label: string;
+  section: 'CORE_INFO' | 'LEGAL_TAX' | 'ADDRESS' | 'CLAIMED_BRANDS' | 'CLAIMED_MANUFACTURER' | 'DOCUMENTS';
+  value: any;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejection_comment?: string;
+}
+
+export interface BusinessSubmissionDocument {
+  id: string;
+  doc_type: 'TAX_CERTIFICATE' | 'BUSINESS_LICENSE' | 'TRADEMARK_REGISTRATION' | 'DEALER_AUTHORIZATION' | 'ID_PROOF';
+  doc_name: string;
+  doc_url: string;
+  file_size?: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  rejection_comment?: string;
+}
+
+export interface BusinessSubmissionAudit {
+  id: string;
+  round: number;
+  actor_id: string;
+  actor_name: string;
+  action: 'SUBMITTED' | 'REQUESTED_REVISION' | 'APPROVED' | 'REJECTED';
+  notes?: string;
+  timestamp: string;
+}
+
+export interface BusinessSubmission {
+  id: string;
+  user_id: string;
+  business_name: string;
+  legal_name: string;
+  website?: string;
+  phone?: string;
+  country_code: string;
+  tax_id: string;
+  registration_number?: string;
+  
+  address: {
+    line1: string;
+    line2?: string;
+    city: string;
+    state_province: string;
+    postal_code: string;
+    country_code: string;
+  };
+
+  to_claim_party_id?: string;
+  to_claim_party_name: string;
+  
+  documents: BusinessSubmissionDocument[];
+  sections: Record<string, BusinessSubmissionSectionItem>;
+
+  status: 'SUBMITTED' | 'UNDER_REVIEW' | 'NEEDS_REVISION' | 'APPROVED' | 'REJECTED';
+  current_round: number;
+  submitted_at?: string;
+  reviewed_at?: string;
+  reviewed_by_user_name?: string;
+  
+  audit_history: BusinessSubmissionAudit[];
+
+  created_at: string;
+  updated_at: string;
+}
+
+export type BrandSubmissionType = 'CLAIM' | 'CREATE_NEW';
+
+export interface BrandSubmission {
+  id: string;
+  party_id: string;
+  user_id: string;
+  submission_type: BrandSubmissionType;
+  brand_id?: string;
+  brand_name: string;
+  brand_slug: string;
+  logo_url?: string;
+  manufacturer_party_id?: string;
+  manufacturer_company_name?: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'NEEDS_REVISION' | 'APPROVED' | 'REJECTED';
+  current_round: number;
+  rejection_comments?: string;
+  sections?: Record<string, BusinessSubmissionSectionItem>;
+  audit_history?: BusinessSubmissionAudit[];
+  created_at: string;
+  updated_at: string;
+}
+
+export type ManufacturerSubmissionType = 'REGISTER_NEW' | 'CLAIM_PARTY';
+
+export interface ManufacturerSubmission {
+  id: string;
+  party_id: string;
+  user_id: string;
+  submission_type: ManufacturerSubmissionType;
+  company_name: string;
+  registration_number?: string;
+  target_party_id?: string;
+  status: 'DRAFT' | 'SUBMITTED' | 'UNDER_REVIEW' | 'NEEDS_REVISION' | 'APPROVED' | 'REJECTED';
+  current_round: number;
+  rejection_comments?: string;
+  created_at: string;
+  updated_at: string;
+}

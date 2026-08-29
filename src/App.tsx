@@ -20,6 +20,7 @@ import UserAddresses from './pages/user/UserAddresses';
 import UserIdentifications from './pages/user/UserIdentifications';
 import UserBrands from './pages/user/UserBrands';
 import CreateBusiness from './pages/user/CreateBusiness';
+import UserBusinessSubmissions from './pages/user/UserBusinessSubmissions';
 import UserSellerProducts from './pages/user/UserSellerProducts';
 import SellerProductSubmissionForm from './pages/user/SellerProductSubmissionForm';
 
@@ -28,9 +29,23 @@ import BusinessMembers from './pages/business/BusinessMembers';
 import BusinessRoles from './pages/business/BusinessRoles';
 import BusinessEmailsPage from './pages/business/BusinessEmailsPage';
 import BusinessSettings from './pages/business/BusinessSettings';
-import BusinessRFQs from './pages/business/BusinessRFQs';
 import BusinessProfile from './pages/business/BusinessProfile';
-import BusinessBrands from './pages/business/BusinessBrands';
+import BusinessPartyManufacturerBrands from './pages/business/BusinessPartyManufacturerBrands';
+
+// Enterprise Sourcing RFQ Pages
+import { BuyerDashboard } from './pages/rfq/BuyerDashboard';
+import { RfqList } from './pages/rfq/RfqList';
+import { RfqCreateWizard } from './pages/rfq/RfqCreateWizard';
+import { RfqWorkspace } from './pages/rfq/RfqWorkspace';
+import { ItemDetailWorkspace } from './pages/rfq/ItemDetailWorkspace';
+import { SupplierRfqInbox } from './pages/rfq/SupplierRfqInbox';
+import { SupplierItemRespond } from './pages/rfq/SupplierItemRespond';
+import { SupplierProductMapping } from './pages/rfq/SupplierProductMapping';
+import { RequesterQuoteReview } from './pages/rfq/RequesterQuoteReview';
+import { RfqAwardReleasePo } from './pages/rfq/RfqAwardReleasePo';
+import { SupplierAwardReceipt } from './pages/rfq/SupplierAwardReceipt';
+import { RfqAwardCheckMapping } from './pages/rfq/RfqAwardCheckMapping';
+
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 import PlatformLayout from './layouts/PlatformLayout';
 import PlatformDashboard from './pages/platform/PlatformDashboard';
@@ -50,6 +65,8 @@ import PlatformRoles from './pages/platform/PlatformRoles';
 import PlatformSellerProducts from './pages/platform/PlatformSellerProducts';
 import PlatformSellerProductReviewQueue from './pages/platform/PlatformSellerProductReviewQueue';
 import PlatformSellerProductReviewDetail from './pages/platform/PlatformSellerProductReviewDetail';
+import PlatformBusinessReviewQueue from './pages/platform/PlatformBusinessReviewQueue';
+import PlatformBusinessReviewDetail from './pages/platform/PlatformBusinessReviewDetail';
 
 import NotFound from './pages/common/NotFound';
 
@@ -112,7 +129,24 @@ const App: React.FC = () => {
                 <Route path="seller-products" element={<UserSellerProducts />} />
                 <Route path="seller-products/create" element={<SellerProductSubmissionForm />} />
                 <Route path="seller-products/edit/:id" element={<SellerProductSubmissionForm />} />
-                <Route path="create-business" element={<CreateBusiness />} />
+                <Route path="business-submissions" element={<UserBusinessSubmissions />} />
+                <Route path="business-submissions/new" element={<CreateBusiness />} />
+                <Route path="business-submissions/edit/:id" element={<CreateBusiness />} />
+
+                {/* User RFQ Sourcing Routes */}
+                <Route path="rfqs/dashboard" element={<BuyerDashboard />} />
+                <Route path="rfqs" element={<RfqList />} />
+                <Route path="rfqs/create" element={<RfqCreateWizard />} />
+                <Route path="rfqs/:rfqId" element={<RfqWorkspace />} />
+                <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
+                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
+                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/check-mapping" element={<RfqAwardCheckMapping />} />
+                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/release-po" element={<RfqAwardReleasePo />} />
+                <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
+
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
             </Route>
@@ -123,15 +157,29 @@ const App: React.FC = () => {
                 <Route index element={<Navigate to="dashboard" replace />} />
                 <Route path="dashboard" element={<BusinessDashboard />} />
                 <Route path="profile" element={<BusinessProfile />} />
-                <Route path="brands" element={<BusinessBrands />} />
+                <Route path="party-brands" element={<BusinessPartyManufacturerBrands />} />
                 <Route path="members" element={<BusinessMembers />} />
                 <Route path="roles" element={<BusinessRoles />} />
                 <Route path="emails" element={<BusinessEmailsPage />} />
                 <Route path="settings" element={<BusinessSettings />} />
-                <Route path="rfqs" element={<BusinessRFQs />} />
                 <Route path="products" element={<UserSellerProducts />} />
                 <Route path="products/create" element={<SellerProductSubmissionForm />} />
                 <Route path="products/edit/:id" element={<SellerProductSubmissionForm />} />
+
+                {/* Business RFQ Sourcing Routes */}
+                <Route path="rfqs/dashboard" element={<BuyerDashboard />} />
+                <Route path="rfqs" element={<RfqList />} />
+                <Route path="rfqs/create" element={<RfqCreateWizard />} />
+                <Route path="rfqs/:rfqId" element={<RfqWorkspace />} />
+                <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
+                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
+                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/check-mapping" element={<RfqAwardCheckMapping />} />
+                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/release-po" element={<RfqAwardReleasePo />} />
+                <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                {/* <Route path="seller/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} /> */}
+                <Route path="seller/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
+
                 <Route path="*" element={<NotFound scope="business" />} />
               </Route>
             </Route>
@@ -150,12 +198,15 @@ const App: React.FC = () => {
                 <Route path="seller-products" element={<PlatformSellerProducts />} />
                 <Route path="seller-product-reviews" element={<PlatformSellerProductReviewQueue />} />
                 <Route path="seller-product-reviews/:id" element={<PlatformSellerProductReviewDetail />} />
+                <Route path="business-reviews" element={<PlatformBusinessReviewQueue />} />
+                <Route path="business-reviews/:id" element={<PlatformBusinessReviewDetail />} />
                 <Route path="users" element={<PlatformUsers />} />
                 <Route path="user-registry" element={<PlatformUserRegistry />} />
                 <Route path="businesses" element={<PlatformBusinesses />} />
                 <Route path="parties" element={<PlatformParties />} />
                 <Route path="manufacturers" element={<PlatformManufacturers />} />
                 <Route path="brands" element={<PlatformBrands />} />
+                <Route path="brand-claims" element={<PlatformBrands />} />
                 <Route path="platform-roles" element={<PlatformRoles />} />
                 <Route path="*" element={<NotFound scope="platform" />} />
               </Route>

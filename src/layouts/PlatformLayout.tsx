@@ -18,7 +18,7 @@ const PlatformLayout: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 768;
+      const mobile = window.innerWidth < 1200;
       setIsMobile(mobile);
       if (!mobile) setMobileOpen(false);
     };
@@ -36,6 +36,14 @@ const PlatformLayout: React.FC = () => {
     } else {
       navigate('/user/dashboard');
     }
+  };
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/p/dashboard');
   };
 
   const breadcrumbItems = customBreadcrumbs || [];
@@ -80,19 +88,24 @@ const PlatformLayout: React.FC = () => {
       label: collapsed ? null : "Organization",
       children: [
         {
+          key: "/p/parties",
+          icon: <Lucide.Building2 size={16} />,
+          label: <Link to="/p/parties">Parties & Claims</Link>,
+        },
+        {
           key: "/p/businesses",
           icon: <Lucide.Building size={16} />,
           label: <Link to="/p/businesses">Businesses</Link>,
         },
         {
+          key: "/p/business-reviews",
+          icon: <Lucide.FileCheck size={16} />,
+          label: <Link to="/p/business-reviews">Business Reviews & Audit</Link>,
+        },
+        {
           key: "/p/user-registry",
           icon: <Lucide.UserCheck size={16} />,
           label: <Link to="/p/user-registry">All Users Registry</Link>,
-        },
-        {
-          key: "/p/parties",
-          icon: <Lucide.Building2 size={16} />,
-          label: <Link to="/p/parties">Parties & Claims</Link>,
         },
       ],
     },
@@ -111,7 +124,7 @@ const PlatformLayout: React.FC = () => {
         {
           key: "/p/brands",
           icon: <Lucide.Award size={16} />,
-          label: <Link to="/p/brands">Brands</Link>,
+          label: <Link to="/p/brands">Brands & Claims Audit</Link>,
         },
         {
           key: "/p/manufacturers",
@@ -131,7 +144,7 @@ const PlatformLayout: React.FC = () => {
         {
           key: "/p/seller-product-reviews",
           icon: <Lucide.ShieldCheck size={16} />,
-          label: <Link to="/p/seller-product-reviews">Product Reviews & Audit</Link>,
+          label: <Link to="/p/seller-product-reviews">Seller Product Reviews</Link>,
         },
       ],
     },
@@ -331,6 +344,16 @@ const PlatformLayout: React.FC = () => {
 
         {/* Scrollable Content */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full">
+          <div className="mb-3">
+            <AntButton
+              type="default"
+              icon={<Lucide.ArrowLeft size={16} />}
+              onClick={handleGoBack}
+              className="h-9 px-3 rounded-md border-gray-300 text-gray-700 font-medium hover:border-gray-400 hover:text-gray-900"
+            >
+              Back to Previous Page
+            </AntButton>
+          </div>
           {breadcrumbItems.length > 0 && (
             <div className="mb-6">
               <AntBreadcrumb

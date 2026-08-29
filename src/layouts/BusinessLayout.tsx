@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Tag as AntTag, Modal as AntModal, Input as AntInput, message as antMessage } from 'antd';
+import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Tag as AntTag, Modal as AntModal, Input as AntInput, App as AntApp } from 'antd';
 import type { MenuProps } from 'antd';
 import * as Lucide from 'lucide-react';
 import { useWorkspace, type DynamicWorkspace } from '../contexts/WorkspaceContext';
@@ -8,6 +8,7 @@ import { useBreadcrumbContext } from '../contexts/BreadcrumbContext';
 import { cn } from '../lib/utils';
 
 const BusinessLayout: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -24,7 +25,7 @@ const BusinessLayout: React.FC = () => {
 
   useEffect(() => {
     const handleResize = () => {
-      const mobile = window.innerWidth < 768;
+      const mobile = window.innerWidth < 1200;
       setIsMobile(mobile);
       if (!mobile) setMobileOpen(false);
     };
@@ -74,6 +75,14 @@ const BusinessLayout: React.FC = () => {
     } else {
       antMessage.error('Invalid secondary switch password.');
     }
+  };
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+    navigate('/b/dashboard');
   };
 
   const breadcrumbItems = customBreadcrumbs || [];
@@ -139,44 +148,61 @@ const BusinessLayout: React.FC = () => {
             label: <Link to="/b/products">Products</Link>,
           },
           {
-            key: '/b/rfqs',
-            icon: <Lucide.FileText size={18} />,
-            label: <Link to="/b/rfqs">RFQs & Quotes</Link>,
-          },
-          {
-            key: '/b/brands',
+            key: '/b/party-brands',
             icon: <Lucide.Award size={18} />,
-            label: <Link to="/b/brands">Brands & Claiming</Link>,
+            label: <Link to="/b/party-brands">Party, Manufacturer & Brands</Link>,
           },
         ],
       },
       {
-        key: 'team-rbac-group',
+        key: 'enterprise-sourcing-group',
         type: 'group',
-        label: collapsed ? null : 'Organization & Team',
+        label: collapsed ? null : 'Enterprise Sourcing (RFQs)',
         children: [
           {
-            key: '/b/members',
-            icon: <Lucide.Users size={18} />,
-            label: <Link to="/b/members">Team Members</Link>,
+            key: '/b/rfqs/dashboard',
+            icon: <Lucide.BarChart3 size={18} />,
+            label: <Link to="/b/rfqs/dashboard">Sourcing Dashboard</Link>,
           },
           {
-            key: '/b/roles',
-            icon: <Lucide.ShieldCheck size={18} />,
-            label: <Link to="/b/roles">Roles & RBAC Permissions</Link>,
+            key: '/b/rfqs',
+            icon: <Lucide.FileText size={18} />,
+            label: <Link to="/b/rfqs">RFQ Containers</Link>,
           },
           {
-            key: '/b/business-emails',
-            icon: <Lucide.Mail size={18} />,
-            label: <Link to="/b/business-emails">Corporate Emails</Link>,
-          },
-          {
-            key: '/b/settings',
-            icon: <Lucide.Settings size={18} />,
-            label: <Link to="/b/settings">Settings</Link>,
+            key: '/b/seller/rfqs',
+            icon: <Lucide.Inbox size={18} />,
+            label: <Link to="/b/seller/rfqs">Seller RFQ Opportunities</Link>,
           },
         ],
       },
+      // {
+      //   key: 'team-rbac-group',
+      //   type: 'group',
+      //   label: collapsed ? null : 'Organization & Team',
+      //   children: [
+      //     {
+      //       key: '/b/members',
+      //       icon: <Lucide.Users size={18} />,
+      //       label: <Link to="/b/members">Team Members</Link>,
+      //     },
+      //     {
+      //       key: '/b/roles',
+      //       icon: <Lucide.ShieldCheck size={18} />,
+      //       label: <Link to="/b/roles">Roles & RBAC Permissions</Link>,
+      //     },
+      //     // {
+      //     //   key: '/b/business-emails',
+      //     //   icon: <Lucide.Mail size={18} />,
+      //     //   label: <Link to="/b/business-emails">Corporate Emails</Link>,
+      //     // },
+      //     // {
+      //     //   key: '/b/settings',
+      //     //   icon: <Lucide.Settings size={18} />,
+      //     //   label: <Link to="/b/settings">Settings</Link>,
+      //     // },
+      //   ],
+      // },
     ];
   };
 
@@ -278,7 +304,7 @@ const BusinessLayout: React.FC = () => {
           <div className="flex items-center gap-2 sm:gap-4">
             <AntButton
               type="text"
-              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.ChevronLeft size={20} />)}
+              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.PanelLeftClose size={20} />)}
               onClick={() => {
                 if (isMobile) {
                   setMobileOpen(!mobileOpen);
@@ -369,11 +395,21 @@ const BusinessLayout: React.FC = () => {
 
         {/* Content Body */}
         <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full">
-          {breadcrumbItems.length > 0 && (
-            <div className="mb-6">
-              <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />
-            </div>
-          )}
+          <div className="mb-3">
+            {breadcrumbItems.length > 0 && (
+              <div className="mb-6">
+                <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />
+              </div>
+            )}
+            <AntButton
+              type="default"
+              icon={<Lucide.ArrowLeft size={16} />}
+              onClick={handleGoBack}
+              className="h-9 px-3 rounded-md border-slate-300 text-slate-700 font-medium hover:border-slate-400 hover:text-slate-900"
+            >
+              Back to Previous Page
+            </AntButton>
+          </div>
           <div className="max-w-7xl w-full mx-auto min-w-0">
             <Outlet />
           </div>

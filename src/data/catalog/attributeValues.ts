@@ -16,10 +16,14 @@ export const mockAttributeValues: AttributeValue[] = [
 
   { id: 'val-7-1', attributeId: 'attr-7', value: 'Titanium Black', label: 'Titanium Black' },
   { id: 'val-7-2', attributeId: 'attr-7', value: 'Titanium Gray', label: 'Titanium Gray' },
+  { id: 'val-7-3', attributeId: 'attr-7', value: 'Red', label: 'Red' },
   { id: 'val-8-1', attributeId: 'attr-8', value: 'IP68', label: 'IP68' },
+  { id: 'val-8-2', attributeId: 'attr-8', value: 'IP67', label: 'IP67' },
+  { id: 'val-8-3', attributeId: 'attr-8', value: 'IP65', label: 'IP65' },
   { id: 'val-9-1', attributeId: 'attr-9', value: '512GB', label: '512GB' },
   { id: 'val-9-2', attributeId: 'attr-9', value: '1TB', label: '1TB' },
   { id: 'val-10-1', attributeId: 'attr-10', value: 'Snapdragon 8 Gen 3', label: 'Snapdragon 8 Gen 3' },
+  { id: 'val-10-2', attributeId: 'attr-10', value: 'Snapdragon 7 Gen 1', label: 'Snapdragon 7 Gen 1' },
   { id: 'val-11-1', attributeId: 'attr-11', value: '200 MP', label: '200 MP' },
   { id: 'val-12-1', attributeId: 'attr-12', value: '5x Periscope Optical Zoom', label: '5x Periscope Optical Zoom' },
 
@@ -36,5 +40,9 @@ export const mockAttributeValues: AttributeValue[] = [
   { id: 'val-21-1', attributeId: 'attr-21', value: '33.0 MP Full-Frame Exmor R', label: '33.0 MP Full-Frame Exmor R' },
   { id: 'val-22-1', attributeId: 'attr-22', value: 'ISO 51200', label: 'ISO 51200' },
   { id: 'val-23-1', attributeId: 'attr-23', value: '4K 60p 10-bit 4:2:2', label: '4K 60p 10-bit 4:2:2' },
-  { id: 'val-24-1', attributeId: 'attr-24', value: '10 fps Mechanical/Electronic', label: '10 fps Mechanical/Electronic' }
+  { id: 'val-24-1', attributeId: 'attr-24', value: '10 fps Mechanical/Electronic', label: '10 fps Mechanical/Electronic' },
+
+  { id: 'val-25-1', attributeId: 'attr-25', value: '5G', label: '5G' },
+  { id: 'val-25-2', attributeId: 'attr-25', value: '4G', label: '4G' },
+  { id: 'val-25-3', attributeId: 'attr-25', value: '3G', label: '3G' },
 ];

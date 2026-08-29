@@ -24,7 +24,33 @@
   }
 }
 
+.ant-select-selection-item{
+   @apply bg-slate-100/50 grow-1;
+}
 /* Custom Scrollbar Utility */
+html::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+html::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.25);
+  border-radius: 9999px;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+  background: rgb(255, 255, 255);
+}
+
+html ,*{
+  scrollbar-width: thin;
+  /* scrollbar-color: rgba(74, 182, 231, 0.692) transparent; */
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;

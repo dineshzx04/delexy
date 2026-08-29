@@ -6,7 +6,7 @@ export const mockAttributeGroups: AttributeGroup[] = [
   { id: 'grp-3', name: 'Display Details', attributeIds: ['attr-5', 'attr-6'] },
 
   { id: 'grp-4', name: 'Build & Aesthetics', attributeIds: ['attr-7', 'attr-8'] },
-  { id: 'grp-5', name: 'Processing & Memory', attributeIds: ['attr-9', 'attr-10'] },
+  { id: 'grp-5', name: 'Processing & Memory', attributeIds: ['attr-9', 'attr-10', 'attr-25'] },
   { id: 'grp-6', name: 'Optics System', attributeIds: ['attr-11', 'attr-12'] },
 
   { id: 'grp-7', name: 'Sizing & Fit', attributeIds: ['attr-13', 'attr-14'] },

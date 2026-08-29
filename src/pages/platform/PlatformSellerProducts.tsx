@@ -61,8 +61,7 @@ const PlatformSellerProducts: React.FC = () => {
     }).filter(sp =>
       sp.product_name.toLowerCase().includes(searchText.toLowerCase()) ||
       sp.id.toLowerCase().includes(searchText.toLowerCase()) ||
-      sp.part_number.toLowerCase().includes(searchText.toLowerCase()) ||
-      sp.brandName.toLowerCase().includes(searchText.toLowerCase()) ||
+      sp.brandName?.toLowerCase().includes(searchText.toLowerCase()) ||
       sp.sellerPartyName.toLowerCase().includes(searchText.toLowerCase())
     );
   }, [dbSellerProducts, dbCategories, dbMasterProducts, dbParties, dbManufacturers, dbBrands, searchText]);
@@ -278,32 +277,10 @@ const PlatformSellerProducts: React.FC = () => {
                   <span className="text-gray-400 block">Category</span>
                   <span className="font-semibold text-gray-800">{selectedProductRecord.categoryName}</span>
                 </div>
-                <div>
+                <div className="col-span-2">
                   <span className="text-gray-400 block">Master Template</span>
                   <span className="font-mono text-gray-800">{selectedProductRecord.masterProductName} ({selectedProductRecord.catalog_product_id})</span>
                 </div>
-                <div>
-                  <span className="text-gray-400 block">Part Number</span>
-                  <span className="font-mono text-gray-800">{selectedProductRecord.part_number}</span>
-                </div>
-                {selectedProductRecord.model_number && (
-                  <div>
-                    <span className="text-gray-400 block">Model Number</span>
-                    <span className="font-mono text-gray-800">{selectedProductRecord.model_number}</span>
-                  </div>
-                )}
-                {selectedProductRecord.year_of_manufacture && (
-                  <div>
-                    <span className="text-gray-400 block">Year of Manufacture</span>
-                    <span className="font-mono text-gray-800">{selectedProductRecord.year_of_manufacture}</span>
-                  </div>
-                )}
-                {selectedProductRecord.country_of_origin && (
-                  <div>
-                    <span className="text-gray-400 block">Country of Origin</span>
-                    <span className="font-semibold text-gray-800">{selectedProductRecord.country_of_origin}</span>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -332,7 +309,7 @@ const PlatformSellerProducts: React.FC = () => {
               </div>
             </div>
 
-            {/* 3. Global Specifications (Grouped) */}
+            {/* 2. Global Specifications (Grouped) */}
             <div className="space-y-2">
               <span className="font-bold text-sm text-gray-900 flex items-center gap-2">
                 <Lucide.Settings2 size={16} className="text-purple-600" />
@@ -361,7 +338,7 @@ const PlatformSellerProducts: React.FC = () => {
               )}
             </div>
 
-            {/* 4. Sellable Product Variants Matrix */}
+            {/* 3. Sellable Product Variants Matrix */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-sm text-gray-900 flex items-center gap-2">
@@ -432,36 +409,6 @@ const PlatformSellerProducts: React.FC = () => {
                   }
                 ]}
               />
-            </div>
-
-            {/* 5. Physical Dimensions & Text Documentation */}
-            <div className="space-y-2">
-              <span className="font-bold text-sm text-gray-900 flex items-center gap-2">
-                <Lucide.FileText size={16} className="text-indigo-600" />
-                Technical Documentation & Dimensions
-              </span>
-              <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 space-y-2 text-xs">
-                {(selectedProductRecord.height || selectedProductRecord.width || selectedProductRecord.length || selectedProductRecord.weight) && (
-                  <div className="grid grid-cols-4 gap-2 border-b border-gray-200 pb-2">
-                    <div><span className="text-gray-400 block">Height</span><strong>{selectedProductRecord.height || '-'}</strong></div>
-                    <div><span className="text-gray-400 block">Width</span><strong>{selectedProductRecord.width || '-'}</strong></div>
-                    <div><span className="text-gray-400 block">Length</span><strong>{selectedProductRecord.length || '-'}</strong></div>
-                    <div><span className="text-gray-400 block">Weight</span><strong>{selectedProductRecord.weight || '-'}</strong></div>
-                  </div>
-                )}
-                {selectedProductRecord.operation_instructions && (
-                  <div><span className="text-gray-400 block font-semibold">Operation Instructions:</span><p className="text-gray-700 m-0">{selectedProductRecord.operation_instructions}</p></div>
-                )}
-                {selectedProductRecord.safety_instructions && (
-                  <div><span className="text-gray-400 block font-semibold">Safety Instructions:</span><p className="text-gray-700 m-0">{selectedProductRecord.safety_instructions}</p></div>
-                )}
-                {selectedProductRecord.handling_instructions && (
-                  <div><span className="text-gray-400 block font-semibold">Handling Instructions:</span><p className="text-gray-700 m-0">{selectedProductRecord.handling_instructions}</p></div>
-                )}
-                {selectedProductRecord.maintenance_instructions && (
-                  <div><span className="text-gray-400 block font-semibold">Maintenance Instructions:</span><p className="text-gray-700 m-0">{selectedProductRecord.maintenance_instructions}</p></div>
-                )}
-              </div>
             </div>
           </div>
         )}

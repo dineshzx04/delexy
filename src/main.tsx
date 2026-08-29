@@ -1,6 +1,6 @@
  import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, App as AntApp } from 'antd';
 import App from './App';
 import { StyleProvider, legacyLogicalPropertiesTransformer } from '@ant-design/cssinjs';
 import './index.css';
@@ -34,7 +34,9 @@ if (root) {
             }
           }}
         >
-          <App />
+          <AntApp>
+            <App />
+          </AntApp>
         </ConfigProvider>
       </StyleProvider>
 

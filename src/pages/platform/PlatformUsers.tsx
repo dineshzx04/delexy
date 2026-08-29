@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Table as AntTable, Button as AntButton, Tag as AntTag, Modal as AntModal, Form as AntForm, Select as AntSelect, message as antMessage, Card as AntCard, Tooltip as AntTooltip } from 'antd';
+import { Table as AntTable, Button as AntButton, Tag as AntTag, Modal as AntModal, Form as AntForm, Select as AntSelect, Card as AntCard, Tooltip as AntTooltip, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -7,6 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { userDb, type User, type PlatformMembership, type PlatformRole } from '../../data/user';
 
 const PlatformUsers: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingMembership, setEditingMembership] = useState<any>(null);
   const [form] = AntForm.useForm();
@@ -257,20 +258,22 @@ const PlatformUsers: React.FC = () => {
       >
         <AntForm form={form} layout="vertical" onFinish={handleSaveMembership} className="mt-4">
           <AntForm.Item name="platform_role_id" label="Platform Role" rules={[{ required: true, message: 'Please select a role' }]}>
-            <AntSelect placeholder="Select a platform role">
-              {platformRoles.map((role: PlatformRole) => (
-                <AntSelect.Option key={role.id} value={role.id}>
-                  {role.role_name} ({role.permissions.length} permissions)
-                </AntSelect.Option>
-              ))}
-            </AntSelect>
+            <AntSelect
+              placeholder="Select a platform role"
+              options={platformRoles.map((role: PlatformRole) => ({
+                value: role.id,
+                label: `${role.role_name} (${role.permissions.length} permissions)`,
+              }))}
+            />
           </AntForm.Item>
 
           <AntForm.Item name="status" label="Membership Status" rules={[{ required: true }]}>
-            <AntSelect>
-              <AntSelect.Option value="ACTIVE">ACTIVE</AntSelect.Option>
-              <AntSelect.Option value="INACTIVE">INACTIVE</AntSelect.Option>
-            </AntSelect>
+            <AntSelect
+              options={[
+                { value: 'ACTIVE', label: 'ACTIVE' },
+                { value: 'INACTIVE', label: 'INACTIVE' },
+              ]}
+            />
           </AntForm.Item>
         </AntForm>
       </AntModal>

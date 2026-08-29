@@ -7,7 +7,7 @@ import {
   Select as AntSelect,
   Tag as AntTag,
   Modal as AntModal,
-  message as antMessage
+  App as AntApp
 } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -18,17 +18,10 @@ import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   userDb,
-  type EmailRecord,
-  mockUsers,
-  mockEmails,
-  mockUserEmails,
-  mockBusinessEmails,
-  mockBusinesses,
-  mockBusinessMemberships
+  type EmailRecord
 } from '../../data/user';
 import { businessDb } from '../../data/business';
 
-const { Option } = AntSelect;
 
 export interface CompactEmailDisplay {
   id: string;
@@ -52,6 +45,7 @@ interface AddEmailFormValues {
 }
 
 const UserProfile: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const { currentUserId } = useWorkspace();
   const targetUserId = currentUserId || 'usr-1';
 
@@ -63,14 +57,14 @@ const UserProfile: React.FC = () => {
 
   useBreadcrumb(breadcrumbs);
 
-  // 1. Fetch User Record from Dexie DB or fallback to mockUsers from src/data/user/users.ts
+  // 1. Fetch User Record strictly from Dexie DB (userDb.users)
   const userRecord = useLiveQuery(
     async () => await userDb.users.get(targetUserId),
     [targetUserId]
-  ) || mockUsers.find((u) => u.id === targetUserId) || mockUsers[0];
+  );
 
-  // 2. Query User Emails (Primary & Secondary) directly from Dexie DB / mockUserEmails
-  const liveUserEmails = useLiveQuery(
+  // 2. Query User Emails (Primary & Secondary) strictly from Dexie DB (userDb.userEmails + userDb.emails)
+  const individualEmails: CompactEmailDisplay[] = useLiveQuery(
     async () => {
       const uEmails = await userDb.userEmails.where('user_id').equals(targetUserId).toArray();
       const allEmails = await userDb.emails.toArray();
@@ -87,28 +81,13 @@ const UserProfile: React.FC = () => {
       });
     },
     [targetUserId]
-  );
+  ) || [];
 
-  const fallbackUserEmails: CompactEmailDisplay[] = React.useMemo(() => {
-    const uEmails = mockUserEmails.filter((ue) => ue.user_id === targetUserId);
-    return uEmails.map((ue) => {
-      const matchEmail = mockEmails.find((e) => e.id === ue.email_id);
-      return {
-        id: ue.id,
-        email: matchEmail?.email || ue.email_id,
-        type: ue.is_primary ? 'PRIMARY' : 'SECONDARY',
-        roleLabel: ue.is_primary ? 'Account Primary Email' : 'Secondary Recovery Email',
-        isVerified: ue.is_verified,
-      };
-    });
-  }, [targetUserId]);
-
-  const individualEmails = (liveUserEmails && liveUserEmails.length > 0) ? liveUserEmails : fallbackUserEmails;
   const primaryEmailItem = individualEmails.find((e) => e.type === 'PRIMARY') || individualEmails[0];
   const secondaryEmails = individualEmails.filter((e) => e.type === 'SECONDARY');
 
-  // 3. Query Business Emails & Roles directly from Dexie DB / mockBusinessEmails
-  const liveBusinessEmails = useLiveQuery(
+  // 3. Query Business Emails & Roles strictly from Dexie DB (userDb.businessMemberships + userDb.businessEmails)
+  const businessEmails: CompactEmailDisplay[] = useLiveQuery(
     async () => {
       const memberships = await userDb.businessMemberships.where('user_id').equals(targetUserId).toArray();
       const bizIds = memberships.map((m) => m.business_id);
@@ -133,9 +112,9 @@ const UserProfile: React.FC = () => {
       });
     },
     [targetUserId]
-  );
+  ) || [];
 
-  // 4. Query Personal Addresses directly from Dexie DB (via User's Personal Party party_id)
+  // 4. Query Personal Addresses strictly from Dexie DB (via User's Personal Party party_id)
   const mappedAddresses = useLiveQuery(
     async () => {
       const userParty = await businessDb.parties
@@ -150,27 +129,6 @@ const UserProfile: React.FC = () => {
     [targetUserId]
   ) || [];
 
-  const fallbackBusinessEmails: CompactEmailDisplay[] = React.useMemo(() => {
-    const list: CompactEmailDisplay[] = [];
-    const memberships = mockBusinessMemberships.filter((bm) => bm.user_id === targetUserId);
-    memberships.forEach((bm) => {
-      const biz = mockBusinesses.find((b) => b.id === bm.business_id);
-      const bizEmails = mockBusinessEmails.filter((be) => be.business_id === bm.business_id);
-      bizEmails.forEach((be) => {
-        const matchEmail = mockEmails.find((e) => e.id === be.email_id);
-        list.push({
-          id: be.id,
-          email: matchEmail?.email || be.email_id,
-          type: 'BUSINESS',
-          roleLabel: `${biz?.name || 'Business'} (${be.label || 'Contact'}) • Role: ${bm.membership_type}`,
-          isVerified: be.is_verified,
-        });
-      });
-    });
-    return list;
-  }, [targetUserId]);
-
-  const businessEmails = (liveBusinessEmails && liveBusinessEmails.length > 0) ? liveBusinessEmails : fallbackBusinessEmails;
   const totalEmailsCount = individualEmails.length + businessEmails.length;
 
   // React Hook Form for Personal Information
@@ -423,11 +381,15 @@ const UserProfile: React.FC = () => {
                     name="timezone"
                     control={profileControl}
                     render={({ field }) => (
-                      <AntSelect {...field} className="w-full">
-                        <Option value="utc">UTC (Universal Coordinated Time)</Option>
-                        <Option value="est">EST (Eastern Standard Time)</Option>
-                        <Option value="pst">PST (Pacific Standard Time)</Option>
-                      </AntSelect>
+                      <AntSelect
+                        {...field}
+                        className="w-full"
+                        options={[
+                          { value: 'utc', label: 'UTC (Universal Coordinated Time)' },
+                          { value: 'est', label: 'EST (Eastern Standard Time)' },
+                          { value: 'pst', label: 'PST (Pacific Standard Time)' },
+                        ]}
+                      />
                     )}
                   />
                 </FormItem>

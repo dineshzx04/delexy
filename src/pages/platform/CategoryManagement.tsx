@@ -246,20 +246,22 @@ const CategoryManagement: React.FC = () => {
         {/* Navigation Breadcrumb Bar */}
         <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex items-center gap-3">
           <Lucide.FolderTree size={20} className="text-gray-400" />
-          <AntBreadcrumb className="text-base font-medium">
-            <AntBreadcrumb.Item className="cursor-pointer hover:text-sky-600 transition-colors" onClick={() => navigateToBreadcrumb(-1)}>
-              Root Level
-            </AntBreadcrumb.Item>
-            {path.map((crumb, index) => (
-              <AntBreadcrumb.Item
-                key={crumb.id}
-                className={index === path.length - 1 ? "text-gray-900" : "cursor-pointer hover:text-sky-600 transition-colors"}
-                onClick={() => navigateToBreadcrumb(index)}
-              >
-                {crumb.name}
-              </AntBreadcrumb.Item>
-            ))}
-          </AntBreadcrumb>
+          <AntBreadcrumb
+            className="text-base font-medium"
+            items={[
+              {
+                title: 'Root Level',
+                className: 'cursor-pointer hover:text-sky-600 transition-colors',
+                onClick: () => navigateToBreadcrumb(-1),
+              },
+              ...path.map((crumb, index) => ({
+                key: crumb.id,
+                title: crumb.name,
+                className: index === path.length - 1 ? "text-gray-900" : "cursor-pointer hover:text-sky-600 transition-colors",
+                onClick: () => navigateToBreadcrumb(index),
+              })),
+            ]}
+          />
         </div>
 
         {/* Toolbar */}

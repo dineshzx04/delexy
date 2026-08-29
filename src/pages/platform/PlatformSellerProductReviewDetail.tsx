@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Card as AntCard, Button as AntButton, Tag as AntTag, Input as AntInput, Progress as AntProgress, Alert as AntAlert, message as antMessage, Modal as AntModal, Space as AntSpace, Table as AntTable, Collapse as AntCollapse } from 'antd';
+import { Card as AntCard, Button as AntButton, Tag as AntTag, Input as AntInput, Progress as AntProgress, Alert as AntAlert, Modal as AntModal, Space as AntSpace, Table as AntTable, Collapse as AntCollapse, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -9,6 +9,7 @@ import { catalogDb, type SellerProductSubmission, type SubmissionAttributeItem, 
 import { businessDb, type Party } from '../../data/business';
 
 const PlatformSellerProductReviewDetail: React.FC = () => {
+  const { message: antMessage } = AntApp.useApp();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { currentUser } = useWorkspace();
@@ -311,29 +312,9 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
         category_id: attrs.category_id?.value || 'c-3-1-1',
         catalog_product_id: attrs.catalog_product_id?.value || 'prod-2',
         product_name: attrs.product_name?.value || 'Untitled Seller Product',
-        manufacturer_id: attrs.manufacturer_id?.value || 'mfg-1',
-        brand_id: attrs.brand_id?.value || 'brd-1',
+        manufacturer_id: attrs.manufacturer_id?.value || undefined,
+        brand_id: attrs.brand_id?.value || undefined,
         party_id: submission.party_id,
-
-        year_of_manufacture: attrs.year_of_manufacture?.value,
-        country_of_origin: 'US',
-        model_number: attrs.model_number?.value,
-        part_number: attrs.part_number?.value || 'PN-101',
-
-        height: attrs.height?.value,
-        width: attrs.width?.value,
-        length: attrs.length?.value,
-        weight: attrs.weight?.value,
-
-        deviations: attrs.deviations?.value,
-        exclusions: attrs.exclusions?.value,
-        assumptions: attrs.assumptions?.value,
-        operation_instructions: attrs.operation_instructions?.value,
-        safety_instructions: attrs.safety_instructions?.value,
-        handling_instructions: attrs.handling_instructions?.value,
-        maintenance_instructions: attrs.maintenance_instructions?.value,
-        additional_requirements: attrs.additional_requirements?.value,
-        additional_information: attrs.additional_information?.value,
 
         dynamic_attributes: [],
         specifications: attrs.specifications?.value || [],
@@ -433,6 +414,42 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
       displayVal = <pre className="text-[11px] font-mono leading-tight">{JSON.stringify(item.value, null, 2)}</pre>;
     }
 
+    // Collect all auditor review comments across round history + current state
+    const allComments: Array<{
+      round: number;
+      comment: string;
+      reviewerName?: string;
+      timestamp?: string;
+      status?: string;
+    }> = [];
+
+    if (item.round_history && item.round_history.length > 0) {
+      item.round_history.forEach((rh) => {
+        if (rh.rejection_comment && rh.rejection_comment.trim()) {
+          allComments.push({
+            round: rh.round,
+            comment: rh.rejection_comment.trim(),
+            reviewerName: rh.reviewed_by_user_name || 'Platform Admin',
+            timestamp: rh.timestamp,
+            status: rh.status,
+          });
+        }
+      });
+    }
+
+    if (item.rejection_comment && item.rejection_comment.trim()) {
+      const lastHistComment = allComments[allComments.length - 1]?.comment;
+      if (lastHistComment !== item.rejection_comment.trim()) {
+        allComments.push({
+          round: submission.current_round,
+          comment: item.rejection_comment.trim(),
+          reviewerName: item.reviewed_by_user_name || 'Platform Admin',
+          timestamp: item.reviewed_at,
+          status: item.status,
+        });
+      }
+    }
+
     return (
       <div
         key={fieldKey}
@@ -501,13 +518,42 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
           {isComplexValue ? displayVal : (item.value || <span className="text-gray-400 italic">No value provided</span>)}
         </div>
 
-        {/* Rejection comment display */}
-        {item.status === 'REJECTED' && item.rejection_comment && (
-          <div className="mt-1.5 text-xs bg-red-100/80 border border-red-200 p-2 rounded text-red-800 space-y-0.5">
-            <div className="font-semibold flex items-center gap-1">
-              <Lucide.MessageSquare size={12} /> Reviewer Comment:
+        {/* All Platform Auditor Review Comments Across Rounds */}
+        {allComments.length > 0 && (
+          <div className="mt-2.5 space-y-1.5">
+            <div className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
+              <Lucide.MessageSquare size={13} className="text-sky-600" />
+              <span>Platform Auditor Review Comments ({allComments.length}):</span>
             </div>
-            <div>{item.rejection_comment}</div>
+            <div className="space-y-1.5">
+              {allComments.map((c, idx) => (
+                <div
+                  key={idx}
+                  className={`text-xs p-2.5 rounded border space-y-1 ${
+                    c.status === 'REJECTED' || (idx === allComments.length - 1 && item.status === 'REJECTED')
+                      ? 'bg-red-50/90 border-red-300 text-red-900'
+                      : c.status === 'APPROVED'
+                      ? 'bg-emerald-50/90 border-emerald-300 text-emerald-900'
+                      : 'bg-amber-50/90 border-amber-300 text-amber-900'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-[11px] font-semibold border-b border-black/5 pb-1">
+                    <span className="flex items-center gap-1.5">
+                      <AntTag color="purple" className="text-[10px] py-0 px-1 font-mono">
+                        Round {c.round}
+                      </AntTag>
+                      <span className="text-gray-800 font-bold">{c.reviewerName}</span>
+                    </span>
+                    {c.timestamp && (
+                      <span className="text-[10px] text-gray-500 font-mono">
+                        {new Date(c.timestamp).toLocaleDateString()} {new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mb-0 text-xs font-medium leading-relaxed">{c.comment}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -745,58 +791,12 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
           </div>
         </AntCard>
 
-        {/* SECTION 2: MANUFACTURING & PHYSICAL SPECS */}
-        <AntCard
-          title={
-            <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
-              <Lucide.Factory size={16} className="text-emerald-600" />
-              2. Manufacturing & Physical Specs
-            </div>
-          }
-          className="border border-gray-200 shadow-sm"
-          size="small"
-        >
-          <div className="space-y-3">
-            {renderAttributeCard('year_of_manufacture')}
-            {renderAttributeCard('model_number')}
-            {renderAttributeCard('part_number')}
-            {renderAttributeCard('height')}
-            {renderAttributeCard('width')}
-            {renderAttributeCard('length')}
-            {renderAttributeCard('weight')}
-          </div>
-        </AntCard>
-
-        {/* SECTION 3: OPERATIONAL & GOVERNANCE INSTRUCTIONS */}
-        <AntCard
-          title={
-            <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
-              <Lucide.ShieldCheck size={16} className="text-purple-600" />
-              3. Operational & Governance Instructions
-            </div>
-          }
-          className="border border-gray-200 shadow-sm"
-          size="small"
-        >
-          <div className="space-y-3">
-            {renderAttributeCard('operation_instructions')}
-            {renderAttributeCard('safety_instructions')}
-            {renderAttributeCard('handling_instructions')}
-            {renderAttributeCard('maintenance_instructions')}
-            {renderAttributeCard('deviations')}
-            {renderAttributeCard('exclusions')}
-            {renderAttributeCard('assumptions')}
-            {renderAttributeCard('additional_requirements')}
-            {renderAttributeCard('additional_information')}
-          </div>
-        </AntCard>
-
-        {/* SECTION 4: CATEGORY DYNAMIC SPECIFICATIONS */}
+        {/* SECTION 2: CATEGORY DYNAMIC SPECIFICATIONS */}
         <AntCard
           title={
             <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
               <Lucide.SlidersHorizontal size={16} className="text-indigo-600" />
-              4. Dynamic Technical Specifications
+              2. Dynamic Technical Specifications
             </div>
           }
           className="border border-gray-200 shadow-sm"
@@ -807,12 +807,12 @@ const PlatformSellerProductReviewDetail: React.FC = () => {
           </div>
         </AntCard>
 
-        {/* SECTION 5: SELLABLE PRODUCT VARIANTS DIRECTORY */}
+        {/* SECTION 3: SELLABLE PRODUCT VARIANTS DIRECTORY */}
         <AntCard
           title={
             <div className="flex items-center gap-2 text-gray-900 font-bold text-sm">
               <Lucide.Layers3 size={16} className="text-purple-600" />
-              5. Sellable Product Variants Directory
+              3. Sellable Product Variants Directory
             </div>
           }
           className="border border-gray-200 shadow-sm"

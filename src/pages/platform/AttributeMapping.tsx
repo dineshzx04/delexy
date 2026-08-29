@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Table as AntTable, Tabs as AntTabs, Button as AntButton, Input as AntInput, message } from 'antd';
+import { Table as AntTable, Tabs as AntTabs, Button as AntButton, Input as AntInput, App as AntApp } from 'antd';
 import * as Lucide from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
@@ -9,6 +9,7 @@ import { catalogDb } from '../../data/catalog';
 const { TabPane } = AntTabs;
 
 const AttributeMapping: React.FC = () => {
+  const { message } = AntApp.useApp();
   const breadcrumbs = useMemo(() => [
     { title: <Link to="/p/dashboard" className="text-gray-500 hover:text-sky-600 transition-colors">Platform</Link>, url: '/p/dashboard' },
     { title: <span className="text-gray-500">Taxonomies</span> },
