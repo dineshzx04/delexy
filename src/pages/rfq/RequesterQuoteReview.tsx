@@ -173,7 +173,7 @@ export const RequesterQuoteReview: React.FC = () => {
       const initialNotes: Record<string, string> = {};
       quoteVariants.forEach((v) => {
         initialAccepted[v.id] = !!v.buyer_accepted;
-        initialNotes[v.id] = v.buyer_note || '';
+        initialNotes[v.id] = '';
       });
       setAcceptedVariants(initialAccepted);
       setBuyerVariantNotes(initialNotes);
@@ -286,8 +286,7 @@ export const RequesterQuoteReview: React.FC = () => {
         }
         for (const [variantId, accepted] of Object.entries(acceptedVariants)) {
           await rfqDb.seller_quote_variants.update(variantId, {
-            buyer_accepted: accepted,
-            buyer_note: buyerVariantNotes[variantId] || ''
+            buyer_accepted: accepted
           });
         }
       });

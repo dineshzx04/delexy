@@ -102,14 +102,26 @@ export interface SellerQuoteVariant {
   satisfaction_status?: 'SATISFIED' | 'CUSTOM';
   signature?: string;
   is_selected?: boolean;
-  seller_note?: string;
-  buyer_note?: string;
 }
 
-export interface SellerQuoteComment {
+export interface SellerQuoteSuggestedVariant {
   id: string;
   seller_quote_id: string;
-  round: number
+  seller_product_id: string;
+  variant_id: string;
+  sku: string;
+  list_price: number;
+  offer_price: number;
+  combinations: VariantCombination[];
+  specifications?: any[];
+  is_selected: boolean;
+  buyer_accepted?: boolean;
+}
+
+export interface SellerQuoteAttributeComment {
+  id: string;
+  seller_quote_id: string;
+  round: number;
   attribute_type?: AttributeType;
   group_id: string;
   attribute_id: string;
@@ -118,6 +130,20 @@ export interface SellerQuoteComment {
   actor_id: string;
   created_at: string;
 }
+
+export interface SellerQuoteVariantComment {
+  id: string;
+  seller_quote_id: string;
+  round: number;
+  variant_id: string;
+  variant_type?: "CUSTOM" | "SUGGESTED";
+  comment: string;
+  actor_type: "BUYER" | "SELLER";
+  actor_id: string;
+  created_at: string;
+}
+
+export type SellerQuoteComment = SellerQuoteAttributeComment;
 
 // export interface ItemAttributeChangeHistory {
 //   id: string;
@@ -209,6 +235,8 @@ export type SellerQuoteStatus =
   | "DEVIATION_ACCEPTED"
   | "PRODUCT_SUBMIT_REVISION"
   | "FINAL_ACKNOWLEDGE"
+  | "FINAL_ACKNOWLEDGE_REQUESTED"
+  | "FINAL_ACKNOWLEDGE_ACCEPTED"
   | "REJECTED";
 
 export type AwardItemStatus =

@@ -6,7 +6,10 @@ import type {
   SellerQuote,
   SellerQuoteAttribute,
   SellerQuoteVariant,
+  SellerQuoteSuggestedVariant,
   SellerQuoteComment,
+  SellerQuoteAttributeComment,
+  SellerQuoteVariantComment,
   // RfqAward,
 } from "./rfq.module";
 
@@ -17,19 +20,25 @@ export class RfqDatabase extends Dexie {
   seller_quotes!: Table<SellerQuote, string>;
   seller_quote_attributes!: Table<SellerQuoteAttribute, string>;
   seller_quote_variants!: Table<SellerQuoteVariant, string>;
+  seller_quote_suggested_variants!: Table<SellerQuoteSuggestedVariant, string>;
   seller_quote_comments!: Table<SellerQuoteComment, string>;
+  seller_quote_attribute_comments!: Table<SellerQuoteAttributeComment, string>;
+  seller_quote_variant_comments!: Table<SellerQuoteVariantComment, string>;
   // rfq_awards!: Table<RfqAward, string>;
 
   constructor() {
     super("delexy_rfq_db");
-    this.version(11).stores({
+    this.version(12).stores({
       rfqs: "id, status, requester_id, requester_party_id",
       rfq_items: "id, rfq_id, category_id",
       rfq_item_attributes: "id, rfq_item_id, group_id, attribute_id",
       seller_quotes: "id, rfq_item_id, seller_party_id, status, [rfq_item_id+seller_party_id]",
       seller_quote_attributes: "id, seller_quote_id, group_id, attribute_id",
       seller_quote_variants: "id, seller_quote_id",
+      seller_quote_suggested_variants: "id, seller_quote_id, variant_id, seller_product_id",
       seller_quote_comments: "id, seller_quote_id, group_id, attribute_id, actor_id",
+      seller_quote_attribute_comments: "id, seller_quote_id, group_id, attribute_id, actor_id",
+      seller_quote_variant_comments: "id, seller_quote_id, variant_id, actor_id",
       // rfq_awards: "id, rfq_id, rfq_item_id, seller_party_id, seller_quote_id",
     });
   }
