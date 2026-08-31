@@ -1225,7 +1225,7 @@ const Section3SuggestedCatalog: React.FC<Section3Props> = ({
                     <div className="space-y-1">
                       <div className="font-mono font-bold text-xs text-slate-800 mb-1">SKU: {record.sku}</div>
                       <div className="flex flex-wrap gap-1">
-                        {record.combinations.map((c: any, i: number) => {
+                        {record.combinations?.map((c: any, i: number) => {
                           if (c.attribute_id === 'mfg_brand_mapping') {
                             const parts = (c.value_id || '').split(':');
                             const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
@@ -2210,8 +2210,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         sku: sv.sku,
         list_price: sv.list_price,
         offer_price: sv.offer_price,
-        combinations: sv.combinations,
-        specifications: sv.specifications,
+        // combinations: sv.combinations,
+        // specifications: sv.specifications,
         is_selected: true,
         buyer_accepted: sv.buyer_accepted || false
       }));

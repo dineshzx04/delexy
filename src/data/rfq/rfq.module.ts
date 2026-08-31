@@ -111,7 +111,7 @@ export interface SellerQuoteSuggestedVariant {
   sku: string;
   list_price: number;
   offer_price: number;
-  combinations: VariantCombination[];
+  combinations?: VariantCombination[];
   specifications?: any[];
   is_selected: boolean;
   buyer_accepted?: boolean;

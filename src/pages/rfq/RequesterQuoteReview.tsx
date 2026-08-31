@@ -314,6 +314,7 @@ export const RequesterQuoteReview: React.FC = () => {
   const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []);
   const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []);
   const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []);
+  const allSellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []);
 
   const sellerProduct = useLiveQuery(
     async () => {
@@ -415,7 +416,8 @@ export const RequesterQuoteReview: React.FC = () => {
     allVariants === undefined ||
     itemAttributes === undefined ||
     allManufacturers === undefined ||
-    allBrands === undefined;
+    allBrands === undefined ||
+    allSellerProducts === undefined;
 
   const breadcrumbs = React.useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
@@ -488,20 +490,48 @@ export const RequesterQuoteReview: React.FC = () => {
       buyer_accepted: acceptedVariants[v.id] ?? v.buyer_accepted
     }));
 
-    const suggestedItems = (quoteSuggestedVariants || []).map(sv => ({
-      id: sv.id,
-      type: 'SUGGESTED' as const,
-      title: sv.sku || sv.id,
-      sku: sv.sku,
-      list_price: sv.list_price,
-      offer_price: sv.offer_price,
-      combinations: sv.combinations,
-      product_attributes: (sv as any).product_attributes || [...(sv.combinations || []), ...(sv.specifications || [])],
-      buyer_accepted: acceptedSuggestedVariants[sv.id] ?? sv.buyer_accepted
-    }));
+    const suggestedItems = (quoteSuggestedVariants || []).map(sv => {
+      const sp = (allSellerProducts || []).find((p: any) => p.id === sv.seller_product_id || p.variants?.some((v: any) => v.id === sv.variant_id));
+      const mfgBrandPair = (sp && sp.manufacturer_id && sp.brand_id) ? [{
+        attribute_id: 'mfg_brand_mapping',
+        group_id: "system",
+        attribute_name: "Manufacturer & Brand",
+        value_id: `${sp.manufacturer_id || "any"}:${sp.brand_id || "any"}`,
+        value_label: undefined,
+        values: [{ value_id: `${sp.manufacturer_id || "any"}:${sp.brand_id || "any"}` }]
+      }] : [];
+
+      const variantObj = sp?.variants?.find((v: any) => v.id === sv.variant_id);
+      const comboVals = [...mfgBrandPair, ...(variantObj?.combination_values || sv.combinations || [])];
+      const sortedComboVals = [...comboVals].sort((a: any, b: any) => {
+        if (a.attribute_id === 'mfg_brand_mapping') return -1;
+        if (b.attribute_id === 'mfg_brand_mapping') return 1;
+        return 0;
+      });
+      const combinations = sortedComboVals.map((cv: any) => ({
+        ...cv,
+        values: cv.values || [{ value_label: cv.label || cv.value_label, value_id: cv.value_id }]
+      }));
+      const parentSpecs = sp?.specifications || sv.specifications || [];
+      const product_attributes = (sv as any).product_attributes && (sv as any).product_attributes.length > 0
+        ? (sv as any).product_attributes
+        : [...combinations, ...parentSpecs];
+
+      return {
+        id: sv.id,
+        type: 'SUGGESTED' as const,
+        title: sv.sku || variantObj?.sku || sv.id,
+        sku: sv.sku || variantObj?.sku,
+        list_price: sv.list_price || variantObj?.price,
+        offer_price: sv.offer_price,
+        combinations: combinations,
+        product_attributes: product_attributes,
+        buyer_accepted: acceptedSuggestedVariants[sv.id] ?? sv.buyer_accepted
+      };
+    });
 
     return [...customItems, ...suggestedItems];
-  }, [quoteVariants, quoteSuggestedVariants, parentSpecs, acceptedVariants, acceptedSuggestedVariants]);
+  }, [quoteVariants, quoteSuggestedVariants, parentSpecs, acceptedVariants, acceptedSuggestedVariants, allSellerProducts]);
 
   const proposalAttributesMap = React.useMemo(() => {
     const map: Record<string, any> = {};

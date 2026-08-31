@@ -499,7 +499,7 @@ const AssignedSellersTab: React.FC<TabProps> = ({ itemId }) => {
 const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
   const screens = AntGrid.useBreakpoint();
   const isMobile = !screens.md;
-  const navigate = useNavigate();
+
   const { rfqId } = useParams<{ rfqId: string }>();
   const { activeWorkspace } = useWorkspace();
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
@@ -517,6 +517,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
   const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
   const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
   const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
+  const allSellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []) || [];
 
   const submittedQuotes = useLiveQuery(
     () =>
@@ -563,6 +564,19 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
       const party = parties.find((p) => p.id === quote.seller_party_id);
       const supplierName = party?.display_name || quote.seller_party_id;
 
+      // Extract quote attributes (specs) for custom options of this quote
+      const quoteSpecs = allQuoteAttributes
+        .filter((attr) => attr.seller_quote_id === quote.id && !attr.is_variant && attr.attribute_id !== 'mfg_brand_mapping' && attr.values && attr.values.length > 0)
+        .map((attr) => ({
+          group_id: attr.group_id,
+          attribute_id: attr.attribute_id,
+          attribute_name: catalogAttributes?.find((a) => a.id === attr.attribute_id)?.name || attr.attribute_id,
+          connector: attr.connector,
+          value_id: attr.values[0]?.value_id,
+          value_label: attr.values[0]?.value_label,
+          values: attr.values,
+        }));
+
       // Custom Quote Variants
       const customVars = allQuoteVariants.filter((v) => v.seller_quote_id === quote.id);
       customVars.forEach((v, idx) => {
@@ -581,7 +595,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
           title: label,
           type: 'CUSTOM',
           offer_price: v.offer_price,
-          product_attributes: v.product_attributes || v.combinations || [],
+          product_attributes: v.product_attributes || [...(v.combinations || []), ...quoteSpecs],
           status: quote.status,
           buyer_accepted: v.buyer_accepted,
         });
@@ -589,31 +603,53 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
 
       // Suggested Catalog Variants
       const suggestedVars = allQuoteSuggestedVariants.filter((v) => v.seller_quote_id === quote.id);
-      suggestedVars.forEach((v) => {
-        let label = v.sku || `Suggested SKU (${v.variant_id})`;
-        // if (v.combinations && v.combinations.length > 0) {
-        //   const comboLabel = v.combinations.map((c: any) => c.value_label || c.value_id).join(' / ');
-        //   label = `${v.sku ? v.sku + ' - ' : ''}${comboLabel}`;
-        // }
+      suggestedVars.forEach((sv) => {
+        const sp = (allSellerProducts || []).find((p: any) => p.id === sv.seller_product_id || p.variants?.some((v: any) => v.id === sv.variant_id));
+        const mfgBrandPair = (sp && sp.manufacturer_id && sp.brand_id) ? [{
+          attribute_id: 'mfg_brand_mapping',
+          group_id: "system",
+          attribute_name: "Manufacturer & Brand",
+          value_id: `${sp.manufacturer_id || "any"}:${sp.brand_id || "any"}`,
+          value_label: undefined,
+          values: [{ value_id: `${sp.manufacturer_id || "any"}:${sp.brand_id || "any"}` }]
+        }] : [];
+
+        const variant = sp?.variants?.find((v: any) => v.id === sv.variant_id);
+        const comboVals = [...mfgBrandPair, ...(variant?.combination_values || sv.combinations || [])];
+        const sortedComboVals = [...comboVals].sort((a: any, b: any) => {
+          if (a.attribute_id === 'mfg_brand_mapping') return -1;
+          if (b.attribute_id === 'mfg_brand_mapping') return 1;
+          return 0;
+        });
+        const combinations = sortedComboVals.map((cv: any) => ({
+          ...cv,
+          values: cv.values || [{ value_label: cv.label || cv.value_label, value_id: cv.value_id }]
+        }));
+        const parentSpecs = sp?.specifications || sv.specifications || [];
+        const product_attributes = (sv as any).product_attributes && (sv as any).product_attributes.length > 0
+          ? (sv as any).product_attributes
+          : [...combinations, ...parentSpecs];
+
+        let label = sv.sku || variant?.sku || `Suggested SKU (${sv.variant_id})`;
 
         items.push({
-          id: v.id,
+          id: sv.id,
           quoteId: quote.id,
           sellerQuoteNumber: quote.seller_quote_number,
           supplierName,
           title: label,
           type: 'SUGGESTED',
-          offer_price: v.offer_price,
-          list_price: v.list_price,
-          // product_attributes: v.product_attributes || v.combinations || [],
+          offer_price: sv.offer_price,
+          list_price: sv.list_price || variant?.price,
+          product_attributes: product_attributes,
           status: quote.status,
-          buyer_accepted: v.buyer_accepted,
+          buyer_accepted: sv.buyer_accepted,
         });
       });
     });
 
     return items;
-  }, [submittedQuotes, parties, allQuoteVariants, allQuoteSuggestedVariants]);
+  }, [submittedQuotes, parties, allQuoteVariants, allQuoteSuggestedVariants, allQuoteAttributes, catalogAttributes, allSellerProducts]);
 
   // Map proposal attributes by quote ID using Map object (keyed by unique group_id + attribute_id)
   const proposalAttributesMap = React.useMemo(() => {
@@ -631,11 +667,101 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
     return map;
   }, [submittedQuotes, allQuoteAttributes]);
 
+  // Helper renderer for attribute value tags with connectors & manufacturer-brand pair labels
+  const renderAttributeCell = (matchedAttr: any, connectorFallback = 'AND') => {
+    if (!matchedAttr) return <span className="text-slate-400 italic font-normal">N/A</span>;
+
+    const attrId = matchedAttr.attribute_id || matchedAttr.attrId;
+
+    if (attrId === 'offer_price') {
+      if (typeof matchedAttr.offer_price === 'number') {
+        return (
+          <AntTag color="green" className="font-extrabold text-xs m-0 font-mono">
+            ${matchedAttr.offer_price.toLocaleString()}
+          </AntTag>
+        );
+      }
+      return <span className="text-slate-500 italic font-medium text-xs">Quote Offer Price</span>;
+    }
+
+    const values = matchedAttr.values && matchedAttr.values.length > 0 ? matchedAttr.values : [];
+    if (!values || values.length === 0) {
+      return <span className="text-slate-400 italic font-normal">N/A</span>;
+    }
+
+    if (attrId === 'mfg_brand_mapping') {
+      return (
+        <div className=" ">
+          {values.map((vObj: any, vIdx: number) => {
+            const valId = vObj?.value_id || vObj?.id || '';
+            if (!valId) return null;
+            const parts = valId.split(':');
+            const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+            const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+            const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+            const brand = (allBrands || []).find((b: any) => b.id === brandId);
+            const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
+            const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+            const isFirst = vIdx === 0;
+
+            return (
+              <>
+                <div className='flex items-center gap-1'>
+                  {!isFirst && (
+                    <span className="mx-1 text-emerald-600 font-bold text-[12px] select-none">
+                      {" | "}
+                    </span>
+                  )}
+                  <span key={vIdx} className="flex-grow-1 inline-flex flex-col gap-1 my-0.5 border rounded border-slate-200 p-1 overflow-hidden">
+                    <AntTag color="purple" className="text-[11px] m-0 font-medium whitespace-normal break-words">
+                      Mfg: {mfgName}
+                    </AntTag>
+                    {/* <span className="text-slate-400 font-bold text-[11px] select-none">×</span> */}
+                    <AntTag color="blue" className="text-[11px] m-0 font-medium whitespace-normal break-words">
+                      Brand: {brandName}
+                    </AntTag>
+                  </span>
+                </div>
+              </>
+            );
+          })}
+        </div>
+      );
+    }
+
+    const connector = matchedAttr.connector || connectorFallback;
+    const propJoiner = connector === 'OR' ? ' | ' : ', ';
+
+    return (
+      <div className="flex flex-wrap items-center">
+        {values.map((v: any, vIdx: number) => {
+          const valId = v.value_id || v.id;
+          const value = catalogAttributeValues?.find((cv: any) => cv.id === valId);
+          const valLabel = value?.label
+          const isLast = vIdx === values.length - 1;
+
+          return (
+            <span key={vIdx} className="inline-flex items-center my-0.5">
+              <AntTag color="default" className="text-[11px] m-0 font-medium">
+                {valLabel}
+              </AntTag>
+              {!isLast && (
+                <span className="mx-0.5 text-emerald-600 font-bold text-[12px] select-none">
+                  {propJoiner}
+                </span>
+              )}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
   // Build matrix rows for Ant Design Table with rowSpan merging (System Specs first)
   const matrixRows = React.useMemo(() => {
     if (!itemAttributes?.length) return [];
 
-    const rowMap = new Map<string, { groupId: string; groupName: string; attrId: string; attrName: string; reqDisplayValue: string }[]>();
+    const rowMap = new Map<string, { groupId: string; groupName: string; attrId: string; attrName: string; reqAttr: any }[]>();
 
     itemAttributes.forEach((ia: any) => {
       const groupId = ia.group_id || 'general';
@@ -645,18 +771,6 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
         ? 'Manufacturer & Brand'
         : (catalogAttributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id);
 
-      let reqDisplayValue = 'N/A';
-      if (ia.attribute_id === 'mfg_brand_mapping') {
-        reqDisplayValue = (ia.values || []).map((v: any) => v.value_label || v.value_id).join(' | ') || 'N/A';
-      } else {
-        const reqValIds = new Set((ia.values || []).map((v: any) => v.value_id));
-        const reqValLabels = (catalogAttributeValues || [])
-          .filter((v) => reqValIds.has(v.id))
-          .map((v) => v.value || v.label);
-        const joiner = ia.connector === 'AND' ? ', ' : ' | ';
-        reqDisplayValue = reqValLabels.length > 0 ? reqValLabels.join(joiner) : (ia.values || []).map((v: any) => v.value_label || v.value_id).join(joiner) || 'N/A';
-      }
-
       if (!rowMap.has(groupId)) {
         rowMap.set(groupId, []);
       }
@@ -665,9 +779,30 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
         groupName,
         attrId: ia.attribute_id,
         attrName,
-        reqDisplayValue,
+        reqAttr: ia,
       });
     });
+
+    // Ensure System Specifications group has Unit Offer Price row
+    if (!rowMap.has('system')) {
+      rowMap.set('system', []);
+    }
+    const systemRows = rowMap.get('system')!;
+    if (!systemRows.some((r) => r.attrId === 'offer_price')) {
+      const mfgIdx = systemRows.findIndex((r) => r.attrId === 'mfg_brand_mapping');
+      const offerPriceRow = {
+        groupId: 'system',
+        groupName: 'System Specifications',
+        attrId: 'offer_price',
+        attrName: 'Unit Offer Price',
+        reqAttr: { attribute_id: 'offer_price' },
+      };
+      if (mfgIdx !== -1) {
+        systemRows.splice(mfgIdx + 1, 0, offerPriceRow);
+      } else {
+        systemRows.unshift(offerPriceRow);
+      }
+    }
 
     // Sort group entries so 'system' group comes first
     const sortedEntries = [...rowMap.entries()].sort(([gIdA], [gIdB]) => {
@@ -685,14 +820,14 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
           groupName: attr.groupName,
           attrId: attr.attrId,
           attrName: attr.attrName,
-          reqDisplayValue: attr.reqDisplayValue,
+          reqAttr: attr.reqAttr,
           groupRowSpan: idx === 0 ? attrs.length : 0,
         });
       });
     });
 
     return rows;
-  }, [itemAttributes, attributeGroups, catalogAttributes, catalogAttributeValues]);
+  }, [itemAttributes, attributeGroups, catalogAttributes]);
 
   if (submittedQuotes.length === 0) {
     return (
@@ -724,7 +859,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
             title: 'Attribute Group',
             dataIndex: 'groupName',
             key: 'groupName',
-            fixed: isMobile ? undefined : 'left',
+            // fixed: isMobile ? undefined : 'left',
             className: 'align-top bg-slate-50 font-bold text-slate-700 text-xs w-32 md:w-36 min-w-[120px]',
             onCell: (record: any) => ({
               rowSpan: record.groupRowSpan,
@@ -745,13 +880,10 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
           },
           {
             title: 'Requested Specifications',
-            dataIndex: 'reqDisplayValue',
-            key: 'reqDisplayValue',
+            key: 'requestedSpecs',
             fixed: isMobile ? undefined : 'left',
-            className: 'align-top text-xs bg-blue-50 font-medium text-slate-900 w-40 md:w-48 min-w-[150px]',
-            render: (text: string) => (
-              <span className="font-medium text-slate-900 text-xs">{text}</span>
-            )
+            className: 'align-top text-xs font-medium text-slate-900 w-40 md:w-48 min-w-[0px]',
+            render: (_: any, record: any) => renderAttributeCell(record.reqAttr)
           },
           ...selectedOfferedItems.map((colItem) => ({
             title: (
@@ -759,9 +891,10 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
                 <div className="flex flex-col items-center gap-0.5 text-xs">
                   <span className="font-semibold text-slate-800">{colItem.supplierName}</span>
                   <span className="font-mono text-indigo-700 font-semibold text-[11px]">({colItem.sellerQuoteNumber})</span>
+                  <span className="font-mono text-green-700 font-semibold text-[11px]">{colItem.title}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-bold text-emerald-700 text-xs">${colItem.offer_price?.toLocaleString()}</span>
+                  {/* <span className="font-bold text-emerald-700 text-xs">${colItem.offer_price?.toLocaleString()}</span> */}
                   <Link
                     to={`${basePath}/${rfqId}/items/${itemId}/quotes/${colItem.quoteId}/review`}
                     className="text-[11px] p-0 font-semibold text-blue-600 hover:text-blue-700 hover:underline"
@@ -774,66 +907,14 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
             key: colItem.id,
             className: 'align-top text-xs w-40 md:w-48 min-w-[150px]',
             render: (_: any, record: any) => {
+              if (record.attrId === 'offer_price') {
+                return renderAttributeCell({ attribute_id: 'offer_price', offer_price: colItem.offer_price });
+              }
               const matchedAttr = (colItem.product_attributes || []).find((pa: any) => pa.attribute_id === record.attrId);
               const uniqueKey = `${record.groupId}_${record.attrId}`;
               const propAttr = proposalAttributesMap.get(colItem.quoteId)?.get(uniqueKey) || proposalAttributesMap.get(colItem.quoteId)?.get(record.attrId);
 
-              const values = matchedAttr ? [matchedAttr] : (propAttr?.values || []);
-              if (!values || values.length === 0) {
-                return <span className="text-slate-400 italic font-normal">N/A</span>;
-              }
-
-              if (record.attrId === 'mfg_brand_mapping') {
-                const valObj = values[0];
-                const valId = valObj?.value_id || valObj?.id || '';
-                if (!valId) return <span className="text-slate-400 italic font-normal">N/A</span>;
-
-                const parts = valId.split(':');
-                const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
-                const brandId = parts[1] !== 'any' ? parts[1] : undefined;
-                const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
-                const brand = (allBrands || []).find((b: any) => b.id === brandId);
-                const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
-                const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
-
-                return (
-                  <AntTag color="purple" className="text-[11px] m-0">
-                    Mfg: {mfgName} × Brand: {brandName}
-                  </AntTag>
-                );
-              }
-
-              const connector = propAttr?.connector || 'AND';
-              const propJoiner = connector === 'OR' ? ' | ' : ', ';
-
-              return (
-                <div className="flex flex-wrap items-center">
-                  {values.map((v: any, vIdx: number) => {
-                    const valId = v.value_id || v.id;
-                    const valObj = catalogAttributeValues?.find((cv: any) => cv.id === valId);
-                    const valLabel = valObj?.label
-                      || valObj?.value
-                      || v.value_label
-                      || v.label
-                      || v.value
-                      || valId;
-                    const isLast = vIdx === values.length - 1;
-
-                    return (
-                      <span key={vIdx} className="inline-flex items-center my-0.5">
-                        <AntTag color="blue" className="text-[11px] m-0 font-medium">
-                          {valLabel}
-                        </AntTag>
-                        {!isLast && (
-                          <span className="mx-0.5 text-emerald-600 font-bold text-[12px] select-none">
-                            {propJoiner}
-                          </span>
-                        )}
-                      </span>
-                    );
-                  })}
-                </div>
-              );
+              return renderAttributeCell(matchedAttr || {}, propAttr?.connector);
             }
           }))
         ]}
