@@ -96,10 +96,9 @@ export interface SellerQuoteVariant {
   offer_price: number;
   buyer_accepted?: boolean;
   combinations: VariantCombination[];
-  option_type?: 'CUSTOM_GENERATED' | 'CATALOG_SKU';
+  product_attributes?: any[];
   catalog_variant_id?: string;
   sku?: string;
-  satisfaction_status?: 'SATISFIED' | 'CUSTOM';
   signature?: string;
   is_selected?: boolean;
 }
