@@ -6,6 +6,7 @@ import {
   AppstoreOutlined,
   FolderOpenOutlined,
   TeamOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
 import { businessDb } from '../../data/business/business.db';
@@ -124,6 +125,15 @@ export const RfqWorkspace: React.FC = () => {
                 </span>
               ),
               children: <SuppliersTab rfqId={rfqId!} />,
+            },
+            {
+              key: 'analytics',
+              label: (
+                <span className="font-semibold flex items-center gap-1.5 text-xs">
+                  <BarChartOutlined /> Quote Awarding
+                </span>
+              ),
+              children: <QuoteAwardingTab rfqId={rfqId!} />,
             },
           ]}
         />
@@ -433,6 +443,25 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
           scroll={{ x: 500 }}
         />
       </Drawer>
+    </div>
+  );
+};
+
+// ============================================================================
+// SUB-COMPONENT 3: Placeholder Tab (Sourcing Analytics & Package Overview)
+// ============================================================================
+const QuoteAwardingTab: React.FC<{ rfqId: string }> = () => {
+  return (
+    <div className="p-8 text-center text-slate-500 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 my-2">
+      <div className="max-w-md mx-auto space-y-2">
+        <span className="inline-flex p-3 rounded-full bg-indigo-50 text-indigo-600 text-lg">
+          <BarChartOutlined />
+        </span>
+        <h3 className="text-sm font-bold text-slate-800 m-0">Sourcing Analytics & Comparisons</h3>
+        <p className="text-xs text-slate-500 m-0">
+          This section will display package-level quotation comparisons, total spending estimates, and supplier performance metrics across all line items in this RFQ package.
+        </p>
+      </div>
     </div>
   );
 };
