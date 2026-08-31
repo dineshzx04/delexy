@@ -60,19 +60,45 @@ export const RfqWorkspace: React.FC = () => {
       {/* Professional Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">{rfq.title}</h1>
-            <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-              {rfq.rfq_number}
-            </span>
-            <RfqStatusBadge status={rfq.status} />
-          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">RFQ Sourcing Workspace</h1>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Requester: <strong className="text-slate-700">{rfq.requester_name}</strong> &bull; Deadline: <strong className="text-slate-700">{new Date(rfq.submission_deadline).toLocaleDateString()}</strong>
-            {rfq.description && <span className="ml-2 text-slate-400 font-normal italic">({rfq.description})</span>}
+            Manage line items, supplier assignments, quote comparisons, and contract awards for this RFQ.
           </p>
         </div>
       </div>
+
+      {/* RFQ Details */}
+      <Descriptions
+        title={<span className="text-sm font-bold text-slate-800">RFQ Sourcing Details</span>}
+        bordered
+        size="small"
+        column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
+        labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
+        contentStyle={{ fontSize: '12px', color: '#1e293b' }}
+        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200"
+        classNames={{ header: "mb-0", title: "p-2" }}
+      >
+        <Descriptions.Item label="Buyer" span={2}>
+          <span className="font-semibold text-slate-800 text-xs">{rfq.requester_name}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="RFQ Title">
+          <span className="font-semibold text-slate-900 text-xs">{rfq.title}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="RFQ Number">
+          <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="RFQ Status">
+          <RfqStatusBadge status={rfq.status} />
+        </Descriptions.Item>
+        <Descriptions.Item label="Submission Deadline">
+          <span className="text-slate-700 font-medium text-xs">{new Date(rfq.submission_deadline).toLocaleDateString()}</span>
+        </Descriptions.Item>
+        {rfq.description && (
+          <Descriptions.Item label="Description" span={2}>
+            <span className="text-slate-600 text-xs italic">{rfq.description}</span>
+          </Descriptions.Item>
+        )}
+      </Descriptions>
 
       {/* Tabs Container */}
       <Card size="small" className="shadow-sm border-slate-200">

@@ -80,16 +80,50 @@ export const ItemDetailWorkspace: React.FC = () => {
       {/* Professional Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">{itemProduct?.name || 'Sourcing Line Item'}</h1>
-            <RfqItemStatusBadge status={item.status} />
-            <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit}</AntTag>
-          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Sourcing Line Item Workspace</h1>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            RFQ: <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span> &bull; Category: <strong className="text-slate-700">{categoryName}</strong>
+            Manage requested attributes, assigned suppliers, quotation offers, and contract awards for this line item.
           </p>
         </div>
       </div>
+
+      {/* Sourcing Item Details */}
+      <Descriptions
+        title={<span className="text-sm font-bold text-slate-800">Sourcing Item Details</span>}
+        bordered
+        size="small"
+        column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
+        labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
+        contentStyle={{ fontSize: '12px', color: '#1e293b' }}
+        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200"
+        classNames={{ header: "mb-0", title: "p-2" }}
+      >
+        <Descriptions.Item label="Buyer" span={2}>
+          <span className="font-semibold text-slate-800 text-xs">{rfq.requester_name}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="RFQ Number">
+          <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Item Status">
+          <RfqItemStatusBadge status={item.status} />
+        </Descriptions.Item>
+        <Descriptions.Item label="Product / Service">
+          <span className="font-semibold text-slate-900 text-xs">{itemProduct?.name || 'Custom Specifications'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Category">
+          <span className="text-slate-700 text-xs">{categoryName}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="SKU">
+          {item?.variant_id ? (
+            <AntTag color="purple" className="font-mono font-semibold m-0 text-xs">{item.variant_id}</AntTag>
+          ) : (
+            <AntTag color="orange" className="font-semibold m-0 text-xs">Custom Product</AntTag>
+          )}
+        </Descriptions.Item>
+        <Descriptions.Item label="Requested Quantity">
+          <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+        </Descriptions.Item>
+      </Descriptions>
 
       {/* Tabs Container */}
       <Card size="small" className="shadow-sm border-slate-200">

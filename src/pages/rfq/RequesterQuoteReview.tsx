@@ -9,6 +9,7 @@ import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
+import { RFQQuoteStatusBadge } from './RfqStatusBadge';
 
 /* ============================================================================
  * SUBCOMPONENT: ComparisonMatrixModal
@@ -981,18 +982,9 @@ export const RequesterQuoteReview: React.FC = () => {
       {/* Professional Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Review Sourcing Quote Proposal</h1>
-            <AntTag color="purple" className="font-mono font-bold text-xs m-0">{quote.seller_quote_number}</AntTag>
-            <AntTag
-              color={quote.status === 'SUBMITTED' ? 'blue' : quote.status === 'DRAFT' ? 'orange' : quote.status === 'DEVIATION_ACCEPTED' ? 'green' : quote.status === 'REJECTED' ? 'red' : 'default'}
-              className="font-bold text-xs m-0"
-            >
-              {quote.status}
-            </AntTag>
-          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Review Sourcing Quote Proposal</h1>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Supplier: <strong className="text-slate-700">{sellerParty?.display_name || quote.seller_party_id}</strong> &bull; RFQ: <span className="font-mono font-bold text-slate-700">{rfq?.rfq_number}</span>
+            Evaluate supplier offered options, compare attribute deviations, and accept proposal or request revisions.
           </p>
         </div>
       </div>
@@ -1024,6 +1016,9 @@ export const RequesterQuoteReview: React.FC = () => {
             header: "mb-0"
           }}
         >
+          <Descriptions.Item label="Seller" span={2}>
+            <span className="font-semibold text-slate-800 text-xs">{sellerParty?.display_name || quote.seller_party_id}</span>
+          </Descriptions.Item>
           <Descriptions.Item label="RFQ Number">
             <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
           </Descriptions.Item>
@@ -1031,12 +1026,7 @@ export const RequesterQuoteReview: React.FC = () => {
             <AntTag color="purple" className="font-mono font-bold m-0 text-xs">{quote.seller_quote_number}</AntTag>
           </Descriptions.Item>
           <Descriptions.Item label="Quote Status">
-            <AntTag
-              color={quote.status === 'SUBMITTED' ? 'blue' : quote.status === 'DRAFT' ? 'orange' : quote.status === 'DEVIATION_ACCEPTED' ? 'green' : quote.status === 'REJECTED' ? 'red' : 'default'}
-              className="m-0 text-xs"
-            >
-              {quote.status}
-            </AntTag>
+            <RFQQuoteStatusBadge status={quote?.status} />
           </Descriptions.Item>
           <Descriptions.Item label="Round">
             <div className="flex items-center gap-1.5">

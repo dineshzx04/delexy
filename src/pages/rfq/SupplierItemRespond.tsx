@@ -9,6 +9,7 @@ import { businessDb } from '../../data/business/business.db';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
+import { RFQQuoteStatusBadge } from './RfqStatusBadge';
 
 interface ProposalAttribute {
   attribute_type: AttributeType;
@@ -110,15 +111,21 @@ export const SupplierItemRespond: React.FC = () => {
       {/* Professional Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">RFQ Item Proposal Wizard</h1>
-            <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
-              {rfq.rfq_number}
-            </span>
-          </div>
-          <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Sourcing proposal and offer response for <strong className="text-slate-700">{rfq.requester_name || 'Requester'}</strong>
-          </p>
+          {viewStep === 0 ? (
+            <>
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Submit Sourcing Quote Proposal</h1>
+              <p className="text-xs text-slate-500 mt-0.5 m-0">
+                Submit pricing, attribute specifications, and custom or suggested product options for this line item.
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Sourcing Proposal Acknowledgement</h1>
+              <p className="text-xs text-slate-500 mt-0.5 m-0">
+                Review final contract details, purchase order status, and sign-off confirmation.
+              </p>
+            </>
+          )}
         </div>
       </div>
 
@@ -127,21 +134,13 @@ export const SupplierItemRespond: React.FC = () => {
           <Steps
             current={viewStep}
             onChange={(step) => setViewStep(step)}
-            titlePlacement="vertical"
+            // titlePlacement="vertical"
             ellipsis
             items={[
               { title: 'Proposal & Product Mapping' },
               { title: 'Final Approval' },
             ]}
           />
-          <div className="py-2.5 border-b border-slate-100 text-center">
-            {viewStep === 0 && (
-              <p className="text-xs text-slate-500 m-0">Submit or revise your offer specifications, custom options, catalog product mapping, and pricing.</p>
-            )}
-            {viewStep === 1 && (
-              <p className="text-xs text-slate-500 m-0">Final sign-off by both parties.</p>
-            )}
-          </div>
 
           <div className="flex items-center justify-between py-3 mb-2">
             <AntButton
@@ -2470,6 +2469,9 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
         classNames={{ header: "mb-1" }}
         className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200"
       >
+        <Descriptions.Item label="Buyer" span={2}>
+          <span className="font-semibold text-slate-800 text-xs">{rfq.requester_name || 'Requester'}</span>
+        </Descriptions.Item>
         <Descriptions.Item label="RFQ Number">
           <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
         </Descriptions.Item>
@@ -2479,12 +2481,8 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
           </AntTag>
         </Descriptions.Item>
         <Descriptions.Item label="Quote Status">
-          <AntTag
-            color={!existingQuote ? 'default' : existingQuote.status === 'SUBMITTED' ? 'blue' : existingQuote.status === 'DRAFT' ? 'orange' : existingQuote.status === 'REJECTED' ? 'red' : 'default'}
-            className="m-0 text-xs"
-          >
-            {existingQuote?.status || 'NEW'}
-          </AntTag>
+          <RFQQuoteStatusBadge status={existingQuote?.status || null} />
+
         </Descriptions.Item>
         <Descriptions.Item label="Round">
           <div className="flex items-center gap-1.5">
