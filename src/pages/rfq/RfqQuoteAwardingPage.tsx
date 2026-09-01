@@ -1,10 +1,20 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Alert, Button, Card, Pagination, Segmented, Tag as AntTag, InputNumber } from "antd";
-import { TableOutlined, TrophyOutlined } from "@ant-design/icons";
+import { Alert, Button, Card, Pagination, Segmented, Tag as AntTag, InputNumber, message, notification, Tooltip, Descriptions } from "antd";
+import {
+  TableOutlined,
+  TrophyOutlined,
+  SaveOutlined,
+  CheckCircleOutlined,
+  ThunderboltOutlined,
+  FileTextOutlined,
+  DollarOutlined,
+  RocketOutlined,
+  ShopOutlined,
+} from "@ant-design/icons";
 
-import { rfqDb } from "../../data/rfq";
+import { rfqDb, type RfqAwardHeader, type RfqAwardItem, type PurchaseOrder, type PurchaseOrderItem, type PoAcknowledgement } from "../../data/rfq";
 import { businessDb } from "../../data/business/business.db";
 import { catalogDb } from "../../data/catalog/catalog.db";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
@@ -42,7 +52,19 @@ type FlattenedVariant = ProposalVariant & {
   quoteStatus: string;
 };
 
-const VALID_QUOTE_STATUSES = ["SUBMITTED", "ACCEPTED", "FINAL_ACKNOWLEDGE", "DEVIATION_ACCEPTED"] as const;
+export type AwardAllocation = {
+  rfq_item_id: string;
+  seller_party_id: string;
+  seller_quote_id: string;
+  variant_id: string;
+  variant_col_key: string;
+  excel_letter: string;
+  variant_type: "CUSTOM" | "SUGGESTED";
+  unit_price: number;
+  awarded_quantity: number;
+  unit_of_measure: string;
+  seller_accepted?: boolean;
+};
 
 const getExcelColumn = (index: number): string => {
   let result = "";
@@ -63,13 +85,18 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   const navigate = useNavigate();
 
   const { activeWorkspace, currentUserId } = useWorkspace();
-
   const isBusinessContext = activeWorkspace?.type === "BUSINESS";
   const basePath = isBusinessContext ? "/b/rfqs" : "/user/rfqs";
 
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
+  const [allocations, setAllocations] = useState<Record<string, AwardAllocation>>({});
 
+  /*
+   * --------------------------------------------------------------------------
+   * Single Consolidated Database Query via Promise.all
+   * --------------------------------------------------------------------------
+   */
   const pageData = useLiveQuery(async () => {
     if (!rfqId) return null;
 
@@ -85,6 +112,10 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       allProposalVariants,
       allSuggestedVariants,
       quoteAttributes,
+      existingAwardHeaders,
+      existingAwardItems,
+      existingPurchaseOrders,
+      existingPoAcknowledgements,
     ] = await Promise.all([
       rfqDb.rfqs.get(rfqId),
       rfqDb.rfq_items.where("rfq_id").equals(rfqId).toArray(),
@@ -97,6 +128,10 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       rfqDb.seller_quote_variants.toArray(),
       rfqDb.seller_quote_suggested_variants.toArray(),
       rfqDb.seller_quote_attributes.toArray(),
+      rfqDb.rfq_award_headers.where("rfq_id").equals(rfqId).toArray(),
+      rfqDb.rfq_award_items.where("rfq_id").equals(rfqId).toArray(),
+      rfqDb.purchase_orders.where("rfq_id").equals(rfqId).toArray(),
+      rfqDb.po_acknowledgements.toArray(),
     ]);
 
     return {
@@ -111,6 +146,10 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       allManufacturers,
       allBrands,
       quoteAttributes,
+      existingAwardHeaders,
+      existingAwardItems,
+      existingPurchaseOrders,
+      existingPoAcknowledgements,
     };
   }, [rfqId]);
 
@@ -126,8 +165,56 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     allManufacturers = [],
     allBrands = [],
     quoteAttributes = [],
+    existingAwardHeaders = [],
+    existingAwardItems = [],
+    existingPurchaseOrders = [],
+    existingPoAcknowledgements = [],
   } = pageData ?? {};
 
+  /*
+   * --------------------------------------------------------------------------
+   * Seed Allocations from DB (draft_snapshot or award items)
+   * --------------------------------------------------------------------------
+   */
+  useEffect(() => {
+    const currentHeader = existingAwardHeaders[0];
+    if (currentHeader?.draft_snapshot) {
+      try {
+        const parsed = JSON.parse(currentHeader.draft_snapshot);
+        setAllocations(prev => ({ ...parsed, ...prev }));
+        return;
+      } catch (err) {
+        console.error("Failed to parse draft_snapshot", err);
+      }
+    }
+
+    if (existingAwardItems.length > 0) {
+      const initialMap: Record<string, AwardAllocation> = {};
+      existingAwardItems.forEach(item => {
+        const key = `${item.rfq_item_id}:${item.variant_id}`;
+        initialMap[key] = {
+          rfq_item_id: item.rfq_item_id,
+          seller_party_id: item.seller_party_id,
+          seller_quote_id: item.seller_quote_id,
+          variant_id: item.variant_id,
+          variant_col_key: `col_${item.variant_id}`,
+          excel_letter: "",
+          variant_type: item.variant_type,
+          unit_price: item.unit_price,
+          awarded_quantity: item.awarded_quantity,
+          unit_of_measure: "PCS",
+          seller_accepted: item.seller_accepted,
+        };
+      });
+      setAllocations(prev => ({ ...initialMap, ...prev }));
+    }
+  }, [existingAwardHeaders, existingAwardItems]);
+
+  /*
+   * --------------------------------------------------------------------------
+   * Breadcrumbs & Derived Workspace Context
+   * --------------------------------------------------------------------------
+   */
   const breadcrumbs = useMemo(
     () => [
       { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
@@ -157,6 +244,11 @@ export const RfqQuoteAwardingPage: React.FC = () => {
 
   const activeCategory = useMemo(() => categories.find(category => category.id === activeItem?.category_id), [categories, activeItem?.category_id]);
 
+  /*
+   * --------------------------------------------------------------------------
+   * Proposal Matrix Construction for Active Item
+   * --------------------------------------------------------------------------
+   */
   const { sellerProposals } = useMemo(() => {
     if (!activeItem?.id) {
       return {
@@ -293,36 +385,250 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     [sellerProposals],
   );
 
+  /*
+   * --------------------------------------------------------------------------
+   * Allocation Computations for Active Item
+   * --------------------------------------------------------------------------
+   */
+  const activeItemAllocatedQty = useMemo(() => {
+    if (!activeItem?.id) return 0;
+    return Object.values(allocations)
+      .filter(a => a.rfq_item_id === activeItem.id)
+      .reduce((sum, a) => sum + (a.awarded_quantity || 0), 0);
+  }, [allocations, activeItem?.id]);
+
+  const activeItemReqQty = activeItem?.req_quantity || 0;
+  const activeItemRemainingQty = Math.max(0, activeItemReqQty - activeItemAllocatedQty);
+
+  const handleQtyChange = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string, newQty: number | null) => {
+    if (!activeItem?.id) return;
+    const qty = Math.max(0, newQty || 0);
+    const key = `${activeItem.id}:${variant.id}`;
+
+    setAllocations(prev => ({
+      ...prev,
+      [key]: {
+        rfq_item_id: activeItem.id,
+        seller_party_id: sellerPartyId,
+        seller_quote_id: sellerQuoteId,
+        variant_id: variant.id,
+        variant_col_key: variant.colKey,
+        excel_letter: variant.excelLetter,
+        variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
+        unit_price: variant.offerPrice,
+        awarded_quantity: qty,
+        unit_of_measure: variant.unit || "PCS",
+        seller_accepted: false,
+      },
+    }));
+  };
+
+  const handleQuickFullAllocation = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string) => {
+    if (!activeItem?.id) return;
+    const currentVariantQty = allocations[`${activeItem.id}:${variant.id}`]?.awarded_quantity || 0;
+    const targetQty = currentVariantQty + activeItemRemainingQty;
+    handleQtyChange(variant, sellerPartyId, sellerQuoteId, targetQty);
+  };
+
+  /*
+   * --------------------------------------------------------------------------
+   * Persistence Handlers (Save Draft vs Finalize Awards & POs)
+   * --------------------------------------------------------------------------
+   */
+  const handleSaveDraft = async () => {
+    if (!rfqId) return;
+    const now = new Date().toISOString();
+    const headerId = `award-proc-${rfqId}`;
+
+    const activeAllocations = Object.values(allocations).filter(a => a.awarded_quantity > 0);
+    const totalAmount = activeAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
+
+    const headerRecord: RfqAwardHeader = {
+      id: headerId,
+      rfq_id: rfqId,
+      process_status: "DRAFT",
+      created_by_user_id: currentUserId || "usr-1",
+      total_awarded_amount: totalAmount,
+      draft_snapshot: JSON.stringify(allocations),
+      updated_at: now,
+      created_at: existingAwardHeaders[0]?.created_at || now,
+    };
+
+    // const itemRecords: RfqAwardItem[] = activeAllocations.map(a => ({
+    //   id: `award-item-${a.rfq_item_id}-${a.variant_id}`,
+    //   award_header_id: headerId,
+    //   rfq_id: rfqId,
+    //   rfq_item_id: a.rfq_item_id,
+    //   seller_party_id: a.seller_party_id,
+    //   seller_quote_id: a.seller_quote_id,
+    //   variant_id: a.variant_id,
+    //   variant_type: a.variant_type,
+    //   unit_price: a.unit_price,
+    //   awarded_quantity: a.awarded_quantity,
+    //   total_price: a.unit_price * a.awarded_quantity,
+    //   seller_accepted: a.seller_accepted ?? false,
+    //   updated_at: now,
+    //   created_at: now,
+    // }));
+
+    // await rfqDb.rfq_award_headers.put(headerRecord);
+    // await rfqDb.rfq_award_items.where("rfq_id").equals(rfqId).delete();
+    // if (itemRecords.length > 0) {
+    //   await rfqDb.rfq_award_items.bulkPut(itemRecords);
+    // }
+    message.success("Draft award allocations saved successfully.");
+  };
+
+  const handleFinalizeAndGeneratePOs = async () => {
+    if (!rfqId) return;
+
+    // Check over-allocation across line items
+    for (const item of rfqItems) {
+      const itemAllocated = Object.values(allocations)
+        .filter(a => a.rfq_item_id === item.id)
+        .reduce((sum, a) => sum + (a.awarded_quantity || 0), 0);
+      if (itemAllocated > item.req_quantity) {
+        message.error(`Line item #${item.item_index || 1} is over-allocated (${itemAllocated}/${item.req_quantity}). Please adjust before finalizing.`);
+        return;
+      }
+    }
+
+    const activeAllocations = Object.values(allocations).filter(a => a.awarded_quantity > 0);
+    if (activeAllocations.length === 0) {
+      message.warning("Please allocate award quantities to at least one variant before finalizing.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const headerId = `award-proc-${rfqId}`;
+    const totalAmount = activeAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
+
+    // 1. Write Award Header
+    const headerRecord: RfqAwardHeader = {
+      id: headerId,
+      rfq_id: rfqId,
+      process_status: "AWARD_FINALIZED",
+      created_by_user_id: currentUserId || "usr-1",
+      total_awarded_amount: totalAmount,
+      updated_at: now,
+      created_at: existingAwardHeaders[0]?.created_at || now,
+    };
+    await rfqDb.rfq_award_headers.put(headerRecord);
+
+    // 2. Group items per seller & generate POs
+    const sellerGroups: Record<string, AwardAllocation[]> = {};
+    activeAllocations.forEach(a => {
+      if (!sellerGroups[a.seller_party_id]) sellerGroups[a.seller_party_id] = [];
+      sellerGroups[a.seller_party_id].push(a);
+    });
+
+    const poRecords: PurchaseOrder[] = [];
+    const poItemRecords: PurchaseOrderItem[] = [];
+    const poAckRecords: PoAcknowledgement[] = [];
+    const itemRecords: RfqAwardItem[] = [];
+
+    let poCounter = existingPurchaseOrders.length + 1;
+
+    for (const [sellerPartyId, sellerAllocations] of Object.entries(sellerGroups)) {
+      const poId = `po-${rfqId}-${sellerPartyId}`;
+      const poNumber = `PO-2026-${String(poCounter++).padStart(3, "0")}`;
+      const sellerTotal = sellerAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
+
+      const buyerPartyId = activePartyId || "pty-buyer";
+
+      poRecords.push({
+        id: poId,
+        po_number: poNumber,
+        rfq_id: rfqId,
+        award_header_id: headerId,
+        buyer_party_id: buyerPartyId,
+        seller_party_id: sellerPartyId,
+        total_amount: sellerTotal,
+        currency: "USD",
+        po_status: "RELEASED",
+        shipping_address: rfq?.shipping_destination || "Corporate HQ Logistics",
+        payment_terms: "Net 30 Days",
+        po_released_at: now,
+        created_at: now,
+        updated_at: now,
+      });
+
+      poAckRecords.push({
+        id: `ack-${poId}`,
+        purchase_order_id: poId,
+        seller_party_id: sellerPartyId,
+        seller_acknowledged: false,
+        buyer_confirmed: true,
+        buyer_confirmed_at: now,
+        buyer_note: "Purchase order released automatically upon contract award finalization.",
+        updated_at: now,
+      });
+
+      sellerAllocations.forEach(a => {
+        const awardItemId = `award-item-${a.rfq_item_id}-${a.variant_id}`;
+        itemRecords.push({
+          id: awardItemId,
+          award_header_id: headerId,
+          rfq_id: rfqId,
+          rfq_item_id: a.rfq_item_id,
+          seller_party_id: a.seller_party_id,
+          seller_quote_id: a.seller_quote_id,
+          variant_id: a.variant_id,
+          variant_type: a.variant_type,
+          unit_price: a.unit_price,
+          awarded_quantity: a.awarded_quantity,
+          total_price: a.unit_price * a.awarded_quantity,
+          seller_accepted: true,
+          seller_accepted_at: now,
+          purchase_order_id: poId,
+          updated_at: now,
+          created_at: now,
+        });
+
+        poItemRecords.push({
+          id: `po-item-${poId}-${a.variant_id}`,
+          purchase_order_id: poId,
+          award_item_id: awardItemId,
+          rfq_item_id: a.rfq_item_id,
+          variant_id: a.variant_id,
+          unit_price: a.unit_price,
+          awarded_quantity: a.awarded_quantity,
+          total_price: a.unit_price * a.awarded_quantity,
+        });
+      });
+    }
+
+    await rfqDb.rfq_award_items.where("rfq_id").equals(rfqId).delete();
+    await rfqDb.rfq_award_items.bulkPut(itemRecords);
+
+    await rfqDb.purchase_orders.where("rfq_id").equals(rfqId).delete();
+    await rfqDb.purchase_orders.bulkPut(poRecords);
+
+    await rfqDb.purchase_order_items.bulkPut(poItemRecords);
+    await rfqDb.po_acknowledgements.bulkPut(poAckRecords);
+
+    // Update RFQ status to AWARDED
+    await rfqDb.rfqs.update(rfqId, { status: "AWARDED", updated_at: now });
+
+    for (const item of rfqItems) {
+      await rfqDb.rfq_items.update(item.id, { status: "AWARDED", updated_at: now });
+    }
+
+    notification.success({
+      message: "Contract Awards Finalized!",
+      description: `Successfully generated ${poRecords.length} Purchase Order(s) for awarded suppliers.`,
+    });
+
+    setViewMode("summary");
+  };
+
+  /*
+   * --------------------------------------------------------------------------
+   * Matrix Row Definitions
+   * --------------------------------------------------------------------------
+   */
   const rowsDefinition = useMemo(
     () => [
-      // {
-      //   key: "seller_name",
-      //   attributeName: "Seller Name",
-      //   getValue: (variant: FlattenedVariant) => <span className="font-bold text-slate-900 text-xs">{variant.sellerName}</span>,
-      // },
-      // {
-      //   key: "quote_number",
-      //   attributeName: "Quote Number & Status",
-      //   getValue: (variant: FlattenedVariant) => (
-      //     <div className="space-y-0.5">
-      //       <span className="font-mono text-xs text-slate-800">{variant.quoteNumber}</span>
-      //       <div>
-      //         <AntTag color={variant.quoteStatus === "DEVIATION_ACCEPTED" ? "emerald" : "blue"} className="text-[10px] m-0 font-medium">
-      //           {variant.quoteStatus}
-      //         </AntTag>
-      //       </div>
-      //     </div>
-      //   ),
-      // },
-      // {
-      //   key: "proposal_type",
-      //   attributeName: "Proposal Type",
-      //   getValue: (variant: FlattenedVariant) => (
-      //     <AntTag color={variant.type.includes("Catalog") ? "indigo" : "purple"} className="text-xs m-0 font-medium">
-      //       {variant.type}
-      //     </AntTag>
-      //   ),
-      // },
       {
         key: "manufacturer",
         attributeName: "Manufacturer / Brand",
@@ -356,11 +662,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
         attributeName: "MOQ",
         getValue: (variant: FlattenedVariant) => <span className="font-semibold text-slate-800 text-xs">2 Pcs</span>,
       },
-      // {
-      //   key: "unit",
-      //   attributeName: "Unit of Measure",
-      //   getValue: (variant: FlattenedVariant) => <span className="text-slate-600 text-xs font-mono">{variant.unit}</span>,
-      // },
       {
         key: "total_price",
         attributeName: "Total Price",
@@ -369,28 +670,51 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       {
         key: "award_quantity",
         attributeName: "Award Quantity (Allocation)",
-        getValue: (variant: FlattenedVariant) => (
-          <div className="flex flex-col gap-1">
-            <InputNumber
-              min={0}
-              // max={variant.offerQuantity}
-              step={1}
-              // value={variant.awardQty}
-              value={0}
-              // onChange={value => handleAwardQtyChange(variant.id, value)}
-              size="small"
-              className="!w-20 text-[11px] !h-7 font-mono"
-            />
-            {/* <span className="font-semibold text-indigo-700 text-xs">
-              {variant.awardQty} {variant.unit}
-            </span> */}
-          </div>
-        ),
+        getValue: (variant: FlattenedVariant) => {
+          const currentQty = allocations[`${activeItem?.id}:${variant.id}`]?.awarded_quantity || 0;
+          const currentSubtotal = variant.offerPrice * currentQty;
+
+          return (
+            <div className="flex flex-col gap-1.5 items-start">
+              <div className="flex items-center gap-1">
+                <InputNumber
+                  min={0}
+                  step={1}
+                  value={currentQty}
+                  onChange={val => handleQtyChange(variant, variant.sellerName, variant.quoteNumber, val)}
+                  size="small"
+                  className="!w-24 text-[11px] !h-7 font-mono font-bold"
+                />
+
+                <Tooltip title="Quick Fill Remaining Quantity">
+                  <Button
+                    size="small"
+                    type="default"
+                    icon={<ThunderboltOutlined />}
+                    onClick={() => handleQuickFullAllocation(variant, variant.sellerName, variant.quoteNumber)}
+                    className="!h-7 !px-1.5 text-[10px] text-indigo-600 hover:text-indigo-700 font-semibold"
+                  />
+                </Tooltip>
+              </div>
+
+              {currentQty > 0 && (
+                <div className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                  Subtotal: {formatCurrency(currentSubtotal)}
+                </div>
+              )}
+            </div>
+          );
+        },
       },
     ],
-    [],
+    [allocations, activeItem?.id, activeItemRemainingQty],
   );
 
+  /*
+   * --------------------------------------------------------------------------
+   * Early Return Guards
+   * --------------------------------------------------------------------------
+   */
   if (!pageData) {
     return (
       <div className="p-8 text-center text-slate-500">
@@ -403,7 +727,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     return (
       <div className="p-8 text-center text-slate-500">
         <h2 className="text-lg font-bold text-slate-800">RFQ Sourcing Container Not Found</h2>
-
         <Button size="small" className="mt-3" onClick={() => navigate(basePath)}>
           Back to RFQs List
         </Button>
@@ -411,18 +734,46 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     );
   }
 
+  const currentProcessHeader = existingAwardHeaders[0];
+  const isFinalized = currentProcessHeader?.process_status === "AWARD_FINALIZED" || currentProcessHeader?.process_status === "PO_GENERATED";
+
   return (
     <div className="max-w-7xl mx-auto space-y-4">
+      {/* Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1 border-b border-slate-200">
         <div>
-          <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Quote Awarding Workspace</h1>
-
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Quote Awarding Workspace</h1>
+            {isFinalized ? (
+              <AntTag color="emerald" className="font-bold text-xs">
+                FINALIZED
+              </AntTag>
+            ) : (
+              <AntTag color="blue" className="font-bold text-xs">
+                DRAFT ALLOCATION
+              </AntTag>
+            )}
+          </div>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
             Evaluate proposals, compare deviation-accepted seller quotes, and manage contract awards across RFQ line items.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
+          <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
+            Save Draft
+          </Button>
+
+          <Button
+            type="primary"
+            size="small"
+            icon={<CheckCircleOutlined />}
+            onClick={handleFinalizeAndGeneratePOs}
+            className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
+          >
+            Finalize & Generate POs
+          </Button>
+
           <Segmented
             value={viewMode}
             onChange={value => setViewMode(value as ViewMode)}
@@ -440,7 +791,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
                 label: (
                   <span className="flex items-center gap-1.5 text-xs font-semibold">
                     <TrophyOutlined />
-                    Award Overview
+                    Award Overview ({existingPurchaseOrders.length} POs)
                   </span>
                 ),
                 value: "summary",
@@ -452,6 +803,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Active RFQ Item Line Selector & Header */}
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
@@ -467,7 +819,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
           </div>
 
           <p className="text-xs text-slate-500 m-0">
-            Requested Quantity:
+            Requested Quantity:{" "}
             <strong className="text-slate-800">
               {activeItem?.req_quantity} {activeItem?.req_unit ?? "PCS"}
             </strong>
@@ -477,8 +829,51 @@ export const RfqQuoteAwardingPage: React.FC = () => {
         <Pagination size="small" current={currentPage} total={rfqItems.length} pageSize={1} showSizeChanger={false} onChange={setCurrentPage} className="m-0" />
       </div>
 
+      {/* View Mode 1: Comparison Matrix */}
       {viewMode === "matrix" && (
         <div className="space-y-3">
+          {/* Live Allocation Summary Widget */}
+          <div className="bg-slate-900 text-white rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 shadow-md border border-slate-800">
+            <div className="flex items-center gap-4">
+              <div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Line Item Goal</div>
+                <div className="text-sm font-bold text-slate-100">
+                  {activeItemReqQty} {activeItem?.req_unit || "PCS"}
+                </div>
+              </div>
+              <div className="h-7 w-px bg-slate-700" />
+              <div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Allocated Qty</div>
+                <div className="text-sm font-bold text-emerald-400">
+                  {activeItemAllocatedQty} {activeItem?.req_unit || "PCS"}
+                </div>
+              </div>
+              <div className="h-7 w-px bg-slate-700" />
+              <div>
+                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Unallocated Remainder</div>
+                <div className="text-sm font-bold text-amber-400">
+                  {activeItemRemainingQty} {activeItem?.req_unit || "PCS"}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {activeItemAllocatedQty === activeItemReqQty && activeItemReqQty > 0 ? (
+                <AntTag color="emerald" className="px-3 py-1 text-xs font-bold rounded-full">
+                  ✓ 100% Fully Allocated
+                </AntTag>
+              ) : activeItemAllocatedQty > activeItemReqQty ? (
+                <AntTag color="red" className="px-3 py-1 text-xs font-bold rounded-full">
+                  ⚠ Over Allocated (+{activeItemAllocatedQty - activeItemReqQty})
+                </AntTag>
+              ) : (
+                <AntTag color="amber" className="px-3 py-1 text-xs font-bold rounded-full">
+                  Partially Allocated
+                </AntTag>
+              )}
+            </div>
+          </div>
+
           <div className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200/80 rounded-md px-3 py-2 text-xs">
             <div className="flex items-center gap-2 text-emerald-800 font-medium">
               <AntTag color="emerald" className="m-0 font-bold">
@@ -501,7 +896,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
                     <th
                       rowSpan={2}
                       className="sticky left-0 top-0 z-30 bg-slate-100 border-r border-b border-slate-200 px-3 py-2 text-left font-bold text-slate-800 text-xs min-w-[220px]"
-                      //  shadow-[3px_0_5px_-2px_rgba(0,0,0,0.12)]
                     >
                       Basic Attribute
                     </th>
@@ -542,8 +936,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
                     return (
                       <tr key={row.key} className={rowBg}>
                         <th
-                          className={`sticky left-0 z-10 ${rowBg} border-r border-b border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 text-xs min-w-[220px] `}
-                          // shadow-[3px_0_5px_-2px_rgba(0,0,0,0.1)]
+                          className={`sticky left-0 z-10 ${rowBg} border-r border-b border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 text-xs min-w-[220px]`}
                         >
                           {row.attributeName}
                         </th>
@@ -571,27 +964,113 @@ export const RfqQuoteAwardingPage: React.FC = () => {
         </div>
       )}
 
+      {/* View Mode 2: Award Overview Tab */}
       {viewMode === "summary" && (
-        <Card size="small" className="shadow-sm border-slate-200">
-          <div className="p-6 text-center space-y-3">
-            <span className="inline-flex p-3 rounded-full bg-amber-50 text-amber-600 text-xl">
-              <TrophyOutlined />
-            </span>
+        <div className="space-y-4">
+          <Card size="small" className="shadow-sm border-slate-200">
+            <Descriptions
+              title={<span className="text-sm font-bold text-slate-800">Sourcing Award Header Summary</span>}
+              bordered
+              size="small"
+              column={3}
+              className="mb-2"
+            >
+              <Descriptions.Item label="RFQ Number">{rfq.rfq_number}</Descriptions.Item>
+              <Descriptions.Item label="Award Process Status">
+                <AntTag color={isFinalized ? "emerald" : "blue"} className="font-bold">
+                  {currentProcessHeader?.process_status || "DRAFT"}
+                </AntTag>
+              </Descriptions.Item>
+              <Descriptions.Item label="Total Contract Award Value">
+                <span className="font-bold text-emerald-700">{formatCurrency(currentProcessHeader?.total_awarded_amount || 0)}</span>
+              </Descriptions.Item>
+              <Descriptions.Item label="Total Awarded Line Items">{existingAwardItems.length}</Descriptions.Item>
+              <Descriptions.Item label="Generated Purchase Orders">{existingPurchaseOrders.length} PO(s)</Descriptions.Item>
+            </Descriptions>
+          </Card>
 
-            <h3 className="text-sm font-bold text-slate-800 m-0">Award Decision & Quantity Allocation</h3>
-
-            <p className="text-xs text-slate-500 max-w-lg mx-auto m-0">
-              This section displays overall contract award allocations, line item split orders, and supplier contract confirmations for line item #
-              {activeItem?.item_index ?? currentPage}.
-            </p>
-
-            <div className="pt-2">
-              <AntTag color="purple" className="px-3 py-1 text-xs font-semibold">
-                Line Item Status: {activeItem?.status ?? "OPEN"}
-              </AntTag>
-            </div>
-          </div>
-        </Card>
+          {existingPurchaseOrders.length > 0 ? (
+            <Card
+              title={
+                <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
+                  <RocketOutlined /> Generated Purchase Orders ({existingPurchaseOrders.length})
+                </span>
+              }
+              size="small"
+              className="shadow-sm border-slate-200"
+            >
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse border border-slate-200">
+                  <thead className="bg-slate-100 text-slate-800 border-b border-slate-200 font-bold">
+                    <tr>
+                      <th className="p-2.5 border-r border-slate-200">PO Number</th>
+                      <th className="p-2.5 border-r border-slate-200">Awarded Supplier</th>
+                      <th className="p-2.5 border-r border-slate-200">Total Order Amount</th>
+                      <th className="p-2.5 border-r border-slate-200">PO Status</th>
+                      <th className="p-2.5 border-r border-slate-200">Buyer Release</th>
+                      <th className="p-2.5 border-r border-slate-200">Seller Confirmation</th>
+                      <th className="p-2.5 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {existingPurchaseOrders.map(po => {
+                      const seller = parties.find(p => p.id === po.seller_party_id);
+                      const ack = existingPoAcknowledgements.find(a => a.purchase_order_id === po.id);
+                      return (
+                        <tr key={po.id} className="hover:bg-slate-50">
+                          <td className="p-2.5 border-r border-slate-200 font-mono font-bold text-indigo-700">{po.po_number}</td>
+                          <td className="p-2.5 border-r border-slate-200 font-semibold text-slate-800">
+                            <span className="flex items-center gap-1.5">
+                              <ShopOutlined /> {seller?.display_name || po.seller_party_id}
+                            </span>
+                          </td>
+                          <td className="p-2.5 border-r border-slate-200 font-bold text-emerald-700">{formatCurrency(po.total_amount)}</td>
+                          <td className="p-2.5 border-r border-slate-200">
+                            <AntTag color="blue" className="font-semibold text-[11px]">
+                              {po.po_status}
+                            </AntTag>
+                          </td>
+                          <td className="p-2.5 border-r border-slate-200">
+                            {ack?.buyer_confirmed ? (
+                              <AntTag color="emerald" className="font-semibold text-[10px]">
+                                Released ✓
+                              </AntTag>
+                            ) : (
+                              <AntTag color="amber">Pending Release</AntTag>
+                            )}
+                          </td>
+                          <td className="p-2.5 border-r border-slate-200">
+                            {ack?.seller_acknowledged ? (
+                              <AntTag color="emerald" className="font-semibold text-[10px]">
+                                Acknowledged ✓
+                              </AntTag>
+                            ) : (
+                              <AntTag color="purple" className="font-semibold text-[10px]">
+                                Awaiting Confirmation...
+                              </AntTag>
+                            )}
+                          </td>
+                          <td className="p-2.5 text-center">
+                            <Button size="small" type="link" icon={<FileTextOutlined />} className="text-xs font-semibold p-0">
+                              View PO Details
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : (
+            <Alert
+              type="info"
+              showIcon
+              message="No Purchase Orders Generated Yet"
+              description="Finalize contract awards in the Comparison Matrix view to generate Purchase Orders per supplier."
+            />
+          )}
+        </div>
       )}
     </div>
   );
