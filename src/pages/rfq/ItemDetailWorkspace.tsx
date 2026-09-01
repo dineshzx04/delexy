@@ -891,7 +891,6 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
                 <div className="flex flex-col items-center gap-0.5 text-xs">
                   <span className="font-semibold text-slate-800">{colItem.supplierName}</span>
                   <span className="font-mono text-indigo-700 font-semibold text-[11px]">({colItem.sellerQuoteNumber})</span>
-                  <span className="font-mono text-green-700 font-semibold text-[11px]">{colItem.title}</span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   {/* <span className="font-bold text-emerald-700 text-xs">${colItem.offer_price?.toLocaleString()}</span> */}
@@ -902,6 +901,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
                     Review &rarr;
                   </Link>
                 </div>
+                <span className="font-mono text-green-700 font-semibold text-[11px]">{colItem.title}</span>
               </div>
             ),
             key: colItem.id,

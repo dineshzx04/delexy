@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, Tabs, Tag as AntTag, Button, Table, Drawer, Descriptions, Grid as AntGrid } from 'antd';
+import { Card, Tabs, Tag as AntTag, Button, Table, Drawer, Descriptions, Grid as AntGrid, Pagination, Alert } from 'antd';
 import {
   AppstoreOutlined,
   FolderOpenOutlined,
@@ -66,6 +66,17 @@ export const RfqWorkspace: React.FC = () => {
             Manage line items, supplier assignments, quote comparisons, and contract awards for this RFQ.
           </p>
         </div>
+        <div>
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => navigate(`${basePath}/${rfqId}/awarding`)}
+            icon={<BarChartOutlined />}
+            className="bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold"
+          >
+            Open Quote Awarding Workspace →
+          </Button>
+        </div>
       </div>
 
       {/* RFQ Details */}
@@ -126,15 +137,6 @@ export const RfqWorkspace: React.FC = () => {
               ),
               children: <SuppliersTab rfqId={rfqId!} />,
             },
-            {
-              key: 'analytics',
-              label: (
-                <span className="font-semibold flex items-center gap-1.5 text-xs">
-                  <BarChartOutlined /> Quote Awarding
-                </span>
-              ),
-              children: <QuoteAwardingTab rfqId={rfqId!} />,
-            },
           ]}
         />
       </Card>
@@ -142,19 +144,14 @@ export const RfqWorkspace: React.FC = () => {
   );
 };
 
-
-
-
-
-
-
-
-
-
+// ============================================================================
+// SUB-COMPONENT 1: Items Tab
+// ============================================================================
 const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
   const navigate = useNavigate();
   const { activeWorkspace } = useWorkspace();
-  const basePath = activeWorkspace?.type === 'BUSINESS' ? '/b/rfqs' : '/user/rfqs';
+  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
 
   const items = useLiveQuery(() => rfqDb.rfq_items.where('rfq_id').equals(rfqId).toArray(), [rfqId]) || [];
   const categories = useLiveQuery(() => catalogDb.categories.toArray(), []) || [];
@@ -174,15 +171,15 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
       key: 'product_name',
       render: (_: any, record: any) => {
         const catName = categories.find((c) => c.id === record.category_id)?.name;
-        const cprod = catalogProducts.find(p => p.id === record.catalog_product_id);
+        const cprod = catalogProducts.find((p) => p.id === record.catalog_product_id);
 
         let productName = cprod?.name || record.catalog_product_id || 'Line Item';
         let variantName = '';
 
         if (record.product_id) {
-          const sprod = sellerProducts.find(p => p.id === record.product_id);
+          const sprod = sellerProducts.find((p) => p.id === record.product_id);
           if (record.variant_id) {
-            const variant = sprod?.variants?.find(v => v.id === record.variant_id);
+            const variant = sprod?.variants?.find((v) => v.id === record.variant_id);
             variantName = variant?.sku || record.variant_id;
           }
         }
@@ -216,7 +213,7 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
       key: 'req_quantity',
       width: 120,
       render: (val: number, record: any) => (
-        <span className="font-semibold text-slate-800 text-xs">{val} {record.req_unit}</span>
+        <span className="font-semibold text-slate-800 text-xs">{val} {record.req_unit || 'PCS'}</span>
       ),
     },
     {
@@ -443,25 +440,6 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
           scroll={{ x: 500 }}
         />
       </Drawer>
-    </div>
-  );
-};
-
-// ============================================================================
-// SUB-COMPONENT 3: Placeholder Tab (Sourcing Analytics & Package Overview)
-// ============================================================================
-const QuoteAwardingTab: React.FC<{ rfqId: string }> = () => {
-  return (
-    <div className="p-8 text-center text-slate-500 bg-slate-50/50 rounded-xl border border-dashed border-slate-200 my-2">
-      <div className="max-w-md mx-auto space-y-2">
-        <span className="inline-flex p-3 rounded-full bg-indigo-50 text-indigo-600 text-lg">
-          <BarChartOutlined />
-        </span>
-        <h3 className="text-sm font-bold text-slate-800 m-0">Sourcing Analytics & Comparisons</h3>
-        <p className="text-xs text-slate-500 m-0">
-          This section will display package-level quotation comparisons, total spending estimates, and supplier performance metrics across all line items in this RFQ package.
-        </p>
-      </div>
     </div>
   );
 };

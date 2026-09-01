@@ -42,6 +42,7 @@ import { SupplierRfqInbox } from './pages/rfq/SupplierRfqInbox';
 import { SupplierItemRespond } from './pages/rfq/SupplierItemRespond';
 
 import { RequesterQuoteReview } from './pages/rfq/RequesterQuoteReview';
+import { RfqQuoteAwardingPage } from './pages/rfq/RfqQuoteAwardingPage';
 
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 import PlatformLayout from './layouts/PlatformLayout';
@@ -135,6 +136,7 @@ const App: React.FC = () => {
                 <Route path="rfqs" element={<RfqList />} />
                 <Route path="rfqs/create" element={<RfqCreateWizard />} />
                 <Route path="rfqs/:rfqId" element={<RfqWorkspace />} />
+                <Route path="rfqs/:rfqId/awarding" element={<RfqQuoteAwardingPage />} />
                 <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
                 <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
@@ -163,6 +165,7 @@ const App: React.FC = () => {
                 <Route path="rfqs" element={<RfqList />} />
                 <Route path="rfqs/create" element={<RfqCreateWizard />} />
                 <Route path="rfqs/:rfqId" element={<RfqWorkspace />} />
+                <Route path="rfqs/:rfqId/awarding" element={<RfqQuoteAwardingPage />} />
                 <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
                 <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
