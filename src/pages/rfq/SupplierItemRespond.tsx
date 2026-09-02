@@ -81,7 +81,13 @@ export const SupplierItemRespond: React.FC = () => {
   );
 
   const breadcrumbs = React.useMemo(() => [
-    { title: <a onClick={() => navigate(basePath)}>Sourcing Inbox</a> },
+    {
+      title: <a onClick={() => navigate(basePath)} className='flex items-center'>
+        <div className="text-slate-500">
+          <Lucide.Inbox size={18} />
+        </div>
+      </a>
+    },
     { title: <span className="text-slate-800 font-semibold">{rfq?.rfq_number || 'RFQ'} - Sourcing Offer</span> }
   ], [basePath, rfq?.rfq_number, navigate]);
   useBreadcrumb(breadcrumbs);

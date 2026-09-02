@@ -1,26 +1,51 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Alert, Button, Card, Pagination, Segmented, Tag as AntTag, InputNumber, message, notification, Tooltip, Descriptions } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Steps,
+  Tag as AntTag,
+  InputNumber,
+  message,
+  notification,
+  Tooltip,
+  Descriptions,
+  Checkbox,
+} from "antd";
 import {
   TableOutlined,
   TrophyOutlined,
   SaveOutlined,
   CheckCircleOutlined,
   ThunderboltOutlined,
-  FileTextOutlined,
-  DollarOutlined,
-  RocketOutlined,
   ShopOutlined,
+  ArrowRightOutlined,
+  ArrowLeftOutlined,
+  AppstoreOutlined,
+  UnorderedListOutlined,
 } from "@ant-design/icons";
 
-import { rfqDb, type RfqAwardHeader, type RfqAwardItem, type PurchaseOrder, type PurchaseOrderItem, type PoAcknowledgement } from "../../data/rfq";
+import {
+  rfqDb,
+  type RfqItem,
+  type RfqAwardHeader,
+  type RfqAwardItem,
+  type PurchaseOrder,
+  type PurchaseOrderItem,
+  type PoAcknowledgement,
+  type SellerQuote,
+  type SellerQuoteVariant,
+  type SellerQuoteSuggestedVariant,
+  type SellerQuoteAttribute,
+} from "../../data/rfq";
 import { businessDb } from "../../data/business/business.db";
 import { catalogDb } from "../../data/catalog/catalog.db";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useBreadcrumb } from "../../contexts/BreadcrumbContext";
 
-type ViewMode = "matrix" | "summary";
+type ViewMode = "matrix" | "item_summary" | "summary";
 
 type ProposalVariant = {
   id: string;
@@ -34,7 +59,6 @@ type ProposalVariant = {
   totalPrice: number;
   manufacturer: string;
   brand: string;
-  awardQty: number;
 };
 
 type SellerProposal = {
@@ -64,6 +88,7 @@ export type AwardAllocation = {
   awarded_quantity: number;
   unit_of_measure: string;
   seller_accepted?: boolean;
+  is_selected?: boolean;
 };
 
 const getExcelColumn = (index: number): string => {
@@ -80,6 +105,37 @@ const getExcelColumn = (index: number): string => {
 
 const formatCurrency = (value: number): string => `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const extractMfgBrandFromQuoteAttrs = (
+  quoteId: string,
+  quoteAttributes: SellerQuoteAttribute[],
+  allManufacturers: any[],
+  allBrands: any[]
+): { manufacturer: string; brand: string } => {
+  const quoteAttrs = quoteAttributes.filter(a => a.seller_quote_id === quoteId);
+  const mfgBrandAttribute = quoteAttrs.find(attribute => attribute.attribute_id === "mfg_brand_mapping");
+
+  let manufacturer = "N/A";
+  let brand = "N/A";
+
+  const val = mfgBrandAttribute?.values?.[0];
+  if (val) {
+    const valId = val.value_id || "";
+    if (valId.includes(":")) {
+      const [mfgId, brandId] = valId.split(":");
+      const mfgMap = new Map(allManufacturers.map(m => [m.id, m.company_name]));
+      const brandMap = new Map(allBrands.map(b => [b.id, b.name]));
+      if (mfgId && mfgId !== "any") {
+        manufacturer = mfgMap.get(mfgId) || val.value_label || mfgId;
+      }
+      if (brandId && brandId !== "any") {
+        brand = brandMap.get(brandId) || val.value_label || brandId;
+      }
+    }
+  }
+
+  return { manufacturer, brand };
+};
+
 export const RfqQuoteAwardingPage: React.FC = () => {
   const { rfqId } = useParams<{ rfqId: string }>();
   const navigate = useNavigate();
@@ -93,9 +149,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   const [allocations, setAllocations] = useState<Record<string, AwardAllocation>>({});
 
   /*
-   * --------------------------------------------------------------------------
-   * Single Consolidated Database Query via Promise.all
-   * --------------------------------------------------------------------------
+   * Consolidated Dexie DB Queries
    */
   const pageData = useLiveQuery(async () => {
     if (!rfqId) return null;
@@ -172,9 +226,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   } = pageData ?? {};
 
   /*
-   * --------------------------------------------------------------------------
-   * Seed Allocations from DB (draft_snapshot or award items)
-   * --------------------------------------------------------------------------
+   * Seed Allocations State from DB
    */
   useEffect(() => {
     const currentHeader = existingAwardHeaders[0];
@@ -204,6 +256,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
           awarded_quantity: item.awarded_quantity,
           unit_of_measure: "PCS",
           seller_accepted: item.seller_accepted,
+          is_selected: item.awarded_quantity > 0 || true,
         };
       });
       setAllocations(prev => ({ ...initialMap, ...prev }));
@@ -211,9 +264,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   }, [existingAwardHeaders, existingAwardItems]);
 
   /*
-   * --------------------------------------------------------------------------
-   * Breadcrumbs & Derived Workspace Context
-   * --------------------------------------------------------------------------
+   * Breadcrumbs & Active Party Lookup
    */
   const breadcrumbs = useMemo(
     () => [
@@ -225,222 +276,26 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   );
   useBreadcrumb(breadcrumbs);
 
-  const activeParty = useMemo(() => {
-    if (!parties.length) return null;
+  const activePartyId = useMemo(() => {
+    if (!parties.length) return "";
     if (isBusinessContext) {
-      return parties.find(party => party.owner_type === "BUSINESS" && party.owner_id === activeWorkspace?.businessId);
+      return parties.find(party => party.owner_type === "BUSINESS" && party.owner_id === activeWorkspace?.businessId)?.id ?? "";
     }
-    return parties.find(party => party.owner_type === "USER" && party.owner_id === currentUserId) ?? parties.find(party => party.id === "pty-6");
+    return parties.find(party => party.owner_type === "USER" && party.owner_id === currentUserId)?.id ?? parties.find(party => party.id === "pty-6")?.id ?? "";
   }, [parties, isBusinessContext, activeWorkspace?.businessId, currentUserId]);
 
-  const activePartyId = activeParty?.id ?? "";
   const activeItemIndex = useMemo(() => Math.min(Math.max(currentPage - 1, 0), Math.max(rfqItems.length - 1, 0)), [currentPage, rfqItems.length]);
   const activeItem = rfqItems[activeItemIndex];
 
-  const activeProduct = useMemo(
-    () => catalogProducts.find(product => product.id === activeItem?.catalog_product_id),
-    [catalogProducts, activeItem?.catalog_product_id],
-  );
-
-  const activeCategory = useMemo(() => categories.find(category => category.id === activeItem?.category_id), [categories, activeItem?.category_id]);
-
   /*
-   * --------------------------------------------------------------------------
-   * Proposal Matrix Construction for Active Item
-   * --------------------------------------------------------------------------
-   */
-  const { sellerProposals } = useMemo(() => {
-    if (!activeItem?.id) {
-      return {
-        sellerProposals: [] as SellerProposal[],
-      };
-    }
-
-    const itemId = activeItem.id;
-    const targetQuotes = allQuotes.filter(q => q.rfq_item_id === itemId && q.status === "DEVIATION_ACCEPTED");
-
-    const sellerProposals: SellerProposal[] = [];
-    let excelColIndex = 0;
-
-    for (const quote of targetQuotes) {
-      const sellerParty = parties.find(item => item.id === quote.seller_party_id);
-      const sellerName = sellerParty?.display_name ?? `Supplier (${quote.seller_party_id})`;
-
-      const customVariants = allProposalVariants.filter(variant => variant.seller_quote_id === quote.id);
-      const suggestedVariants = allSuggestedVariants.filter(variant => variant.seller_quote_id === quote.id);
-      const quoteAttrs = quoteAttributes.filter(attribute => attribute.seller_quote_id === quote.id);
-
-      const mfgBrandAttribute = quoteAttrs.find(attribute => attribute.attribute_id === "mfg_brand_mapping");
-
-      let manufacturer = "N/A";
-      let brand = "N/A";
-
-      const val = mfgBrandAttribute?.values?.[0];
-      if (val) {
-        const valId = val.value_id || "";
-        if (valId.includes(":")) {
-          const [mfgId, brandId] = valId.split(":");
-          if (mfgId && mfgId !== "any") {
-            const foundMfg = allManufacturers.find(m => m.id === mfgId);
-            manufacturer = foundMfg?.company_name || val.value_label || mfgId;
-          }
-          if (brandId && brandId !== "any") {
-            const foundBrand = allBrands.find(b => b.id === brandId);
-            brand = foundBrand?.name || val.value_label || brandId;
-          }
-        }
-      }
-
-      const offerQuantity = quote.offer_quantity ?? activeItem.req_quantity ?? 1;
-      const unit = quote.offer_unit ?? activeItem.req_unit ?? "PCS";
-      const awardQty = activeItem.req_quantity ?? quote.offer_quantity ?? 0;
-
-      const proposalVariants: ProposalVariant[] = [];
-
-      for (const variant of customVariants) {
-        const offerPrice = variant.offer_price ?? 0;
-        const excelLetter = getExcelColumn(excelColIndex++);
-
-        proposalVariants.push({
-          id: variant.id,
-          colKey: `col_${variant.id}`,
-          excelLetter,
-          colLabel: `Variant ${excelLetter} (Custom)`,
-          type: "New proposal option",
-          offerPrice,
-          offerQuantity,
-          unit,
-          totalPrice: offerPrice * offerQuantity,
-          manufacturer,
-          brand,
-          awardQty,
-        });
-      }
-
-      for (const variant of suggestedVariants) {
-        const offerPrice = variant.offer_price ?? variant.list_price ?? 0;
-        const excelLetter = getExcelColumn(excelColIndex++);
-
-        proposalVariants.push({
-          id: variant.id,
-          colKey: `col_${variant.id}`,
-          excelLetter,
-          colLabel: `Variant ${excelLetter} (${variant.sku ?? "Suggested SKU"})`,
-          type: "Catalog Suggested SKU",
-          offerPrice,
-          offerQuantity,
-          unit,
-          totalPrice: offerPrice * offerQuantity,
-          manufacturer,
-          brand,
-          awardQty,
-        });
-      }
-
-      if (!proposalVariants.length) {
-        const excelLetter = getExcelColumn(excelColIndex++);
-        const fallbackQuantity = quote.offer_quantity ?? activeItem.req_quantity ?? 100;
-        const fallbackUnit = quote.offer_unit ?? activeItem.req_unit ?? "PCS";
-        const offerPrice = 150 + excelColIndex * 10;
-
-        proposalVariants.push({
-          id: quote.id,
-          colKey: `col_${quote.id}`,
-          excelLetter,
-          colLabel: `Proposal ${excelLetter}`,
-          type: "Standard Quote",
-          offerPrice,
-          offerQuantity: fallbackQuantity,
-          unit: fallbackUnit,
-          totalPrice: offerPrice * fallbackQuantity,
-          manufacturer: manufacturer !== "N/A" ? manufacturer : "Dell / Intel Corp",
-          brand: brand !== "N/A" ? brand : "Enterprise Tech",
-          awardQty: activeItem.req_quantity ?? 100,
-        });
-      }
-
-      sellerProposals.push({
-        sellerId: quote.seller_party_id,
-        sellerName,
-        quoteId: quote.id,
-        quoteNumber: quote.seller_quote_number,
-        quoteStatus: quote.status,
-        variants: proposalVariants,
-      });
-    }
-
-    return { sellerProposals };
-  }, [activeItem, allQuotes, allProposalVariants, allSuggestedVariants, quoteAttributes, parties, allManufacturers, allBrands]);
-
-  const allCombinedVariants = useMemo<FlattenedVariant[]>(
-    () =>
-      sellerProposals.flatMap(seller =>
-        seller.variants.map(variant => ({
-          ...variant,
-          sellerName: seller.sellerName,
-          quoteNumber: seller.quoteNumber,
-          quoteStatus: seller.quoteStatus,
-        })),
-      ),
-    [sellerProposals],
-  );
-
-  /*
-   * --------------------------------------------------------------------------
-   * Allocation Computations for Active Item
-   * --------------------------------------------------------------------------
-   */
-  const activeItemAllocatedQty = useMemo(() => {
-    if (!activeItem?.id) return 0;
-    return Object.values(allocations)
-      .filter(a => a.rfq_item_id === activeItem.id)
-      .reduce((sum, a) => sum + (a.awarded_quantity || 0), 0);
-  }, [allocations, activeItem?.id]);
-
-  const activeItemReqQty = activeItem?.req_quantity || 0;
-  const activeItemRemainingQty = Math.max(0, activeItemReqQty - activeItemAllocatedQty);
-
-  const handleQtyChange = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string, newQty: number | null) => {
-    if (!activeItem?.id) return;
-    const qty = Math.max(0, newQty || 0);
-    const key = `${activeItem.id}:${variant.id}`;
-
-    setAllocations(prev => ({
-      ...prev,
-      [key]: {
-        rfq_item_id: activeItem.id,
-        seller_party_id: sellerPartyId,
-        seller_quote_id: sellerQuoteId,
-        variant_id: variant.id,
-        variant_col_key: variant.colKey,
-        excel_letter: variant.excelLetter,
-        variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
-        unit_price: variant.offerPrice,
-        awarded_quantity: qty,
-        unit_of_measure: variant.unit || "PCS",
-        seller_accepted: false,
-      },
-    }));
-  };
-
-  const handleQuickFullAllocation = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string) => {
-    if (!activeItem?.id) return;
-    const currentVariantQty = allocations[`${activeItem.id}:${variant.id}`]?.awarded_quantity || 0;
-    const targetQty = currentVariantQty + activeItemRemainingQty;
-    handleQtyChange(variant, sellerPartyId, sellerQuoteId, targetQty);
-  };
-
-  /*
-   * --------------------------------------------------------------------------
-   * Persistence Handlers (Save Draft vs Finalize Awards & POs)
-   * --------------------------------------------------------------------------
+   * Global Persistence Handlers (Save Draft vs Finalize Award POs)
    */
   const handleSaveDraft = async () => {
     if (!rfqId) return;
     const now = new Date().toISOString();
     const headerId = `award-proc-${rfqId}`;
 
-    const activeAllocations = Object.values(allocations).filter(a => a.awarded_quantity > 0);
+    const activeAllocations = Object.values(allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
     const totalAmount = activeAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
 
     const headerRecord: RfqAwardHeader = {
@@ -454,38 +309,37 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       created_at: existingAwardHeaders[0]?.created_at || now,
     };
 
-    // const itemRecords: RfqAwardItem[] = activeAllocations.map(a => ({
-    //   id: `award-item-${a.rfq_item_id}-${a.variant_id}`,
-    //   award_header_id: headerId,
-    //   rfq_id: rfqId,
-    //   rfq_item_id: a.rfq_item_id,
-    //   seller_party_id: a.seller_party_id,
-    //   seller_quote_id: a.seller_quote_id,
-    //   variant_id: a.variant_id,
-    //   variant_type: a.variant_type,
-    //   unit_price: a.unit_price,
-    //   awarded_quantity: a.awarded_quantity,
-    //   total_price: a.unit_price * a.awarded_quantity,
-    //   seller_accepted: a.seller_accepted ?? false,
-    //   updated_at: now,
-    //   created_at: now,
-    // }));
+    const itemRecords: RfqAwardItem[] = activeAllocations.map(a => ({
+      id: `award-item-${a.rfq_item_id}-${a.variant_id}`,
+      award_header_id: headerId,
+      rfq_id: rfqId,
+      rfq_item_id: a.rfq_item_id,
+      seller_party_id: a.seller_party_id,
+      seller_quote_id: a.seller_quote_id,
+      variant_id: a.variant_id,
+      variant_type: a.variant_type,
+      unit_price: a.unit_price,
+      awarded_quantity: a.awarded_quantity,
+      total_price: a.unit_price * a.awarded_quantity,
+      seller_accepted: a.seller_accepted ?? false,
+      updated_at: now,
+      created_at: now,
+    }));
 
-    // await rfqDb.rfq_award_headers.put(headerRecord);
-    // await rfqDb.rfq_award_items.where("rfq_id").equals(rfqId).delete();
-    // if (itemRecords.length > 0) {
-    //   await rfqDb.rfq_award_items.bulkPut(itemRecords);
-    // }
+    await rfqDb.rfq_award_headers.put(headerRecord);
+    await rfqDb.rfq_award_items.where("rfq_id").equals(rfqId).delete();
+    if (itemRecords.length > 0) {
+      await rfqDb.rfq_award_items.bulkPut(itemRecords);
+    }
     message.success("Draft award allocations saved successfully.");
   };
 
   const handleFinalizeAndGeneratePOs = async () => {
     if (!rfqId) return;
 
-    // Check over-allocation across line items
     for (const item of rfqItems) {
       const itemAllocated = Object.values(allocations)
-        .filter(a => a.rfq_item_id === item.id)
+        .filter(a => a.rfq_item_id === item.id && a.is_selected)
         .reduce((sum, a) => sum + (a.awarded_quantity || 0), 0);
       if (itemAllocated > item.req_quantity) {
         message.error(`Line item #${item.item_index || 1} is over-allocated (${itemAllocated}/${item.req_quantity}). Please adjust before finalizing.`);
@@ -493,7 +347,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       }
     }
 
-    const activeAllocations = Object.values(allocations).filter(a => a.awarded_quantity > 0);
+    const activeAllocations = Object.values(allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
     if (activeAllocations.length === 0) {
       message.warning("Please allocate award quantities to at least one variant before finalizing.");
       return;
@@ -503,7 +357,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     const headerId = `award-proc-${rfqId}`;
     const totalAmount = activeAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
 
-    // 1. Write Award Header
     const headerRecord: RfqAwardHeader = {
       id: headerId,
       rfq_id: rfqId,
@@ -515,7 +368,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     };
     await rfqDb.rfq_award_headers.put(headerRecord);
 
-    // 2. Group items per seller & generate POs
     const sellerGroups: Record<string, AwardAllocation[]> = {};
     activeAllocations.forEach(a => {
       if (!sellerGroups[a.seller_party_id]) sellerGroups[a.seller_party_id] = [];
@@ -607,7 +459,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     await rfqDb.purchase_order_items.bulkPut(poItemRecords);
     await rfqDb.po_acknowledgements.bulkPut(poAckRecords);
 
-    // Update RFQ status to AWARDED
     await rfqDb.rfqs.update(rfqId, { status: "AWARDED", updated_at: now });
 
     for (const item of rfqItems) {
@@ -623,9 +474,650 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   };
 
   /*
-   * --------------------------------------------------------------------------
+   * Early Return Loading Guards
+   */
+  if (!pageData) {
+    return (
+      <div className="p-8 text-center text-slate-500">
+        <h2 className="text-sm font-semibold text-slate-600">Loading Awarding Workspace...</h2>
+      </div>
+    );
+  }
+
+  if (!rfq || (rfq.requester_id !== activePartyId && activePartyId !== "")) {
+    return (
+      <div className="p-8 text-center text-slate-500">
+        <h2 className="text-lg font-bold text-slate-800">RFQ Sourcing Container Not Found</h2>
+        <Button size="small" className="mt-3" onClick={() => navigate(basePath)}>
+          Back to RFQs List
+        </Button>
+      </div>
+    );
+  }
+
+  const currentProcessHeader = existingAwardHeaders[0];
+  const isFinalized = currentProcessHeader?.process_status === "AWARD_FINALIZED" || currentProcessHeader?.process_status === "PO_GENERATED";
+
+  return (
+    <div className="max-w-7xl mx-auto space-y-4 pb-8">
+      {/* 1. Guided Stepper Header */}
+      <AwardingWorkspaceHeader
+        rfqNumber={rfq.rfq_number}
+        isFinalized={isFinalized}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        onSaveDraft={handleSaveDraft}
+        onFinalize={handleFinalizeAndGeneratePOs}
+      />
+
+      {/* 2. Step 1: Award Line Item Variants View (Unified Component) */}
+      {viewMode === "matrix" && (
+        <div className="space-y-4">
+          <MatrixComparisonSection
+            rfqItems={rfqItems}
+            currentPage={currentPage}
+            onSelectPage={setCurrentPage}
+            catalogProducts={catalogProducts}
+            categories={categories}
+            activeItem={activeItem}
+            allQuotes={allQuotes}
+            allProposalVariants={allProposalVariants}
+            allSuggestedVariants={allSuggestedVariants}
+            quoteAttributes={quoteAttributes}
+            parties={parties}
+            allManufacturers={allManufacturers}
+            allBrands={allBrands}
+            allocations={allocations}
+            setAllocations={setAllocations}
+          />
+
+          {/* Step 1 Footer Action Bar */}
+          <div className="flex items-center justify-between bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
+            <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
+              Save Allocation Draft
+            </Button>
+
+            <Button
+              type="primary"
+              size="middle"
+              onClick={() => setViewMode("item_summary")}
+              className="bg-indigo-600 hover:bg-indigo-700 font-semibold text-xs flex items-center gap-1.5"
+            >
+              Next: Item-Wise Allocations <ArrowRightOutlined />
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* 3. Step 2: Item-Wise Allocations Review View */}
+      {viewMode === "item_summary" && (
+        <div className="space-y-4">
+          <ItemWiseAwardOverviewSummary
+            rfqItems={rfqItems}
+            allocations={allocations}
+            catalogProducts={catalogProducts}
+            categories={categories}
+            parties={parties}
+            allQuotes={allQuotes}
+            allProposalVariants={allProposalVariants}
+            allSuggestedVariants={allSuggestedVariants}
+            quoteAttributes={quoteAttributes}
+            allManufacturers={allManufacturers}
+            allBrands={allBrands}
+          />
+
+          {/* Step 2 Footer Action Bar */}
+          <div className="flex items-center justify-between bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
+            <Button
+              size="middle"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => setViewMode("matrix")}
+              className="text-xs font-semibold"
+            >
+              Back to Line Items Matrix
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
+                Save Draft
+              </Button>
+
+              <Button
+                type="primary"
+                size="middle"
+                onClick={() => setViewMode("summary")}
+                className="bg-indigo-600 hover:bg-indigo-700 font-semibold text-xs flex items-center gap-1.5"
+              >
+                Next: Supplier Award Overview <ArrowRightOutlined />
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. Step 3: Supplier-Wise Final Award Overview Summary View */}
+      {viewMode === "summary" && (
+        <div className="space-y-4">
+          <SellerWiseAwardOverviewSummary
+            rfqId={rfqId}
+            rfq={rfq}
+            currentProcessHeader={currentProcessHeader}
+            isFinalized={isFinalized}
+            allocations={allocations}
+            existingAwardItems={existingAwardItems}
+            existingPurchaseOrders={existingPurchaseOrders}
+            existingPoAcknowledgements={existingPoAcknowledgements}
+            parties={parties}
+            allQuotes={allQuotes}
+            rfqItems={rfqItems}
+            catalogProducts={catalogProducts}
+            categories={categories}
+            allProposalVariants={allProposalVariants}
+            allSuggestedVariants={allSuggestedVariants}
+            quoteAttributes={quoteAttributes}
+            allManufacturers={allManufacturers}
+            allBrands={allBrands}
+          />
+
+          {/* Step 3 Footer Action Bar */}
+          <div className="flex items-center justify-between bg-white p-3 border border-slate-200 rounded-lg shadow-sm">
+            <Button
+              size="middle"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => setViewMode("item_summary")}
+              className="text-xs font-semibold"
+            >
+              Back to Item-Wise Allocations
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
+                Save Draft
+              </Button>
+
+              <Button
+                type="primary"
+                size="middle"
+                icon={<CheckCircleOutlined />}
+                onClick={handleFinalizeAndGeneratePOs}
+                className="bg-emerald-600 hover:bg-emerald-700 font-semibold text-xs"
+              >
+                Finalize Award & Generate Purchase Orders
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+interface AwardingWorkspaceHeaderProps {
+  rfqNumber: string;
+  isFinalized: boolean;
+  viewMode: ViewMode;
+  onViewModeChange: (mode: ViewMode) => void;
+  onSaveDraft: () => void;
+  onFinalize: () => void;
+}
+
+const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
+  rfqNumber,
+  isFinalized,
+  viewMode,
+  onViewModeChange,
+  onSaveDraft,
+  onFinalize,
+}) => {
+  const currentStep = viewMode === "matrix" ? 0 : viewMode === "item_summary" ? 1 : 2;
+
+  return (
+    <Card size="small" className="shadow-sm border-slate-200 bg-white">
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Quote Awarding Workspace</h1>
+            {isFinalized ? (
+              <AntTag color="emerald" className="font-bold text-xs">
+                FINALIZED
+              </AntTag>
+            ) : (
+              <AntTag color="blue" className="font-bold text-xs">
+                DRAFT ALLOCATION
+              </AntTag>
+            )}
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5 m-0">
+            3-Step Guided Workflow: Matrix comparison, item-wise allocation review, supplier-wise award summary, and PO generation.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2.5">
+          <Button size="small" icon={<SaveOutlined />} onClick={onSaveDraft} className="text-xs font-semibold">
+            Save Draft
+          </Button>
+
+          {viewMode === "summary" && (
+            <Button
+              type="primary"
+              size="small"
+              icon={<CheckCircleOutlined />}
+              onClick={onFinalize}
+              className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
+            >
+              Finalize & Generate POs
+            </Button>
+          )}
+
+          <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">RFQ: {rfqNumber}</span>
+        </div>
+      </div>
+
+      {/* 3-Step Stepper Navigation Bar */}
+      <div className="pt-3">
+        <Steps
+          current={currentStep}
+          onChange={step => onViewModeChange(step === 0 ? "matrix" : step === 1 ? "item_summary" : "summary")}
+          size="small"
+          items={[
+            {
+              title: <span className="font-bold text-xs">Step 1: Award Line Item Variants</span>,
+              description: <span className="text-[11px] text-slate-500">Evaluate proposals & allocate per product</span>,
+              icon: <TableOutlined />,
+            },
+            {
+              title: <span className="font-bold text-xs">Step 2: Item-Wise Allocations</span>,
+              description: <span className="text-[11px] text-slate-500">Review awarded seller variants item by item</span>,
+              icon: <UnorderedListOutlined />,
+            },
+            {
+              title: <span className="font-bold text-xs">Step 3: Supplier Award Overview & POs</span>,
+              description: <span className="text-[11px] text-slate-500">Review supplier totals & release Purchase Orders</span>,
+              icon: <TrophyOutlined />,
+            },
+          ]}
+        />
+      </div>
+    </Card>
+  );
+};
+
+interface LineItemsHorizontalCardsNavProps {
+  rfqItems: RfqItem[];
+  currentPage: number;
+  onSelectPage: (page: number) => void;
+  catalogProducts: any[];
+  categories: any[];
+  allocations: Record<string, AwardAllocation>;
+}
+
+const LineItemsHorizontalCardsNav: React.FC<LineItemsHorizontalCardsNavProps> = ({
+  rfqItems,
+  currentPage,
+  onSelectPage,
+  catalogProducts,
+  categories,
+  allocations,
+}) => {
+  return (
+    <Card size="small" className="shadow-sm border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-2 mb-2 pb-1 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <AppstoreOutlined className="text-indigo-600" />
+          <span className="font-bold text-xs text-slate-800">Select RFQ Line Item ({rfqItems.length} Products)</span>
+        </div>
+        <span className="text-[11px] text-slate-500 font-medium">Click card to switch item in comparison matrix</span>
+      </div>
+
+      <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-0.5">
+        {rfqItems.map((item, idx) => {
+          const itemNumber = idx + 1;
+          const isActive = currentPage === itemNumber;
+
+          const product = catalogProducts.find(p => p.id === item.catalog_product_id);
+          const category = categories.find(c => c.id === item.category_id);
+
+          const itemAllocations = Object.values(allocations).filter(a => a.rfq_item_id === item.id && a.is_selected && a.awarded_quantity > 0);
+          const totalAllocatedQty = itemAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
+          const reqQty = item.req_quantity || 1;
+
+          let badgeStatus = (
+            <AntTag color="default" className="text-[10px] m-0 border-slate-200 bg-slate-100 text-slate-600 font-medium">
+              Unallocated
+            </AntTag>
+          );
+
+          if (totalAllocatedQty === reqQty && reqQty > 0) {
+            badgeStatus = (
+              <AntTag color="blue" className="text-[10px] m-0 font-semibold border-blue-200 bg-blue-50 text-blue-700">
+                ✓ 100% Allocated
+              </AntTag>
+            );
+          } else if (totalAllocatedQty > reqQty) {
+            badgeStatus = (
+              <AntTag color="red" className="text-[10px] m-0 font-semibold border-red-200 bg-red-50 text-red-700">
+                ⚠ Over Allocated ({totalAllocatedQty}/{reqQty})
+              </AntTag>
+            );
+          } else if (totalAllocatedQty > 0) {
+            badgeStatus = (
+              <AntTag color="amber" className="text-[10px] m-0 font-semibold border-amber-200 bg-amber-50 text-amber-800">
+                Partially Allocated ({totalAllocatedQty}/{reqQty})
+              </AntTag>
+            );
+          }
+
+          return (
+            <div
+              key={item.id}
+              onClick={() => onSelectPage(itemNumber)}
+              className={`flex-shrink-0 min-w-[240px] max-w-[280px] p-2.5 rounded-lg border transition-all cursor-pointer select-none ${
+                isActive
+                  ? "border-indigo-600 bg-indigo-50/50 shadow-md ring-2 ring-indigo-200"
+                  : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50 shadow-sm"
+              }`}
+            >
+              <div className="flex items-center justify-between gap-1 mb-1">
+                <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">
+                  Item #{item.item_index || itemNumber}
+                </span>
+                {badgeStatus}
+              </div>
+
+              <div className="font-semibold text-slate-900 text-xs truncate mb-1" title={product?.name || `RFQ Line Item #${itemNumber}`}>
+                {product?.name || `RFQ Line Item #${itemNumber}`}
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-slate-600">
+                <AntTag color="blue" className="text-[10px] m-0 truncate max-w-[120px]">
+                  {category?.name || "Category"}
+                </AntTag>
+                <span className="font-bold text-slate-800">
+                  {item.req_quantity} {item.req_unit || "PCS"}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+};
+
+interface MatrixComparisonSectionProps {
+  rfqItems: RfqItem[];
+  currentPage: number;
+  onSelectPage: (page: number) => void;
+  catalogProducts: any[];
+  categories: any[];
+  activeItem?: RfqItem;
+  allQuotes: SellerQuote[];
+  allProposalVariants: SellerQuoteVariant[];
+  allSuggestedVariants: SellerQuoteSuggestedVariant[];
+  quoteAttributes: SellerQuoteAttribute[];
+  parties: any[];
+  allManufacturers: any[];
+  allBrands: any[];
+  allocations: Record<string, AwardAllocation>;
+  setAllocations: React.Dispatch<React.SetStateAction<Record<string, AwardAllocation>>>;
+}
+
+const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
+  rfqItems,
+  currentPage,
+  onSelectPage,
+  catalogProducts,
+  categories,
+  activeItem,
+  allQuotes,
+  allProposalVariants,
+  allSuggestedVariants,
+  quoteAttributes,
+  parties,
+  allManufacturers,
+  allBrands,
+  allocations,
+  setAllocations,
+}) => {
+  /*
+   * Proposal Matrix Construction for Active Line Item
+   */
+  const { sellerProposals } = useMemo(() => {
+    if (!activeItem?.id) {
+      return { sellerProposals: [] as SellerProposal[] };
+    }
+
+    const itemId = activeItem.id;
+    const targetQuotes = allQuotes.filter(q => q.rfq_item_id === itemId && q.status === "DEVIATION_ACCEPTED");
+
+    const customVariantsMap = new Map<string, typeof allProposalVariants>();
+    allProposalVariants.forEach(v => {
+      const list = customVariantsMap.get(v.seller_quote_id) || [];
+      list.push(v);
+      customVariantsMap.set(v.seller_quote_id, list);
+    });
+
+    const suggestedVariantsMap = new Map<string, typeof allSuggestedVariants>();
+    allSuggestedVariants.forEach(v => {
+      const list = suggestedVariantsMap.get(v.seller_quote_id) || [];
+      list.push(v);
+      suggestedVariantsMap.set(v.seller_quote_id, list);
+    });
+
+    const partiesMap = new Map(parties.map(p => [p.id, p.display_name]));
+
+    const sellerProposalsResult: SellerProposal[] = [];
+    let excelColIndex = 0;
+
+    for (const quote of targetQuotes) {
+      const sellerName = partiesMap.get(quote.seller_party_id) ?? `Supplier (${quote.seller_party_id})`;
+      const customVariants = customVariantsMap.get(quote.id) || [];
+      const suggestedVariants = suggestedVariantsMap.get(quote.id) || [];
+
+      const { manufacturer, brand } = extractMfgBrandFromQuoteAttrs(quote.id, quoteAttributes, allManufacturers, allBrands);
+
+      const offerQuantity = quote.offer_quantity ?? activeItem.req_quantity ?? 1;
+      const unit = quote.offer_unit ?? activeItem.req_unit ?? "PCS";
+
+      const proposalVariants: ProposalVariant[] = [];
+
+      for (const variant of customVariants) {
+        const offerPrice = variant.offer_price ?? 0;
+        const excelLetter = getExcelColumn(excelColIndex++);
+
+        proposalVariants.push({
+          id: variant.id,
+          colKey: `col_${variant.id}`,
+          excelLetter,
+          colLabel: `Variant ${excelLetter} (Custom)`,
+          type: "New proposal option",
+          offerPrice,
+          offerQuantity,
+          unit,
+          totalPrice: offerPrice * offerQuantity,
+          manufacturer,
+          brand,
+        });
+      }
+
+      for (const variant of suggestedVariants) {
+        const offerPrice = variant.offer_price ?? variant.list_price ?? 0;
+        const excelLetter = getExcelColumn(excelColIndex++);
+
+        proposalVariants.push({
+          id: variant.id,
+          colKey: `col_${variant.id}`,
+          excelLetter,
+          colLabel: `Variant ${excelLetter} (${variant.sku ?? "Suggested SKU"})`,
+          type: "Catalog Suggested SKU",
+          offerPrice,
+          offerQuantity,
+          unit,
+          totalPrice: offerPrice * offerQuantity,
+          manufacturer,
+          brand,
+        });
+      }
+
+      sellerProposalsResult.push({
+        sellerId: quote.seller_party_id,
+        sellerName,
+        quoteId: quote.id,
+        quoteNumber: quote.seller_quote_number,
+        quoteStatus: quote.status,
+        variants: proposalVariants,
+      });
+    }
+
+    return { sellerProposals: sellerProposalsResult };
+  }, [activeItem, allQuotes, allProposalVariants, allSuggestedVariants, quoteAttributes, parties, allManufacturers, allBrands]);
+
+  const allCombinedVariants = useMemo<FlattenedVariant[]>(
+    () =>
+      sellerProposals.flatMap(seller =>
+        seller.variants.map(variant => ({
+          ...variant,
+          sellerName: seller.sellerName,
+          quoteNumber: seller.quoteNumber,
+          quoteStatus: seller.quoteStatus,
+        })),
+      ),
+    [sellerProposals],
+  );
+
+  /*
+   * Allocation Insights for Active Item
+   */
+  const activeItemInsights = useMemo(() => {
+    if (!activeItem?.id) {
+      return {
+        totalSellers: 0,
+        totalVariants: 0,
+        allocatedSellersCount: 0,
+        allocatedVariantsCount: 0,
+        allocatedQty: 0,
+        reqQty: 0,
+        remainingQty: 0,
+        allocatedTotalPrice: 0,
+        lowestPrice: 0,
+      };
+    }
+
+    const totalSellers = sellerProposals.length;
+    const totalVariants = allCombinedVariants.length;
+
+    const itemAllocations = Object.values(allocations).filter(a => a.rfq_item_id === activeItem.id && a.is_selected && a.awarded_quantity > 0);
+
+    const allocatedSellersCount = new Set(itemAllocations.map(a => a.seller_party_id)).size;
+    const allocatedVariantsCount = itemAllocations.length;
+
+    const allocatedQty = itemAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
+    const reqQty = activeItem.req_quantity || 0;
+    const remainingQty = Math.max(0, reqQty - allocatedQty);
+
+    const allocatedTotalPrice = itemAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
+
+    const lowestPrice = allCombinedVariants.length > 0 ? Math.min(...allCombinedVariants.map(v => v.offerPrice)) : 0;
+
+    return {
+      totalSellers,
+      totalVariants,
+      allocatedSellersCount,
+      allocatedVariantsCount,
+      allocatedQty,
+      reqQty,
+      remainingQty,
+      allocatedTotalPrice,
+      lowestPrice,
+    };
+  }, [activeItem?.id, activeItem?.req_quantity, sellerProposals, allCombinedVariants, allocations]);
+
+  /*
+   * Matrix Selection Handlers
+   */
+  const handleToggleVariantSelection = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string, checked: boolean) => {
+    if (!activeItem?.id) return;
+    const key = `${activeItem.id}:${variant.id}`;
+
+    setAllocations(prev => {
+      const existing = prev[key];
+      const currentQty = existing?.awarded_quantity || 0;
+      const nextQty = checked ? currentQty : 0;
+
+      return {
+        ...prev,
+        [key]: {
+          rfq_item_id: activeItem.id,
+          seller_party_id: sellerPartyId,
+          seller_quote_id: sellerQuoteId,
+          variant_id: variant.id,
+          variant_col_key: variant.colKey,
+          excel_letter: variant.excelLetter,
+          variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
+          unit_price: variant.offerPrice,
+          awarded_quantity: nextQty,
+          unit_of_measure: variant.unit || "PCS",
+          seller_accepted: false,
+          is_selected: checked,
+        },
+      };
+    });
+  };
+
+  const handleQtyChange = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string, newQty: number | null) => {
+    if (!activeItem?.id) return;
+    const qty = Math.max(0, newQty || 0);
+    const key = `${activeItem.id}:${variant.id}`;
+
+    setAllocations(prev => {
+      const currentIsSelected = prev[key]?.is_selected;
+      return {
+        ...prev,
+        [key]: {
+          rfq_item_id: activeItem.id,
+          seller_party_id: sellerPartyId,
+          seller_quote_id: sellerQuoteId,
+          variant_id: variant.id,
+          variant_col_key: variant.colKey,
+          excel_letter: variant.excelLetter,
+          variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
+          unit_price: variant.offerPrice,
+          awarded_quantity: qty,
+          unit_of_measure: variant.unit || "PCS",
+          seller_accepted: false,
+          is_selected: qty > 0 ? true : (currentIsSelected ?? false),
+        },
+      };
+    });
+  };
+
+  const handleQuickFullAllocation = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string) => {
+    if (!activeItem?.id) return;
+    const key = `${activeItem.id}:${variant.id}`;
+    const currentVariantQty = allocations[key]?.awarded_quantity || 0;
+    const targetQty = currentVariantQty + activeItemInsights.remainingQty;
+
+    setAllocations(prev => ({
+      ...prev,
+      [key]: {
+        rfq_item_id: activeItem.id,
+        seller_party_id: sellerPartyId,
+        seller_quote_id: sellerQuoteId,
+        variant_id: variant.id,
+        variant_col_key: variant.colKey,
+        excel_letter: variant.excelLetter,
+        variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
+        unit_price: variant.offerPrice,
+        awarded_quantity: targetQty,
+        unit_of_measure: variant.unit || "PCS",
+        seller_accepted: false,
+        is_selected: true,
+      },
+    }));
+  };
+
+  /*
    * Matrix Row Definitions
-   * --------------------------------------------------------------------------
    */
   const rowsDefinition = useMemo(
     () => [
@@ -658,20 +1150,42 @@ export const RfqQuoteAwardingPage: React.FC = () => {
         ),
       },
       {
-        key: "moq",
-        attributeName: "MOQ",
-        getValue: (variant: FlattenedVariant) => <span className="font-semibold text-slate-800 text-xs">2 Pcs</span>,
-      },
-      {
         key: "total_price",
         attributeName: "Total Price",
         getValue: (variant: FlattenedVariant) => <span className="font-bold text-slate-900 text-xs">{formatCurrency(variant.totalPrice)}</span>,
       },
       {
+        key: "select_variant",
+        attributeName: "Select for Award",
+        getValue: (variant: FlattenedVariant) => {
+          const key = `${activeItem?.id}:${variant.id}`;
+          const isSelected = !!allocations[key]?.is_selected;
+
+          return (
+            <div className="flex items-center gap-1.5">
+              <Checkbox
+                checked={isSelected}
+                onChange={e => handleToggleVariantSelection(variant, variant.sellerName, variant.quoteNumber, e.target.checked)}
+                className="font-medium text-xs"
+              >
+                {isSelected ? (
+                  <span className="text-indigo-600 font-bold text-xs">Selected</span>
+                ) : (
+                  <span className="text-slate-500 text-xs">Select Option</span>
+                )}
+              </Checkbox>
+            </div>
+          );
+        },
+      },
+      {
         key: "award_quantity",
         attributeName: "Award Quantity (Allocation)",
         getValue: (variant: FlattenedVariant) => {
-          const currentQty = allocations[`${activeItem?.id}:${variant.id}`]?.awarded_quantity || 0;
+          const key = `${activeItem?.id}:${variant.id}`;
+          const allocation = allocations[key];
+          const isSelected = !!allocation?.is_selected;
+          const currentQty = allocation?.awarded_quantity || 0;
           const currentSubtotal = variant.offerPrice * currentQty;
 
           return (
@@ -680,16 +1194,19 @@ export const RfqQuoteAwardingPage: React.FC = () => {
                 <InputNumber
                   min={0}
                   step={1}
+                  disabled={!isSelected}
                   value={currentQty}
                   onChange={val => handleQtyChange(variant, variant.sellerName, variant.quoteNumber, val)}
                   size="small"
                   className="!w-24 text-[11px] !h-7 font-mono font-bold"
+                  placeholder={isSelected ? "Qty" : "Disabled"}
                 />
 
-                <Tooltip title="Quick Fill Remaining Quantity">
+                <Tooltip title={isSelected ? "Quick Fill Remaining Quantity" : "Select variant checkbox first"}>
                   <Button
                     size="small"
                     type="default"
+                    disabled={!isSelected}
                     icon={<ThunderboltOutlined />}
                     onClick={() => handleQuickFullAllocation(variant, variant.sellerName, variant.quoteNumber)}
                     className="!h-7 !px-1.5 text-[10px] text-indigo-600 hover:text-indigo-700 font-semibold"
@@ -697,7 +1214,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
                 </Tooltip>
               </div>
 
-              {currentQty > 0 && (
+              {isSelected && currentQty > 0 && (
                 <div className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                   Subtotal: {formatCurrency(currentSubtotal)}
                 </div>
@@ -707,248 +1224,705 @@ export const RfqQuoteAwardingPage: React.FC = () => {
         },
       },
     ],
-    [allocations, activeItem?.id, activeItemRemainingQty],
+    [allocations, activeItem?.id, activeItemInsights.remainingQty],
   );
 
-  /*
-   * --------------------------------------------------------------------------
-   * Early Return Guards
-   * --------------------------------------------------------------------------
-   */
-  if (!pageData) {
-    return (
-      <div className="p-8 text-center text-slate-500">
-        <h2 className="text-sm font-semibold text-slate-600">Loading Awarding Workspace...</h2>
-      </div>
-    );
-  }
-
-  if (!rfq || (rfq.requester_id !== activePartyId && activePartyId !== "")) {
-    return (
-      <div className="p-8 text-center text-slate-500">
-        <h2 className="text-lg font-bold text-slate-800">RFQ Sourcing Container Not Found</h2>
-        <Button size="small" className="mt-3" onClick={() => navigate(basePath)}>
-          Back to RFQs List
-        </Button>
-      </div>
-    );
-  }
-
-  const currentProcessHeader = existingAwardHeaders[0];
-  const isFinalized = currentProcessHeader?.process_status === "AWARD_FINALIZED" || currentProcessHeader?.process_status === "PO_GENERATED";
-
   return (
-    <div className="max-w-7xl mx-auto space-y-4">
-      {/* Header Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-1 border-b border-slate-200">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Quote Awarding Workspace</h1>
-            {isFinalized ? (
-              <AntTag color="emerald" className="font-bold text-xs">
-                FINALIZED
+    <div className="space-y-4">
+      {/* 1. Embedded Line Item Horizontal Cards Navigation */}
+      <LineItemsHorizontalCardsNav
+        rfqItems={rfqItems}
+        currentPage={currentPage}
+        onSelectPage={onSelectPage}
+        catalogProducts={catalogProducts}
+        categories={categories}
+        allocations={allocations}
+      />
+
+      {/* 2. Insights Overview Bar & Comparison Matrix Card */}
+      <Card size="small" className="shadow-sm border-slate-200 bg-white">
+        <div className="mb-3 bg-slate-50 border border-slate-200 rounded-md px-3 py-1.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div className="flex flex-wrap items-center gap-3.5 text-slate-700">
+            <span className="flex items-center gap-1 font-medium">
+              <ShopOutlined className="text-slate-400" />
+              <span>Proposals:</span>
+              <strong className="text-slate-900">{activeItemInsights.totalSellers} Sellers</strong>
+              <span className="text-slate-400 font-normal">({activeItemInsights.totalVariants} Var)</span>
+            </span>
+
+            <span className="text-slate-300">|</span>
+
+            <span className="flex items-center gap-1 font-medium">
+              <CheckCircleOutlined className="text-slate-400" />
+              <span>Allocated:</span>
+              <strong className="text-slate-900">{activeItemInsights.allocatedSellersCount} Sellers</strong>
+              <span className="text-slate-400 font-normal">({activeItemInsights.allocatedVariantsCount} Var)</span>
+            </span>
+
+            <span className="text-slate-300">|</span>
+
+            <span className="flex items-center gap-1 font-medium">
+              <span>Qty:</span>
+              <strong className="text-slate-900">
+                {activeItemInsights.allocatedQty} / {activeItemInsights.reqQty} {activeItem?.req_unit || "PCS"}
+              </strong>
+              <span className="text-slate-400 font-normal text-xs">(Rem: {activeItemInsights.remainingQty})</span>
+            </span>
+
+            <span className="text-slate-300">|</span>
+
+            <span className="flex items-center gap-1 font-medium">
+              <span>Value:</span>
+              <strong className="text-slate-900">{formatCurrency(activeItemInsights.allocatedTotalPrice)}</strong>
+            </span>
+
+            {activeItemInsights.lowestPrice > 0 && (
+              <>
+                <span className="text-slate-300">|</span>
+                <span className="flex items-center gap-1 font-medium">
+                  <span>Min Price:</span>
+                  <strong className="text-slate-900">{formatCurrency(activeItemInsights.lowestPrice)}</strong>
+                  <span className="text-slate-400 font-normal">/ {activeItem?.req_unit || "unit"}</span>
+                </span>
+              </>
+            )}
+          </div>
+
+          <div>
+            {activeItemInsights.allocatedQty === activeItemInsights.reqQty && activeItemInsights.reqQty > 0 ? (
+              <AntTag color="blue" className="px-2 py-0 text-[11px] font-medium rounded m-0 border-blue-200 bg-blue-50 text-blue-700">
+                ✓ 100% Fully Allocated
+              </AntTag>
+            ) : activeItemInsights.allocatedQty > activeItemInsights.reqQty ? (
+              <AntTag color="red" className="px-2 py-0 text-[11px] font-medium rounded m-0 border-red-200 bg-red-50 text-red-700">
+                ⚠ Over Allocated (+{activeItemInsights.allocatedQty - activeItemInsights.reqQty})
               </AntTag>
             ) : (
-              <AntTag color="blue" className="font-bold text-xs">
-                DRAFT ALLOCATION
+              <AntTag color="default" className="px-2 py-0 text-[11px] font-medium rounded m-0 border-slate-200 bg-slate-100 text-slate-700">
+                Partially Allocated
               </AntTag>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Evaluate proposals, compare deviation-accepted seller quotes, and manage contract awards across RFQ line items.
-          </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
-            Save Draft
-          </Button>
+        {allCombinedVariants.length > 0 ? (
+          <div className="overflow-x-auto overflow-y-auto max-h-[70vh] border border-slate-200 rounded-lg shadow-sm bg-white">
+            <table className="w-full border-separate border-spacing-0 text-xs text-left">
+              <thead className="bg-slate-100 text-slate-800">
+                <tr>
+                  <th
+                    rowSpan={2}
+                    className="sticky left-0 top-0 z-30 bg-slate-100 border-r border-b border-slate-200 px-3 py-2 text-left font-bold text-slate-800 text-xs min-w-[220px]"
+                  >
+                    Basic Attribute
+                  </th>
+                  {sellerProposals.map(seller => (
+                    <th
+                      key={seller.sellerId}
+                      colSpan={seller.variants.length}
+                      className="sticky top-0 z-20 text-center font-bold text-slate-900 bg-slate-100 border-r border-b border-slate-200 py-1.5 px-3 text-xs"
+                    >
+                      <div>{seller.sellerName}</div>
+                      <div className="text-[10px] font-mono text-slate-500 font-normal">{seller.quoteNumber}</div>
+                    </th>
+                  ))}
+                </tr>
 
-          <Button
-            type="primary"
-            size="small"
-            icon={<CheckCircleOutlined />}
-            onClick={handleFinalizeAndGeneratePOs}
-            className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
-          >
-            Finalize & Generate POs
-          </Button>
+                <tr>
+                  {sellerProposals.map(seller =>
+                    seller.variants.map(variant => (
+                      <th
+                        key={variant.id}
+                        className="sticky top-[38px] z-20 text-center font-medium text-slate-800 bg-slate-50 border-r border-b border-slate-200 py-1 px-3 text-xs min-w-[180px]"
+                      >
+                        <div className="flex items-center justify-center gap-1 py-0.5">
+                          <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[11px]">
+                            {variant.excelLetter}
+                          </span>
+                          <span className="font-medium text-slate-800 text-xs">{variant.colLabel}</span>
+                        </div>
+                      </th>
+                    )),
+                  )}
+                </tr>
+              </thead>
 
-          <Segmented
-            value={viewMode}
-            onChange={value => setViewMode(value as ViewMode)}
-            options={[
-              {
-                label: (
-                  <span className="flex items-center gap-1.5 text-xs font-semibold">
-                    <TableOutlined />
-                    Comparison Matrix
-                  </span>
-                ),
-                value: "matrix",
-              },
-              {
-                label: (
-                  <span className="flex items-center gap-1.5 text-xs font-semibold">
-                    <TrophyOutlined />
-                    Award Overview ({existingPurchaseOrders.length} POs)
-                  </span>
-                ),
-                value: "summary",
-              },
-            ]}
-          />
+              <tbody>
+                {rowsDefinition.map((row, rowIndex) => {
+                  const rowBg = rowIndex % 2 === 0 ? "bg-white" : "bg-slate-50";
+                  return (
+                    <tr key={row.key} className={rowBg}>
+                      <th
+                        className={`sticky left-0 z-10 ${rowBg} border-r border-b border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 text-xs min-w-[220px]`}
+                      >
+                        {row.attributeName}
+                      </th>
 
-          <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">RFQ: {rfq.rfq_number}</span>
-        </div>
-      </div>
-
-      {/* Active RFQ Item Line Selector & Header */}
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 shadow-sm">
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 rounded bg-indigo-600 text-white font-bold text-xs">
-              Item {currentPage} of {rfqItems.length}
-            </span>
-
-            <span className="font-bold text-slate-900 text-sm">{activeProduct?.name ?? `RFQ Line Item #${activeItem?.item_index ?? currentPage}`}</span>
-
-            <AntTag color="blue" className="text-xs font-semibold m-0">
-              {activeCategory?.name ?? "Category"}
-            </AntTag>
+                      {allCombinedVariants.map(variant => (
+                        <td key={variant.colKey} className="border-r border-b border-slate-200 text-xs px-3 py-2 min-w-[180px]">
+                          {row.getValue(variant)}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+        ) : (
+          <Alert
+            type="info"
+            showIcon
+            message="No Deviation Accepted Quotes Available"
+            description="There are currently no quotes with deviation accepted status for this line item. You can switch line items using the horizontal product card navigation above."
+            className="my-3"
+          />
+        )}
+      </Card>
 
-          <p className="text-xs text-slate-500 m-0">
-            Requested Quantity:{" "}
-            <strong className="text-slate-800">
-              {activeItem?.req_quantity} {activeItem?.req_unit ?? "PCS"}
-            </strong>
-          </p>
+      {/* 3. Current Selection Insights (Seller-Wise Breakdown for Active Item) */}
+      <SellerWiseSelectionInsightsSection
+        activeItem={activeItem}
+        allocations={allocations}
+        setAllocations={setAllocations}
+        allCombinedVariants={allCombinedVariants}
+        parties={parties}
+        allQuotes={allQuotes}
+        activeItemInsights={activeItemInsights}
+      />
+    </div>
+  );
+};
+
+interface SellerWiseSelectionInsightsSectionProps {
+  activeItem?: RfqItem;
+  allocations: Record<string, AwardAllocation>;
+  setAllocations: React.Dispatch<React.SetStateAction<Record<string, AwardAllocation>>>;
+  allCombinedVariants: FlattenedVariant[];
+  parties: any[];
+  allQuotes: SellerQuote[];
+  activeItemInsights: {
+    allocatedVariantsCount: number;
+    allocatedQty: number;
+    reqQty: number;
+    allocatedTotalPrice: number;
+  };
+}
+
+const SellerWiseSelectionInsightsSection: React.FC<SellerWiseSelectionInsightsSectionProps> = ({
+  activeItem,
+  allocations,
+  setAllocations,
+  allCombinedVariants,
+  parties,
+  allQuotes,
+  activeItemInsights,
+}) => {
+  const sellerAllocationsGrouped = useMemo(() => {
+    if (!activeItem?.id) return [];
+
+    const activeAllocations = Object.values(allocations).filter(a => a.rfq_item_id === activeItem.id && a.is_selected && a.awarded_quantity > 0);
+
+    if (activeAllocations.length === 0) return [];
+
+    const reqQty = activeItem.req_quantity || 1;
+
+    const groupsMap = new Map<
+      string,
+      {
+        sellerPartyId: string;
+        sellerName: string;
+        sellerQuoteId: string;
+        quoteNumber: string;
+        totalQty: number;
+        totalValue: number;
+        items: Array<{
+          allocation: AwardAllocation;
+          variant?: FlattenedVariant;
+          excelLetter: string;
+          variantLabel: string;
+          manufacturer: string;
+          brand: string;
+          unitPrice: number;
+          awardedQty: number;
+          subtotal: number;
+          sharePct: number;
+        }>;
+      }
+    >();
+
+    for (const alloc of activeAllocations) {
+      const variant = allCombinedVariants.find(v => v.id === alloc.variant_id);
+      const sellerParty = parties.find(p => p.id === alloc.seller_party_id);
+      const quote = allQuotes.find(q => q.id === alloc.seller_quote_id);
+
+      const sellerName = sellerParty?.display_name || `Supplier (${alloc.seller_party_id})`;
+      const quoteNumber = quote?.seller_quote_number || "Quote Proposal";
+
+      if (!groupsMap.has(alloc.seller_party_id)) {
+        groupsMap.set(alloc.seller_party_id, {
+          sellerPartyId: alloc.seller_party_id,
+          sellerName,
+          sellerQuoteId: alloc.seller_quote_id,
+          quoteNumber,
+          totalQty: 0,
+          totalValue: 0,
+          items: [],
+        });
+      }
+
+      const group = groupsMap.get(alloc.seller_party_id)!;
+      const unitPrice = alloc.unit_price || variant?.offerPrice || 0;
+      const awardedQty = alloc.awarded_quantity || 0;
+      const subtotal = unitPrice * awardedQty;
+      const sharePct = Math.round((awardedQty / reqQty) * 100);
+
+      group.totalQty += awardedQty;
+      group.totalValue += subtotal;
+
+      group.items.push({
+        allocation: alloc,
+        variant,
+        excelLetter: alloc.excel_letter || variant?.excelLetter || "A",
+        variantLabel: variant?.colLabel || `Variant (${alloc.variant_type})`,
+        manufacturer: variant?.manufacturer || "N/A",
+        brand: variant?.brand || "N/A",
+        unitPrice,
+        awardedQty,
+        subtotal,
+        sharePct,
+      });
+    }
+
+    return Array.from(groupsMap.values()).map(g => ({
+      ...g,
+      sellerSharePct: Math.round((g.totalQty / reqQty) * 100),
+    }));
+  }, [activeItem, allocations, allCombinedVariants, parties, allQuotes]);
+
+  const handleClearActiveItemAllocations = () => {
+    if (!activeItem?.id) return;
+    setAllocations(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(key => {
+        if (key.startsWith(`${activeItem.id}:`)) {
+          next[key] = {
+            ...next[key],
+            awarded_quantity: 0,
+            is_selected: false,
+          };
+        }
+      });
+      return next;
+    });
+    message.info("Cleared all variant allocations for this line item.");
+  };
+
+  return (
+    <Card size="small" className="shadow-sm border-slate-200 bg-white">
+      {/* Section Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-2 border-b border-slate-200">
+        <div className="flex items-center gap-2">
+          <TrophyOutlined className="text-amber-500 text-base" />
+          <h3 className="text-xs font-bold text-slate-800 tracking-wider m-0">Current Line Item Selection Insights (Seller-Wise Breakdown)</h3>
+          <AntTag color="blue" className="text-[11px] font-semibold m-0">
+            {sellerAllocationsGrouped.length} Awarded Supplier(s)
+          </AntTag>
         </div>
 
-        <Pagination size="small" current={currentPage} total={rfqItems.length} pageSize={1} showSizeChanger={false} onChange={setCurrentPage} className="m-0" />
+        {sellerAllocationsGrouped.length > 0 && (
+          <Button size="small" type="text" danger onClick={handleClearActiveItemAllocations} className="text-xs font-semibold">
+            Clear Line Allocations
+          </Button>
+        )}
       </div>
 
-      {/* View Mode 1: Comparison Matrix */}
-      {viewMode === "matrix" && (
+      {sellerAllocationsGrouped.length > 0 ? (
         <div className="space-y-3">
-          {/* Live Allocation Summary Widget */}
-          <div className="bg-slate-900 text-white rounded-lg p-3 flex flex-wrap items-center justify-between gap-3 shadow-md border border-slate-800">
-            <div className="flex items-center gap-4">
-              <div>
-                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Line Item Goal</div>
-                <div className="text-sm font-bold text-slate-100">
-                  {activeItemReqQty} {activeItem?.req_unit || "PCS"}
+          {/* Seller-Wise Cards List */}
+          {sellerAllocationsGrouped.map(sellerGroup => (
+            <div key={sellerGroup.sellerPartyId} className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50/50">
+              <div className="bg-slate-100/80 px-3 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <ShopOutlined className="text-indigo-600" />
+                  <span className="font-bold text-slate-900 text-xs">{sellerGroup.sellerName}</span>
+                  <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">{sellerGroup.quoteNumber}</span>
+                </div>
+
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-slate-600">
+                    Allocated Qty:{" "}
+                    <strong className="text-slate-900">
+                      {sellerGroup.totalQty} {activeItem?.req_unit || "PCS"}
+                    </strong>{" "}
+                    <span className="text-slate-400 font-normal">({sellerGroup.sellerSharePct}% Share)</span>
+                  </span>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-600">
+                    Supplier Total: <strong className="text-emerald-700">{formatCurrency(sellerGroup.totalValue)}</strong>
+                  </span>
                 </div>
               </div>
-              <div className="h-7 w-px bg-slate-700" />
-              <div>
-                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Allocated Qty</div>
-                <div className="text-sm font-bold text-emerald-400">
-                  {activeItemAllocatedQty} {activeItem?.req_unit || "PCS"}
-                </div>
-              </div>
-              <div className="h-7 w-px bg-slate-700" />
-              <div>
-                <div className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">Unallocated Remainder</div>
-                <div className="text-sm font-bold text-amber-400">
-                  {activeItemRemainingQty} {activeItem?.req_unit || "PCS"}
-                </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left bg-white border-collapse">
+                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                    <tr>
+                      <th className="p-2 border-r border-slate-200">Variant Option</th>
+                      <th className="p-2 border-r border-slate-200">Manufacturer / Brand</th>
+                      <th className="p-2 border-r border-slate-200 text-right">Unit Price</th>
+                      <th className="p-2 border-r border-slate-200 text-right">Awarded Qty</th>
+                      <th className="p-2 border-r border-slate-200 text-right">Subtotal</th>
+                      <th className="p-2 text-center">Line Share</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {sellerGroup.items.map(item => (
+                      <tr key={item.allocation.variant_id}>
+                        <td className="p-2 border-r border-slate-200">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[10px]">{item.excelLetter}</span>
+                            <span className="font-semibold text-slate-800 text-xs">{item.variantLabel}</span>
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-200">
+                          <div className="flex items-center gap-1">
+                            <AntTag color="purple" className="text-[10px] m-0">
+                              {item.manufacturer}
+                            </AntTag>
+                            <AntTag color="blue" className="text-[10px] m-0">
+                              {item.brand}
+                            </AntTag>
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-800">{formatCurrency(item.unitPrice)}</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-semibold text-slate-900">
+                          {item.awardedQty} {activeItem?.req_unit || "PCS"}
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">{formatCurrency(item.subtotal)}</td>
+                        <td className="p-2 text-center font-mono font-semibold text-indigo-600">{item.sharePct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
+          ))}
 
-            <div className="flex items-center gap-2">
-              {activeItemAllocatedQty === activeItemReqQty && activeItemReqQty > 0 ? (
-                <AntTag color="emerald" className="px-3 py-1 text-xs font-bold rounded-full">
+          {/* Grand Total Bar */}
+          <div className="mt-3 pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs bg-slate-50 p-2.5 rounded-md">
+            <div className="flex items-center gap-3 text-slate-700">
+              <span>
+                Awarded Sellers: <strong className="text-slate-900">{sellerAllocationsGrouped.length} Sellers</strong>
+              </span>
+              <span className="text-slate-300">|</span>
+              <span>
+                Awarded Variants: <strong className="text-slate-900">{activeItemInsights.allocatedVariantsCount} Variants</strong>
+              </span>
+              <span className="text-slate-300">|</span>
+              <span>
+                Grand Total Qty:{" "}
+                <strong className="text-indigo-700">
+                  {activeItemInsights.allocatedQty} / {activeItemInsights.reqQty} {activeItem?.req_unit || "PCS"}
+                </strong>
+              </span>
+              <span className="text-slate-300">|</span>
+              <span>
+                Grand Total Value: <strong className="text-emerald-700">{formatCurrency(activeItemInsights.allocatedTotalPrice)}</strong>
+              </span>
+            </div>
+
+            <div>
+              {activeItemInsights.allocatedQty === activeItemInsights.reqQty && activeItemInsights.reqQty > 0 ? (
+                <AntTag color="blue" className="font-semibold text-xs m-0">
                   ✓ 100% Fully Allocated
                 </AntTag>
-              ) : activeItemAllocatedQty > activeItemReqQty ? (
-                <AntTag color="red" className="px-3 py-1 text-xs font-bold rounded-full">
-                  ⚠ Over Allocated (+{activeItemAllocatedQty - activeItemReqQty})
+              ) : activeItemInsights.allocatedQty > activeItemInsights.reqQty ? (
+                <AntTag color="red" className="font-semibold text-xs m-0">
+                  ⚠ Over Allocated (+{activeItemInsights.allocatedQty - activeItemInsights.reqQty})
                 </AntTag>
               ) : (
-                <AntTag color="amber" className="px-3 py-1 text-xs font-bold rounded-full">
+                <AntTag color="default" className="font-semibold text-xs m-0">
                   Partially Allocated
                 </AntTag>
               )}
             </div>
           </div>
+        </div>
+      ) : (
+        <Alert
+          type="info"
+          showIcon
+          message="No Variant Allocations Selected"
+          description="Check the 'Select for Award' checkbox and enter quantities in the comparison matrix above to view current selection insights."
+          className="my-1"
+        />
+      )}
+    </Card>
+  );
+};
 
-          <div className="flex items-center justify-between bg-emerald-50/70 border border-emerald-200/80 rounded-md px-3 py-2 text-xs">
-            <div className="flex items-center gap-2 text-emerald-800 font-medium">
-              <AntTag color="emerald" className="m-0 font-bold">
-                DEVIATION ACCEPTED
+/*
+ * ============================================================================
+ * Step 2 Sub-Component: ItemWiseAwardOverviewSummary (Item-Wise Breakdown)
+ * ============================================================================
+ */
+interface ItemWiseAwardOverviewSummaryProps {
+  rfqItems: RfqItem[];
+  allocations: Record<string, AwardAllocation>;
+  catalogProducts: any[];
+  categories: any[];
+  parties: any[];
+  allQuotes: SellerQuote[];
+  allProposalVariants: SellerQuoteVariant[];
+  allSuggestedVariants: SellerQuoteSuggestedVariant[];
+  quoteAttributes: SellerQuoteAttribute[];
+  allManufacturers: any[];
+  allBrands: any[];
+}
+
+const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> = ({
+  rfqItems,
+  allocations,
+  catalogProducts,
+  categories,
+  parties,
+  allQuotes,
+  allProposalVariants,
+  allSuggestedVariants,
+  quoteAttributes,
+  allManufacturers,
+  allBrands,
+}) => {
+  const itemWiseGroups = useMemo(() => {
+    const partiesMap = new Map(parties.map(p => [p.id, p.display_name]));
+    const quotesMap = new Map(allQuotes.map(q => [q.id, q]));
+
+    const variantsMap = new Map<string, { colLabel: string; excelLetter: string; manufacturer: string; brand: string }>();
+    let excelIdx = 0;
+
+    for (const q of allQuotes) {
+      const customVars = allProposalVariants.filter(v => v.seller_quote_id === q.id);
+      const suggestedVars = allSuggestedVariants.filter(v => v.seller_quote_id === q.id);
+
+      const { manufacturer, brand } = extractMfgBrandFromQuoteAttrs(q.id, quoteAttributes, allManufacturers, allBrands);
+
+      for (const v of customVars) {
+        const excelLetter = getExcelColumn(excelIdx++);
+        variantsMap.set(v.id, {
+          colLabel: `Variant ${excelLetter} (Custom)`,
+          excelLetter,
+          manufacturer,
+          brand,
+        });
+      }
+
+      for (const v of suggestedVars) {
+        const excelLetter = getExcelColumn(excelIdx++);
+        variantsMap.set(v.id, {
+          colLabel: `Variant ${excelLetter} (${v.sku ?? "Suggested SKU"})`,
+          excelLetter,
+          manufacturer,
+          brand,
+        });
+      }
+    }
+
+    return rfqItems.map((item, index) => {
+      const product = catalogProducts.find(p => p.id === item.catalog_product_id);
+      const category = categories.find(c => c.id === item.category_id);
+
+      const itemAllocations = Object.values(allocations).filter(a => a.rfq_item_id === item.id && a.is_selected && a.awarded_quantity > 0);
+
+      const totalAllocatedQty = itemAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
+      const totalItemValue = itemAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
+      const reqQty = item.req_quantity || 1;
+
+      const allocatedRows = itemAllocations.map(alloc => {
+        const sellerPartyName = partiesMap.get(alloc.seller_party_id) || `Supplier (${alloc.seller_party_id})`;
+        const quote = quotesMap.get(alloc.seller_quote_id);
+        const variantInfo = variantsMap.get(alloc.variant_id);
+
+        const unitPrice = alloc.unit_price || 0;
+        const awardedQty = alloc.awarded_quantity || 0;
+        const subtotal = unitPrice * awardedQty;
+        const sharePct = Math.round((awardedQty / reqQty) * 100);
+
+        return {
+          allocation: alloc,
+          sellerName: sellerPartyName,
+          quoteNumber: quote?.seller_quote_number || "Quote Proposal",
+          excelLetter: alloc.excel_letter || variantInfo?.excelLetter || "A",
+          variantLabel: variantInfo?.colLabel || `Variant (${alloc.variant_type})`,
+          manufacturer: variantInfo?.manufacturer || "N/A",
+          brand: variantInfo?.brand || "N/A",
+          unitPrice,
+          awardedQty,
+          subtotal,
+          sharePct,
+        };
+      });
+
+      return {
+        item,
+        itemNumber: item.item_index || index + 1,
+        productName: product?.name || `RFQ Line Item #${index + 1}`,
+        categoryName: category?.name || "Category",
+        reqQty,
+        reqUnit: item.req_unit || "PCS",
+        totalAllocatedQty,
+        totalItemValue,
+        allocatedRows,
+      };
+    });
+  }, [rfqItems, allocations, catalogProducts, categories, parties, allQuotes, allProposalVariants, allSuggestedVariants, quoteAttributes, allManufacturers, allBrands]);
+
+  const grandTotalValue = useMemo(() => itemWiseGroups.reduce((sum, g) => sum + g.totalItemValue, 0), [itemWiseGroups]);
+  const allocatedItemsCount = useMemo(() => itemWiseGroups.filter(g => g.allocatedRows.length > 0).length, [itemWiseGroups]);
+
+  return (
+    <div className="space-y-4">
+      {/* Header Summary Card */}
+      <Card size="small" className="shadow-sm border-slate-200 bg-white">
+        <Descriptions
+          title={
+            <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+              <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <UnorderedListOutlined className="text-indigo-600" />
+                Item-Wise Seller Award Allocations Overview
+              </span>
+              <AntTag color="blue" className="font-bold">
+                {allocatedItemsCount} of {rfqItems.length} Line Items Allocated
               </AntTag>
+            </div>
+          }
+          bordered
+          size="small"
+          column={{ xs: 1, sm: 2, md: 3 }}
+          className="mt-2 text-xs"
+        >
+          <Descriptions.Item label="Total RFQ Line Items">
+            <span className="font-bold text-slate-800">{rfqItems.length} Line Items</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Allocated Line Items">
+            <span className="font-semibold text-indigo-700">{allocatedItemsCount} Items</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Total Awarded Value">
+            <span className="font-bold text-emerald-700">{formatCurrency(grandTotalValue)}</span>
+          </Descriptions.Item>
+        </Descriptions>
+      </Card>
 
-              <span>Displaying quotes where seller deviations have been reviewed & accepted.</span>
+      {/* List of RFQ Items with Awarded Seller Variants */}
+      {itemWiseGroups.map(group => (
+        <Card key={group.item.id} size="small" className="shadow-sm border-slate-200 bg-white overflow-hidden">
+          <div className="bg-slate-100/90 px-3 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 mb-2 rounded-t-md">
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded">
+                Line Item #{group.itemNumber}
+              </span>
+              <span className="font-bold text-slate-900 text-xs">{group.productName}</span>
+              <AntTag color="blue" className="text-[10px] m-0">
+                {group.categoryName}
+              </AntTag>
             </div>
 
-            <span className="text-slate-500 font-mono text-[11px]">
-              {allCombinedVariants.length} Variant Proposal(s) across {sellerProposals.length} Seller(s)
-            </span>
+            <div className="flex items-center gap-3 text-xs">
+              <span className="text-slate-600">
+                Requested Qty: <strong className="text-slate-900">{group.reqQty} {group.reqUnit}</strong>
+              </span>
+
+              <span className="text-slate-300">|</span>
+
+              <span className="text-slate-600">
+                Allocated:{" "}
+                <strong className="text-indigo-700">
+                  {group.totalAllocatedQty} / {group.reqQty} {group.reqUnit}
+                </strong>
+              </span>
+
+              <span className="text-slate-300">|</span>
+
+              <span className="text-slate-600">
+                Item Value: <strong className="text-emerald-700">{formatCurrency(group.totalItemValue)}</strong>
+              </span>
+
+              {group.totalAllocatedQty === group.reqQty && group.reqQty > 0 ? (
+                <AntTag color="blue" className="font-semibold text-[10px] m-0">
+                  ✓ 100% Allocated
+                </AntTag>
+              ) : group.totalAllocatedQty > group.reqQty ? (
+                <AntTag color="red" className="font-semibold text-[10px] m-0">
+                  ⚠ Over Allocated
+                </AntTag>
+              ) : group.totalAllocatedQty > 0 ? (
+                <AntTag color="amber" className="font-semibold text-[10px] m-0">
+                  Partially Allocated
+                </AntTag>
+              ) : (
+                <AntTag color="default" className="font-semibold text-[10px] m-0">
+                  Unallocated
+                </AntTag>
+              )}
+            </div>
           </div>
 
-          {allCombinedVariants.length > 0 ? (
-            <div className="overflow-x-auto overflow-y-auto max-h-[70vh] border border-slate-200 rounded-lg shadow-sm bg-white">
-              <table className="w-full border-separate border-spacing-0 text-xs text-left">
-                <thead className="bg-slate-100 text-slate-800">
+          {group.allocatedRows.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs text-left border-collapse border border-slate-200">
+                <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                   <tr>
-                    <th
-                      rowSpan={2}
-                      className="sticky left-0 top-0 z-30 bg-slate-100 border-r border-b border-slate-200 px-3 py-2 text-left font-bold text-slate-800 text-xs min-w-[220px]"
-                    >
-                      Basic Attribute
-                    </th>
-                    {sellerProposals.map(seller => (
-                      <th
-                        key={seller.sellerId}
-                        colSpan={seller.variants.length}
-                        className="sticky top-0 z-20 text-center font-bold text-slate-900 bg-slate-100 border-r border-b border-slate-200 py-1.5 px-3 text-xs"
-                      >
-                        <div>{seller.sellerName}</div>
-                        <div className="text-[10px] font-mono text-slate-500 font-normal">{seller.quoteNumber}</div>
-                      </th>
-                    ))}
-                  </tr>
-
-                  <tr>
-                    {sellerProposals.map(seller =>
-                      seller.variants.map(variant => (
-                        <th
-                          key={variant.id}
-                          className="sticky top-[38px] z-20 text-center font-medium text-slate-800 bg-slate-50 border-r border-b border-slate-200 py-1 px-3 text-xs min-w-[180px]"
-                        >
-                          <div className="flex items-center justify-center gap-1 py-0.5">
-                            <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[11px]">
-                              {variant.excelLetter}
-                            </span>
-                            <span className="font-medium text-slate-800 text-xs">{variant.colLabel}</span>
-                          </div>
-                        </th>
-                      )),
-                    )}
+                    <th className="p-2 border-r border-slate-200">Supplier Name & Quote #</th>
+                    <th className="p-2 border-r border-slate-200">Awarded Variant Option</th>
+                    <th className="p-2 border-r border-slate-200">Manufacturer / Brand</th>
+                    <th className="p-2 border-r border-slate-200 text-right">Unit Price</th>
+                    <th className="p-2 border-r border-slate-200 text-right">Awarded Quantity</th>
+                    <th className="p-2 border-r border-slate-200 text-right">Subtotal</th>
+                    <th className="p-2 text-center">Line Share</th>
                   </tr>
                 </thead>
-
-                <tbody>
-                  {rowsDefinition.map((row, rowIndex) => {
-                    const rowBg = rowIndex % 2 === 0 ? "bg-white" : "bg-slate-50";
-                    return (
-                      <tr key={row.key} className={rowBg}>
-                        <th
-                          className={`sticky left-0 z-10 ${rowBg} border-r border-b border-slate-200 px-3 py-2 text-left font-semibold text-slate-700 text-xs min-w-[220px]`}
-                        >
-                          {row.attributeName}
-                        </th>
-
-                        {allCombinedVariants.map(variant => (
-                          <td key={variant.colKey} className="border-r border-b border-slate-200 text-xs px-3 py-2 min-w-[180px]">
-                            {row.getValue(variant)}
-                          </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
+                <tbody className="divide-y divide-slate-200 bg-white">
+                  {group.allocatedRows.map(row => (
+                    <tr key={row.allocation.variant_id} className="hover:bg-slate-50">
+                      <td className="p-2 border-r border-slate-200">
+                        <div className="flex items-center gap-1.5">
+                          <ShopOutlined className="text-indigo-600" />
+                          <span className="font-semibold text-slate-900">{row.sellerName}</span>
+                          <span className="font-mono text-[10px] text-slate-500 bg-slate-100 px-1 py-0.5 rounded border border-slate-200">
+                            {row.quoteNumber}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="p-2 border-r border-slate-200">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[10px]">
+                            {row.excelLetter}
+                          </span>
+                          <span className="font-medium text-slate-800">{row.variantLabel}</span>
+                        </div>
+                      </td>
+                      <td className="p-2 border-r border-slate-200">
+                        <div className="flex items-center gap-1">
+                          <AntTag color="purple" className="text-[10px] m-0">
+                            {row.manufacturer}
+                          </AntTag>
+                          <AntTag color="blue" className="text-[10px] m-0">
+                            {row.brand}
+                          </AntTag>
+                        </div>
+                      </td>
+                      <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-800">
+                        {formatCurrency(row.unitPrice)}
+                      </td>
+                      <td className="p-2 border-r border-slate-200 text-right font-semibold text-slate-900">
+                        {row.awardedQty} {group.reqUnit}
+                      </td>
+                      <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">
+                        {formatCurrency(row.subtotal)}
+                      </td>
+                      <td className="p-2 text-center font-mono font-semibold text-indigo-600">{row.sharePct}%</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -956,121 +1930,416 @@ export const RfqQuoteAwardingPage: React.FC = () => {
             <Alert
               type="info"
               showIcon
-              message="No Deviation Accepted Quotes Available"
-              description="There are currently no quotes with deviation accepted status for this line item. You can switch line items using the pagination controls above."
-              className="my-3"
+              message="No Variant Allocations for this Line Item"
+              description="No seller variants have been selected for award on this line item yet."
+              className="my-1"
             />
           )}
-        </div>
-      )}
+        </Card>
+      ))}
+    </div>
+  );
+};
 
-      {/* View Mode 2: Award Overview Tab */}
-      {viewMode === "summary" && (
+/*
+ * ============================================================================
+ * Step 3 Sub-Component: SellerWiseAwardOverviewSummary (Supplier-Wise Summary)
+ * ============================================================================
+ */
+interface SellerWiseAwardOverviewSummaryProps {
+  rfqId?: string;
+  rfq: any;
+  currentProcessHeader?: RfqAwardHeader;
+  isFinalized: boolean;
+  allocations: Record<string, AwardAllocation>;
+  existingAwardItems: RfqAwardItem[];
+  existingPurchaseOrders: PurchaseOrder[];
+  existingPoAcknowledgements: PoAcknowledgement[];
+  parties: any[];
+  allQuotes: SellerQuote[];
+  rfqItems: RfqItem[];
+  catalogProducts: any[];
+  categories: any[];
+  allProposalVariants: SellerQuoteVariant[];
+  allSuggestedVariants: SellerQuoteSuggestedVariant[];
+  quoteAttributes: SellerQuoteAttribute[];
+  allManufacturers: any[];
+  allBrands: any[];
+}
+
+const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryProps> = ({
+  rfqId,
+  rfq,
+  currentProcessHeader,
+  isFinalized,
+  allocations,
+  existingAwardItems,
+  existingPurchaseOrders,
+  existingPoAcknowledgements,
+  parties,
+  allQuotes,
+  rfqItems,
+  catalogProducts,
+  categories,
+  allProposalVariants,
+  allSuggestedVariants,
+  quoteAttributes,
+  allManufacturers,
+  allBrands,
+}) => {
+  const allCombinedVariants = useMemo<FlattenedVariant[]>(() => {
+    const customMap = new Map<string, typeof allProposalVariants>();
+    allProposalVariants.forEach(v => {
+      const list = customMap.get(v.seller_quote_id) || [];
+      list.push(v);
+      customMap.set(v.seller_quote_id, list);
+    });
+
+    const suggestedMap = new Map<string, typeof allSuggestedVariants>();
+    allSuggestedVariants.forEach(v => {
+      const list = suggestedMap.get(v.seller_quote_id) || [];
+      list.push(v);
+      suggestedMap.set(v.seller_quote_id, list);
+    });
+
+    const partiesMap = new Map(parties.map(p => [p.id, p.display_name]));
+
+    const result: FlattenedVariant[] = [];
+    let excelIndex = 0;
+
+    for (const quote of allQuotes) {
+      const sellerName = partiesMap.get(quote.seller_party_id) ?? `Supplier (${quote.seller_party_id})`;
+      const customVars = customMap.get(quote.id) || [];
+      const suggestedVars = suggestedMap.get(quote.id) || [];
+
+      const { manufacturer, brand } = extractMfgBrandFromQuoteAttrs(quote.id, quoteAttributes, allManufacturers, allBrands);
+
+      for (const variant of customVars) {
+        const offerPrice = variant.offer_price ?? 0;
+        const excelLetter = getExcelColumn(excelIndex++);
+        result.push({
+          id: variant.id,
+          colKey: `col_${variant.id}`,
+          excelLetter,
+          colLabel: `Variant ${excelLetter} (Custom)`,
+          type: "New proposal option",
+          offerPrice,
+          offerQuantity: quote.offer_quantity ?? 1,
+          unit: quote.offer_unit ?? "PCS",
+          totalPrice: offerPrice * (quote.offer_quantity ?? 1),
+          manufacturer,
+          brand,
+          sellerName,
+          quoteNumber: quote.seller_quote_number,
+          quoteStatus: quote.status,
+        });
+      }
+
+      for (const variant of suggestedVars) {
+        const offerPrice = variant.offer_price ?? variant.list_price ?? 0;
+        const excelLetter = getExcelColumn(excelIndex++);
+        result.push({
+          id: variant.id,
+          colKey: `col_${variant.id}`,
+          excelLetter,
+          colLabel: `Variant ${excelLetter} (${variant.sku ?? "Suggested SKU"})`,
+          type: "Catalog Suggested SKU",
+          offerPrice,
+          offerQuantity: quote.offer_quantity ?? 1,
+          unit: quote.offer_unit ?? "PCS",
+          totalPrice: offerPrice * (quote.offer_quantity ?? 1),
+          manufacturer,
+          brand,
+          sellerName,
+          quoteNumber: quote.seller_quote_number,
+          quoteStatus: quote.status,
+        });
+      }
+    }
+    return result;
+  }, [allQuotes, allProposalVariants, allSuggestedVariants, quoteAttributes, parties, allManufacturers, allBrands]);
+
+  const rfqAwardSummaryBySeller = useMemo(() => {
+    if (!rfqId) return [];
+
+    const activeAllocations = Object.values(allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
+
+    const sellerGroupsMap = new Map<
+      string,
+      {
+        sellerPartyId: string;
+        sellerName: string;
+        quoteId: string;
+        quoteNumber: string;
+        purchaseOrder?: PurchaseOrder;
+        poAcknowledgement?: PoAcknowledgement;
+        totalAmount: number;
+        items: Array<{
+          rfqItemId: string;
+          itemIndex: number;
+          productName: string;
+          categoryName: string;
+          variantId: string;
+          excelLetter: string;
+          variantLabel: string;
+          manufacturer: string;
+          brand: string;
+          unitPrice: number;
+          awardedQuantity: number;
+          totalPrice: number;
+          unitOfMeasure: string;
+        }>;
+      }
+    >();
+
+    if (existingAwardItems.length > 0) {
+      existingAwardItems.forEach(item => {
+        const sellerParty = parties.find(p => p.id === item.seller_party_id);
+        const quote = allQuotes.find(q => q.id === item.seller_quote_id);
+        const po = existingPurchaseOrders.find(p => p.id === item.purchase_order_id || p.seller_party_id === item.seller_party_id);
+        const ack = po ? existingPoAcknowledgements.find(a => a.purchase_order_id === po.id) : undefined;
+
+        const rfqItem = rfqItems.find(i => i.id === item.rfq_item_id);
+        const product = catalogProducts.find(p => p.id === rfqItem?.catalog_product_id);
+        const category = categories.find(c => c.id === rfqItem?.category_id);
+        const variant = allCombinedVariants.find(v => v.id === item.variant_id);
+
+        if (!sellerGroupsMap.has(item.seller_party_id)) {
+          sellerGroupsMap.set(item.seller_party_id, {
+            sellerPartyId: item.seller_party_id,
+            sellerName: sellerParty?.display_name || `Supplier (${item.seller_party_id})`,
+            quoteId: item.seller_quote_id,
+            quoteNumber: quote?.seller_quote_number || "Quote Proposal",
+            purchaseOrder: po,
+            poAcknowledgement: ack,
+            totalAmount: 0,
+            items: [],
+          });
+        }
+
+        const group = sellerGroupsMap.get(item.seller_party_id)!;
+        group.totalAmount += item.total_price || item.unit_price * item.awarded_quantity;
+
+        group.items.push({
+          rfqItemId: item.rfq_item_id,
+          itemIndex: rfqItem?.item_index || 1,
+          productName: product?.name || `RFQ Line Item #${rfqItem?.item_index || 1}`,
+          categoryName: category?.name || "Category",
+          variantId: item.variant_id,
+          excelLetter: variant?.excelLetter || "A",
+          variantLabel: variant?.colLabel || `Variant (${item.variant_type})`,
+          manufacturer: variant?.manufacturer || "N/A",
+          brand: variant?.brand || "N/A",
+          unitPrice: item.unit_price,
+          awardedQuantity: item.awarded_quantity,
+          totalPrice: item.total_price || item.unit_price * item.awarded_quantity,
+          unitOfMeasure: "PCS",
+        });
+      });
+    } else {
+      activeAllocations.forEach(alloc => {
+        const sellerParty = parties.find(p => p.id === alloc.seller_party_id);
+        const quote = allQuotes.find(q => q.id === alloc.seller_quote_id);
+        const rfqItem = rfqItems.find(i => i.id === alloc.rfq_item_id);
+        const product = catalogProducts.find(p => p.id === rfqItem?.catalog_product_id);
+        const category = categories.find(c => c.id === rfqItem?.category_id);
+        const variant = allCombinedVariants.find(v => v.id === alloc.variant_id);
+
+        if (!sellerGroupsMap.has(alloc.seller_party_id)) {
+          sellerGroupsMap.set(alloc.seller_party_id, {
+            sellerPartyId: alloc.seller_party_id,
+            sellerName: sellerParty?.display_name || `Supplier (${alloc.seller_party_id})`,
+            quoteId: alloc.seller_quote_id,
+            quoteNumber: quote?.seller_quote_number || "Quote Proposal",
+            totalAmount: 0,
+            items: [],
+          });
+        }
+
+        const group = sellerGroupsMap.get(alloc.seller_party_id)!;
+        const itemTotal = alloc.unit_price * alloc.awarded_quantity;
+        group.totalAmount += itemTotal;
+
+        group.items.push({
+          rfqItemId: alloc.rfq_item_id,
+          itemIndex: rfqItem?.item_index || 1,
+          productName: product?.name || `RFQ Line Item #${rfqItem?.item_index || 1}`,
+          categoryName: category?.name || "Category",
+          variantId: alloc.variant_id,
+          excelLetter: alloc.excel_letter || variant?.excelLetter || "A",
+          variantLabel: variant?.colLabel || `Variant (${alloc.variant_type})`,
+          manufacturer: variant?.manufacturer || "N/A",
+          brand: variant?.brand || "N/A",
+          unitPrice: alloc.unit_price,
+          awardedQuantity: alloc.awarded_quantity,
+          totalPrice: itemTotal,
+          unitOfMeasure: alloc.unit_of_measure || "PCS",
+        });
+      });
+    }
+
+    return Array.from(sellerGroupsMap.values());
+  }, [
+    rfqId,
+    existingAwardItems,
+    allocations,
+    existingPurchaseOrders,
+    existingPoAcknowledgements,
+    parties,
+    allQuotes,
+    rfqItems,
+    catalogProducts,
+    categories,
+    allCombinedVariants,
+  ]);
+
+  return (
+    <div className="space-y-4">
+      {/* Header Award Summary Card */}
+      <Card size="small" className="shadow-sm border-slate-200 bg-white">
+        <Descriptions
+          title={
+            <div className="flex items-center justify-between pb-1 border-b border-slate-200">
+              <span className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <TrophyOutlined className="text-amber-500" />
+                Final Sourcing Contract Award Summary (Supplier-Wise Preview)
+              </span>
+              <AntTag color={isFinalized ? "emerald" : "blue"} className="font-bold">
+                {currentProcessHeader?.process_status || (rfqAwardSummaryBySeller.length > 0 ? "DRAFT ALLOCATION" : "NO AWARDS")}
+              </AntTag>
+            </div>
+          }
+          bordered
+          size="small"
+          column={{ xs: 1, sm: 2, md: 4 }}
+          className="mt-2 text-xs"
+        >
+          <Descriptions.Item label="RFQ Number">
+            <span className="font-mono font-bold text-slate-800">{rfq?.rfq_number}</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Total Contract Award Value">
+            <span className="font-bold text-emerald-700">
+              {formatCurrency(currentProcessHeader?.total_awarded_amount || rfqAwardSummaryBySeller.reduce((s, g) => s + g.totalAmount, 0))}
+            </span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Awarded Suppliers Count">
+            <span className="font-semibold text-slate-900">{rfqAwardSummaryBySeller.length} Supplier(s)</span>
+          </Descriptions.Item>
+          <Descriptions.Item label="Generated Purchase Orders">
+            <span className="font-semibold text-slate-900">{existingPurchaseOrders.length} PO(s)</span>
+          </Descriptions.Item>
+        </Descriptions>
+      </Card>
+
+      {rfqAwardSummaryBySeller.length > 0 ? (
         <div className="space-y-4">
-          <Card size="small" className="shadow-sm border-slate-200">
-            <Descriptions
-              title={<span className="text-sm font-bold text-slate-800">Sourcing Award Header Summary</span>}
-              bordered
-              size="small"
-              column={3}
-              className="mb-2"
-            >
-              <Descriptions.Item label="RFQ Number">{rfq.rfq_number}</Descriptions.Item>
-              <Descriptions.Item label="Award Process Status">
-                <AntTag color={isFinalized ? "emerald" : "blue"} className="font-bold">
-                  {currentProcessHeader?.process_status || "DRAFT"}
-                </AntTag>
-              </Descriptions.Item>
-              <Descriptions.Item label="Total Contract Award Value">
-                <span className="font-bold text-emerald-700">{formatCurrency(currentProcessHeader?.total_awarded_amount || 0)}</span>
-              </Descriptions.Item>
-              <Descriptions.Item label="Total Awarded Line Items">{existingAwardItems.length}</Descriptions.Item>
-              <Descriptions.Item label="Generated Purchase Orders">{existingPurchaseOrders.length} PO(s)</Descriptions.Item>
-            </Descriptions>
-          </Card>
+          {rfqAwardSummaryBySeller.map(sellerGroup => (
+            <Card key={sellerGroup.sellerPartyId} size="small" className="shadow-sm border-slate-200 bg-white overflow-hidden">
+              {/* Seller Header */}
+              <div className="bg-slate-100/90 px-3 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-3 mb-2 rounded-t-md">
+                <div className="flex items-center gap-2">
+                  <ShopOutlined className="text-indigo-600 text-sm" />
+                  <span className="font-bold text-slate-900 text-xs">{sellerGroup.sellerName}</span>
+                  <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">{sellerGroup.quoteNumber}</span>
+                </div>
 
-          {existingPurchaseOrders.length > 0 ? (
-            <Card
-              title={
-                <span className="text-sm font-bold text-slate-800 flex items-center gap-1.5">
-                  <RocketOutlined /> Generated Purchase Orders ({existingPurchaseOrders.length})
-                </span>
-              }
-              size="small"
-              className="shadow-sm border-slate-200"
-            >
+                <div className="flex items-center gap-3 text-xs">
+                  {sellerGroup.purchaseOrder && (
+                    <span className="font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                      {sellerGroup.purchaseOrder.po_number}
+                    </span>
+                  )}
+
+                  {sellerGroup.poAcknowledgement?.buyer_confirmed ? (
+                    <AntTag color="emerald" className="font-semibold text-[10px] m-0">
+                      PO Released ✓
+                    </AntTag>
+                  ) : (
+                    <AntTag color="amber" className="font-semibold text-[10px] m-0">
+                      PO Pending Release
+                    </AntTag>
+                  )}
+
+                  {sellerGroup.poAcknowledgement?.seller_acknowledged ? (
+                    <AntTag color="emerald" className="font-semibold text-[10px] m-0">
+                      Seller Acknowledged ✓
+                    </AntTag>
+                  ) : (
+                    <AntTag color="purple" className="font-semibold text-[10px] m-0">
+                      Awaiting Confirmation...
+                    </AntTag>
+                  )}
+
+                  <span className="text-slate-300">|</span>
+                  <span className="text-slate-700">
+                    Contract Total: <strong className="text-emerald-700">{formatCurrency(sellerGroup.totalAmount)}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Awarded Items Table for this Seller */}
               <div className="overflow-x-auto">
                 <table className="w-full text-xs text-left border-collapse border border-slate-200">
-                  <thead className="bg-slate-100 text-slate-800 border-b border-slate-200 font-bold">
+                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
                     <tr>
-                      <th className="p-2.5 border-r border-slate-200">PO Number</th>
-                      <th className="p-2.5 border-r border-slate-200">Awarded Supplier</th>
-                      <th className="p-2.5 border-r border-slate-200">Total Order Amount</th>
-                      <th className="p-2.5 border-r border-slate-200">PO Status</th>
-                      <th className="p-2.5 border-r border-slate-200">Buyer Release</th>
-                      <th className="p-2.5 border-r border-slate-200">Seller Confirmation</th>
-                      <th className="p-2.5 text-center">Action</th>
+                      <th className="p-2 border-r border-slate-200">Line Item # & Product</th>
+                      <th className="p-2 border-r border-slate-200">Category</th>
+                      <th className="p-2 border-r border-slate-200">Awarded Variant Option</th>
+                      <th className="p-2 border-r border-slate-200">Manufacturer / Brand</th>
+                      <th className="p-2 border-r border-slate-200 text-right">Unit Price</th>
+                      <th className="p-2 border-r border-slate-200 text-right">Awarded Quantity</th>
+                      <th className="p-2 text-right">Line Item Subtotal</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {existingPurchaseOrders.map(po => {
-                      const seller = parties.find(p => p.id === po.seller_party_id);
-                      const ack = existingPoAcknowledgements.find(a => a.purchase_order_id === po.id);
-                      return (
-                        <tr key={po.id} className="hover:bg-slate-50">
-                          <td className="p-2.5 border-r border-slate-200 font-mono font-bold text-indigo-700">{po.po_number}</td>
-                          <td className="p-2.5 border-r border-slate-200 font-semibold text-slate-800">
-                            <span className="flex items-center gap-1.5">
-                              <ShopOutlined /> {seller?.display_name || po.seller_party_id}
-                            </span>
-                          </td>
-                          <td className="p-2.5 border-r border-slate-200 font-bold text-emerald-700">{formatCurrency(po.total_amount)}</td>
-                          <td className="p-2.5 border-r border-slate-200">
-                            <AntTag color="blue" className="font-semibold text-[11px]">
-                              {po.po_status}
+                  <tbody className="divide-y divide-slate-200 bg-white">
+                    {sellerGroup.items.map(item => (
+                      <tr key={`${item.rfqItemId}-${item.variantId}`} className="hover:bg-slate-50">
+                        <td className="p-2 border-r border-slate-200">
+                          <div className="font-semibold text-slate-900">
+                            Line Item #{item.itemIndex}: {item.productName}
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-200">
+                          <AntTag color="blue" className="text-[10px] m-0">
+                            {item.categoryName}
+                          </AntTag>
+                        </td>
+                        <td className="p-2 border-r border-slate-200">
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[10px]">{item.excelLetter}</span>
+                            <span className="font-medium text-slate-800">{item.variantLabel}</span>
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-200">
+                          <div className="flex items-center gap-1">
+                            <AntTag color="purple" className="text-[10px] m-0">
+                              {item.manufacturer}
                             </AntTag>
-                          </td>
-                          <td className="p-2.5 border-r border-slate-200">
-                            {ack?.buyer_confirmed ? (
-                              <AntTag color="emerald" className="font-semibold text-[10px]">
-                                Released ✓
-                              </AntTag>
-                            ) : (
-                              <AntTag color="amber">Pending Release</AntTag>
-                            )}
-                          </td>
-                          <td className="p-2.5 border-r border-slate-200">
-                            {ack?.seller_acknowledged ? (
-                              <AntTag color="emerald" className="font-semibold text-[10px]">
-                                Acknowledged ✓
-                              </AntTag>
-                            ) : (
-                              <AntTag color="purple" className="font-semibold text-[10px]">
-                                Awaiting Confirmation...
-                              </AntTag>
-                            )}
-                          </td>
-                          <td className="p-2.5 text-center">
-                            <Button size="small" type="link" icon={<FileTextOutlined />} className="text-xs font-semibold p-0">
-                              View PO Details
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                            <AntTag color="blue" className="text-[10px] m-0">
+                              {item.brand}
+                            </AntTag>
+                          </div>
+                        </td>
+                        <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-800">{formatCurrency(item.unitPrice)}</td>
+                        <td className="p-2 border-r border-slate-200 text-right font-semibold text-slate-900">
+                          {item.awardedQuantity} {item.unitOfMeasure}
+                        </td>
+                        <td className="p-2 text-right font-mono font-bold text-emerald-700">{formatCurrency(item.totalPrice)}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </Card>
-          ) : (
-            <Alert
-              type="info"
-              showIcon
-              message="No Purchase Orders Generated Yet"
-              description="Finalize contract awards in the Comparison Matrix view to generate Purchase Orders per supplier."
-            />
-          )}
+          ))}
         </div>
+      ) : (
+        <Alert
+          type="info"
+          showIcon
+          message="No RFQ Contract Awards to Preview"
+          description="Switch to Step 1 (Award Line Item Variants) above to allocate award quantities across line items and save draft or finalize contract awards."
+        />
       )}
     </div>
   );
