@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as Lucide from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -32,9 +32,6 @@ export const SupplierItemRespond: React.FC = () => {
   const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
   const basePath = isBusinessContext ? '/b/seller/rfqs' : '/user/seller/rfqs';
 
-
-  const [viewStep, setViewStep] = useState(0);
-
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []);
   const activeParty = React.useMemo(() => {
     if (!parties || parties.length === 0) return null;
@@ -53,14 +50,6 @@ export const SupplierItemRespond: React.FC = () => {
     },
     [itemId, activePartyId]
   );
-  const status = existingQuote?.status || 'NEW';
-  let currentStep = 0;
-  if (['FINAL_ACKNOWLEDGE'].includes(status)) {
-    currentStep = 1;
-  }
-  useEffect(() => {
-    setViewStep(currentStep);
-  }, [currentStep]);
 
   const rfq = useLiveQuery(
     async () => {
@@ -113,64 +102,18 @@ export const SupplierItemRespond: React.FC = () => {
 
 
   return (
-    <div className="max-w-7xl mx-auto space-y-3">
+    <div className="max-w-7xl mx-auto space-y-3 pb-8">
       {/* Professional Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <div>
-          {viewStep === 0 ? (
-            <>
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Submit Sourcing Quote Proposal</h1>
-              <p className="text-xs text-slate-500 mt-0.5 m-0">
-                Submit pricing, attribute specifications, and custom or suggested product options for this line item.
-              </p>
-            </>
-          ) : (
-            <>
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Sourcing Proposal Acknowledgement</h1>
-              <p className="text-xs text-slate-500 mt-0.5 m-0">
-                Review final contract details, purchase order status, and sign-off confirmation.
-              </p>
-            </>
-          )}
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Submit Sourcing Quote Proposal</h1>
+          <p className="text-xs text-slate-500 mt-0.5 m-0">
+            Submit pricing, attribute specifications, and custom or suggested product options for this line item.
+          </p>
         </div>
       </div>
 
-      <Card size="small" className="shadow-sm border-slate-200">
-        <div className="pt-2 px-2">
-          <Steps
-            current={viewStep}
-            onChange={(step) => setViewStep(step)}
-            // titlePlacement="vertical"
-            ellipsis
-            items={[
-              { title: 'Proposal & Product Mapping' },
-              { title: 'Final Approval' },
-            ]}
-          />
-
-          <div className="flex items-center justify-between py-3 mb-2">
-            <AntButton
-              size="small"
-              disabled={viewStep === 0}
-              onClick={() => setViewStep(v => v - 1)}
-              icon={<ArrowLeftOutlined />}
-            >
-              Previous Step
-            </AntButton>
-            <AntButton
-              size="small"
-              disabled={viewStep === 1}
-              onClick={() => setViewStep(v => v + 1)}
-            >
-              Next Step <ArrowRightOutlined />
-            </AntButton>
-          </div>
-        </div>
-
-
-        {viewStep === 0 && <StepQuoteProposal rfqId={rfqId!} itemId={itemId!} activePartyId={activePartyId} />}
-        {viewStep === 1 && <StepFinalAcknowledgement rfqId={rfqId!} itemId={itemId!} activePartyId={activePartyId} />}
-      </Card>
+      <StepQuoteProposal rfqId={rfqId!} itemId={itemId!} activePartyId={activePartyId} />
     </div>
   );
 };
@@ -2609,20 +2552,4 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
 
 
 
-const StepFinalAcknowledgement: React.FC<{ rfqId: string; itemId: string; activePartyId: string }> = ({ rfqId, itemId, activePartyId }) => {
-  return (
-    <div className="p-4">
 
-      <Result
-        status="success"
-        title="Final Acknowledgement"
-        subTitle="Both parties have approved the product mapping and specifications. Waiting for final confirmation or Purchase Order generation."
-        extra={[
-          <AntButton type="primary" key="ack">
-            Acknowledge
-          </AntButton>
-        ]}
-      />
-    </div>
-  );
-};

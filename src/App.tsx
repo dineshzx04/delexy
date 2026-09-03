@@ -38,7 +38,8 @@ import { RfqList } from './pages/rfq/RfqList';
 import { RfqCreateWizard } from './pages/rfq/RfqCreateWizard';
 import { RfqWorkspace } from './pages/rfq/RfqWorkspace';
 import { ItemDetailWorkspace } from './pages/rfq/ItemDetailWorkspace';
-import { SupplierRfqInbox } from './pages/rfq/SupplierRfqInbox';
+import { SellerRfqInbox } from './pages/rfq/SellerRfqInbox';
+import { SellerRfqWorkspace } from './pages/rfq/SellerRfqWorkspace';
 import { SupplierItemRespond } from './pages/rfq/SupplierItemRespond';
 
 import { RequesterQuoteReview } from './pages/rfq/RequesterQuoteReview';
@@ -139,7 +140,8 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/awarding" element={<RfqQuoteAwardingPage />} />
                 <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
-                <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
+                <Route path="seller/rfqs" element={<SellerRfqInbox />} />
+                <Route path="seller/rfqs/:rfqId" element={<SellerRfqWorkspace />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
@@ -168,7 +170,8 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/awarding" element={<RfqQuoteAwardingPage />} />
                 <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
-                <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
+                <Route path="seller/rfqs" element={<SellerRfqInbox />} />
+                <Route path="seller/rfqs/:rfqId" element={<SellerRfqWorkspace />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
 
                 <Route path="*" element={<NotFound scope="business" />} />

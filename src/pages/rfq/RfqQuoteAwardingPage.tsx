@@ -23,7 +23,6 @@ import {
   ShopOutlined,
   ArrowRightOutlined,
   ArrowLeftOutlined,
-  AppstoreOutlined,
   UnorderedListOutlined,
 } from "@ant-design/icons";
 
@@ -144,7 +143,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   const isBusinessContext = activeWorkspace?.type === "BUSINESS";
   const basePath = isBusinessContext ? "/b/rfqs" : "/user/rfqs";
 
-  const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
   const [allocations, setAllocations] = useState<Record<string, AwardAllocation>>({});
 
@@ -283,9 +281,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     }
     return parties.find(party => party.owner_type === "USER" && party.owner_id === currentUserId)?.id ?? parties.find(party => party.id === "pty-6")?.id ?? "";
   }, [parties, isBusinessContext, activeWorkspace?.businessId, currentUserId]);
-
-  const activeItemIndex = useMemo(() => Math.min(Math.max(currentPage - 1, 0), Math.max(rfqItems.length - 1, 0)), [currentPage, rfqItems.length]);
-  const activeItem = rfqItems[activeItemIndex];
 
   /*
    * Global Persistence Handlers (Save Draft vs Finalize Award POs)
@@ -515,11 +510,8 @@ export const RfqQuoteAwardingPage: React.FC = () => {
         <div className="space-y-4">
           <MatrixComparisonSection
             rfqItems={rfqItems}
-            currentPage={currentPage}
-            onSelectPage={setCurrentPage}
             catalogProducts={catalogProducts}
             categories={categories}
-            activeItem={activeItem}
             allQuotes={allQuotes}
             allProposalVariants={allProposalVariants}
             allSuggestedVariants={allSuggestedVariants}
@@ -742,115 +734,10 @@ const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
   );
 };
 
-interface LineItemsHorizontalCardsNavProps {
-  rfqItems: RfqItem[];
-  currentPage: number;
-  onSelectPage: (page: number) => void;
-  catalogProducts: any[];
-  categories: any[];
-  allocations: Record<string, AwardAllocation>;
-}
-
-const LineItemsHorizontalCardsNav: React.FC<LineItemsHorizontalCardsNavProps> = ({
-  rfqItems,
-  currentPage,
-  onSelectPage,
-  catalogProducts,
-  categories,
-  allocations,
-}) => {
-  return (
-    <Card size="small" className="shadow-sm border-slate-200 bg-white">
-      <div className="flex items-center justify-between gap-2 mb-2 pb-1 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <AppstoreOutlined className="text-indigo-600" />
-          <span className="font-bold text-xs text-slate-800">Select RFQ Line Item ({rfqItems.length} Products)</span>
-        </div>
-        <span className="text-[11px] text-slate-500 font-medium">Click card to switch item in comparison matrix</span>
-      </div>
-
-      <div className="flex items-center gap-3 overflow-x-auto pb-1 pt-0.5">
-        {rfqItems.map((item, idx) => {
-          const itemNumber = idx + 1;
-          const isActive = currentPage === itemNumber;
-
-          const product = catalogProducts.find(p => p.id === item.catalog_product_id);
-          const category = categories.find(c => c.id === item.category_id);
-
-          const itemAllocations = Object.values(allocations).filter(a => a.rfq_item_id === item.id && a.is_selected && a.awarded_quantity > 0);
-          const totalAllocatedQty = itemAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
-          const reqQty = item.req_quantity || 1;
-
-          let badgeStatus = (
-            <AntTag color="default" className="text-[10px] m-0 border-slate-200 bg-slate-100 text-slate-600 font-medium">
-              Unallocated
-            </AntTag>
-          );
-
-          if (totalAllocatedQty === reqQty && reqQty > 0) {
-            badgeStatus = (
-              <AntTag color="blue" className="text-[10px] m-0 font-semibold border-blue-200 bg-blue-50 text-blue-700">
-                ✓ 100% Allocated
-              </AntTag>
-            );
-          } else if (totalAllocatedQty > reqQty) {
-            badgeStatus = (
-              <AntTag color="red" className="text-[10px] m-0 font-semibold border-red-200 bg-red-50 text-red-700">
-                ⚠ Over Allocated ({totalAllocatedQty}/{reqQty})
-              </AntTag>
-            );
-          } else if (totalAllocatedQty > 0) {
-            badgeStatus = (
-              <AntTag color="amber" className="text-[10px] m-0 font-semibold border-amber-200 bg-amber-50 text-amber-800">
-                Partially Allocated ({totalAllocatedQty}/{reqQty})
-              </AntTag>
-            );
-          }
-
-          return (
-            <div
-              key={item.id}
-              onClick={() => onSelectPage(itemNumber)}
-              className={`flex-shrink-0 min-w-[240px] max-w-[280px] p-2.5 rounded-lg border transition-all cursor-pointer select-none ${
-                isActive
-                  ? "border-indigo-600 bg-indigo-50/50 shadow-md ring-2 ring-indigo-200"
-                  : "border-slate-200 bg-white hover:border-indigo-300 hover:bg-slate-50 shadow-sm"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-1 mb-1">
-                <span className="font-mono text-[11px] font-bold text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded">
-                  Item #{item.item_index || itemNumber}
-                </span>
-                {badgeStatus}
-              </div>
-
-              <div className="font-semibold text-slate-900 text-xs truncate mb-1" title={product?.name || `RFQ Line Item #${itemNumber}`}>
-                {product?.name || `RFQ Line Item #${itemNumber}`}
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-600">
-                <AntTag color="blue" className="text-[10px] m-0 truncate max-w-[120px]">
-                  {category?.name || "Category"}
-                </AntTag>
-                <span className="font-bold text-slate-800">
-                  {item.req_quantity} {item.req_unit || "PCS"}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-};
-
 interface MatrixComparisonSectionProps {
   rfqItems: RfqItem[];
-  currentPage: number;
-  onSelectPage: (page: number) => void;
   catalogProducts: any[];
   categories: any[];
-  activeItem?: RfqItem;
   allQuotes: SellerQuote[];
   allProposalVariants: SellerQuoteVariant[];
   allSuggestedVariants: SellerQuoteSuggestedVariant[];
@@ -864,11 +751,8 @@ interface MatrixComparisonSectionProps {
 
 const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
   rfqItems,
-  currentPage,
-  onSelectPage,
   catalogProducts,
   categories,
-  activeItem,
   allQuotes,
   allProposalVariants,
   allSuggestedVariants,
@@ -879,16 +763,69 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
   allocations,
   setAllocations,
 }) => {
+  return (
+    <div className="space-y-6">
+      {rfqItems.map((item, itemIdx) => (
+        <SingleItemMatrixComparisonCard
+          key={item.id}
+          item={item}
+          itemIndex={item.item_index || itemIdx + 1}
+          catalogProducts={catalogProducts}
+          categories={categories}
+          allQuotes={allQuotes}
+          allProposalVariants={allProposalVariants}
+          allSuggestedVariants={allSuggestedVariants}
+          quoteAttributes={quoteAttributes}
+          parties={parties}
+          allManufacturers={allManufacturers}
+          allBrands={allBrands}
+          allocations={allocations}
+          setAllocations={setAllocations}
+        />
+      ))}
+    </div>
+  );
+};
+
+interface SingleItemMatrixComparisonCardProps {
+  item: RfqItem;
+  itemIndex: number;
+  catalogProducts: any[];
+  categories: any[];
+  allQuotes: SellerQuote[];
+  allProposalVariants: SellerQuoteVariant[];
+  allSuggestedVariants: SellerQuoteSuggestedVariant[];
+  quoteAttributes: SellerQuoteAttribute[];
+  parties: any[];
+  allManufacturers: any[];
+  allBrands: any[];
+  allocations: Record<string, AwardAllocation>;
+  setAllocations: React.Dispatch<React.SetStateAction<Record<string, AwardAllocation>>>;
+}
+
+const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardProps> = ({
+  item,
+  itemIndex,
+  catalogProducts,
+  categories,
+  allQuotes,
+  allProposalVariants,
+  allSuggestedVariants,
+  quoteAttributes,
+  parties,
+  allManufacturers,
+  allBrands,
+  allocations,
+  setAllocations,
+}) => {
+  const product = useMemo(() => catalogProducts.find(p => p.id === item.catalog_product_id), [catalogProducts, item.catalog_product_id]);
+  const category = useMemo(() => categories.find(c => c.id === item.category_id), [categories, item.category_id]);
+
   /*
-   * Proposal Matrix Construction for Active Line Item
+   * Proposal Matrix Construction for this Line Item
    */
   const { sellerProposals } = useMemo(() => {
-    if (!activeItem?.id) {
-      return { sellerProposals: [] as SellerProposal[] };
-    }
-
-    const itemId = activeItem.id;
-    const targetQuotes = allQuotes.filter(q => q.rfq_item_id === itemId && q.status === "DEVIATION_ACCEPTED");
+    const targetQuotes = allQuotes.filter(q => q.rfq_item_id === item.id && q.status === "DEVIATION_ACCEPTED");
 
     const customVariantsMap = new Map<string, typeof allProposalVariants>();
     allProposalVariants.forEach(v => {
@@ -916,8 +853,8 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
 
       const { manufacturer, brand } = extractMfgBrandFromQuoteAttrs(quote.id, quoteAttributes, allManufacturers, allBrands);
 
-      const offerQuantity = quote.offer_quantity ?? activeItem.req_quantity ?? 1;
-      const unit = quote.offer_unit ?? activeItem.req_unit ?? "PCS";
+      const offerQuantity = quote.offer_quantity ?? item.req_quantity ?? 1;
+      const unit = quote.offer_unit ?? item.req_unit ?? "PCS";
 
       const proposalVariants: ProposalVariant[] = [];
 
@@ -970,7 +907,7 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
     }
 
     return { sellerProposals: sellerProposalsResult };
-  }, [activeItem, allQuotes, allProposalVariants, allSuggestedVariants, quoteAttributes, parties, allManufacturers, allBrands]);
+  }, [item, allQuotes, allProposalVariants, allSuggestedVariants, quoteAttributes, parties, allManufacturers, allBrands]);
 
   const allCombinedVariants = useMemo<FlattenedVariant[]>(
     () =>
@@ -986,33 +923,19 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
   );
 
   /*
-   * Allocation Insights for Active Item
+   * Allocation Insights for this Item
    */
   const activeItemInsights = useMemo(() => {
-    if (!activeItem?.id) {
-      return {
-        totalSellers: 0,
-        totalVariants: 0,
-        allocatedSellersCount: 0,
-        allocatedVariantsCount: 0,
-        allocatedQty: 0,
-        reqQty: 0,
-        remainingQty: 0,
-        allocatedTotalPrice: 0,
-        lowestPrice: 0,
-      };
-    }
-
     const totalSellers = sellerProposals.length;
     const totalVariants = allCombinedVariants.length;
 
-    const itemAllocations = Object.values(allocations).filter(a => a.rfq_item_id === activeItem.id && a.is_selected && a.awarded_quantity > 0);
+    const itemAllocations = Object.values(allocations).filter(a => a.rfq_item_id === item.id && a.is_selected && a.awarded_quantity > 0);
 
     const allocatedSellersCount = new Set(itemAllocations.map(a => a.seller_party_id)).size;
     const allocatedVariantsCount = itemAllocations.length;
 
     const allocatedQty = itemAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
-    const reqQty = activeItem.req_quantity || 0;
+    const reqQty = item.req_quantity || 0;
     const remainingQty = Math.max(0, reqQty - allocatedQty);
 
     const allocatedTotalPrice = itemAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
@@ -1030,14 +953,13 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
       allocatedTotalPrice,
       lowestPrice,
     };
-  }, [activeItem?.id, activeItem?.req_quantity, sellerProposals, allCombinedVariants, allocations]);
+  }, [item.id, item.req_quantity, sellerProposals, allCombinedVariants, allocations]);
 
   /*
    * Matrix Selection Handlers
    */
   const handleToggleVariantSelection = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string, checked: boolean) => {
-    if (!activeItem?.id) return;
-    const key = `${activeItem.id}:${variant.id}`;
+    const key = `${item.id}:${variant.id}`;
 
     setAllocations(prev => {
       const existing = prev[key];
@@ -1047,7 +969,7 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
       return {
         ...prev,
         [key]: {
-          rfq_item_id: activeItem.id,
+          rfq_item_id: item.id,
           seller_party_id: sellerPartyId,
           seller_quote_id: sellerQuoteId,
           variant_id: variant.id,
@@ -1065,16 +987,15 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
   };
 
   const handleQtyChange = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string, newQty: number | null) => {
-    if (!activeItem?.id) return;
     const qty = Math.max(0, newQty || 0);
-    const key = `${activeItem.id}:${variant.id}`;
+    const key = `${item.id}:${variant.id}`;
 
     setAllocations(prev => {
       const currentIsSelected = prev[key]?.is_selected;
       return {
         ...prev,
         [key]: {
-          rfq_item_id: activeItem.id,
+          rfq_item_id: item.id,
           seller_party_id: sellerPartyId,
           seller_quote_id: sellerQuoteId,
           variant_id: variant.id,
@@ -1092,15 +1013,14 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
   };
 
   const handleQuickFullAllocation = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string) => {
-    if (!activeItem?.id) return;
-    const key = `${activeItem.id}:${variant.id}`;
+    const key = `${item.id}:${variant.id}`;
     const currentVariantQty = allocations[key]?.awarded_quantity || 0;
     const targetQty = currentVariantQty + activeItemInsights.remainingQty;
 
     setAllocations(prev => ({
       ...prev,
       [key]: {
-        rfq_item_id: activeItem.id,
+        rfq_item_id: item.id,
         seller_party_id: sellerPartyId,
         seller_quote_id: sellerQuoteId,
         variant_id: variant.id,
@@ -1158,7 +1078,7 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
         key: "select_variant",
         attributeName: "Select for Award",
         getValue: (variant: FlattenedVariant) => {
-          const key = `${activeItem?.id}:${variant.id}`;
+          const key = `${item.id}:${variant.id}`;
           const isSelected = !!allocations[key]?.is_selected;
 
           return (
@@ -1182,7 +1102,7 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
         key: "award_quantity",
         attributeName: "Award Quantity (Allocation)",
         getValue: (variant: FlattenedVariant) => {
-          const key = `${activeItem?.id}:${variant.id}`;
+          const key = `${item.id}:${variant.id}`;
           const allocation = allocations[key];
           const isSelected = !!allocation?.is_selected;
           const currentQty = allocation?.awarded_quantity || 0;
@@ -1224,24 +1144,30 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
         },
       },
     ],
-    [allocations, activeItem?.id, activeItemInsights.remainingQty],
+    [allocations, item.id, activeItemInsights.remainingQty],
   );
 
   return (
-    <div className="space-y-4">
-      {/* 1. Embedded Line Item Horizontal Cards Navigation */}
-      <LineItemsHorizontalCardsNav
-        rfqItems={rfqItems}
-        currentPage={currentPage}
-        onSelectPage={onSelectPage}
-        catalogProducts={catalogProducts}
-        categories={categories}
-        allocations={allocations}
-      />
+    <Card size="small" className="shadow-sm border-slate-200 bg-white">
+      <div className="space-y-3">
+        {/* Product Line Item Header Banner */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200 bg-slate-50/80 -mx-3 -mt-3 p-3 rounded-t-lg">
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded">
+              Line Item #{item.item_index || itemIndex}
+            </span>
+            <h3 className="font-bold text-slate-900 text-sm m-0">{product?.name || `RFQ Line Item #${itemIndex}`}</h3>
+            <AntTag color="blue" className="text-[11px] font-medium m-0">
+              {category?.name || "Category"}
+            </AntTag>
+          </div>
+          <div className="text-xs font-semibold text-slate-700">
+            Requested Qty: <span className="font-bold text-slate-900">{item.req_quantity} {item.req_unit || "PCS"}</span>
+          </div>
+        </div>
 
-      {/* 2. Insights Overview Bar & Comparison Matrix Card */}
-      <Card size="small" className="shadow-sm border-slate-200 bg-white">
-        <div className="mb-3 bg-slate-50 border border-slate-200 rounded-md px-3 py-1.5 flex flex-wrap items-center justify-between gap-3 text-xs">
+        {/* Insights Overview Bar */}
+        <div className="bg-slate-50 border border-slate-200 rounded-md px-3 py-1.5 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex flex-wrap items-center gap-3.5 text-slate-700">
             <span className="flex items-center gap-1 font-medium">
               <ShopOutlined className="text-slate-400" />
@@ -1264,7 +1190,7 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
             <span className="flex items-center gap-1 font-medium">
               <span>Qty:</span>
               <strong className="text-slate-900">
-                {activeItemInsights.allocatedQty} / {activeItemInsights.reqQty} {activeItem?.req_unit || "PCS"}
+                {activeItemInsights.allocatedQty} / {activeItemInsights.reqQty} {item?.req_unit || "PCS"}
               </strong>
               <span className="text-slate-400 font-normal text-xs">(Rem: {activeItemInsights.remainingQty})</span>
             </span>
@@ -1282,7 +1208,7 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
                 <span className="flex items-center gap-1 font-medium">
                   <span>Min Price:</span>
                   <strong className="text-slate-900">{formatCurrency(activeItemInsights.lowestPrice)}</strong>
-                  <span className="text-slate-400 font-normal">/ {activeItem?.req_unit || "unit"}</span>
+                  <span className="text-slate-400 font-normal">/ {item?.req_unit || "unit"}</span>
                 </span>
               </>
             )}
@@ -1305,6 +1231,7 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
           </div>
         </div>
 
+        {/* Comparison Matrix Table */}
         {allCombinedVariants.length > 0 ? (
           <div className="overflow-x-auto overflow-y-auto max-h-[70vh] border border-slate-200 rounded-lg shadow-sm bg-white">
             <table className="w-full border-separate border-spacing-0 text-xs text-left">
@@ -1374,23 +1301,23 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
             type="info"
             showIcon
             message="No Deviation Accepted Quotes Available"
-            description="There are currently no quotes with deviation accepted status for this line item. You can switch line items using the horizontal product card navigation above."
+            description="There are currently no quotes with deviation accepted status for this line item."
             className="my-3"
           />
         )}
-      </Card>
 
-      {/* 3. Current Selection Insights (Seller-Wise Breakdown for Active Item) */}
-      <SellerWiseSelectionInsightsSection
-        activeItem={activeItem}
-        allocations={allocations}
-        setAllocations={setAllocations}
-        allCombinedVariants={allCombinedVariants}
-        parties={parties}
-        allQuotes={allQuotes}
-        activeItemInsights={activeItemInsights}
-      />
-    </div>
+        {/* Seller-Wise Selection Insights Section for this Line Item */}
+        <SellerWiseSelectionInsightsSection
+          activeItem={item}
+          allocations={allocations}
+          setAllocations={setAllocations}
+          allCombinedVariants={allCombinedVariants}
+          parties={parties}
+          allQuotes={allQuotes}
+          activeItemInsights={activeItemInsights}
+        />
+      </div>
+    </Card>
   );
 };
 
