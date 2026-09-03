@@ -40,11 +40,9 @@ import { RfqWorkspace } from './pages/rfq/RfqWorkspace';
 import { ItemDetailWorkspace } from './pages/rfq/ItemDetailWorkspace';
 import { SupplierRfqInbox } from './pages/rfq/SupplierRfqInbox';
 import { SupplierItemRespond } from './pages/rfq/SupplierItemRespond';
-import { SupplierProductMapping } from './pages/rfq/SupplierProductMapping';
+
 import { RequesterQuoteReview } from './pages/rfq/RequesterQuoteReview';
-import { RfqAwardReleasePo } from './pages/rfq/RfqAwardReleasePo';
-import { SupplierAwardReceipt } from './pages/rfq/SupplierAwardReceipt';
-import { RfqAwardCheckMapping } from './pages/rfq/RfqAwardCheckMapping';
+import { RfqQuoteAwardingPage } from './pages/rfq/RfqQuoteAwardingPage';
 
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 import PlatformLayout from './layouts/PlatformLayout';
@@ -138,15 +136,11 @@ const App: React.FC = () => {
                 <Route path="rfqs" element={<RfqList />} />
                 <Route path="rfqs/create" element={<RfqCreateWizard />} />
                 <Route path="rfqs/:rfqId" element={<RfqWorkspace />} />
+                <Route path="rfqs/:rfqId/awarding" element={<RfqQuoteAwardingPage />} />
                 <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
-                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/check-mapping" element={<RfqAwardCheckMapping />} />
-                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/release-po" element={<RfqAwardReleasePo />} />
                 <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
-                <Route path="seller/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} />
-                <Route path="seller/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
-
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
             </Route>
@@ -171,14 +165,11 @@ const App: React.FC = () => {
                 <Route path="rfqs" element={<RfqList />} />
                 <Route path="rfqs/create" element={<RfqCreateWizard />} />
                 <Route path="rfqs/:rfqId" element={<RfqWorkspace />} />
+                <Route path="rfqs/:rfqId/awarding" element={<RfqQuoteAwardingPage />} />
                 <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
-                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/check-mapping" element={<RfqAwardCheckMapping />} />
-                <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/award/release-po" element={<RfqAwardReleasePo />} />
                 <Route path="seller/rfqs" element={<SupplierRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
-                {/* <Route path="seller/rfqs/:rfqId/items/:itemId/product" element={<SupplierProductMapping />} /> */}
-                <Route path="seller/rfqs/:rfqId/items/:itemId/award/:awardId/receipt" element={<SupplierAwardReceipt />} />
 
                 <Route path="*" element={<NotFound scope="business" />} />
               </Route>

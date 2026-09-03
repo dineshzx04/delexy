@@ -1,0 +1,46 @@
+{
+  "poNumber": "PO-2026-ENG9041-APEX-002",
+  "rfqId": "RFQ-2026-ENG9041",
+  "supplierName": "Apex Engineering Solutions Ltd.",
+  "sellerKey": "apex",
+  "buyerCompany": "Apex Global Energy & Petrochemical Corp.",
+  "buyerContact": "Sarah Jenkins (s.jenkins@apex-energy.corp)",
+  "createdAt": "2026-08-31",
+  "deliveryDate": "2026-10-25",
+  "deliveryAddress": "Houston Port Terminal 4, Gate 12, TX 77015, USA",
+  "incoterms": "DDP (Delivered Duty Paid)",
+  "paymentTerms": "Net 45 Days",
+  "currency": "USD",
+  "lineItems": [
+    {
+      "itemCode": "VLV-HP-200",
+      "description": "Item #1: 2-Inch High-Pressure Ball Valves - Apex FlowTech",
+      "spec": "2\" Flanged Class 150 Full Port",
+      "material": "Stainless Steel 316",
+      "cert": "ISO 9001 / API 6D",
+      "qty": 300,
+      "unit": "Units",
+      "unitPrice": 4200,
+      "discountPercent": 0,
+      "totalPrice": 1260000,
+      "leadTime": "10 Days"
+    },
+    {
+      "itemCode": "FLG-WN-600",
+      "description": "Item #2: 4-Inch ASME Class 600 Weld Neck Flanges - Apex PrecisionFlange",
+      "spec": "4\" Class 600 RF WN Sch 80",
+      "material": "ASTM A182 F316 Dual Grade",
+      "cert": "TUV / ISO 9001 / EN 10204 3.2",
+      "qty": 420,
+      "unit": "Units",
+      "unitPrice": 1290,
+      "discountPercent": 3,
+      "totalPrice": 525546,
+      "leadTime": "12 Days"
+    }
+  ],
+  "subtotal": 1785546,
+  "estimatedFreight": 32140,
+  "tax": 89277,
+  "totalOrderValue": 1906963
+}

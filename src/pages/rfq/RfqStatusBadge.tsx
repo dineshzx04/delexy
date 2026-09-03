@@ -24,7 +24,8 @@ export const RfqItemStatusBadge: React.FC<{ status: RfqItemStatus }> = ({ status
   return <Tag color={color}>{status}</Tag>;
 };
 
-export const RFQQuoteStatusBadge: React.FC<{ status: SellerQuoteStatus }> = ({ status }) => {
+export const RFQQuoteStatusBadge: React.FC<{ status?: SellerQuoteStatus | null }> = ({ status }) => {
+  if (!status) return "N/A"
   let color = 'default';
   if (status === 'DRAFT') color = 'default';
   if (status === 'SUBMITTED') color = 'blue';

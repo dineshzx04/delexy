@@ -6,8 +6,15 @@ import type {
   SellerQuote,
   SellerQuoteAttribute,
   SellerQuoteVariant,
+  SellerQuoteSuggestedVariant,
   SellerQuoteComment,
-  // RfqAward,
+  SellerQuoteAttributeComment,
+  SellerQuoteVariantComment,
+  RfqAwardHeader,
+  RfqAwardItem,
+  PurchaseOrder,
+  PurchaseOrderItem,
+  PoAcknowledgement,
 } from "./rfq.module";
 
 export class RfqDatabase extends Dexie {
@@ -17,20 +24,34 @@ export class RfqDatabase extends Dexie {
   seller_quotes!: Table<SellerQuote, string>;
   seller_quote_attributes!: Table<SellerQuoteAttribute, string>;
   seller_quote_variants!: Table<SellerQuoteVariant, string>;
+  seller_quote_suggested_variants!: Table<SellerQuoteSuggestedVariant, string>;
   seller_quote_comments!: Table<SellerQuoteComment, string>;
-  // rfq_awards!: Table<RfqAward, string>;
+  seller_quote_attribute_comments!: Table<SellerQuoteAttributeComment, string>;
+  seller_quote_variant_comments!: Table<SellerQuoteVariantComment, string>;
+  rfq_award_headers!: Table<RfqAwardHeader, string>;
+  rfq_award_items!: Table<RfqAwardItem, string>;
+  purchase_orders!: Table<PurchaseOrder, string>;
+  purchase_order_items!: Table<PurchaseOrderItem, string>;
+  po_acknowledgements!: Table<PoAcknowledgement, string>;
 
   constructor() {
     super("delexy_rfq_db");
-    this.version(11).stores({
+    this.version(13).stores({
       rfqs: "id, status, requester_id, requester_party_id",
       rfq_items: "id, rfq_id, category_id",
       rfq_item_attributes: "id, rfq_item_id, group_id, attribute_id",
       seller_quotes: "id, rfq_item_id, seller_party_id, status, [rfq_item_id+seller_party_id]",
       seller_quote_attributes: "id, seller_quote_id, group_id, attribute_id",
       seller_quote_variants: "id, seller_quote_id",
+      seller_quote_suggested_variants: "id, seller_quote_id, variant_id, seller_product_id",
       seller_quote_comments: "id, seller_quote_id, group_id, attribute_id, actor_id",
-      // rfq_awards: "id, rfq_id, rfq_item_id, seller_party_id, seller_quote_id",
+      seller_quote_attribute_comments: "id, seller_quote_id, group_id, attribute_id, actor_id",
+      seller_quote_variant_comments: "id, seller_quote_id, variant_id, actor_id",
+      rfq_award_headers: "id, rfq_id, process_status",
+      rfq_award_items: "id, award_header_id, rfq_id, rfq_item_id, seller_party_id, seller_quote_id, seller_accepted",
+      purchase_orders: "id, po_number, rfq_id, award_header_id, buyer_party_id, seller_party_id, po_status",
+      purchase_order_items: "id, purchase_order_id, award_item_id, rfq_item_id",
+      po_acknowledgements: "id, purchase_order_id, seller_party_id",
     });
   }
 }

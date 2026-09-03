@@ -1,11 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu as AntMenu, Dropdown as AntDropdown, Avatar as AntAvatar, Breadcrumb as AntBreadcrumb, Button as AntButton, Tag as AntTag, Modal as AntModal, Input as AntInput, App as AntApp } from 'antd';
-import type { MenuProps } from 'antd';
-import * as Lucide from 'lucide-react';
-import { useWorkspace, type DynamicWorkspace } from '../contexts/WorkspaceContext';
-import { useBreadcrumbContext } from '../contexts/BreadcrumbContext';
-import { cn } from '../lib/utils';
+import React, { useState, useEffect, useRef } from "react";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import {
+  Menu as AntMenu,
+  Dropdown as AntDropdown,
+  Avatar as AntAvatar,
+  Breadcrumb as AntBreadcrumb,
+  Button as AntButton,
+  Tag as AntTag,
+  Modal as AntModal,
+  Input as AntInput,
+  App as AntApp,
+} from "antd";
+import type { MenuProps } from "antd";
+import * as Lucide from "lucide-react";
+import { useWorkspace, type DynamicWorkspace } from "../contexts/WorkspaceContext";
+import { useBreadcrumbContext } from "../contexts/BreadcrumbContext";
+import { cn } from "../lib/utils";
 
 const BusinessLayout: React.FC = () => {
   const { message: antMessage } = AntApp.useApp();
@@ -19,9 +29,34 @@ const BusinessLayout: React.FC = () => {
   const { customBreadcrumbs } = useBreadcrumbContext();
 
   const [pendingWorkspace, setPendingWorkspace] = useState<DynamicWorkspace | null>(null);
-  const [switchPassInput, setSwitchPassInput] = useState('123456');
+  const [switchPassInput, setSwitchPassInput] = useState("123456");
   const [switchPassModalOpen, setSwitchPassModalOpen] = useState(false);
   const [loadingPass, setLoadingPass] = useState(false);
+
+  const [isFixedBackBtn, setIsFixedBackBtn] = useState(false);
+  const [btnLeftPos, setBtnLeftPos] = useState<number | undefined>(undefined);
+  const breadcrumbCardRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleScrollOrResize = () => {
+      if (!breadcrumbCardRef.current) return;
+      const rect = breadcrumbCardRef.current.getBoundingClientRect();
+      if (rect.top <= 68) {
+        setIsFixedBackBtn(true);
+        setBtnLeftPos(rect.left);
+      } else {
+        setIsFixedBackBtn(false);
+      }
+    };
+
+    handleScrollOrResize();
+    window.addEventListener("scroll", handleScrollOrResize, { passive: true });
+    window.addEventListener("resize", handleScrollOrResize, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScrollOrResize);
+      window.removeEventListener("resize", handleScrollOrResize);
+    };
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -30,27 +65,27 @@ const BusinessLayout: React.FC = () => {
       if (!mobile) setMobileOpen(false);
     };
     handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   const handleWorkspaceSwitch = (id: string) => {
-    const targetWs = workspaces.find((w) => w.id === id);
+    const targetWs = workspaces.find(w => w.id === id);
     if (!targetWs) return;
 
     if (targetWs.requireSwitchPassword && targetWs.id !== activeWorkspace.id) {
       setPendingWorkspace(targetWs);
-      setSwitchPassInput('123456');
+      setSwitchPassInput("123456");
       setSwitchPassModalOpen(true);
     } else {
       const ws = switchWorkspace(id);
       if (!ws) return;
-      if (ws.type === 'PLATFORM') {
-        navigate('/p/dashboard');
-      } else if (ws.type === 'BUSINESS') {
-        navigate('/b/dashboard');
+      if (ws.type === "PLATFORM") {
+        navigate("/p/dashboard");
+      } else if (ws.type === "BUSINESS") {
+        navigate("/b/dashboard");
       } else {
-        navigate('/user/dashboard');
+        navigate("/user/dashboard");
       }
     }
   };
@@ -65,15 +100,15 @@ const BusinessLayout: React.FC = () => {
       const ws = switchWorkspace(pendingWorkspace.id);
       setSwitchPassModalOpen(false);
       setPendingWorkspace(null);
-      if (ws?.type === 'PLATFORM') {
-        navigate('/p/dashboard');
-      } else if (ws?.type === 'BUSINESS') {
-        navigate('/b/dashboard');
+      if (ws?.type === "PLATFORM") {
+        navigate("/p/dashboard");
+      } else if (ws?.type === "BUSINESS") {
+        navigate("/b/dashboard");
       } else {
-        navigate('/user/dashboard');
+        navigate("/user/dashboard");
       }
     } else {
-      antMessage.error('Invalid secondary switch password.');
+      antMessage.error("Invalid secondary switch password.");
     }
   };
 
@@ -82,34 +117,34 @@ const BusinessLayout: React.FC = () => {
       navigate(-1);
       return;
     }
-    navigate('/b/dashboard');
+    navigate("/b/dashboard");
   };
 
   const breadcrumbItems = customBreadcrumbs || [];
 
-  const userMenuItems: MenuProps['items'] = [
+  const userMenuItems: MenuProps["items"] = [
     {
-      key: 'profile',
+      key: "profile",
       icon: <Lucide.User size={16} />,
       label: <Link to="/user/profile">My Individual Profile</Link>,
     },
     {
-      key: 'settings',
+      key: "settings",
       icon: <Lucide.Building size={16} />,
       label: <Link to="/b/settings">Business Settings</Link>,
     },
     {
-      type: 'divider',
+      type: "divider",
     },
     {
-      key: 'logout',
+      key: "logout",
       icon: <Lucide.LogOut size={16} className="text-red-500" />,
       label: (
         <span
           className="text-red-500 cursor-pointer block"
           onClick={() => {
             logout();
-            navigate('/login');
+            navigate("/login");
           }}
         >
           Log out
@@ -121,56 +156,56 @@ const BusinessLayout: React.FC = () => {
   const getMenuItems = () => {
     return [
       {
-        key: 'tenant-dashboard-group',
-        type: 'group',
-        label: collapsed ? null : 'Overview',
+        key: "tenant-dashboard-group",
+        type: "group",
+        label: collapsed ? null : "Overview",
         children: [
           {
-            key: '/b/dashboard',
+            key: "/b/dashboard",
             icon: <Lucide.LayoutDashboard size={18} />,
             label: <Link to="/b/dashboard">Dashboard</Link>,
           },
           {
-            key: '/b/profile',
+            key: "/b/profile",
             icon: <Lucide.Building size={18} />,
             label: <Link to="/b/profile">Business Profile</Link>,
           },
         ],
       },
       {
-        key: 'commerce-catalog-group',
-        type: 'group',
-        label: collapsed ? null : 'Commerce & Selling',
+        key: "commerce-catalog-group",
+        type: "group",
+        label: collapsed ? null : "Commerce & Selling",
         children: [
           {
-            key: '/b/products',
+            key: "/b/products",
             icon: <Lucide.Package size={18} />,
             label: <Link to="/b/products">Products</Link>,
           },
           {
-            key: '/b/party-brands',
+            key: "/b/party-brands",
             icon: <Lucide.Award size={18} />,
             label: <Link to="/b/party-brands">Party, Manufacturer & Brands</Link>,
           },
         ],
       },
       {
-        key: 'enterprise-sourcing-group',
-        type: 'group',
-        label: collapsed ? null : 'Enterprise Sourcing (RFQs)',
+        key: "enterprise-sourcing-group",
+        type: "group",
+        label: collapsed ? null : "Enterprise Sourcing (RFQs)",
         children: [
           {
-            key: '/b/rfqs/dashboard',
+            key: "/b/rfqs/dashboard",
             icon: <Lucide.BarChart3 size={18} />,
             label: <Link to="/b/rfqs/dashboard">Sourcing Dashboard</Link>,
           },
           {
-            key: '/b/rfqs',
+            key: "/b/rfqs",
             icon: <Lucide.FileText size={18} />,
             label: <Link to="/b/rfqs">RFQ Containers</Link>,
           },
           {
-            key: '/b/seller/rfqs',
+            key: "/b/seller/rfqs",
             icon: <Lucide.Inbox size={18} />,
             label: <Link to="/b/seller/rfqs">Seller RFQ Opportunities</Link>,
           },
@@ -206,18 +241,17 @@ const BusinessLayout: React.FC = () => {
     ];
   };
 
-  const workspaceMenuItems: MenuProps['items'] = workspaces.map((w) => ({
+  const workspaceMenuItems: MenuProps["items"] = workspaces.map(w => ({
     key: w.id,
     label: (
-      <div
-        onClick={() => handleWorkspaceSwitch(w.id)}
-        className={`flex items-center justify-between gap-4 py-2 min-w-[240px] cursor-pointer`}
-      >
+      <div onClick={() => handleWorkspaceSwitch(w.id)} className={`flex items-center justify-between gap-4 py-2 min-w-[240px] cursor-pointer`}>
         <div className="flex flex-col">
           <div className="flex items-center gap-1.5">
             <span className="font-semibold text-slate-800 text-sm">{w.name}</span>
             {w.requireSwitchPassword && (
-              <AntTag color="orange" className="text-[10px] m-0 font-medium px-1 py-0">Lock</AntTag>
+              <AntTag color="orange" className="text-[10px] m-0 font-medium px-1 py-0">
+                Lock
+              </AntTag>
             )}
           </div>
           {w.email && (
@@ -226,34 +260,32 @@ const BusinessLayout: React.FC = () => {
               {w.email}
             </span>
           )}
-          <span className="text-[11px] text-slate-500 capitalize mt-0.5">{w.type} • Role: {w.role}</span>
+          <span className="text-[11px] text-slate-500 capitalize mt-0.5">
+            {w.type} • Role: {w.role}
+          </span>
         </div>
         {w.id === activeWorkspace.id && <Lucide.Check size={16} className="text-sky-600 shrink-0" />}
       </div>
     ),
   }));
 
-  const userInitials = currentUser?.first_name && currentUser?.last_name
-    ? `${currentUser.first_name[0]}${currentUser.last_name[0]}`
-    : (currentUser?.full_name ? currentUser.full_name.substring(0, 2).toUpperCase() : 'US');
+  const userInitials =
+    currentUser?.first_name && currentUser?.last_name
+      ? `${currentUser.first_name[0]}${currentUser.last_name[0]}`
+      : currentUser?.full_name
+        ? currentUser.full_name.substring(0, 2).toUpperCase()
+        : "US";
 
   return (
     <div className="min-h-screen flex bg-slate-50 text-slate-900 antialiased">
       {/* Mobile Overlay Backdrop */}
-      {isMobile && mobileOpen && (
-        <div
-          className="fixed inset-0 bg-slate-900/50 z-30 transition-opacity"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+      {isMobile && mobileOpen && <div className="fixed inset-0 bg-slate-900/50 z-30 transition-opacity" onClick={() => setMobileOpen(false)} />}
 
       {/* Business Sidebar */}
       <aside
         className={cn(
           "bg-slate-900 text-slate-100 border-r border-slate-800 flex flex-col fixed left-0 top-0 bottom-0 z-40 transition-all duration-300",
-          isMobile
-            ? (mobileOpen ? "w-72 translate-x-0 shadow-2xl" : "w-72 -translate-x-full")
-            : (collapsed ? "w-16" : "w-72")
+          isMobile ? (mobileOpen ? "w-72 translate-x-0 shadow-2xl" : "w-72 -translate-x-full") : collapsed ? "w-16" : "w-72",
         )}
       >
         {/* Brand Header */}
@@ -265,17 +297,13 @@ const BusinessLayout: React.FC = () => {
             {(!collapsed || isMobile) && (
               <div className="flex flex-col leading-none">
                 <span className="font-bold text-base text-white tracking-tight truncate max-w-[140px]">
-                  {activeWorkspace.name.replace(/\(Personal\)/g, '')}
+                  {activeWorkspace.name.replace(/\(Personal\)/g, "")}
                 </span>
-                <span className="text-[10px] text-indigo-400 font-semibold tracking-wider uppercase mt-0.5">
-                  Business Workspace
-                </span>
+                <span className="text-[10px] text-indigo-400 font-semibold tracking-wider uppercase mt-0.5">Business Workspace</span>
               </div>
             )}
           </Link>
-          {isMobile && (
-            <AntButton type="text" icon={<Lucide.X size={18} className="text-slate-400" />} onClick={() => setMobileOpen(false)} />
-          )}
+          {isMobile && <AntButton type="text" icon={<Lucide.X size={18} className="text-slate-400" />} onClick={() => setMobileOpen(false)} />}
         </div>
 
         {/* Sidebar Navigation */}
@@ -284,7 +312,7 @@ const BusinessLayout: React.FC = () => {
             mode="inline"
             theme="dark"
             selectedKeys={[location.pathname]}
-            items={getMenuItems() as MenuProps['items']}
+            items={getMenuItems() as MenuProps["items"]}
             className="border-none bg-transparent w-auto"
             inlineCollapsed={!isMobile && collapsed}
           />
@@ -292,19 +320,16 @@ const BusinessLayout: React.FC = () => {
       </aside>
 
       {/* Main Container */}
-      <div className={cn(
-        "flex-1 flex flex-col transition-all duration-300 min-w-0",
-        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-72")
-      )}>
+      <div className={cn("flex-1 flex flex-col transition-all duration-300 min-w-0", isMobile ? "ml-0" : collapsed ? "ml-16" : "ml-72")}>
         {/* Top Navbar */}
         <header
           className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 fixed top-0 right-0 z-20 transition-all duration-300 left-0"
-          style={{ left: isMobile ? '0px' : (collapsed ? '4rem' : '18rem') }}
+          style={{ left: isMobile ? "0px" : collapsed ? "4rem" : "18rem" }}
         >
           <div className="flex items-center gap-2 sm:gap-4">
             <AntButton
               type="text"
-              icon={isMobile ? <Lucide.Menu size={20} /> : (collapsed ? <Lucide.Menu size={20} /> : <Lucide.PanelLeftClose size={20} />)}
+              icon={isMobile ? <Lucide.Menu size={20} /> : collapsed ? <Lucide.Menu size={20} /> : <Lucide.PanelLeftClose size={20} />}
               onClick={() => {
                 if (isMobile) {
                   setMobileOpen(!mobileOpen);
@@ -323,15 +348,13 @@ const BusinessLayout: React.FC = () => {
 
           <div className="flex items-center gap-4">
             {/* Workspace Switcher Dropdown */}
-            <AntDropdown menu={{ items: workspaceMenuItems }} trigger={['click']} placement="bottomRight">
+            <AntDropdown menu={{ items: workspaceMenuItems }} trigger={["click"]} placement="bottomRight">
               <div className="flex items-center gap-2.5 cursor-pointer hover:bg-indigo-50/60 py-1.5 px-3 rounded-lg transition-colors border border-indigo-200 bg-white">
                 <Lucide.Building2 size={16} className="text-indigo-600 flex-shrink-0" />
                 <div className="hidden md:flex flex-col leading-tight text-left">
                   <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-sm text-slate-800">{activeWorkspace.name}</span>
-                    <span className="text-[10px] text-indigo-700 bg-indigo-100 px-1.5 py-0.2 rounded font-medium uppercase">
-                      {activeWorkspace.role}
-                    </span>
+                    <span className="text-[10px] text-indigo-700 bg-indigo-100 px-1.5 py-0.2 rounded font-medium uppercase">{activeWorkspace.role}</span>
                   </div>
                   {activeWorkspace.email && (
                     <span className="text-[11px] text-slate-500 font-normal flex items-center gap-1">
@@ -346,11 +369,11 @@ const BusinessLayout: React.FC = () => {
 
             <AntButton type="text" icon={<Lucide.Bell size={18} />} className="text-slate-600 flex items-center justify-center" />
 
-            <AntDropdown menu={{ items: userMenuItems }} trigger={['click']} placement="bottomRight">
+            <AntDropdown menu={{ items: userMenuItems }} trigger={["click"]} placement="bottomRight">
               <div className="flex items-center gap-2 cursor-pointer hover:bg-slate-100 p-1 pr-3 rounded-full transition-colors border border-slate-200">
-                <AntAvatar style={{ backgroundColor: '#4f46e5' }}>{userInitials}</AntAvatar>
+                <AntAvatar style={{ backgroundColor: "#4f46e5" }}>{userInitials}</AntAvatar>
                 <div className="hidden md:flex flex-col leading-tight text-left">
-                  <span className="text-sm font-semibold text-slate-800">{currentUser?.full_name || 'User'}</span>
+                  <span className="text-sm font-semibold text-slate-800">{currentUser?.full_name || "User"}</span>
                   <span className="text-xs text-slate-500 flex items-center gap-1">
                     <Lucide.Mail size={11} className="text-slate-400" />
                     {activeWorkspace.email}
@@ -380,13 +403,14 @@ const BusinessLayout: React.FC = () => {
         >
           <div className="space-y-4 py-2">
             <p className="text-slate-600 text-sm">
-              Switching workspace to <span className="font-bold text-indigo-700">{pendingWorkspace?.name}</span> requires secondary switch password verification:
+              Switching workspace to <span className="font-bold text-indigo-700">{pendingWorkspace?.name}</span> requires secondary switch password
+              verification:
             </p>
 
             <AntInput.Password
               size="large"
               value={switchPassInput}
-              onChange={(e) => setSwitchPassInput(e.target.value)}
+              onChange={e => setSwitchPassInput(e.target.value)}
               placeholder="Enter switch password (e.g. 123456)"
               prefix={<Lucide.Lock size={16} className="text-slate-400" />}
             />
@@ -394,21 +418,28 @@ const BusinessLayout: React.FC = () => {
         </AntModal>
 
         {/* Content Body */}
-        <main className="flex-1 p-4 sm:p-6 md:p-8 mt-16 min-w-0 w-full">
-          <div className="mb-3">
+        <main className="flex-1 p-1 sm:p-3 md:p-4 mt-16 min-w-0 w-full">
+          <div ref={breadcrumbCardRef} className="max-w-7xl w-full mx-auto mb-3 flex items-center gap-4">
+            {/* Back Button - Fixed at top-[4.25rem] when container touches header */}
+            <div
+              className={cn(isFixedBackBtn ? "fixed top-[4.25rem] z-40 transition-all duration-150" : "relative")}
+              style={isFixedBackBtn && btnLeftPos !== undefined ? { left: `${btnLeftPos}px` } : undefined}
+            >
+              <AntButton
+                icon={<Lucide.ArrowLeft size={16} />}
+                onClick={handleGoBack}
+                className="rounded-full bg-white border border-slate-300 shadow-md hover:bg-slate-100 text-slate-800 flex items-center justify-center w-8 h-8"
+              />
+            </div>
+
+            {/* Layout spacer when button becomes fixed to prevent breadcrumb jump */}
+            {isFixedBackBtn && <div className="w-8 h-8 flex-shrink-0" />}
+
             {breadcrumbItems.length > 0 && (
-              <div className="mb-6">
+              <div className="flex-1 min-w-0">
                 <AntBreadcrumb items={breadcrumbItems} className="text-sm font-medium" />
               </div>
             )}
-            <AntButton
-              type="default"
-              icon={<Lucide.ArrowLeft size={16} />}
-              onClick={handleGoBack}
-              className="h-9 px-3 rounded-md border-slate-300 text-slate-700 font-medium hover:border-slate-400 hover:text-slate-900"
-            >
-              Back to Previous Page
-            </AntButton>
           </div>
           <div className="max-w-7xl w-full mx-auto min-w-0">
             <Outlet />

@@ -109,14 +109,9 @@ export const RfqList: React.FC = () => {
       {/* Professional Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">RFQ Sourcing Containers</h1>
-            <span className="bg-blue-50 text-blue-700 text-[11px] font-bold px-2 py-0.5 rounded-full border border-blue-200">
-              {partyRfqs.length} Total
-            </span>
-          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">RFQ Sourcing Management</h1>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Sourcing workspace and seller quotation containers for <strong className="text-slate-700">{activePartyName}</strong>
+            Manage and track purchase request packages, supplier invitations, and quotation responses.
           </p>
         </div>
 

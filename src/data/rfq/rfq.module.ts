@@ -96,20 +96,31 @@ export interface SellerQuoteVariant {
   offer_price: number;
   buyer_accepted?: boolean;
   combinations: VariantCombination[];
-  option_type?: 'CUSTOM_GENERATED' | 'CATALOG_SKU';
+  product_attributes?: any[];
   catalog_variant_id?: string;
   sku?: string;
-  satisfaction_status?: 'SATISFIED' | 'CUSTOM';
   signature?: string;
   is_selected?: boolean;
-  seller_note?: string;
-  buyer_note?: string;
 }
 
-export interface SellerQuoteComment {
+export interface SellerQuoteSuggestedVariant {
   id: string;
   seller_quote_id: string;
-  round: number
+  seller_product_id: string;
+  variant_id: string;
+  sku: string;
+  list_price: number;
+  offer_price: number;
+  combinations?: VariantCombination[];
+  specifications?: any[];
+  is_selected: boolean;
+  buyer_accepted?: boolean;
+}
+
+export interface SellerQuoteAttributeComment {
+  id: string;
+  seller_quote_id: string;
+  round: number;
   attribute_type?: AttributeType;
   group_id: string;
   attribute_id: string;
@@ -118,6 +129,20 @@ export interface SellerQuoteComment {
   actor_id: string;
   created_at: string;
 }
+
+export interface SellerQuoteVariantComment {
+  id: string;
+  seller_quote_id: string;
+  round: number;
+  variant_id: string;
+  variant_type?: "CUSTOM" | "SUGGESTED";
+  comment: string;
+  actor_type: "BUYER" | "SELLER";
+  actor_id: string;
+  created_at: string;
+}
+
+export type SellerQuoteComment = SellerQuoteAttributeComment;
 
 // export interface ItemAttributeChangeHistory {
 //   id: string;
@@ -138,31 +163,93 @@ export interface SellerQuoteComment {
 //   archived_at?: string;
 // }
 
-// export interface RfqAward {
-//   id: string;
-//   rfq_id: string;
-//   rfq_item_id: string;
-//   seller_quote_id: string;
-//   seller_party_id: string;
-//   awarded_quantity: number;
-//   variant_id: string;
-//   offered_variant_id: string | null;
-//   unit_price: number;
-//   currency?: string;
-//   award_status: AwardStatus;
-//   product_mapping_status: ProductMappingStatus;
-//   purchase_order_id?: string;
-//   awarded_at: string;
-//   awarded_by_user_id?: string;
+export type AwardProcessStatus =
+  | "DRAFT"
+  | "SUBMITTED_FOR_APPROVAL"
+  | "AWARD_FINALIZED"
+  | "PO_GENERATED"
+  | "COMPLETED"
+  | "CANCELLED";
 
-//   // Metadata details for PO release & receipt
-//   shipping_address?: string;
-//   payment_terms?: string;
-//   delivery_notes?: string;
-//   po_released_at?: string;
-//   po_received_at?: string;
-//   supplier_acknowledgement_note?: string;
-// }
+export interface RfqAwardHeader {
+  id: string;
+  rfq_id: string;
+  process_status: AwardProcessStatus;
+  created_by_user_id?: string;
+  total_awarded_amount: number;
+  notes?: string;
+  draft_snapshot?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RfqAwardItem {
+  id: string;
+  award_header_id: string;
+  rfq_id: string;
+  rfq_item_id: string;
+  seller_party_id: string;
+  seller_quote_id: string;
+  variant_id: string;
+  variant_type: "CUSTOM" | "SUGGESTED";
+  unit_price: number;
+  awarded_quantity: number;
+  total_price: number;
+  seller_accepted: boolean;
+  seller_accepted_at?: string;
+  purchase_order_id?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PoStatus =
+  | "DRAFT"
+  | "RELEASED"
+  | "SELLER_ACKNOWLEDGED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export interface PurchaseOrder {
+  id: string;
+  po_number: string;
+  rfq_id: string;
+  award_header_id: string;
+  buyer_party_id: string;
+  seller_party_id: string;
+  total_amount: number;
+  currency: string;
+  po_status: PoStatus;
+  shipping_address?: string;
+  payment_terms?: string;
+  delivery_notes?: string;
+  po_released_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PurchaseOrderItem {
+  id: string;
+  purchase_order_id: string;
+  award_item_id: string;
+  rfq_item_id: string;
+  variant_id: string;
+  unit_price: number;
+  awarded_quantity: number;
+  total_price: number;
+}
+
+export interface PoAcknowledgement {
+  id: string;
+  purchase_order_id: string;
+  seller_party_id: string;
+  seller_acknowledged: boolean;
+  seller_acknowledged_at?: string;
+  seller_note?: string;
+  buyer_confirmed: boolean;
+  buyer_confirmed_at?: string;
+  buyer_note?: string;
+  updated_at: string;
+}
 
 // ============================================================================
 // SECTION 2: NESTED SUB-STRUCTURES, LIFECYCLE ENUMS & VALUE OBJECTS
@@ -209,6 +296,8 @@ export type SellerQuoteStatus =
   | "DEVIATION_ACCEPTED"
   | "PRODUCT_SUBMIT_REVISION"
   | "FINAL_ACKNOWLEDGE"
+  | "FINAL_ACKNOWLEDGE_REQUESTED"
+  | "FINAL_ACKNOWLEDGE_ACCEPTED"
   | "REJECTED";
 
 export type AwardItemStatus =

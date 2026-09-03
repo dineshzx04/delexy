@@ -1,17 +1,18 @@
 import React, { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Card, Tabs, Tag as AntTag, Button, Table, Descriptions, Grid as AntGrid } from 'antd';
 import {
   AppstoreOutlined,
   FileTextOutlined,
   TeamOutlined,
+  BarChartOutlined,
 } from '@ant-design/icons';
 import { rfqDb } from '../../data/rfq';
 import { catalogDb } from '../../data/catalog/catalog.db';
 import { businessDb } from '../../data/business/business.db';
 import { useWorkspace } from '../../contexts/WorkspaceContext';
-import { RfqItemStatusBadge } from './RfqStatusBadge';
+import { RfqItemStatusBadge, RFQQuoteStatusBadge } from './RfqStatusBadge';
 import { useBreadcrumb } from '../../contexts/BreadcrumbContext';
 
 interface TabProps {
@@ -80,16 +81,50 @@ export const ItemDetailWorkspace: React.FC = () => {
       {/* Professional Page Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
         <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">{itemProduct?.name || 'Sourcing Line Item'}</h1>
-            <RfqItemStatusBadge status={item.status} />
-            <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit}</AntTag>
-          </div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Sourcing Line Item Workspace</h1>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            RFQ: <span className="font-mono font-bold text-slate-700">{rfq.rfq_number}</span> &bull; Category: <strong className="text-slate-700">{categoryName}</strong>
+            Manage requested attributes, assigned suppliers, quotation offers, and contract awards for this line item.
           </p>
         </div>
       </div>
+
+      {/* Sourcing Item Details */}
+      <Descriptions
+        title={<span className="text-sm font-bold text-slate-800">Sourcing Item Details</span>}
+        bordered
+        size="small"
+        column={{ xxl: 2, xl: 2, lg: 2, md: 1, sm: 1, xs: 1 }}
+        labelStyle={{ fontSize: '12px', fontWeight: 600, color: '#475569', backgroundColor: '#f8fafc' }}
+        contentStyle={{ fontSize: '12px', color: '#1e293b' }}
+        className="mb-4 bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200"
+        classNames={{ header: "mb-0", title: "p-2" }}
+      >
+        <Descriptions.Item label="Buyer" span={2}>
+          <span className="font-semibold text-slate-800 text-xs">{rfq.requester_name}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="RFQ Number">
+          <span className="font-mono font-bold text-slate-700 text-xs">{rfq.rfq_number}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Item Status">
+          <RfqItemStatusBadge status={item.status} />
+        </Descriptions.Item>
+        <Descriptions.Item label="Product / Service">
+          <span className="font-semibold text-slate-900 text-xs">{itemProduct?.name || 'Custom Specifications'}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="Category">
+          <span className="text-slate-700 text-xs">{categoryName}</span>
+        </Descriptions.Item>
+        <Descriptions.Item label="SKU">
+          {item?.variant_id ? (
+            <AntTag color="purple" className="font-mono font-semibold m-0 text-xs">{item.variant_id}</AntTag>
+          ) : (
+            <AntTag color="orange" className="font-semibold m-0 text-xs">Custom Product</AntTag>
+          )}
+        </Descriptions.Item>
+        <Descriptions.Item label="Requested Quantity">
+          <AntTag color="blue" className="font-bold m-0 text-xs">{item.req_quantity} {item.req_unit || 'pcs'}</AntTag>
+        </Descriptions.Item>
+      </Descriptions>
 
       {/* Tabs Container */}
       <Card size="small" className="shadow-sm border-slate-200">
@@ -102,7 +137,7 @@ export const ItemDetailWorkspace: React.FC = () => {
               key: 'quotes',
               label: (
                 <span className="font-semibold flex items-center gap-1.5 text-xs">
-                  <FileTextOutlined /> Supplier Quotes ({quotesCount})
+                  <FileTextOutlined /> Seller Quotes ({quotesCount})
                 </span>
               ),
               children: <SupplierQuotesTab itemId={itemId} />
@@ -124,6 +159,15 @@ export const ItemDetailWorkspace: React.FC = () => {
                 </span>
               ),
               children: <AssignedSellersTab itemId={itemId} />
+            },
+            {
+              key: 'comparisons',
+              label: (
+                <span className="font-semibold flex items-center gap-1.5 text-xs">
+                  <BarChartOutlined /> Submitted Quote Comparisons ({quotesCount})
+                </span>
+              ),
+              children: <SubmittedQuoteComparisonsTab itemId={itemId} />
             }
           ]}
         />
@@ -216,7 +260,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
   }, [item, itemAttributes, attributeGroups, attributes, attributesValues]);
 
   const screens = AntGrid.useBreakpoint();
-  const descriptionsLayout = screens.md ? 'horizontal' : 'vertical';
+  const isMobile = !screens.md;
 
   if (!item) return null;
 
@@ -233,12 +277,12 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
             style={{ borderLeft: `4px solid ${accentColor}` }}
           >
             <div
-              className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"
+              className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2.5 sm:px-4 sm:py-3"
               style={{ backgroundColor: `${accentColor}14` }}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 <span
-                  className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white"
+                  className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white shrink-0"
                   style={{ backgroundColor: accentColor }}
                 >
                   {idx + 1}
@@ -249,14 +293,14 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
                 {groupRows.length} attributes
               </AntTag>
             </div>
-            <div className="p-3">
+            <div className="p-2 sm:p-3">
               <Descriptions
-                layout={descriptionsLayout}
+                layout={isMobile ? 'vertical' : 'horizontal'}
                 bordered
                 size="small"
-                column={{ xs: 1, sm: 1, md: 1 }}
+                column={1}
                 labelStyle={{
-                  width: screens.md ? '35%' : '100%',
+                  width: isMobile ? undefined : '30%',
                   backgroundColor: '#f8fafc',
                   fontWeight: 600,
                   fontSize: '12px',
@@ -268,10 +312,10 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
                   <Descriptions.Item
                     key={attrRow.key}
                     label={
-                      <div className="flex flex-col gap-0.5">
+                      <div className="flex flex-wrap items-center justify-between gap-1">
                         <span className="font-semibold text-slate-800 text-xs">{attrRow.attributeName}</span>
                         {attrRow.connector && attrRow.values?.length > 1 && (
-                          <AntTag color="cyan" className="text-[10px] font-semibold w-max mt-0.5">
+                          <AntTag color="cyan" className="text-[10px] font-semibold m-0">
                             {attrRow.connector === 'AND' ? 'Match ALL (AND)' : 'Match ANY (OR)'}
                           </AntTag>
                         )}
@@ -279,7 +323,7 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
                     }
                   >
                     <div className="flex flex-col gap-1">
-                      <span className="text-slate-800 text-xs font-medium">{attrRow.reqViewValue}</span>
+                      <span className="text-slate-800 text-xs font-medium break-words">{attrRow.reqViewValue}</span>
                       {attrRow.description && (
                         <span className="text-[11px] text-slate-500 italic">Note: {attrRow.description}</span>
                       )}
@@ -318,46 +362,54 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
 
   const quotesColumns = [
     {
+      title: 'S.No.',
+      key: 'sno',
+      className: 'w-14 min-w-[50px] text-center',
+      align: 'center' as const,
+      render: (_: any, __: any, index: number) => (
+        <span className="font-semibold text-xs text-slate-500">{index + 1}</span>
+      )
+    },
+    {
       title: 'Quote Reference',
       dataIndex: 'seller_quote_number',
       key: 'seller_quote_number',
-      render: (text: string, record: any) => (
-        <span
-          // onClick={() => navigate(`${basePath}/${rfqId}/items/${itemId}/quotes/${record.id}/review`)}
-          className="font-bold text-xs"
-        >
+      className: 'w-36 md:w-54 min-w-[120px]',
+      render: (text: string) => (
+        <span className="font-mono font-bold text-xs text-indigo-700">
           {text}
         </span>
       )
     },
     {
-      title: 'Seller ID',
+      title: 'Seller',
       dataIndex: 'seller_party_id',
       key: 'seller_party_id',
+      className: 'min-w-[160px]',
       render: (sellerId: string) => {
         const p = parties.find((party) => party.id === sellerId);
-        return <span className="text-xs text-slate-700 font-medium">{p?.display_name || sellerId}</span>;
+        return <span className="text-xs text-slate-800 font-semibold">{p?.display_name || sellerId}</span>;
       }
     },
     {
       title: 'Round',
       dataIndex: 'round',
       key: 'round',
-      render: (val: number) => <AntTag color="blue" className="text-[10px] font-bold">Round #{val}</AntTag>
+      className: 'w-24 min-w-[90px]',
+      render: (val: number) => <AntTag color="blue" className="text-[10px] font-bold m-0">Round #{val}</AntTag>
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: string) => (
-        <AntTag color={status === 'DEVIATION_ACCEPTED' ? 'success' : 'default'} className="text-[10px] font-semibold">
-          {status}
-        </AntTag>
-      )
+      className: 'w-32 md:w-36 min-w-[130px]',
+      render: (status: any) => <RFQQuoteStatusBadge status={status} />
     },
     {
       title: 'Action',
       key: 'action',
+      className: 'w-32 min-w-[120px] text-right',
+      align: 'right' as const,
       render: (_: any, record: any) => (
         <Button
           size="small"
@@ -379,6 +431,7 @@ const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
       rowKey="id"
       pagination={false}
       size="small"
+      scroll={{ x: 'max-content' }}
       locale={{ emptyText: 'No quotes received yet for this item.' }}
     />
   );
@@ -434,7 +487,438 @@ const AssignedSellersTab: React.FC<TabProps> = ({ itemId }) => {
       rowKey="id"
       pagination={false}
       size="small"
+      scroll={{ x: 'max-content' }}
       locale={{ emptyText: 'No sellers assigned to this RFQ item.' }}
     />
+  );
+};
+
+// ============================================================================
+// SUB-COMPONENT 4: Submitted Quote Comparisons Tab
+// ============================================================================
+const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
+  const screens = AntGrid.useBreakpoint();
+  const isMobile = !screens.md;
+
+  const { rfqId } = useParams<{ rfqId: string }>();
+  const { activeWorkspace } = useWorkspace();
+  const isBusinessContext = activeWorkspace?.type === 'BUSINESS';
+  const basePath = isBusinessContext ? '/b/rfqs' : '/user/rfqs';
+
+  const item = useLiveQuery(() => rfqDb.rfq_items.get(itemId), [itemId]);
+  const itemAttributes = useLiveQuery(
+    () => rfqDb.rfq_item_attributes.where('rfq_item_id').equals(itemId).toArray(),
+    [itemId]
+  ) || [];
+
+  const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
+  const catalogAttributes = useLiveQuery(() => catalogDb.attributes.toArray(), []) || [];
+  const attributeGroups = useLiveQuery(() => catalogDb.attributeGroups.toArray(), []) || [];
+  const catalogAttributeValues = useLiveQuery(() => catalogDb.attributeValues.toArray(), []) || [];
+  const allManufacturers = useLiveQuery(() => businessDb.manufacturers.toArray(), []) || [];
+  const allBrands = useLiveQuery(() => businessDb.brands.toArray(), []) || [];
+  const allSellerProducts = useLiveQuery(() => catalogDb.sellerProducts.toArray(), []) || [];
+
+  const submittedQuotes = useLiveQuery(
+    () =>
+      rfqDb.seller_quotes
+        .where('rfq_item_id')
+        .equals(itemId)
+        .filter((q) => q.status !== 'NOT_SUBMITTED')
+        .toArray(),
+    [itemId]
+  ) || [];
+
+  const submittedQuoteIds = React.useMemo(() => submittedQuotes.map((q) => q.id), [submittedQuotes]);
+
+  const allQuoteAttributes = useLiveQuery(
+    async () => {
+      if (submittedQuoteIds.length === 0) return [];
+      return await rfqDb.seller_quote_attributes.where('seller_quote_id').anyOf(submittedQuoteIds).toArray();
+    },
+    [submittedQuoteIds]
+  ) || [];
+
+  const allQuoteVariants = useLiveQuery(
+    async () => {
+      if (submittedQuoteIds.length === 0) return [];
+      return await rfqDb.seller_quote_variants.where('seller_quote_id').anyOf(submittedQuoteIds).toArray();
+    },
+    [submittedQuoteIds]
+  ) || [];
+
+  const allQuoteSuggestedVariants = useLiveQuery(
+    async () => {
+      if (submittedQuoteIds.length === 0) return [];
+      return await rfqDb.seller_quote_suggested_variants.where('seller_quote_id').anyOf(submittedQuoteIds).toArray();
+    },
+    [submittedQuoteIds]
+  ) || [];
+
+  // Build offered items across all submitted quotes
+  const selectedOfferedItems = React.useMemo(() => {
+    if (!submittedQuotes.length) return [];
+    const items: any[] = [];
+
+    submittedQuotes.forEach((quote) => {
+      const party = parties.find((p) => p.id === quote.seller_party_id);
+      const supplierName = party?.display_name || quote.seller_party_id;
+
+      // Extract quote attributes (specs) for custom options of this quote
+      const quoteSpecs = allQuoteAttributes
+        .filter((attr) => attr.seller_quote_id === quote.id && !attr.is_variant && attr.attribute_id !== 'mfg_brand_mapping' && attr.values && attr.values.length > 0)
+        .map((attr) => ({
+          group_id: attr.group_id,
+          attribute_id: attr.attribute_id,
+          attribute_name: catalogAttributes?.find((a) => a.id === attr.attribute_id)?.name || attr.attribute_id,
+          connector: attr.connector,
+          value_id: attr.values[0]?.value_id,
+          value_label: attr.values[0]?.value_label,
+          values: attr.values,
+        }));
+
+      // Custom Quote Variants
+      const customVars = allQuoteVariants.filter((v) => v.seller_quote_id === quote.id);
+      customVars.forEach((v, idx) => {
+        let label = '';
+        // if (v.combinations && v.combinations.length > 0) {
+        //   label = v.combinations.map((c: any) => c.value_label || c.value_id).join(' / ');
+        // } else {
+        //   label = `Custom Option ${idx + 1}`;
+        // }
+
+        items.push({
+          id: v.id,
+          quoteId: quote.id,
+          sellerQuoteNumber: quote.seller_quote_number,
+          supplierName,
+          title: label,
+          type: 'CUSTOM',
+          offer_price: v.offer_price,
+          product_attributes: v.product_attributes || [...(v.combinations || []), ...quoteSpecs],
+          status: quote.status,
+          buyer_accepted: v.buyer_accepted,
+        });
+      });
+
+      // Suggested Catalog Variants
+      const suggestedVars = allQuoteSuggestedVariants.filter((v) => v.seller_quote_id === quote.id);
+      suggestedVars.forEach((sv) => {
+        const sp = (allSellerProducts || []).find((p: any) => p.id === sv.seller_product_id || p.variants?.some((v: any) => v.id === sv.variant_id));
+        const mfgBrandPair = (sp && sp.manufacturer_id && sp.brand_id) ? [{
+          attribute_id: 'mfg_brand_mapping',
+          group_id: "system",
+          attribute_name: "Manufacturer & Brand",
+          value_id: `${sp.manufacturer_id || "any"}:${sp.brand_id || "any"}`,
+          value_label: undefined,
+          values: [{ value_id: `${sp.manufacturer_id || "any"}:${sp.brand_id || "any"}` }]
+        }] : [];
+
+        const variant = sp?.variants?.find((v: any) => v.id === sv.variant_id);
+        const comboVals = [...mfgBrandPair, ...(variant?.combination_values || sv.combinations || [])];
+        const sortedComboVals = [...comboVals].sort((a: any, b: any) => {
+          if (a.attribute_id === 'mfg_brand_mapping') return -1;
+          if (b.attribute_id === 'mfg_brand_mapping') return 1;
+          return 0;
+        });
+        const combinations = sortedComboVals.map((cv: any) => ({
+          ...cv,
+          values: cv.values || [{ value_label: cv.label || cv.value_label, value_id: cv.value_id }]
+        }));
+        const parentSpecs = sp?.specifications || sv.specifications || [];
+        const product_attributes = (sv as any).product_attributes && (sv as any).product_attributes.length > 0
+          ? (sv as any).product_attributes
+          : [...combinations, ...parentSpecs];
+
+        let label = sv.sku || variant?.sku || `Suggested SKU (${sv.variant_id})`;
+
+        items.push({
+          id: sv.id,
+          quoteId: quote.id,
+          sellerQuoteNumber: quote.seller_quote_number,
+          supplierName,
+          title: label,
+          type: 'SUGGESTED',
+          offer_price: sv.offer_price,
+          list_price: sv.list_price || variant?.price,
+          product_attributes: product_attributes,
+          status: quote.status,
+          buyer_accepted: sv.buyer_accepted,
+        });
+      });
+    });
+
+    return items;
+  }, [submittedQuotes, parties, allQuoteVariants, allQuoteSuggestedVariants, allQuoteAttributes, catalogAttributes, allSellerProducts]);
+
+  // Map proposal attributes by quote ID using Map object (keyed by unique group_id + attribute_id)
+  const proposalAttributesMap = React.useMemo(() => {
+    const map = new Map<string, Map<string, any>>();
+    submittedQuotes.forEach((q) => {
+      const qAttrs = allQuoteAttributes.filter((a) => a.seller_quote_id === q.id);
+      const propAttrs = new Map<string, any>();
+      qAttrs.forEach((qa) => {
+        const uniqueKey = `${qa.group_id}_${qa.attribute_id}`;
+        propAttrs.set(uniqueKey, qa);
+        propAttrs.set(qa.attribute_id, qa);
+      });
+      map.set(q.id, propAttrs);
+    });
+    return map;
+  }, [submittedQuotes, allQuoteAttributes]);
+
+  // Helper renderer for attribute value tags with connectors & manufacturer-brand pair labels
+  const renderAttributeCell = (matchedAttr: any, connectorFallback = 'AND') => {
+    if (!matchedAttr) return <span className="text-slate-400 italic font-normal">N/A</span>;
+
+    const attrId = matchedAttr.attribute_id || matchedAttr.attrId;
+
+    if (attrId === 'offer_price') {
+      if (typeof matchedAttr.offer_price === 'number') {
+        return (
+          <AntTag color="green" className="font-extrabold text-xs m-0 font-mono">
+            ${matchedAttr.offer_price.toLocaleString()}
+          </AntTag>
+        );
+      }
+      return <span className="text-slate-500 italic font-medium text-xs">Quote Offer Price</span>;
+    }
+
+    const values = matchedAttr.values && matchedAttr.values.length > 0 ? matchedAttr.values : [];
+    if (!values || values.length === 0) {
+      return <span className="text-slate-400 italic font-normal">N/A</span>;
+    }
+
+    if (attrId === 'mfg_brand_mapping') {
+      return (
+        <div className=" ">
+          {values.map((vObj: any, vIdx: number) => {
+            const valId = vObj?.value_id || vObj?.id || '';
+            if (!valId) return null;
+            const parts = valId.split(':');
+            const mfgId = parts[0] !== 'any' ? parts[0] : undefined;
+            const brandId = parts[1] !== 'any' ? parts[1] : undefined;
+            const mfg = (allManufacturers || []).find((m: any) => m.id === mfgId);
+            const brand = (allBrands || []).find((b: any) => b.id === brandId);
+            const mfgName = mfg?.company_name || (mfgId ? mfgId : 'Any Mfg');
+            const brandName = brand?.name || (brandId ? brandId : 'Any Brand');
+            const isFirst = vIdx === 0;
+
+            return (
+              <>
+                <div className='flex items-center gap-1'>
+                  {!isFirst && (
+                    <span className="mx-1 text-emerald-600 font-bold text-[12px] select-none">
+                      {" | "}
+                    </span>
+                  )}
+                  <span key={vIdx} className="flex-grow-1 inline-flex flex-col gap-1 my-0.5 border rounded border-slate-200 p-1 overflow-hidden">
+                    <AntTag color="purple" className="text-[11px] m-0 font-medium whitespace-normal break-words">
+                      Mfg: {mfgName}
+                    </AntTag>
+                    {/* <span className="text-slate-400 font-bold text-[11px] select-none">×</span> */}
+                    <AntTag color="blue" className="text-[11px] m-0 font-medium whitespace-normal break-words">
+                      Brand: {brandName}
+                    </AntTag>
+                  </span>
+                </div>
+              </>
+            );
+          })}
+        </div>
+      );
+    }
+
+    const connector = matchedAttr.connector || connectorFallback;
+    const propJoiner = connector === 'OR' ? ' | ' : ', ';
+
+    return (
+      <div className="flex flex-wrap items-center">
+        {values.map((v: any, vIdx: number) => {
+          const valId = v.value_id || v.id;
+          const value = catalogAttributeValues?.find((cv: any) => cv.id === valId);
+          const valLabel = value?.label
+          const isLast = vIdx === values.length - 1;
+
+          return (
+            <span key={vIdx} className="inline-flex items-center my-0.5">
+              <AntTag color="default" className="text-[11px] m-0 font-medium">
+                {valLabel}
+              </AntTag>
+              {!isLast && (
+                <span className="mx-0.5 text-emerald-600 font-bold text-[12px] select-none">
+                  {propJoiner}
+                </span>
+              )}
+            </span>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Build matrix rows for Ant Design Table with rowSpan merging (System Specs first)
+  const matrixRows = React.useMemo(() => {
+    if (!itemAttributes?.length) return [];
+
+    const rowMap = new Map<string, { groupId: string; groupName: string; attrId: string; attrName: string; reqAttr: any }[]>();
+
+    itemAttributes.forEach((ia: any) => {
+      const groupId = ia.group_id || 'general';
+      const groupName = groupId === 'system' ? 'System Specifications' : (attributeGroups.find((g) => g.id === groupId)?.name || 'General Specifications');
+
+      const attrName = ia.attribute_id === 'mfg_brand_mapping'
+        ? 'Manufacturer & Brand'
+        : (catalogAttributes.find((a) => a.id === ia.attribute_id)?.name || ia.attribute_id);
+
+      if (!rowMap.has(groupId)) {
+        rowMap.set(groupId, []);
+      }
+      rowMap.get(groupId)!.push({
+        groupId,
+        groupName,
+        attrId: ia.attribute_id,
+        attrName,
+        reqAttr: ia,
+      });
+    });
+
+    // Ensure System Specifications group has Unit Offer Price row
+    if (!rowMap.has('system')) {
+      rowMap.set('system', []);
+    }
+    const systemRows = rowMap.get('system')!;
+    if (!systemRows.some((r) => r.attrId === 'offer_price')) {
+      const mfgIdx = systemRows.findIndex((r) => r.attrId === 'mfg_brand_mapping');
+      const offerPriceRow = {
+        groupId: 'system',
+        groupName: 'System Specifications',
+        attrId: 'offer_price',
+        attrName: 'Unit Offer Price',
+        reqAttr: { attribute_id: 'offer_price' },
+      };
+      if (mfgIdx !== -1) {
+        systemRows.splice(mfgIdx + 1, 0, offerPriceRow);
+      } else {
+        systemRows.unshift(offerPriceRow);
+      }
+    }
+
+    // Sort group entries so 'system' group comes first
+    const sortedEntries = [...rowMap.entries()].sort(([gIdA], [gIdB]) => {
+      if (gIdA === 'system') return -1;
+      if (gIdB === 'system') return 1;
+      return 0;
+    });
+
+    const rows: any[] = [];
+    sortedEntries.forEach(([gId, attrs]) => {
+      attrs.forEach((attr, idx) => {
+        rows.push({
+          key: `${gId}_${attr.attrId}`,
+          groupId: gId,
+          groupName: attr.groupName,
+          attrId: attr.attrId,
+          attrName: attr.attrName,
+          reqAttr: attr.reqAttr,
+          groupRowSpan: idx === 0 ? attrs.length : 0,
+        });
+      });
+    });
+
+    return rows;
+  }, [itemAttributes, attributeGroups, catalogAttributes]);
+
+  if (submittedQuotes.length === 0) {
+    return (
+      <div className="p-8 text-center text-slate-500">
+        <h3 className="text-sm font-bold text-slate-700 m-0">No Submitted Quotes to Compare</h3>
+        <p className="text-xs text-slate-400 mt-1">When suppliers submit quote proposals for this line item, their offered options will be compared side-by-side here.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 pt-1">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-sm font-bold text-slate-800 m-0">Submitted Quote Options Matrix ({selectedOfferedItems.length} offered options)</h3>
+          <p className="text-xs text-slate-500 mt-0.5 m-0">Side-by-side comparison matrix of all supplier proposals for this line item.</p>
+        </div>
+      </div>
+
+      <Table
+        dataSource={matrixRows}
+        rowKey="key"
+        pagination={false}
+        size="small"
+        bordered
+        scroll={{ x: 'max-content' }}
+        columns={[
+          {
+            title: 'Attribute Group',
+            dataIndex: 'groupName',
+            key: 'groupName',
+            // fixed: isMobile ? undefined : 'left',
+            className: 'align-top bg-slate-50 font-bold text-slate-700 text-xs w-32 md:w-36 min-w-[120px]',
+            onCell: (record: any) => ({
+              rowSpan: record.groupRowSpan,
+            }),
+            render: (text: string) => (
+              <span className="font-bold text-slate-800 text-xs">{text}</span>
+            )
+          },
+          {
+            title: 'Attribute Name',
+            dataIndex: 'attrName',
+            key: 'attrName',
+            fixed: isMobile ? undefined : 'left',
+            className: 'align-top font-semibold text-slate-700 text-xs bg-white w-36 md:w-44 min-w-[130px]',
+            render: (text: string) => (
+              <span className="font-semibold text-slate-700 text-xs">{text}</span>
+            )
+          },
+          {
+            title: 'Requested Specifications',
+            key: 'requestedSpecs',
+            fixed: isMobile ? undefined : 'left',
+            className: 'align-top text-xs font-medium text-slate-900 w-40 md:w-48 min-w-[0px]',
+            render: (_: any, record: any) => renderAttributeCell(record.reqAttr)
+          },
+          ...selectedOfferedItems.map((colItem) => ({
+            title: (
+              <div className="flex flex-col items-center gap-0.5 py-1 min-w-[150px]">
+                <div className="flex flex-col items-center gap-0.5 text-xs">
+                  <span className="font-semibold text-slate-800">{colItem.supplierName}</span>
+                  <span className="font-mono text-indigo-700 font-semibold text-[11px]">({colItem.sellerQuoteNumber})</span>
+                </div>
+                <div className="flex items-center gap-2 mt-0.5">
+                  {/* <span className="font-bold text-emerald-700 text-xs">${colItem.offer_price?.toLocaleString()}</span> */}
+                  <Link
+                    to={`${basePath}/${rfqId}/items/${itemId}/quotes/${colItem.quoteId}/review`}
+                    className="text-[11px] p-0 font-semibold text-blue-600 hover:text-blue-700 hover:underline"
+                  >
+                    Review &rarr;
+                  </Link>
+                </div>
+                <span className="font-mono text-green-700 font-semibold text-[11px]">{colItem.title}</span>
+              </div>
+            ),
+            key: colItem.id,
+            className: 'align-top text-xs w-40 md:w-48 min-w-[150px]',
+            render: (_: any, record: any) => {
+              if (record.attrId === 'offer_price') {
+                return renderAttributeCell({ attribute_id: 'offer_price', offer_price: colItem.offer_price });
+              }
+              const matchedAttr = (colItem.product_attributes || []).find((pa: any) => pa.attribute_id === record.attrId);
+              const uniqueKey = `${record.groupId}_${record.attrId}`;
+              const propAttr = proposalAttributesMap.get(colItem.quoteId)?.get(uniqueKey) || proposalAttributesMap.get(colItem.quoteId)?.get(record.attrId);
+
+              return renderAttributeCell(matchedAttr || {}, propAttr?.connector);
+            }
+          }))
+        ]}
+      />
+    </div>
   );
 };
