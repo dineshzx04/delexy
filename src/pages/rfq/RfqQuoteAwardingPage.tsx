@@ -13,6 +13,8 @@ import {
   Tooltip,
   Descriptions,
   Checkbox,
+  Modal,
+  Input,
 } from "antd";
 import {
   TableOutlined,
@@ -24,6 +26,7 @@ import {
   ArrowRightOutlined,
   ArrowLeftOutlined,
   UnorderedListOutlined,
+  SendOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -268,7 +271,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     () => [
       { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
       { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number ?? "RFQ Workspace"}</a> },
-      { title: <span className="text-slate-800 font-semibold">Quote Awarding Workspace</span> },
+      { title: <span className="text-slate-800">Quote Award Revision</span> },
     ],
     [navigate, basePath, rfqId, rfq?.rfq_number],
   );
@@ -422,11 +425,18 @@ export const RfqQuoteAwardingPage: React.FC = () => {
           seller_quote_id: a.seller_quote_id,
           variant_id: a.variant_id,
           variant_type: a.variant_type,
+          award_round: 1,
+          buyer_target_quantity: a.awarded_quantity,
+          seller_offered_quantity: a.awarded_quantity,
           unit_price: a.unit_price,
           awarded_quantity: a.awarded_quantity,
           total_price: a.unit_price * a.awarded_quantity,
+          unit_of_measure: a.unit_of_measure || "PCS",
+          award_item_status: "CONFIRMED",
           seller_accepted: true,
           seller_accepted_at: now,
+          buyer_accepted: true,
+          buyer_accepted_at: now,
           purchase_order_id: poId,
           updated_at: now,
           created_at: now,
@@ -438,8 +448,10 @@ export const RfqQuoteAwardingPage: React.FC = () => {
           award_item_id: awardItemId,
           rfq_item_id: a.rfq_item_id,
           variant_id: a.variant_id,
+          variant_label: `Option ${a.excel_letter || "A"}`,
           unit_price: a.unit_price,
           awarded_quantity: a.awarded_quantity,
+          unit_of_measure: a.unit_of_measure || "PCS",
           total_price: a.unit_price * a.awarded_quantity,
         });
       });
@@ -570,9 +582,9 @@ export const RfqQuoteAwardingPage: React.FC = () => {
             </Button>
 
             <div className="flex items-center gap-2">
-              <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
+              {/* <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
                 Save Draft
-              </Button>
+              </Button> */}
 
               <Button
                 type="primary"
@@ -623,9 +635,9 @@ export const RfqQuoteAwardingPage: React.FC = () => {
             </Button>
 
             <div className="flex items-center gap-2">
-              <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
+              {/* <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-semibold">
                 Save Draft
-              </Button>
+              </Button> */}
 
               <Button
                 type="primary"
@@ -668,26 +680,26 @@ const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-200">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Quote Awarding Workspace</h1>
+            <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Quote Award Revision Workspace</h1>
             {isFinalized ? (
               <AntTag color="emerald" className="font-bold text-xs">
                 FINALIZED
               </AntTag>
             ) : (
               <AntTag color="blue" className="font-bold text-xs">
-                DRAFT ALLOCATION
+                AWARD REVISION
               </AntTag>
             )}
           </div>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            3-Step Guided Workflow: Matrix comparison, item-wise allocation review, supplier-wise award summary, and PO generation.
+            Item-Seller Award Revision & PO Generation: Evaluate proposals, negotiate item-wise seller allocations with revision rounds, and release Purchase Orders.
           </p>
         </div>
 
         <div className="flex items-center gap-2.5">
-          <Button size="small" icon={<SaveOutlined />} onClick={onSaveDraft} className="text-xs font-semibold">
+          {/* <Button size="small" icon={<SaveOutlined />} onClick={onSaveDraft} className="text-xs font-semibold">
             Save Draft
-          </Button>
+          </Button> */}
 
           {viewMode === "summary" && (
             <Button
@@ -717,13 +729,13 @@ const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
               description: <span className="text-[11px] text-slate-500">Evaluate proposals & allocate per product</span>,
               icon: <TableOutlined />,
             },
+            // {
+            //   title: <span className="font-bold text-xs">Step 2: Item-Wise Allocations</span>,
+            //   description: <span className="text-[11px] text-slate-500">Review awarded seller variants item by item</span>,
+            //   icon: <UnorderedListOutlined />,
+            // },
             {
-              title: <span className="font-bold text-xs">Step 2: Item-Wise Allocations</span>,
-              description: <span className="text-[11px] text-slate-500">Review awarded seller variants item by item</span>,
-              icon: <UnorderedListOutlined />,
-            },
-            {
-              title: <span className="font-bold text-xs">Step 3: Supplier Award Overview & POs</span>,
+              title: <span className="font-bold text-xs">Step 2: Supplier Award Overview & POs</span>,
               description: <span className="text-[11px] text-slate-500">Review supplier totals & release Purchase Orders</span>,
               icon: <TrophyOutlined />,
             },
@@ -1098,54 +1110,169 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
           );
         },
       },
-      {
-        key: "award_quantity",
-        attributeName: "Award Quantity (Allocation)",
-        getValue: (variant: FlattenedVariant) => {
-          const key = `${item.id}:${variant.id}`;
-          const allocation = allocations[key];
-          const isSelected = !!allocation?.is_selected;
-          const currentQty = allocation?.awarded_quantity || 0;
-          const currentSubtotal = variant.offerPrice * currentQty;
-
-          return (
-            <div className="flex flex-col gap-1.5 items-start">
-              <div className="flex items-center gap-1">
-                <InputNumber
-                  min={0}
-                  step={1}
-                  disabled={!isSelected}
-                  value={currentQty}
-                  onChange={val => handleQtyChange(variant, variant.sellerName, variant.quoteNumber, val)}
-                  size="small"
-                  className="!w-24 text-[11px] !h-7 font-mono font-bold"
-                  placeholder={isSelected ? "Qty" : "Disabled"}
-                />
-
-                <Tooltip title={isSelected ? "Quick Fill Remaining Quantity" : "Select variant checkbox first"}>
-                  <Button
-                    size="small"
-                    type="default"
-                    disabled={!isSelected}
-                    icon={<ThunderboltOutlined />}
-                    onClick={() => handleQuickFullAllocation(variant, variant.sellerName, variant.quoteNumber)}
-                    className="!h-7 !px-1.5 text-[10px] text-indigo-600 hover:text-indigo-700 font-semibold"
-                  />
-                </Tooltip>
-              </div>
-
-              {isSelected && currentQty > 0 && (
-                <div className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                  Subtotal: {formatCurrency(currentSubtotal)}
-                </div>
-              )}
-            </div>
-          );
-        },
-      },
     ],
-    [allocations, item.id, activeItemInsights.remainingQty],
+    [allocations, item.id],
   );
+
+  const sellerAllocationsGrouped = useMemo(() => {
+    if (!item?.id) return [];
+
+    const activeAllocations = Object.values(allocations).filter(a => a.rfq_item_id === item.id && a.is_selected);
+
+    if (activeAllocations.length === 0) return [];
+
+    const reqQty = item.req_quantity || 1;
+
+    const groupsMap = new Map<
+      string,
+      {
+        sellerPartyId: string;
+        sellerName: string;
+        sellerQuoteId: string;
+        quoteNumber: string;
+        proposalRound: number;
+        awardRound: number;
+        quoteStatus: string;
+        totalQty: number;
+        totalValue: number;
+        items: Array<{
+          allocation: AwardAllocation;
+          variant?: FlattenedVariant;
+          excelLetter: string;
+          variantLabel: string;
+          manufacturer: string;
+          brand: string;
+          unitPrice: number;
+          awardedQty: number;
+          subtotal: number;
+          sharePct: number;
+        }>;
+      }
+    >();
+
+    for (const alloc of activeAllocations) {
+      const variant = allCombinedVariants.find(v => v.id === alloc.variant_id);
+      const sellerParty = parties.find(p => p.id === alloc.seller_party_id);
+      const quote = allQuotes.find(q => q.id === alloc.seller_quote_id);
+
+      const sellerName = sellerParty?.display_name || `Supplier (${alloc.seller_party_id})`;
+      const quoteNumber = quote?.seller_quote_number || "Quote Proposal";
+
+      if (!groupsMap.has(alloc.seller_party_id)) {
+        groupsMap.set(alloc.seller_party_id, {
+          sellerPartyId: alloc.seller_party_id,
+          sellerName,
+          sellerQuoteId: alloc.seller_quote_id,
+          quoteNumber,
+          proposalRound: quote?.round || 1,
+          awardRound: quote?.award_round || 1,
+          quoteStatus: quote?.status || "SUBMITTED",
+          totalQty: 0,
+          totalValue: 0,
+          items: [],
+        });
+      }
+
+      const group = groupsMap.get(alloc.seller_party_id)!;
+      const unitPrice = alloc.unit_price || variant?.offerPrice || 0;
+      const awardedQty = alloc.awarded_quantity || 0;
+      const subtotal = unitPrice * awardedQty;
+      const sharePct = Math.round((awardedQty / reqQty) * 100);
+
+      group.totalQty += awardedQty;
+      group.totalValue += subtotal;
+
+      group.items.push({
+        allocation: alloc,
+        variant,
+        excelLetter: alloc.excel_letter || variant?.excelLetter || "A",
+        variantLabel: variant?.colLabel || `Variant (${alloc.variant_type})`,
+        manufacturer: variant?.manufacturer || "N/A",
+        brand: variant?.brand || "N/A",
+        unitPrice,
+        awardedQty,
+        subtotal,
+        sharePct,
+      });
+    }
+
+    return Array.from(groupsMap.values()).map(g => ({
+      ...g,
+      sellerSharePct: Math.round((g.totalQty / reqQty) * 100),
+    }));
+  }, [item, allocations, allCombinedVariants, parties, allQuotes]);
+
+  const [revisionModalVisible, setRevisionModalVisible] = useState(false);
+  const [selectedSellerForRevision, setSelectedSellerForRevision] = useState<any>(null);
+  const [revisionNote, setRevisionNote] = useState("");
+  const [submittingRevision, setSubmittingRevision] = useState(false);
+
+  const handleOpenAwardRevisionModal = (sellerGroup: any) => {
+    setSelectedSellerForRevision(sellerGroup);
+    setRevisionNote("");
+    setRevisionModalVisible(true);
+  };
+
+  const handleConfirmAwardRevision = async () => {
+    if (!selectedSellerForRevision) return;
+    setSubmittingRevision(true);
+    try {
+      const nextAwardRound = (selectedSellerForRevision.awardRound || 1) + 1;
+
+      await rfqDb.seller_quotes.update(selectedSellerForRevision.sellerQuoteId, {
+        award_round: nextAwardRound,
+        status: "REVISION_REQUIRED",
+        updated_at: new Date().toISOString(),
+      });
+
+      for (const allocItem of selectedSellerForRevision.items) {
+        await rfqDb.award_revision_history.add({
+          id: `arh-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          rfq_id: item.rfq_id,
+          rfq_item_id: item.id,
+          seller_party_id: selectedSellerForRevision.sellerPartyId,
+          seller_quote_id: selectedSellerForRevision.sellerQuoteId,
+          award_round: nextAwardRound,
+          actor_type: "BUYER",
+          actor_id: "buyer-user",
+          variant_id: allocItem.allocation.variant_id,
+          quantity: allocItem.awardedQty,
+          unit_price: allocItem.unitPrice,
+          note: revisionNote || undefined,
+          created_at: new Date().toISOString(),
+        });
+      }
+
+      message.success(
+        `Award Revision Request (Award Rev R${nextAwardRound}) successfully sent to ${selectedSellerForRevision.sellerName}!`
+      );
+      setRevisionModalVisible(false);
+      setSelectedSellerForRevision(null);
+    } catch (err) {
+      console.error("Failed to send award revision request:", err);
+      message.error("Failed to send award revision request.");
+    } finally {
+      setSubmittingRevision(false);
+    }
+  };
+
+  const handleClearActiveItemAllocations = () => {
+    if (!item?.id) return;
+    setAllocations(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(key => {
+        if (key.startsWith(`${item.id}:`)) {
+          next[key] = {
+            ...next[key],
+            awarded_quantity: 0,
+            is_selected: false,
+          };
+        }
+      });
+      return next;
+    });
+    message.info("Cleared all variant allocations for this line item.");
+  };
 
   return (
     <Card size="small" className="shadow-sm border-slate-200 bg-white">
@@ -1306,285 +1433,279 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
           />
         )}
 
-        {/* Seller-Wise Selection Insights Section for this Line Item */}
-        <SellerWiseSelectionInsightsSection
-          activeItem={item}
-          allocations={allocations}
-          setAllocations={setAllocations}
-          allCombinedVariants={allCombinedVariants}
-          parties={parties}
-          allQuotes={allQuotes}
-          activeItemInsights={activeItemInsights}
-        />
-      </div>
-    </Card>
-  );
-};
+        <Card size="small" className="shadow-sm border-slate-200 bg-white">
+          {/* Section Header */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-2 border-b border-slate-200">
+            <div className="flex items-center gap-2">
+              <TrophyOutlined className="text-amber-500 text-base" />
+              <h3 className="text-xs font-bold text-slate-800 tracking-wider m-0">Current Line Item Selection Insights (Seller-Wise Breakdown)</h3>
+              <AntTag color="blue" className="text-[11px] font-semibold m-0">
+                {sellerAllocationsGrouped.length} Awarded Supplier(s)
+              </AntTag>
+            </div>
 
-interface SellerWiseSelectionInsightsSectionProps {
-  activeItem?: RfqItem;
-  allocations: Record<string, AwardAllocation>;
-  setAllocations: React.Dispatch<React.SetStateAction<Record<string, AwardAllocation>>>;
-  allCombinedVariants: FlattenedVariant[];
-  parties: any[];
-  allQuotes: SellerQuote[];
-  activeItemInsights: {
-    allocatedVariantsCount: number;
-    allocatedQty: number;
-    reqQty: number;
-    allocatedTotalPrice: number;
-  };
-}
+            {sellerAllocationsGrouped.length > 0 && (
+              <Button size="small" type="text" danger onClick={handleClearActiveItemAllocations} className="text-xs font-semibold">
+                Clear Line Allocations
+              </Button>
+            )}
+          </div>
 
-const SellerWiseSelectionInsightsSection: React.FC<SellerWiseSelectionInsightsSectionProps> = ({
-  activeItem,
-  allocations,
-  setAllocations,
-  allCombinedVariants,
-  parties,
-  allQuotes,
-  activeItemInsights,
-}) => {
-  const sellerAllocationsGrouped = useMemo(() => {
-    if (!activeItem?.id) return [];
+          {sellerAllocationsGrouped.length > 0 ? (
+            <div className="space-y-3">
 
-    const activeAllocations = Object.values(allocations).filter(a => a.rfq_item_id === activeItem.id && a.is_selected && a.awarded_quantity > 0);
-
-    if (activeAllocations.length === 0) return [];
-
-    const reqQty = activeItem.req_quantity || 1;
-
-    const groupsMap = new Map<
-      string,
-      {
-        sellerPartyId: string;
-        sellerName: string;
-        sellerQuoteId: string;
-        quoteNumber: string;
-        totalQty: number;
-        totalValue: number;
-        items: Array<{
-          allocation: AwardAllocation;
-          variant?: FlattenedVariant;
-          excelLetter: string;
-          variantLabel: string;
-          manufacturer: string;
-          brand: string;
-          unitPrice: number;
-          awardedQty: number;
-          subtotal: number;
-          sharePct: number;
-        }>;
-      }
-    >();
-
-    for (const alloc of activeAllocations) {
-      const variant = allCombinedVariants.find(v => v.id === alloc.variant_id);
-      const sellerParty = parties.find(p => p.id === alloc.seller_party_id);
-      const quote = allQuotes.find(q => q.id === alloc.seller_quote_id);
-
-      const sellerName = sellerParty?.display_name || `Supplier (${alloc.seller_party_id})`;
-      const quoteNumber = quote?.seller_quote_number || "Quote Proposal";
-
-      if (!groupsMap.has(alloc.seller_party_id)) {
-        groupsMap.set(alloc.seller_party_id, {
-          sellerPartyId: alloc.seller_party_id,
-          sellerName,
-          sellerQuoteId: alloc.seller_quote_id,
-          quoteNumber,
-          totalQty: 0,
-          totalValue: 0,
-          items: [],
-        });
-      }
-
-      const group = groupsMap.get(alloc.seller_party_id)!;
-      const unitPrice = alloc.unit_price || variant?.offerPrice || 0;
-      const awardedQty = alloc.awarded_quantity || 0;
-      const subtotal = unitPrice * awardedQty;
-      const sharePct = Math.round((awardedQty / reqQty) * 100);
-
-      group.totalQty += awardedQty;
-      group.totalValue += subtotal;
-
-      group.items.push({
-        allocation: alloc,
-        variant,
-        excelLetter: alloc.excel_letter || variant?.excelLetter || "A",
-        variantLabel: variant?.colLabel || `Variant (${alloc.variant_type})`,
-        manufacturer: variant?.manufacturer || "N/A",
-        brand: variant?.brand || "N/A",
-        unitPrice,
-        awardedQty,
-        subtotal,
-        sharePct,
-      });
-    }
-
-    return Array.from(groupsMap.values()).map(g => ({
-      ...g,
-      sellerSharePct: Math.round((g.totalQty / reqQty) * 100),
-    }));
-  }, [activeItem, allocations, allCombinedVariants, parties, allQuotes]);
-
-  const handleClearActiveItemAllocations = () => {
-    if (!activeItem?.id) return;
-    setAllocations(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(key => {
-        if (key.startsWith(`${activeItem.id}:`)) {
-          next[key] = {
-            ...next[key],
-            awarded_quantity: 0,
-            is_selected: false,
-          };
-        }
-      });
-      return next;
-    });
-    message.info("Cleared all variant allocations for this line item.");
-  };
-
-  return (
-    <Card size="small" className="shadow-sm border-slate-200 bg-white">
-      {/* Section Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-2 border-b border-slate-200">
-        <div className="flex items-center gap-2">
-          <TrophyOutlined className="text-amber-500 text-base" />
-          <h3 className="text-xs font-bold text-slate-800 tracking-wider m-0">Current Line Item Selection Insights (Seller-Wise Breakdown)</h3>
-          <AntTag color="blue" className="text-[11px] font-semibold m-0">
-            {sellerAllocationsGrouped.length} Awarded Supplier(s)
-          </AntTag>
-        </div>
-
-        {sellerAllocationsGrouped.length > 0 && (
-          <Button size="small" type="text" danger onClick={handleClearActiveItemAllocations} className="text-xs font-semibold">
-            Clear Line Allocations
-          </Button>
-        )}
-      </div>
-
-      {sellerAllocationsGrouped.length > 0 ? (
-        <div className="space-y-3">
-          {/* Seller-Wise Cards List */}
-          {sellerAllocationsGrouped.map(sellerGroup => (
-            <div key={sellerGroup.sellerPartyId} className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50/50">
-              <div className="bg-slate-100/80 px-3 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <ShopOutlined className="text-indigo-600" />
-                  <span className="font-bold text-slate-900 text-xs">{sellerGroup.sellerName}</span>
-                  <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">{sellerGroup.quoteNumber}</span>
-                </div>
-
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-slate-600">
-                    Allocated Qty:{" "}
-                    <strong className="text-slate-900">
-                      {sellerGroup.totalQty} {activeItem?.req_unit || "PCS"}
-                    </strong>{" "}
-                    <span className="text-slate-400 font-normal">({sellerGroup.sellerSharePct}% Share)</span>
+              {/* Grand Total Bar */}
+              <div className="mt-3 pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs bg-slate-50 p-2.5 rounded-md">
+                <div className="flex items-center gap-3 text-slate-700">
+                  <span>
+                    Awarded Sellers: <strong className="text-slate-900">{sellerAllocationsGrouped.length} Sellers</strong>
                   </span>
                   <span className="text-slate-300">|</span>
-                  <span className="text-slate-600">
-                    Supplier Total: <strong className="text-emerald-700">{formatCurrency(sellerGroup.totalValue)}</strong>
+                  <span>
+                    Awarded Variants: <strong className="text-slate-900">{activeItemInsights.allocatedVariantsCount} Variants</strong>
                   </span>
+                  <span className="text-slate-300">|</span>
+                  <span>
+                    Grand Total Qty:{" "}
+                    <strong className="text-indigo-700">
+                      {activeItemInsights.allocatedQty} / {activeItemInsights.reqQty} {item?.req_unit || "PCS"}
+                    </strong>
+                  </span>
+                  <span className="text-slate-300">|</span>
+                  <span>
+                    Grand Total Value: <strong className="text-emerald-700">{formatCurrency(activeItemInsights.allocatedTotalPrice)}</strong>
+                  </span>
+                </div>
+
+                <div>
+                  {activeItemInsights.allocatedQty === activeItemInsights.reqQty && activeItemInsights.reqQty > 0 ? (
+                    <AntTag color="blue" className="font-semibold text-xs m-0">
+                      ✓ 100% Fully Allocated
+                    </AntTag>
+                  ) : activeItemInsights.allocatedQty > activeItemInsights.reqQty ? (
+                    <AntTag color="red" className="font-semibold text-xs m-0">
+                      ⚠ Over Allocated (+{activeItemInsights.allocatedQty - activeItemInsights.reqQty})
+                    </AntTag>
+                  ) : (
+                    <AntTag color="default" className="font-semibold text-xs m-0">
+                      Partially Allocated
+                    </AntTag>
+                  )}
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left bg-white border-collapse">
-                  <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
-                    <tr>
-                      <th className="p-2 border-r border-slate-200">Variant Option</th>
-                      <th className="p-2 border-r border-slate-200">Manufacturer / Brand</th>
-                      <th className="p-2 border-r border-slate-200 text-right">Unit Price</th>
-                      <th className="p-2 border-r border-slate-200 text-right">Awarded Qty</th>
-                      <th className="p-2 border-r border-slate-200 text-right">Subtotal</th>
-                      <th className="p-2 text-center">Line Share</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200">
-                    {sellerGroup.items.map(item => (
-                      <tr key={item.allocation.variant_id}>
-                        <td className="p-2 border-r border-slate-200">
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[10px]">{item.excelLetter}</span>
-                            <span className="font-semibold text-slate-800 text-xs">{item.variantLabel}</span>
-                          </div>
-                        </td>
-                        <td className="p-2 border-r border-slate-200">
-                          <div className="flex items-center gap-1">
-                            <AntTag color="purple" className="text-[10px] m-0">
-                              {item.manufacturer}
-                            </AntTag>
-                            <AntTag color="blue" className="text-[10px] m-0">
-                              {item.brand}
-                            </AntTag>
-                          </div>
-                        </td>
-                        <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-800">{formatCurrency(item.unitPrice)}</td>
-                        <td className="p-2 border-r border-slate-200 text-right font-semibold text-slate-900">
-                          {item.awardedQty} {activeItem?.req_unit || "PCS"}
-                        </td>
-                        <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">{formatCurrency(item.subtotal)}</td>
-                        <td className="p-2 text-center font-mono font-semibold text-indigo-600">{item.sharePct}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
+              {/* Seller-Wise Cards List */}
+              {sellerAllocationsGrouped.map(sellerGroup => (
+                <div key={sellerGroup.sellerPartyId} className="border border-slate-200 rounded-lg overflow-hidden bg-slate-50/50">
+                  <div className="bg-slate-100/80 px-3 py-2 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <ShopOutlined className="text-indigo-600" />
+                      <span className="font-bold text-slate-900 text-xs">{sellerGroup.sellerName}</span>
+                      <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">{sellerGroup.quoteNumber}</span>
+                      <AntTag color="cyan" className="text-[10px] font-semibold m-0">
+                        Proposal R{sellerGroup.proposalRound}
+                      </AntTag>
+                      <AntTag color="purple" className="text-[10px] font-semibold m-0">
+                        Award Rev R{sellerGroup.awardRound}
+                      </AntTag>
+                    </div>
 
-          {/* Grand Total Bar */}
-          <div className="mt-3 pt-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 text-xs bg-slate-50 p-2.5 rounded-md">
-            <div className="flex items-center gap-3 text-slate-700">
-              <span>
-                Awarded Sellers: <strong className="text-slate-900">{sellerAllocationsGrouped.length} Sellers</strong>
-              </span>
-              <span className="text-slate-300">|</span>
-              <span>
-                Awarded Variants: <strong className="text-slate-900">{activeItemInsights.allocatedVariantsCount} Variants</strong>
-              </span>
-              <span className="text-slate-300">|</span>
-              <span>
-                Grand Total Qty:{" "}
-                <strong className="text-indigo-700">
-                  {activeItemInsights.allocatedQty} / {activeItemInsights.reqQty} {activeItem?.req_unit || "PCS"}
-                </strong>
-              </span>
-              <span className="text-slate-300">|</span>
-              <span>
-                Grand Total Value: <strong className="text-emerald-700">{formatCurrency(activeItemInsights.allocatedTotalPrice)}</strong>
-              </span>
+                    <div className="flex items-center gap-3 text-xs">
+                      <span className="text-slate-600">
+                        Allocated Qty:{" "}
+                        <strong className="text-slate-900">
+                          {sellerGroup.totalQty} {item?.req_unit || "PCS"}
+                        </strong>{" "}
+                        <span className="text-slate-400 font-normal">({sellerGroup.sellerSharePct}% Share)</span>
+                      </span>
+                      <span className="text-slate-300">|</span>
+                      <span className="text-slate-600">
+                        Supplier Total: <strong className="text-emerald-700">{formatCurrency(sellerGroup.totalValue)}</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left bg-white border-collapse">
+                      <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200">
+                        <tr>
+                          <th className="p-2 border-r border-slate-200">Variant Option</th>
+                          <th className="p-2 border-r border-slate-200">Manufacturer / Brand</th>
+                          <th className="p-2 border-r border-slate-200 text-right">Unit Price</th>
+                          <th className="p-2 border-r border-slate-200 text-right">Awarded Qty</th>
+                          <th className="p-2 border-r border-slate-200 text-right">Subtotal</th>
+                          <th className="p-2 text-center">Line Share</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {sellerGroup.items.map(item => (
+                          <tr key={item.allocation.variant_id}>
+                            <td className="p-2 border-r border-slate-200">
+                              <div className="flex items-center gap-1.5">
+                                <span className="px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 font-mono font-bold text-[10px]">{item.excelLetter}</span>
+                                <span className="font-semibold text-slate-800 text-xs">{item.variantLabel}</span>
+                              </div>
+                            </td>
+                            <td className="p-2 border-r border-slate-200">
+                              <div className="flex items-center gap-1">
+                                <AntTag color="purple" className="text-[10px] m-0">
+                                  {item.manufacturer}
+                                </AntTag>
+                                <AntTag color="blue" className="text-[10px] m-0">
+                                  {item.brand}
+                                </AntTag>
+                              </div>
+                            </td>
+                            <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-slate-800">{formatCurrency(item.unitPrice)}</td>
+                            <td className="p-2 border-r border-slate-200 text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <InputNumber
+                                  min={0}
+                                  step={1}
+                                  value={item.awardedQty}
+                                  onChange={val => {
+                                    if (item.variant) {
+                                      handleQtyChange(item.variant, item.allocation.seller_party_id, item.allocation.seller_quote_id, val);
+                                    }
+                                  }}
+                                  size="small"
+                                  className="!w-24 text-[11px] !h-7 font-mono font-bold"
+                                  placeholder="Qty"
+                                />
+                                <Tooltip title="Quick Fill Remaining Quantity">
+                                  <Button
+                                    size="small"
+                                    type="default"
+                                    icon={<ThunderboltOutlined />}
+                                    onClick={() => {
+                                      if (item.variant) {
+                                        handleQuickFullAllocation(item.variant, item.allocation.seller_party_id, item.allocation.seller_quote_id);
+                                      }
+                                    }}
+                                    className="!h-7 !px-1.5 text-[10px] text-indigo-600 hover:text-indigo-700 font-semibold"
+                                  />
+                                </Tooltip>
+                              </div>
+                            </td>
+                            <td className="p-2 border-r border-slate-200 text-right font-mono font-bold text-emerald-700">{formatCurrency(item.subtotal)}</td>
+                            <td className="p-2 text-center font-mono font-semibold text-indigo-600">{item.sharePct}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Item-Supplier Award Revision Action Bar */}
+                  <div className="bg-slate-50 px-3 py-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 text-xs">
+                      {sellerGroup.quoteStatus === "REVISION_REQUIRED" ? (
+                        <AntTag color="orange" className="font-semibold text-xs m-0">
+                          Award Revision Requested (Awaiting Seller Response)
+                        </AntTag>
+                      ) : (
+                        <span className="text-slate-500 text-[11px]">
+                          Revise allocated quantities and send award revision request directly to this seller.
+                        </span>
+                      )}
+                    </div>
+
+                    <Button
+                      size="small"
+                      type="primary"
+                      ghost
+                      icon={<SendOutlined />}
+                      onClick={() => handleOpenAwardRevisionModal(sellerGroup)}
+                      className="text-xs font-semibold"
+                    >
+                      Send Award Revision Request to {sellerGroup.sellerName} (Award Rev R{sellerGroup.awardRound + 1})
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+            </div>
+          ) : (
+            <Alert
+              type="info"
+              showIcon
+              message="No Variant Allocations Selected"
+              description="Check the 'Select for Award' checkbox and enter quantities in the comparison matrix above to view current selection insights."
+              className="my-1"
+            />
+          )}
+        </Card>
+
+        {/* Item-Supplier Award Revision Modal */}
+        <Modal
+          open={revisionModalVisible}
+          title={
+            <div className="flex items-center gap-2">
+              <SendOutlined className="text-indigo-600" />
+              <span>Send Award Revision Request</span>
+            </div>
+          }
+          onCancel={() => {
+            if (!submittingRevision) {
+              setRevisionModalVisible(false);
+              setSelectedSellerForRevision(null);
+            }
+          }}
+          onOk={handleConfirmAwardRevision}
+          confirmLoading={submittingRevision}
+          okText={`Send Revision (Award Rev R${(selectedSellerForRevision?.awardRound || 1) + 1})`}
+          okButtonProps={{ className: "bg-indigo-600 hover:bg-indigo-700 font-semibold" }}
+        >
+          <div className="space-y-3 py-2 text-xs">
+            <Alert
+              type="info"
+              showIcon
+              message="Negotiate Allocation with Seller"
+              description={
+                <span>
+                  You are requesting an Award Revision for <strong>{selectedSellerForRevision?.sellerName}</strong> on Line Item #{item.item_index || itemIndex} (
+                  <strong>{product?.name || "Product"}</strong>). This will initiate <strong>Award Revision Round {(selectedSellerForRevision?.awardRound || 1) + 1}</strong> with this seller.
+                </span>
+              }
+            />
+
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200 space-y-1.5">
+              <div className="flex justify-between font-semibold text-slate-700">
+                <span>Proposal Round:</span>
+                <AntTag color="cyan">Proposal R{selectedSellerForRevision?.proposalRound}</AntTag>
+              </div>
+              <div className="flex justify-between font-semibold text-slate-700">
+                <span>New Award Revision Round:</span>
+                <AntTag color="purple">Award Rev R{(selectedSellerForRevision?.awardRound || 1) + 1}</AntTag>
+              </div>
+              <div className="flex justify-between font-semibold text-slate-700">
+                <span>Target Allocated Quantity:</span>
+                <span className="font-mono font-bold text-slate-900">
+                  {selectedSellerForRevision?.totalQty} {item?.req_unit || "PCS"}
+                </span>
+              </div>
+              <div className="flex justify-between font-semibold text-slate-700">
+                <span>Estimated Allocation Value:</span>
+                <span className="font-mono font-bold text-emerald-700">
+                  {formatCurrency(selectedSellerForRevision?.totalValue || 0)}
+                </span>
+              </div>
             </div>
 
             <div>
-              {activeItemInsights.allocatedQty === activeItemInsights.reqQty && activeItemInsights.reqQty > 0 ? (
-                <AntTag color="blue" className="font-semibold text-xs m-0">
-                  ✓ 100% Fully Allocated
-                </AntTag>
-              ) : activeItemInsights.allocatedQty > activeItemInsights.reqQty ? (
-                <AntTag color="red" className="font-semibold text-xs m-0">
-                  ⚠ Over Allocated (+{activeItemInsights.allocatedQty - activeItemInsights.reqQty})
-                </AntTag>
-              ) : (
-                <AntTag color="default" className="font-semibold text-xs m-0">
-                  Partially Allocated
-                </AntTag>
-              )}
+              <label className="block font-semibold text-slate-700 mb-1">
+                Revision Request Note for Seller (Optional):
+              </label>
+              <Input.TextArea
+                rows={3}
+                placeholder="e.g. Please confirm if you can supply 300 PCS at $245 within 14 days lead time."
+                value={revisionNote}
+                onChange={e => setRevisionNote(e.target.value)}
+                className="text-xs"
+              />
             </div>
           </div>
-        </div>
-      ) : (
-        <Alert
-          type="info"
-          showIcon
-          message="No Variant Allocations Selected"
-          description="Check the 'Select for Award' checkbox and enter quantities in the comparison matrix above to view current selection insights."
-          className="my-1"
-        />
-      )}
+        </Modal>
+      </div>
     </Card>
   );
 };
@@ -1726,7 +1847,11 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
           bordered
           size="small"
           column={{ xs: 1, sm: 2, md: 3 }}
-          className="mt-2 text-xs"
+          className="mt-2"
+          classNames={{
+            label: "text-xs p-1",
+            content: "text-xs p-1"
+          }}
         >
           <Descriptions.Item label="Total RFQ Line Items">
             <span className="font-bold text-slate-800">{rfqItems.length} Line Items</span>

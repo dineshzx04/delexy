@@ -21,7 +21,17 @@ export const SellerRfqWorkspace: React.FC = () => {
   const pageData = useLiveQuery(async () => {
     if (!rfqId) return null;
 
-    const [rfq, rfqItems, parties, quotes, catalogProducts, categories, sellerProducts] = await Promise.all([
+    const [
+      rfq,
+      rfqItems,
+      parties,
+      quotes,
+      catalogProducts,
+      categories,
+      sellerProducts,
+      awardHistory,
+      awardItems,
+    ] = await Promise.all([
       rfqDb.rfqs.get(rfqId),
       rfqDb.rfq_items.where('rfq_id').equals(rfqId).toArray(),
       businessDb.parties.toArray(),
@@ -29,12 +39,34 @@ export const SellerRfqWorkspace: React.FC = () => {
       catalogDb.products.toArray(),
       catalogDb.categories.toArray(),
       catalogDb.sellerProducts.toArray(),
+      rfqDb.award_revision_history.where('rfq_id').equals(rfqId).toArray(),
+      rfqDb.rfq_award_items.where('rfq_id').equals(rfqId).toArray(),
     ]);
 
-    return { rfq, rfqItems, parties, quotes, catalogProducts, categories, sellerProducts };
+    return {
+      rfq,
+      rfqItems,
+      parties,
+      quotes,
+      catalogProducts,
+      categories,
+      sellerProducts,
+      awardHistory: awardHistory || [],
+      awardItems: awardItems || [],
+    };
   }, [rfqId]);
 
-  const { rfq, rfqItems = [], parties = [], quotes = [], catalogProducts = [], categories = [], sellerProducts = [] } = pageData ?? {};
+  const {
+    rfq,
+    rfqItems = [],
+    parties = [],
+    quotes = [],
+    catalogProducts = [],
+    categories = [],
+    sellerProducts = [],
+    awardHistory = [],
+    awardItems = [],
+  } = pageData ?? {};
 
   const activeParty = useMemo(() => {
     if (!parties.length) return null;
@@ -80,6 +112,24 @@ export const SellerRfqWorkspace: React.FC = () => {
 
         const isVariantSelected = Boolean(item.variant_id);
 
+        const hasAwardHistory = awardHistory.some(
+          (h) => h.rfq_item_id === item.id && h.seller_party_id === activePartyId
+        );
+        const hasAwardItem = awardItems.some(
+          (a) => a.rfq_item_id === item.id && a.seller_party_id === activePartyId
+        );
+
+        const isDeviationAccepted = quote?.status === 'DEVIATION_ACCEPTED';
+        const isAwardRoundSet = Boolean(quote?.award_round !== undefined && quote.award_round >= 1);
+
+        // Move to award revision if deviation accepted, or award round active, or award history exists
+        const isAwardRevision = Boolean(
+          isDeviationAccepted ||
+          hasAwardHistory ||
+          hasAwardItem ||
+          (quote?.status === 'REVISION_REQUIRED' && (isAwardRoundSet || hasAwardHistory))
+        );
+
         return {
           key: item.id,
           rfq_item_id: item.id,
@@ -92,9 +142,12 @@ export const SellerRfqWorkspace: React.FC = () => {
           req_unit: item.req_unit || 'PCS',
           quote_number: quote?.seller_quote_number,
           quote_status: quote?.status || 'NOT_SUBMITTED',
+          proposal_round: quote?.round || 1,
+          award_round: quote?.award_round || 1,
+          is_award_revision: isAwardRevision,
         };
       });
-  }, [rfqItems, quotes, catalogProducts, categories, sellerProducts, activePartyId]);
+  }, [rfqItems, quotes, catalogProducts, categories, sellerProducts, activePartyId, awardHistory, awardItems]);
 
   const requesterPartyName = useMemo(() => {
     if (!rfq?.requester_id) return 'Requester Company';
@@ -225,21 +278,61 @@ export const SellerRfqWorkspace: React.FC = () => {
               ),
             },
             {
-              title: 'Proposal Status',
+              title: 'Proposal & Award Status',
               key: 'status',
-              width: 180,
-              render: (_: any, record: any) => <RFQQuoteStatusBadge status={record.quote_status} />,
+              width: 210,
+              render: (_: any, record: any) => (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <RFQQuoteStatusBadge status={record.quote_status} />
+                    {record.proposal_round > 1 && (
+                      <AntTag color="cyan" className="text-[10px] m-0 font-medium">
+                        Proposal R{record.proposal_round}
+                      </AntTag>
+                    )}
+                  </div>
+                  {record.is_award_revision && record.quote_status === 'REVISION_REQUIRED' && (
+                    <div>
+                      <AntTag color="purple" className="text-[10px] m-0 font-bold">
+                        Award Rev R{record.award_round || 2} Requested
+                      </AntTag>
+                    </div>
+                  )}
+                  {record.quote_status === 'DEVIATION_ACCEPTED' && (
+                    <div>
+                      <AntTag color="emerald" className="text-[10px] m-0 font-semibold">
+                        Award Allocation Eligible
+                      </AntTag>
+                    </div>
+                  )}
+                </div>
+              ),
             },
             {
               title: 'Action',
               key: 'action',
-              width: 160,
+              width: 190,
               align: 'right',
               render: (_: any, record: any) => {
+                if (record.is_award_revision) {
+                  const isRevisionRequired = record.quote_status === 'REVISION_REQUIRED';
+                  return (
+                    <Button
+                      type="primary"
+                      size="small"
+                      className={`${isRevisionRequired ? 'bg-purple-600 hover:bg-purple-700' : 'bg-indigo-600 hover:bg-indigo-700'} font-semibold text-xs flex items-center gap-1 ml-auto`}
+                      onClick={() => navigate(`${basePath}/${rfqId}/items/${record.rfq_item_id}/award-revision`)}
+                      icon={<ArrowRightOutlined />}
+                    >
+                      {isRevisionRequired ? 'Respond to Award Rev' : 'View Award Allocation'}
+                    </Button>
+                  );
+                }
+
                 let buttonText = 'Make Proposal';
                 if (record.quote_status === 'DRAFT') buttonText = 'Continue Draft';
                 else if (record.quote_status === 'SUBMITTED') buttonText = 'View Proposal';
-                else if (record.quote_status === 'REVISION_REQUIRED') buttonText = 'Revise Proposal';
+                else if (record.quote_status === 'REVISION_REQUIRED') buttonText = `Revise Specs (R${record.proposal_round})`;
                 else if (['DEVIATION_ACCEPTED', 'PRODUCT_SUBMIT_REVISION', 'FINAL_ACKNOWLEDGE'].includes(record.quote_status || ''))
                   buttonText = 'View Proposal';
                 else if (record.quote_status === 'REJECTED') buttonText = 'View Proposal';

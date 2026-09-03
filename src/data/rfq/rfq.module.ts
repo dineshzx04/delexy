@@ -62,7 +62,8 @@ export interface RfqItemAttribute {
 export interface SellerQuote {
   id: string;
   rfq_item_id: string;
-  round: number;
+  round: number; // Proposal Revision Round (1, 2, 3...)
+  award_round?: number; // Award Allocation Revision Round (1, 2, 3...)
   seller_party_id: string;
   seller_quote_number: string;
   // offer_unit_price: number;
@@ -165,18 +166,29 @@ export type SellerQuoteComment = SellerQuoteAttributeComment;
 
 export type AwardProcessStatus =
   | "DRAFT"
+  | "REVISION_IN_PROGRESS"
   | "SUBMITTED_FOR_APPROVAL"
   | "AWARD_FINALIZED"
   | "PO_GENERATED"
   | "COMPLETED"
   | "CANCELLED";
 
+export type AwardItemStatus =
+  | "DRAFT"
+  | "REVISION_REQUESTED"
+  | "SELLER_REVISED"
+  | "CONFIRMED"
+  | "REJECTED"
+  | "PO_CREATED";
+
 export interface RfqAwardHeader {
   id: string;
   rfq_id: string;
+  buyer_party_id?: string;
   process_status: AwardProcessStatus;
   created_by_user_id?: string;
   total_awarded_amount: number;
+  total_items_awarded?: number;
   notes?: string;
   draft_snapshot?: string | null;
   created_at: string;
@@ -192,14 +204,47 @@ export interface RfqAwardItem {
   seller_quote_id: string;
   variant_id: string;
   variant_type: "CUSTOM" | "SUGGESTED";
-  unit_price: number;
+  
+  // 2-Tier Round Architecture: Item + Seller Award Revision Round
+  award_round?: number;
+  
+  // Negotiation Quantities & Financials
+  buyer_target_quantity?: number;
+  seller_offered_quantity?: number;
   awarded_quantity: number;
+  unit_price: number;
   total_price: number;
+  unit_of_measure?: string;
+  
+  // Lifecycle & Status
+  award_item_status?: AwardItemStatus;
   seller_accepted: boolean;
   seller_accepted_at?: string;
+  buyer_accepted?: boolean;
+  buyer_accepted_at?: string;
+  
+  // Notes & Audit
+  buyer_revision_note?: string;
+  seller_response_note?: string;
   purchase_order_id?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface AwardRevisionHistory {
+  id: string;
+  rfq_id: string;
+  rfq_item_id: string;
+  seller_party_id: string;
+  seller_quote_id: string;
+  award_round: number;
+  actor_type: "BUYER" | "SELLER";
+  actor_id: string;
+  variant_id: string;
+  quantity: number;
+  unit_price: number;
+  note?: string;
+  created_at: string;
 }
 
 export type PoStatus =
@@ -222,6 +267,7 @@ export interface PurchaseOrder {
   shipping_address?: string;
   payment_terms?: string;
   delivery_notes?: string;
+  issued_by_user_id?: string;
   po_released_at?: string;
   created_at: string;
   updated_at: string;
@@ -233,8 +279,10 @@ export interface PurchaseOrderItem {
   award_item_id: string;
   rfq_item_id: string;
   variant_id: string;
+  variant_label?: string;
   unit_price: number;
   awarded_quantity: number;
+  unit_of_measure?: string;
   total_price: number;
 }
 
@@ -300,13 +348,6 @@ export type SellerQuoteStatus =
   | "FINAL_ACKNOWLEDGE_ACCEPTED"
   | "REJECTED";
 
-export type AwardItemStatus =
-  | "AWARDED"
-  | "PRODUCT_PENDING"
-  | "PRODUCT_SUBMITTED"
-  | "PRODUCT_ACKNOWLEDGED"
-  | "PO_CREATED"
-  | "CANCELLED";
 
 export type AwardStatus =
   | "AWARDED"

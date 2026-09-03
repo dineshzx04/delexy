@@ -41,6 +41,7 @@ import { ItemDetailWorkspace } from './pages/rfq/ItemDetailWorkspace';
 import { SellerRfqInbox } from './pages/rfq/SellerRfqInbox';
 import { SellerRfqWorkspace } from './pages/rfq/SellerRfqWorkspace';
 import { SupplierItemRespond } from './pages/rfq/SupplierItemRespond';
+import { SellerAwardRevisionResponse } from './pages/rfq/SellerAwardRevisionResponse';
 
 import { RequesterQuoteReview } from './pages/rfq/RequesterQuoteReview';
 import { RfqQuoteAwardingPage } from './pages/rfq/RfqQuoteAwardingPage';
@@ -143,6 +144,7 @@ const App: React.FC = () => {
                 <Route path="seller/rfqs" element={<SellerRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId" element={<SellerRfqWorkspace />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/award-revision" element={<SellerAwardRevisionResponse />} />
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
             </Route>
@@ -173,6 +175,7 @@ const App: React.FC = () => {
                 <Route path="seller/rfqs" element={<SellerRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId" element={<SellerRfqWorkspace />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/award-revision" element={<SellerAwardRevisionResponse />} />
 
                 <Route path="*" element={<NotFound scope="business" />} />
               </Route>
