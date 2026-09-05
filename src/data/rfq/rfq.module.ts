@@ -164,75 +164,111 @@ export type SellerQuoteComment = SellerQuoteAttributeComment;
 //   archived_at?: string;
 // }
 
-export type AwardProcessStatus =
+export type RfqQuoteAwardStatus =
   | "DRAFT"
-  | "REVISION_IN_PROGRESS"
-  | "SUBMITTED_FOR_APPROVAL"
+  | "AWARDED"
+  | "REVISION_REQUESTED"
+  | "SELLER_REVISED"
+  | "CONFIRMED"
+  | "PO_CREATED"
+  | "PO_RECEIVED"
   | "AWARD_FINALIZED"
   | "PO_GENERATED"
   | "COMPLETED"
+  | "REJECTED"
   | "CANCELLED";
 
-export type AwardItemStatus =
+export type RfqQuoteVariantAwardStatus =
   | "DRAFT"
+  | "ALLOCATED"
   | "REVISION_REQUESTED"
   | "SELLER_REVISED"
   | "CONFIRMED"
   | "REJECTED"
   | "PO_CREATED";
 
-export interface RfqAwardHeader {
+/**
+ * Commercial award commitment granted to a specific SellerQuote.
+ * Supports split awards per RFQ item, independent round negotiations,
+ * and clean 1:1 lineage to Purchase Orders.
+ */
+export interface RfqQuoteAward {
   id: string;
   rfq_id: string;
-  buyer_party_id?: string;
-  process_status: AwardProcessStatus;
+  rfq_item_id: string;
+  seller_quote_id: string;
+  seller_party_id: string;
+  buyer_party_id: string;
   created_by_user_id?: string;
+  award_status: RfqQuoteAwardStatus;
+  award_round: number;
   total_awarded_amount: number;
-  total_items_awarded?: number;
+  total_awarded_quantity: number;
+  currency?: string;
+  payment_terms?: string;
+  shipping_address?: string;
   notes?: string;
+  buyer_revision_note?: string;
+  seller_response_note?: string;
+  purchase_order_id?: string | null;
   draft_snapshot?: string | null;
+  awarded_at?: string;
+  seller_accepted_at?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface RfqAwardItem {
+/**
+ * Awarded commercial variant belonging to a specific RfqQuoteAward.
+ * Models awarded quantity, pricing, round status, and catalog mapping status.
+ */
+export interface RfqQuoteVariantAward {
   id: string;
-  award_header_id: string;
+  quote_award_id: string;
   rfq_id: string;
   rfq_item_id: string;
-  seller_party_id: string;
   seller_quote_id: string;
+  seller_party_id: string;
   variant_id: string;
   variant_type: "CUSTOM" | "SUGGESTED";
-  
-  // 2-Tier Round Architecture: Item + Seller Award Revision Round
-  award_round?: number;
-  
-  // Negotiation Quantities & Financials
+  variant_label?: string;
+  sku?: string;
+  excel_letter?: string;
+
+  // 2-Tier Round Architecture & Negotiation
+  award_round: number;
   buyer_target_quantity?: number;
   seller_offered_quantity?: number;
   awarded_quantity: number;
   unit_price: number;
   total_price: number;
   unit_of_measure?: string;
-  
+
   // Lifecycle & Status
-  award_item_status?: AwardItemStatus;
+  variant_award_status: RfqQuoteVariantAwardStatus;
   seller_accepted: boolean;
   seller_accepted_at?: string;
   buyer_accepted?: boolean;
   buyer_accepted_at?: string;
-  
+
+  // Catalog Product Mapping Integration
+  product_mapping_status?: ProductMappingStatus;
+  mapped_seller_product_id?: string;
+  mapped_catalog_variant_id?: string;
+
   // Notes & Audit
   buyer_revision_note?: string;
   seller_response_note?: string;
   purchase_order_id?: string | null;
+  purchase_order_item_id?: string | null;
   created_at: string;
   updated_at: string;
 }
 
 export interface AwardRevisionHistory {
   id: string;
+  quote_award_id?: string;
+  quote_variant_award_id?: string;
   rfq_id: string;
   rfq_item_id: string;
   seller_party_id: string;
@@ -258,7 +294,7 @@ export interface PurchaseOrder {
   id: string;
   po_number: string;
   rfq_id: string;
-  award_header_id: string;
+  quote_award_id?: string;
   buyer_party_id: string;
   seller_party_id: string;
   total_amount: number;
@@ -276,7 +312,7 @@ export interface PurchaseOrder {
 export interface PurchaseOrderItem {
   id: string;
   purchase_order_id: string;
-  award_item_id: string;
+  quote_variant_award_id?: string;
   rfq_item_id: string;
   variant_id: string;
   variant_label?: string;

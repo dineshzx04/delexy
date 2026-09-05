@@ -32,7 +32,7 @@ import {
   type RfqItem,
   type SellerQuote,
   type AwardRevisionHistory,
-  type RfqAwardItem,
+  type RfqQuoteVariantAward,
 } from "../../data/rfq";
 import { businessDb } from "../../data/business/business.db";
 import { catalogDb } from "../../data/catalog/catalog.db";
@@ -76,7 +76,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       businessDb.parties.toArray(),
       catalogDb.products.toArray(),
       catalogDb.categories.toArray(),
-      rfqDb.rfq_award_items.where("rfq_item_id").equals(itemId).toArray(),
+      rfqDb.rfq_quote_variant_awards.where("rfq_item_id").equals(itemId).toArray(),
       rfqDb.award_revision_history.where("rfq_item_id").equals(itemId).toArray(),
     ]);
 
@@ -213,22 +213,34 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         updated_at: now,
       });
 
-      // Update award item if present
+      // Update quote variant award and quote award if present
       if (myAwardItem) {
-        await rfqDb.rfq_award_items.update(myAwardItem.id, {
-          award_item_status: "CONFIRMED",
+        const updatePayload = {
+          variant_award_status: "CONFIRMED" as const,
           seller_accepted: true,
           seller_accepted_at: now,
           seller_offered_quantity: offeredQty,
           awarded_quantity: offeredQty,
           seller_response_note: responseNote || undefined,
           updated_at: now,
-        });
+        };
+        await rfqDb.rfq_quote_variant_awards.update(myAwardItem.id, updatePayload);
+        const qa = await rfqDb.rfq_quote_awards.where("seller_quote_id").equals(myQuote.id).first();
+        if (qa) {
+          await rfqDb.rfq_quote_awards.update(qa.id, {
+            award_status: "CONFIRMED",
+            seller_accepted_at: now,
+            seller_response_note: responseNote || undefined,
+            updated_at: now,
+          });
+        }
       }
 
       // Record in audit trail
       await rfqDb.award_revision_history.add({
         id: `arh-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+        quote_award_id: myAwardItem?.quote_award_id,
+        quote_variant_award_id: myAwardItem?.id,
         rfq_id: rfqId!,
         rfq_item_id: itemId!,
         seller_party_id: sellerParty?.id || "pty-seller",
@@ -274,16 +286,25 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         updated_at: now,
       });
 
-      // Update award item if present
+      // Update quote variant award and quote award if present
       if (myAwardItem) {
-        await rfqDb.rfq_award_items.update(myAwardItem.id, {
-          award_item_status: "SELLER_REVISED",
+        const updatePayload = {
+          variant_award_status: "SELLER_REVISED" as const,
           seller_accepted: false,
           seller_offered_quantity: offeredQty,
           unit_price: offeredPrice,
           seller_response_note: responseNote || undefined,
           updated_at: now,
-        });
+        };
+        await rfqDb.rfq_quote_variant_awards.update(myAwardItem.id, updatePayload);
+        const qa = await rfqDb.rfq_quote_awards.where("seller_quote_id").equals(myQuote.id).first();
+        if (qa) {
+          await rfqDb.rfq_quote_awards.update(qa.id, {
+            award_status: "SELLER_REVISED",
+            seller_response_note: responseNote || undefined,
+            updated_at: now,
+          });
+        }
       }
 
       // Record counter-offer in audit trail

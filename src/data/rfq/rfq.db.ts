@@ -10,8 +10,8 @@ import type {
   SellerQuoteComment,
   SellerQuoteAttributeComment,
   SellerQuoteVariantComment,
-  RfqAwardHeader,
-  RfqAwardItem,
+  RfqQuoteAward,
+  RfqQuoteVariantAward,
   AwardRevisionHistory,
   PurchaseOrder,
   PurchaseOrderItem,
@@ -29,8 +29,8 @@ export class RfqDatabase extends Dexie {
   seller_quote_comments!: Table<SellerQuoteComment, string>;
   seller_quote_attribute_comments!: Table<SellerQuoteAttributeComment, string>;
   seller_quote_variant_comments!: Table<SellerQuoteVariantComment, string>;
-  rfq_award_headers!: Table<RfqAwardHeader, string>;
-  rfq_award_items!: Table<RfqAwardItem, string>;
+  rfq_quote_awards!: Table<RfqQuoteAward, string>;
+  rfq_quote_variant_awards!: Table<RfqQuoteVariantAward, string>;
   award_revision_history!: Table<AwardRevisionHistory, string>;
   purchase_orders!: Table<PurchaseOrder, string>;
   purchase_order_items!: Table<PurchaseOrderItem, string>;
@@ -55,6 +55,16 @@ export class RfqDatabase extends Dexie {
       purchase_orders: "id, po_number, rfq_id, award_header_id, buyer_party_id, seller_party_id, po_status",
       purchase_order_items: "id, purchase_order_id, award_item_id, rfq_item_id",
       po_acknowledgements: "id, purchase_order_id, seller_party_id",
+    });
+
+    this.version(15).stores({
+      rfq_award_headers: null,
+      rfq_award_items: null,
+      rfq_quote_awards: "id, rfq_id, rfq_item_id, seller_quote_id, seller_party_id, award_status, [rfq_id+seller_party_id]",
+      rfq_quote_variant_awards: "id, quote_award_id, rfq_id, rfq_item_id, seller_quote_id, seller_party_id, variant_id, variant_award_status, product_mapping_status",
+      purchase_orders: "id, po_number, rfq_id, quote_award_id, buyer_party_id, seller_party_id, po_status",
+      purchase_order_items: "id, purchase_order_id, quote_variant_award_id, rfq_item_id",
+      award_revision_history: "id, quote_award_id, quote_variant_award_id, rfq_id, rfq_item_id, seller_party_id, award_round",
     });
   }
 }

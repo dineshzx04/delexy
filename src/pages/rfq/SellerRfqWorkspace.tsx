@@ -40,7 +40,7 @@ export const SellerRfqWorkspace: React.FC = () => {
       catalogDb.categories.toArray(),
       catalogDb.sellerProducts.toArray(),
       rfqDb.award_revision_history.where('rfq_id').equals(rfqId).toArray(),
-      rfqDb.rfq_award_items.where('rfq_id').equals(rfqId).toArray(),
+      rfqDb.rfq_quote_variant_awards.where('rfq_id').equals(rfqId).toArray(),
     ]);
 
     return {
@@ -52,7 +52,7 @@ export const SellerRfqWorkspace: React.FC = () => {
       categories,
       sellerProducts,
       awardHistory: awardHistory || [],
-      awardItems: awardItems || [],
+      awardItems: awardItems,
     };
   }, [rfqId]);
 
