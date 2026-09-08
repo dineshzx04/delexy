@@ -33,6 +33,7 @@ import {
   type SellerQuote,
   type AwardRevisionHistory,
   type RfqQuoteVariantAward,
+  type RfqAwardRevisionNote,
 } from "../../data/rfq";
 import { businessDb } from "../../data/business/business.db";
 import { catalogDb } from "../../data/catalog/catalog.db";
@@ -69,6 +70,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       categories,
       awardItems,
       historyRecords,
+      revisionNotes,
     ] = await Promise.all([
       rfqDb.rfqs.get(rfqId),
       rfqDb.rfq_items.get(itemId),
@@ -78,6 +80,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       catalogDb.categories.toArray(),
       rfqDb.rfq_quote_variant_awards.where("rfq_item_id").equals(itemId).toArray(),
       rfqDb.award_revision_history.where("rfq_item_id").equals(itemId).toArray(),
+      rfqDb.rfq_award_revision_notes.where("rfq_item_id").equals(itemId).toArray(),
     ]);
 
     return {
@@ -89,6 +92,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       categories: categories || [],
       awardItems: awardItems || [],
       historyRecords: historyRecords || [],
+      revisionNotes: revisionNotes || [],
     };
   }, [rfqId, itemId]);
 
@@ -101,6 +105,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     categories = [],
     awardItems = [],
     historyRecords = [],
+    revisionNotes = [],
   } = pageData ?? {};
 
   /*
@@ -148,6 +153,13 @@ export const SellerAwardRevisionResponse: React.FC = () => {
   const latestBuyerHistory = useMemo(() => {
     return sellerHistory.find(h => h.actor_type === "BUYER") || null;
   }, [sellerHistory]);
+
+  const latestBuyerNote = useMemo(() => {
+    if (!sellerParty?.id) return null;
+    return (revisionNotes || [])
+      .filter(n => n.seller_party_id === sellerParty.id && n.actor_type === "BUYER")
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] || null;
+  }, [revisionNotes, sellerParty]);
 
   /*
    * 4. Breadcrumb Pattern (Rule 4A: Must be called before conditional returns)
@@ -221,7 +233,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           seller_accepted_at: now,
           seller_offered_quantity: offeredQty,
           awarded_quantity: offeredQty,
-          seller_response_note: responseNote || undefined,
           updated_at: now,
         };
         await rfqDb.rfq_quote_variant_awards.update(myAwardItem.id, updatePayload);
@@ -230,10 +241,29 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           await rfqDb.rfq_quote_awards.update(qa.id, {
             award_status: "CONFIRMED",
             seller_accepted_at: now,
-            seller_response_note: responseNote || undefined,
             updated_at: now,
           });
         }
+      }
+
+      // Record in dedicated award revision notes table
+      if (responseNote && responseNote.trim()) {
+        await rfqDb.rfq_award_revision_notes.add({
+          id: `arn-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          rfq_id: rfqId!,
+          rfq_item_id: itemId!,
+          seller_party_id: sellerParty?.id || "pty-seller",
+          seller_quote_id: myQuote.id,
+          buyer_party_id: rfq.requester_party_id || rfq.requester_id || "pty-buyer",
+          quote_award_id: myAwardItem?.quote_award_id,
+          quote_variant_award_id: myAwardItem?.id,
+          award_round: currentAwardRound,
+          actor_type: "SELLER",
+          actor_id: currentUserId || "seller-user",
+          note_type: "SELLER_ACCEPTANCE",
+          note: responseNote.trim(),
+          created_at: now,
+        });
       }
 
       // Record in audit trail
@@ -293,7 +323,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           seller_accepted: false,
           seller_offered_quantity: offeredQty,
           unit_price: offeredPrice,
-          seller_response_note: responseNote || undefined,
           updated_at: now,
         };
         await rfqDb.rfq_quote_variant_awards.update(myAwardItem.id, updatePayload);
@@ -301,10 +330,29 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         if (qa) {
           await rfqDb.rfq_quote_awards.update(qa.id, {
             award_status: "SELLER_REVISED",
-            seller_response_note: responseNote || undefined,
             updated_at: now,
           });
         }
+      }
+
+      // Record in dedicated award revision notes table
+      if (responseNote && responseNote.trim()) {
+        await rfqDb.rfq_award_revision_notes.add({
+          id: `arn-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+          rfq_id: rfqId!,
+          rfq_item_id: itemId!,
+          seller_party_id: sellerParty?.id || "pty-seller",
+          seller_quote_id: myQuote.id,
+          buyer_party_id: rfq.requester_party_id || rfq.requester_id || "pty-buyer",
+          quote_award_id: myAwardItem?.quote_award_id,
+          quote_variant_award_id: myAwardItem?.id,
+          award_round: currentAwardRound,
+          actor_type: "SELLER",
+          actor_id: currentUserId || "seller-user",
+          note_type: "SELLER_COUNTER_OFFER",
+          note: responseNote.trim(),
+          created_at: now,
+        });
       }
 
       // Record counter-offer in audit trail
@@ -416,13 +464,13 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           </Descriptions>
 
           {/* Buyer's Revision Note Callout */}
-          {latestBuyerHistory?.note && (
+          {(latestBuyerNote?.note || latestBuyerHistory?.note) && (
             <Alert
               type="warning"
               showIcon
               icon={<FileTextOutlined className="text-amber-600" />}
               message={<span className="font-bold text-xs text-amber-900">Buyer&apos;s Revision Request Note:</span>}
-              description={<span className="text-xs text-amber-800 italic">&ldquo;{latestBuyerHistory.note}&rdquo;</span>}
+              description={<span className="text-xs text-amber-800 italic">&ldquo;{latestBuyerNote?.note || latestBuyerHistory?.note}&rdquo;</span>}
               className="bg-amber-50/70 border-amber-200"
             />
           )}

@@ -167,25 +167,23 @@ export type SellerQuoteComment = SellerQuoteAttributeComment;
 export type RfqQuoteAwardStatus =
   | "DRAFT"
   | "AWARDED"
-  | "REVISION_REQUESTED"
   | "SELLER_REVISED"
+  | "BUYER_REVISED"
   | "CONFIRMED"
   | "PO_CREATED"
   | "PO_RECEIVED"
-  | "AWARD_FINALIZED"
-  | "PO_GENERATED"
   | "COMPLETED"
   | "REJECTED"
   | "CANCELLED";
 
 export type RfqQuoteVariantAwardStatus =
   | "DRAFT"
-  | "ALLOCATED"
-  | "REVISION_REQUESTED"
+  | "AWARDED"
   | "SELLER_REVISED"
+  | "BUYER_REVISED"
   | "CONFIRMED"
-  | "REJECTED"
-  | "PO_CREATED";
+  | "PO_CREATED"
+  | "REJECTED";
 
 /**
  * Commercial award commitment granted to a specific SellerQuote.
@@ -208,8 +206,6 @@ export interface RfqQuoteAward {
   payment_terms?: string;
   shipping_address?: string;
   notes?: string;
-  buyer_revision_note?: string;
-  seller_response_note?: string;
   purchase_order_id?: string | null;
   draft_snapshot?: string | null;
   awarded_at?: string;
@@ -233,7 +229,6 @@ export interface RfqQuoteVariantAward {
   variant_type: "CUSTOM" | "SUGGESTED";
   variant_label?: string;
   sku?: string;
-  excel_letter?: string;
 
   // 2-Tier Round Architecture & Negotiation
   award_round: number;
@@ -250,15 +245,7 @@ export interface RfqQuoteVariantAward {
   seller_accepted_at?: string;
   buyer_accepted?: boolean;
   buyer_accepted_at?: string;
-
-  // Catalog Product Mapping Integration
-  product_mapping_status?: ProductMappingStatus;
-  mapped_seller_product_id?: string;
-  mapped_catalog_variant_id?: string;
-
   // Notes & Audit
-  buyer_revision_note?: string;
-  seller_response_note?: string;
   purchase_order_id?: string | null;
   purchase_order_item_id?: string | null;
   created_at: string;
@@ -280,6 +267,31 @@ export interface AwardRevisionHistory {
   quantity: number;
   unit_price: number;
   note?: string;
+  created_at: string;
+}
+
+export type RfqAwardRevisionNoteActor = "BUYER" | "SELLER";
+
+export type RfqAwardRevisionNoteType =
+  | "BUYER_REVISION_REQUEST"
+  | "SELLER_COUNTER_OFFER"
+  | "SELLER_ACCEPTANCE"
+  | "GENERAL_NOTE";
+
+export interface RfqAwardRevisionNote {
+  id: string;
+  rfq_id: string;
+  rfq_item_id: string;
+  seller_quote_id: string;
+  seller_party_id: string;
+  buyer_party_id?: string;
+  quote_award_id?: string;
+  quote_variant_award_id?: string;
+  award_round: number;
+  actor_type: RfqAwardRevisionNoteActor;
+  actor_id: string;
+  note_type: RfqAwardRevisionNoteType;
+  note: string;
   created_at: string;
 }
 
@@ -390,12 +402,6 @@ export type AwardStatus =
   | "CANCELLED"
   | "PO_CREATED"
   | "PO_RECEIVED";
-
-export type ProductMappingStatus =
-  | "NOT_REQUIRED"
-  | "PENDING"
-  | "SUBMITTED"
-  | "ACKNOWLEDGED";
 
 export type RfqItemAttributeConnector = "AND" | "OR";
 

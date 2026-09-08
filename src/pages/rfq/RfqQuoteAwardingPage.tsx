@@ -1,21 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import {
-  Alert,
-  Button,
-  Card,
-  Steps,
-  Tag as AntTag,
-  InputNumber,
-  message,
-  notification,
-  Tooltip,
-  Descriptions,
-  Checkbox,
-  Modal,
-  Input,
-} from "antd";
+import { Alert, Button, Card, Steps, Tag as AntTag, InputNumber, message, notification, Tooltip, Descriptions, Checkbox, Modal, Input } from "antd";
 import {
   TableOutlined,
   TrophyOutlined,
@@ -28,6 +14,7 @@ import {
   UnorderedListOutlined,
   SendOutlined,
   EditOutlined,
+  FileTextOutlined,
 } from "@ant-design/icons";
 
 import {
@@ -42,6 +29,8 @@ import {
   type SellerQuoteVariant,
   type SellerQuoteSuggestedVariant,
   type SellerQuoteAttribute,
+  type RfqAwardRevisionNote,
+  type AwardRevisionHistory,
 } from "../../data/rfq";
 import { businessDb } from "../../data/business/business.db";
 import { catalogDb } from "../../data/catalog/catalog.db";
@@ -53,7 +42,6 @@ type ViewMode = "matrix" | "item_summary" | "summary";
 type ProposalVariant = {
   id: string;
   colKey: string;
-  excelLetter: string;
   colLabel: string;
   type: string;
   offerPrice: number;
@@ -65,7 +53,7 @@ type ProposalVariant = {
 };
 
 type SellerProposal = {
-  sellerId: string;
+  sellerPartyId: string;
   sellerName: string;
   quoteId: string;
   quoteNumber: string;
@@ -74,6 +62,7 @@ type SellerProposal = {
 };
 
 type FlattenedVariant = ProposalVariant & {
+  sellerPartyId: string;
   sellerName: string;
   quoteNumber: string;
   quoteStatus: string;
@@ -85,7 +74,6 @@ export type AwardAllocation = {
   seller_quote_id: string;
   variant_id: string;
   variant_col_key: string;
-  excel_letter: string;
   variant_type: "CUSTOM" | "SUGGESTED";
   unit_price: number;
   awarded_quantity: number;
@@ -94,16 +82,9 @@ export type AwardAllocation = {
   is_selected?: boolean;
 };
 
-const getExcelColumn = (index: number): string => {
-  let result = "";
-  let value = index;
-
-  do {
-    result = String.fromCharCode(65 + (value % 26)) + result;
-    value = Math.floor(value / 26) - 1;
-  } while (value >= 0);
-
-  return result;
+export type RfqItemAllocation = {
+  rfq_item_id: string;
+  allocations: AwardAllocation[];
 };
 
 const formatCurrency = (value: number): string => `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -112,7 +93,7 @@ const extractMfgBrandFromQuoteAttrs = (
   quoteId: string,
   quoteAttributes: SellerQuoteAttribute[],
   allManufacturers: any[],
-  allBrands: any[]
+  allBrands: any[],
 ): { manufacturer: string; brand: string } => {
   const quoteAttrs = quoteAttributes.filter(a => a.seller_quote_id === quoteId);
   const mfgBrandAttribute = quoteAttrs.find(attribute => attribute.attribute_id === "mfg_brand_mapping");
@@ -148,11 +129,8 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   const basePath = isBusinessContext ? "/b/rfqs" : "/user/rfqs";
 
   const [viewMode, setViewMode] = useState<ViewMode>("matrix");
-  const [allocations, setAllocations] = useState<Record<string, AwardAllocation>>({});
+  const [allocations, setAllocations] = useState<RfqItemAllocation[]>([]);
 
-  /*
-   * Consolidated Dexie DB Queries
-   */
   const pageData = useLiveQuery(async () => {
     if (!rfqId) return null;
 
@@ -170,8 +148,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       quoteAttributes,
       existingQuoteAwards,
       existingQuoteVariantAwards,
-      existingPurchaseOrders,
-      existingPoAcknowledgements,
+      awardRevisionNotes,
     ] = await Promise.all([
       rfqDb.rfqs.get(rfqId),
       rfqDb.rfq_items.where("rfq_id").equals(rfqId).toArray(),
@@ -186,8 +163,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       rfqDb.seller_quote_attributes.toArray(),
       rfqDb.rfq_quote_awards.where("rfq_id").equals(rfqId).toArray(),
       rfqDb.rfq_quote_variant_awards.where("rfq_id").equals(rfqId).toArray(),
-      rfqDb.purchase_orders.where("rfq_id").equals(rfqId).toArray(),
-      rfqDb.po_acknowledgements.toArray(),
+      rfqDb.rfq_award_revision_notes.where("rfq_id").equals(rfqId).toArray(),
     ]);
 
     return {
@@ -204,8 +180,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       quoteAttributes,
       existingQuoteAwards: existingQuoteAwards || [],
       existingQuoteVariantAwards: existingQuoteVariantAwards || [],
-      existingPurchaseOrders,
-      existingPoAcknowledgements,
+      awardRevisionNotes: awardRevisionNotes || [],
     };
   }, [rfqId]);
 
@@ -223,51 +198,53 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     quoteAttributes = [],
     existingQuoteAwards = [],
     existingQuoteVariantAwards = [],
-    existingPurchaseOrders = [],
-    existingPoAcknowledgements = [],
+    awardRevisionNotes = [],
   } = pageData ?? {};
 
   /*
    * Seed Allocations State from DB
    */
+  // useEffect(() => {
+  //   const currentHeader = existingQuoteAwards[0];
+  //   if (currentHeader?.draft_snapshot) {
+  //     try {
+  //       const parsed = JSON.parse(currentHeader.draft_snapshot);
+  //       setAllocations(prev => ({ ...parsed, ...prev }));
+  //       return;
+  //     } catch (err) {
+  //       console.error("Failed to parse draft_snapshot", err);
+  //     }
+  //   }
+
+  //   if (existingQuoteVariantAwards.length > 0) {
+  //     const initialMap: Record<string, AwardAllocation> = {};
+  //     existingQuoteVariantAwards.forEach(item => {
+  //       const key = `${item.rfq_item_id}:${item.variant_id}`;
+  //       initialMap[key] = {
+  //         rfq_item_id: item.rfq_item_id,
+  //         seller_party_id: item.seller_party_id,
+  //         seller_quote_id: item.seller_quote_id,
+  //         variant_id: item.variant_id,
+  //         variant_col_key: `col_${item.variant_id}`,
+  //         variant_type: item.variant_type,
+  //         unit_price: item.unit_price,
+  //         awarded_quantity: item.awarded_quantity,
+  //         unit_of_measure: item.unit_of_measure || "PCS",
+  //         seller_accepted: item.seller_accepted,
+  //         is_selected: item.awarded_quantity > 0 || true,
+  //       };
   useEffect(() => {
-    const currentHeader = existingQuoteAwards[0];
-    if (currentHeader?.draft_snapshot) {
-      try {
-        const parsed = JSON.parse(currentHeader.draft_snapshot);
-        setAllocations(prev => ({ ...parsed, ...prev }));
-        return;
-      } catch (err) {
-        console.error("Failed to parse draft_snapshot", err);
-      }
-    }
-
-    if (existingQuoteVariantAwards.length > 0) {
-      const initialMap: Record<string, AwardAllocation> = {};
-      existingQuoteVariantAwards.forEach(item => {
-        const key = `${item.rfq_item_id}:${item.variant_id}`;
-        initialMap[key] = {
-          rfq_item_id: item.rfq_item_id,
-          seller_party_id: item.seller_party_id,
-          seller_quote_id: item.seller_quote_id,
-          variant_id: item.variant_id,
-          variant_col_key: `col_${item.variant_id}`,
-          excel_letter: item.excel_letter || "",
-          variant_type: item.variant_type,
-          unit_price: item.unit_price,
-          awarded_quantity: item.awarded_quantity,
-          unit_of_measure: item.unit_of_measure || "PCS",
-          seller_accepted: item.seller_accepted,
-          is_selected: item.awarded_quantity > 0 || true,
-        };
+    if (rfqItems && rfqItems.length > 0) {
+      setAllocations(prev => {
+        const existingMap = new Map(prev.map(p => [p.rfq_item_id, p.allocations]));
+        return rfqItems.map(item => ({
+          rfq_item_id: item.id,
+          allocations: existingMap.get(item.id) || [],
+        }));
       });
-      setAllocations(prev => ({ ...initialMap, ...prev }));
     }
-  }, [existingQuoteAwards, existingQuoteVariantAwards]);
+  }, [rfqItems]);
 
-  /*
-   * Breadcrumbs & Active Party Lookup
-   */
   const breadcrumbs = useMemo(
     () => [
       { title: <a onClick={() => navigate(basePath)}>RFQ Sourcing</a> },
@@ -286,263 +263,25 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     return parties.find(party => party.owner_type === "USER" && party.owner_id === currentUserId)?.id ?? parties.find(party => party.id === "pty-6")?.id ?? "";
   }, [parties, isBusinessContext, activeWorkspace?.businessId, currentUserId]);
 
-  /*
-   * Global Persistence Handlers (Save Draft vs Finalize Award POs)
-   */
-  const handleSaveDraft = async () => {
-    if (!rfqId) return;
-    const now = new Date().toISOString();
-
-    const activeAllocations = Object.values(allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
-    const totalAmount = activeAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
-
-    // Group active allocations by seller quote
-    const quoteGroups: Record<string, AwardAllocation[]> = {};
-    activeAllocations.forEach(a => {
-      if (!quoteGroups[a.seller_quote_id]) quoteGroups[a.seller_quote_id] = [];
-      quoteGroups[a.seller_quote_id].push(a);
-    });
-
-    const quoteAwardRecords: RfqQuoteAward[] = [];
-    const quoteVariantAwardRecords: RfqQuoteVariantAward[] = [];
-
-    Object.entries(quoteGroups).forEach(([quoteId, qAllocations]) => {
-      const quoteAwardId = `quote-award-${quoteId}`;
-      const firstAlloc = qAllocations[0];
-      const qTotalAmount = qAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
-      const qTotalQty = qAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
-
-      quoteAwardRecords.push({
-        id: quoteAwardId,
-        rfq_id: rfqId,
-        rfq_item_id: firstAlloc.rfq_item_id,
-        seller_quote_id: quoteId,
-        seller_party_id: firstAlloc.seller_party_id,
-        buyer_party_id: activePartyId || "pty-buyer",
-        created_by_user_id: currentUserId || "usr-1",
-        award_status: "DRAFT",
-        award_round: 1,
-        total_awarded_amount: qTotalAmount,
-        total_awarded_quantity: qTotalQty,
-        currency: rfq?.currency || "USD",
-        draft_snapshot: JSON.stringify(allocations),
-        updated_at: now,
-        created_at: now,
-      });
-
-      qAllocations.forEach(a => {
-        const qvaId = `qva-${quoteAwardId}-${a.variant_id}`;
-        quoteVariantAwardRecords.push({
-          id: qvaId,
-          quote_award_id: quoteAwardId,
-          rfq_id: rfqId,
-          rfq_item_id: a.rfq_item_id,
-          seller_quote_id: a.seller_quote_id,
-          seller_party_id: a.seller_party_id,
-          variant_id: a.variant_id,
-          variant_type: a.variant_type,
-          variant_label: `Option ${a.excel_letter || "A"}`,
-          excel_letter: a.excel_letter,
-          award_round: 1,
-          buyer_target_quantity: a.awarded_quantity,
-          seller_offered_quantity: a.awarded_quantity,
-          awarded_quantity: a.awarded_quantity,
-          unit_price: a.unit_price,
-          total_price: a.unit_price * a.awarded_quantity,
-          unit_of_measure: a.unit_of_measure || "PCS",
-          variant_award_status: "DRAFT",
-          seller_accepted: a.seller_accepted ?? false,
-          buyer_accepted: true,
-          product_mapping_status: a.variant_type === "SUGGESTED" ? "NOT_REQUIRED" : "PENDING",
-          updated_at: now,
-          created_at: now,
-        });
-      });
-    });
-
-    // Save to primary quote award tables
-    await rfqDb.rfq_quote_awards.where("rfq_id").equals(rfqId).delete();
-    if (quoteAwardRecords.length > 0) {
-      await rfqDb.rfq_quote_awards.bulkPut(quoteAwardRecords);
-    }
-    await rfqDb.rfq_quote_variant_awards.where("rfq_id").equals(rfqId).delete();
-    if (quoteVariantAwardRecords.length > 0) {
-      await rfqDb.rfq_quote_variant_awards.bulkPut(quoteVariantAwardRecords);
-    }
-
-    message.success("Draft quote award allocations saved successfully.");
-  };
-
-  const handleFinalizeAndGeneratePOs = async () => {
-    if (!rfqId) return;
-
-    for (const item of rfqItems) {
-      const itemAllocated = Object.values(allocations)
-        .filter(a => a.rfq_item_id === item.id && a.is_selected)
-        .reduce((sum, a) => sum + (a.awarded_quantity || 0), 0);
-      if (itemAllocated > item.req_quantity) {
-        message.error(`Line item #${item.item_index || 1} is over-allocated (${itemAllocated}/${item.req_quantity}). Please adjust before finalizing.`);
-        return;
-      }
-    }
-
-    const activeAllocations = Object.values(allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
-    if (activeAllocations.length === 0) {
-      message.warning("Please allocate award quantities to at least one variant before finalizing.");
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const totalAmount = activeAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
-    const buyerPartyId = activePartyId || "pty-buyer";
-
-    // Group active allocations by seller quote
-    const quoteGroups: Record<string, AwardAllocation[]> = {};
-    activeAllocations.forEach(a => {
-      if (!quoteGroups[a.seller_quote_id]) quoteGroups[a.seller_quote_id] = [];
-      quoteGroups[a.seller_quote_id].push(a);
-    });
-
-    const quoteAwardRecords: RfqQuoteAward[] = [];
-    const quoteVariantAwardRecords: RfqQuoteVariantAward[] = [];
-    const poRecords: PurchaseOrder[] = [];
-    const poItemRecords: PurchaseOrderItem[] = [];
-    const poAckRecords: PoAcknowledgement[] = [];
-
-    let poCounter = existingPurchaseOrders.length + 1;
-
-    for (const [quoteId, qAllocations] of Object.entries(quoteGroups)) {
-      const quoteAwardId = `quote-award-${quoteId}`;
-      const firstAlloc = qAllocations[0];
-      const sellerPartyId = firstAlloc.seller_party_id;
-      const qTotalAmount = qAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
-      const qTotalQty = qAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
-
-      const poId = `po-${rfqId}-${sellerPartyId}-${quoteId}`;
-      const poNumber = `PO-2026-${String(poCounter++).padStart(3, "0")}`;
-
-      quoteAwardRecords.push({
-        id: quoteAwardId,
-        rfq_id: rfqId,
-        rfq_item_id: firstAlloc.rfq_item_id,
-        seller_quote_id: quoteId,
-        seller_party_id: sellerPartyId,
-        buyer_party_id: buyerPartyId,
-        created_by_user_id: currentUserId || "usr-1",
-        award_status: "AWARDED",
-        award_round: 1,
-        total_awarded_amount: qTotalAmount,
-        total_awarded_quantity: qTotalQty,
-        currency: rfq?.currency || "USD",
-        payment_terms: "Net 30 Days",
-        shipping_address: rfq?.shipping_destination || "Corporate HQ Logistics",
-        purchase_order_id: poId,
-        awarded_at: now,
-        created_at: now,
-        updated_at: now,
-      });
-
-      poRecords.push({
-        id: poId,
-        po_number: poNumber,
-        rfq_id: rfqId,
-        quote_award_id: quoteAwardId,
-        buyer_party_id: buyerPartyId,
-        seller_party_id: sellerPartyId,
-        total_amount: qTotalAmount,
-        currency: rfq?.currency || "USD",
-        po_status: "RELEASED",
-        shipping_address: rfq?.shipping_destination || "Corporate HQ Logistics",
-        payment_terms: "Net 30 Days",
-        po_released_at: now,
-        created_at: now,
-        updated_at: now,
-      });
-
-      poAckRecords.push({
-        id: `ack-${poId}`,
-        purchase_order_id: poId,
-        seller_party_id: sellerPartyId,
-        seller_acknowledged: false,
-        buyer_confirmed: true,
-        buyer_confirmed_at: now,
-        buyer_note: "Purchase order released automatically upon contract award finalization.",
-        updated_at: now,
-      });
-
-      qAllocations.forEach(a => {
-        const qvaId = `qva-${quoteAwardId}-${a.variant_id}`;
-        const poItemId = `po-item-${poId}-${a.variant_id}`;
-
-        quoteVariantAwardRecords.push({
-          id: qvaId,
-          quote_award_id: quoteAwardId,
-          rfq_id: rfqId,
-          rfq_item_id: a.rfq_item_id,
-          seller_quote_id: a.seller_quote_id,
-          seller_party_id: a.seller_party_id,
-          variant_id: a.variant_id,
-          variant_type: a.variant_type,
-          variant_label: `Option ${a.excel_letter || "A"}`,
-          excel_letter: a.excel_letter,
-          award_round: 1,
-          buyer_target_quantity: a.awarded_quantity,
-          seller_offered_quantity: a.awarded_quantity,
-          awarded_quantity: a.awarded_quantity,
-          unit_price: a.unit_price,
-          total_price: a.unit_price * a.awarded_quantity,
-          unit_of_measure: a.unit_of_measure || "PCS",
-          variant_award_status: "CONFIRMED",
-          seller_accepted: true,
-          seller_accepted_at: now,
-          buyer_accepted: true,
-          buyer_accepted_at: now,
-          product_mapping_status: a.variant_type === "SUGGESTED" ? "NOT_REQUIRED" : "PENDING",
-          purchase_order_id: poId,
-          purchase_order_item_id: poItemId,
-          updated_at: now,
-          created_at: now,
-        });
-
-        poItemRecords.push({
-          id: poItemId,
-          purchase_order_id: poId,
-          quote_variant_award_id: qvaId,
-          rfq_item_id: a.rfq_item_id,
-          variant_id: a.variant_id,
-          variant_label: `Option ${a.excel_letter || "A"}`,
-          unit_price: a.unit_price,
-          awarded_quantity: a.awarded_quantity,
-          unit_of_measure: a.unit_of_measure || "PCS",
-          total_price: a.unit_price * a.awarded_quantity,
-        });
-      });
-    }
-
-    // Persist to primary quote award tables
-    await rfqDb.rfq_quote_awards.where("rfq_id").equals(rfqId).delete();
-    await rfqDb.rfq_quote_awards.bulkPut(quoteAwardRecords);
-    await rfqDb.rfq_quote_variant_awards.where("rfq_id").equals(rfqId).delete();
-    await rfqDb.rfq_quote_variant_awards.bulkPut(quoteVariantAwardRecords);
-
-    // Purchase orders
-    await rfqDb.purchase_orders.where("rfq_id").equals(rfqId).delete();
-    await rfqDb.purchase_orders.bulkPut(poRecords);
-    await rfqDb.purchase_order_items.bulkPut(poItemRecords);
-    await rfqDb.po_acknowledgements.bulkPut(poAckRecords);
-
-    await rfqDb.rfqs.update(rfqId, { status: "AWARDED", updated_at: now });
-    for (const item of rfqItems) {
-      await rfqDb.rfq_items.update(item.id, { status: "AWARDED", updated_at: now });
-    }
-
-    notification.success({
-      message: "Contract Awards Finalized!",
-      description: `Successfully awarded ${quoteAwardRecords.length} quote(s) and generated ${poRecords.length} Purchase Order(s).`,
-    });
-
-    setViewMode("summary");
-  };
+  // const handleFinalizeAndGeneratePOs = async () => {
+  //   if (!rfqId) return;
+  //
+  //   for (const item of rfqItems) {
+  //     const itemGroup = allocations.find(a => a.rfq_item_id === item.id);
+  //     const itemAllocated = (itemGroup?.allocations || [])
+  //       .filter(a => a.is_selected)
+  //       .reduce((sum, a) => sum + (a.awarded_quantity || 0), 0);
+  //     if (itemAllocated > item.req_quantity) {
+  //       message.error(`Line item #${item.item_index || 1} is over-allocated (${itemAllocated}/${item.req_quantity}). Please adjust before finalizing.`);
+  //       return;
+  //     }
+  //   }
+  //
+  //   const activeAllocations = allocations.flatMap(itemGroup => itemGroup.allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
+  //   if (activeAllocations.length === 0) {
+  //     message.warning("Please allocate award quantities to at least one variant before finalizing.");
+  //     return;
+  //   }
 
   /*
    * Early Return Loading Guards
@@ -566,25 +305,19 @@ export const RfqQuoteAwardingPage: React.FC = () => {
     );
   }
 
-  const currentQuoteAward = existingQuoteAwards[0];
-  const isFinalized = existingQuoteAwards.some(a => a.award_status === "AWARDED" || a.award_status === "CONFIRMED" || a.award_status === "PO_CREATED" || a.award_status === "AWARD_FINALIZED" || a.award_status === "PO_GENERATED");
-
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-8">
       {/* 1. Guided Stepper Header */}
       <AwardingWorkspaceHeader
-        rfqNumber={rfq.rfq_number}
-        isFinalized={isFinalized}
         viewMode={viewMode}
         onViewModeChange={setViewMode}
-        onSaveDraft={handleSaveDraft}
-        onFinalize={handleFinalizeAndGeneratePOs}
+      // onFinalize={handleFinalizeAndGeneratePOs}
       />
 
       {/* 2. Step 1: Award Line Item Variants View (Unified Component) */}
       {viewMode === "matrix" && (
         <div className="space-y-4">
-          <MatrixComparisonSection
+          <QuoteRevisionSection
             rfqItems={rfqItems}
             catalogProducts={catalogProducts}
             categories={categories}
@@ -597,14 +330,13 @@ export const RfqQuoteAwardingPage: React.FC = () => {
             allBrands={allBrands}
             allocations={allocations}
             setAllocations={setAllocations}
+            awardRevisionNotes={awardRevisionNotes}
+            activePartyId={activePartyId}
+            currentUserId={currentUserId}
           />
 
           {/* Step 1 Footer Action Bar */}
           <div className="flex items-center justify-between bg-white p-3 border border-slate-200/60 rounded-xl shadow-xs">
-            <Button size="small" icon={<SaveOutlined />} onClick={handleSaveDraft} className="text-xs font-medium text-slate-600 hover:text-slate-800 border-slate-200/70">
-              Save Allocation Draft
-            </Button>
-
             <Button
               type="primary"
               size="middle"
@@ -618,7 +350,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
       )}
 
       {/* 3. Step 2: Item-Wise Allocations Review View */}
-      {viewMode === "item_summary" && (
+      {/* {viewMode === "item_summary" && (
         <div className="space-y-4">
           <ItemWiseAwardOverviewSummary
             rfqItems={rfqItems}
@@ -634,7 +366,6 @@ export const RfqQuoteAwardingPage: React.FC = () => {
             allBrands={allBrands}
           />
 
-          {/* Step 2 Footer Action Bar */}
           <div className="flex items-center justify-between bg-white p-3 border border-slate-200/60 rounded-xl shadow-xs">
             <Button
               size="middle"
@@ -657,10 +388,11 @@ export const RfqQuoteAwardingPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      )
+      } */}
 
       {/* 4. Step 3: Supplier-Wise Final Award Overview Summary View */}
-      {viewMode === "summary" && (
+      {/* {viewMode === "summary" && (
         <div className="space-y-4">
           <SellerWiseAwardOverviewSummary
             rfqId={rfqId}
@@ -683,8 +415,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
             allBrands={allBrands}
           />
 
-          {/* Step 3 Footer Action Bar */}
-          <div className="flex items-center justify-between bg-white p-3 border border-slate-200/60 rounded-xl shadow-xs">
+           <div className="flex items-center justify-between bg-white p-3 border border-slate-200/60 rounded-xl shadow-xs">
             <Button
               size="middle"
               icon={<ArrowLeftOutlined />}
@@ -707,27 +438,21 @@ export const RfqQuoteAwardingPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 };
 
 interface AwardingWorkspaceHeaderProps {
-  rfqNumber: string;
-  isFinalized: boolean;
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
-  onSaveDraft: () => void;
-  onFinalize: () => void;
+  // onFinalize: () => void;
 }
 
 const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
-  rfqNumber,
-  isFinalized,
   viewMode,
   onViewModeChange,
-  onSaveDraft,
-  onFinalize,
+  // onFinalize,
 }) => {
   const currentStep = viewMode === "matrix" ? 0 : viewMode === "item_summary" ? 1 : 2;
 
@@ -736,23 +461,15 @@ const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold text-slate-800 tracking-tight m-0">Quote Award Revision Workspace</h1>
-            {isFinalized ? (
-              <AntTag className="px-2 py-0.5 text-[11px] font-medium rounded border border-emerald-200/60 bg-emerald-50/70 text-emerald-700 m-0">
-                FINALIZED
-              </AntTag>
-            ) : (
-              <AntTag className="px-2 py-0.5 text-[11px] font-medium rounded border border-sky-200/60 bg-sky-50/70 text-sky-700 m-0">
-                AWARD REVISION
-              </AntTag>
-            )}
+            <h1 className="text-lg font-semibold text-slate-800 tracking-tight m-0">RFQ Quotes Awarding</h1>
           </div>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Item-Seller Award Revision & PO Generation: Evaluate proposals, negotiate item-wise seller allocations with revision rounds, and release Purchase Orders.
+            Item-Seller Award Revision & PO Generation: Evaluate proposals, negotiate item-wise seller allocations with revision rounds, and release Purchase
+            Orders.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* <div className="flex items-center gap-2.5">
           {viewMode === "summary" && (
             <Button
               type="primary"
@@ -766,7 +483,7 @@ const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
           )}
 
           <span className="font-mono text-xs font-medium text-slate-600 bg-slate-50 px-2.5 py-1 rounded border border-slate-200/60">RFQ: {rfqNumber}</span>
-        </div>
+        </div> */}
       </div>
 
       {/* 3-Step Stepper Navigation Bar */}
@@ -777,9 +494,9 @@ const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
           size="small"
           items={[
             {
-              title: <span className="font-bold text-xs">Step 1: Award Line Item Variants</span>,
+              title: <span className="font-bold text-xs">Award Line Item Variants</span>,
               description: <span className="text-[11px] text-slate-500">Evaluate proposals & allocate per product</span>,
-              icon: <TableOutlined />,
+              // icon: <TableOutlined />,
             },
             // {
             //   title: <span className="font-bold text-xs">Step 2: Item-Wise Allocations</span>,
@@ -787,9 +504,9 @@ const AwardingWorkspaceHeader: React.FC<AwardingWorkspaceHeaderProps> = ({
             //   icon: <UnorderedListOutlined />,
             // },
             {
-              title: <span className="font-bold text-xs">Step 2: Supplier Award Overview & POs</span>,
+              title: <span className="font-bold text-xs">Supplier Award Overview & POs</span>,
               description: <span className="text-[11px] text-slate-500">Review supplier totals & release Purchase Orders</span>,
-              icon: <TrophyOutlined />,
+              // icon: <TrophyOutlined />,
             },
           ]}
         />
@@ -809,11 +526,14 @@ interface MatrixComparisonSectionProps {
   parties: any[];
   allManufacturers: any[];
   allBrands: any[];
-  allocations: Record<string, AwardAllocation>;
-  setAllocations: React.Dispatch<React.SetStateAction<Record<string, AwardAllocation>>>;
+  allocations: RfqItemAllocation[];
+  setAllocations: React.Dispatch<React.SetStateAction<RfqItemAllocation[]>>;
+  awardRevisionNotes?: RfqAwardRevisionNote[];
+  activePartyId?: string;
+  currentUserId?: string;
 }
 
-const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
+const QuoteRevisionSection: React.FC<MatrixComparisonSectionProps> = ({
   rfqItems,
   catalogProducts,
   categories,
@@ -826,12 +546,15 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
   allBrands,
   allocations,
   setAllocations,
+  awardRevisionNotes,
+  activePartyId,
+  currentUserId,
 }) => {
   return (
     <div className="space-y-6">
       {rfqItems.map((item, itemIdx) => (
         <SingleItemMatrixComparisonCard
-          key={item.id}
+          key={itemIdx}
           item={item}
           itemIndex={item.item_index || itemIdx + 1}
           catalogProducts={catalogProducts}
@@ -845,6 +568,9 @@ const MatrixComparisonSection: React.FC<MatrixComparisonSectionProps> = ({
           allBrands={allBrands}
           allocations={allocations}
           setAllocations={setAllocations}
+          awardRevisionNotes={awardRevisionNotes}
+          activePartyId={activePartyId}
+          currentUserId={currentUserId}
         />
       ))}
     </div>
@@ -863,8 +589,11 @@ interface SingleItemMatrixComparisonCardProps {
   parties: any[];
   allManufacturers: any[];
   allBrands: any[];
-  allocations: Record<string, AwardAllocation>;
-  setAllocations: React.Dispatch<React.SetStateAction<Record<string, AwardAllocation>>>;
+  allocations: RfqItemAllocation[];
+  setAllocations: React.Dispatch<React.SetStateAction<RfqItemAllocation[]>>;
+  awardRevisionNotes?: RfqAwardRevisionNote[];
+  activePartyId?: string;
+  currentUserId?: string;
 }
 
 const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardProps> = ({
@@ -881,13 +610,29 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
   allBrands,
   allocations,
   setAllocations,
+  awardRevisionNotes = [],
+  activePartyId,
+  currentUserId,
 }) => {
+  const [cardStep, setCardStep] = useState<0 | 1>(0);
+  const hasAutoSetInitialStep = React.useRef(false);
+
+  const [revisionModalVisible, setRevisionModalVisible] = useState(false);
+  const [selectedSellerForRevision, setSelectedSellerForRevision] = useState<any>(null);
+  const [revisionNote, setRevisionNote] = useState("");
+  const [submittingRevision, setSubmittingRevision] = useState(false);
+
   const product = useMemo(() => catalogProducts.find(p => p.id === item.catalog_product_id), [catalogProducts, item.catalog_product_id]);
   const category = useMemo(() => categories.find(c => c.id === item.category_id), [categories, item.category_id]);
 
-  /*
-   * Proposal Matrix Construction for this Line Item
-   */
+  const hasExistingAwardRevision = useMemo(() => {
+    const itemQuotes = allQuotes.filter(q => q.rfq_item_id === item.id);
+    const hasRevisionQuote = itemQuotes.some(q => (q.award_round !== undefined && q.award_round > 1) || q.status === "REVISION_REQUIRED");
+    const itemAllocations = allocations.find(a => a.rfq_item_id === item.id)?.allocations || [];
+    const hasAllocations = itemAllocations.some(a => a.is_selected && a.awarded_quantity > 0);
+    return hasRevisionQuote || hasAllocations;
+  }, [allQuotes, item.id, allocations]);
+
   const { sellerProposals } = useMemo(() => {
     const targetQuotes = allQuotes.filter(q => q.rfq_item_id === item.id && q.status === "DEVIATION_ACCEPTED");
 
@@ -908,7 +653,7 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
     const partiesMap = new Map(parties.map(p => [p.id, p.display_name]));
 
     const sellerProposalsResult: SellerProposal[] = [];
-    let excelColIndex = 0;
+    let optionCounter = 1;
 
     for (const quote of targetQuotes) {
       const sellerName = partiesMap.get(quote.seller_party_id) ?? `Supplier (${quote.seller_party_id})`;
@@ -924,13 +669,12 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
 
       for (const variant of customVariants) {
         const offerPrice = variant.offer_price ?? 0;
-        const excelLetter = getExcelColumn(excelColIndex++);
+        const optNum = optionCounter++;
 
         proposalVariants.push({
           id: variant.id,
           colKey: `col_${variant.id}`,
-          excelLetter,
-          colLabel: `Variant ${excelLetter} (Custom)`,
+          colLabel: variant.sku ? `Option #${optNum} (${variant.sku})` : `Option #${optNum} (Custom)`,
           type: "New proposal option",
           offerPrice,
           offerQuantity,
@@ -943,13 +687,11 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
 
       for (const variant of suggestedVariants) {
         const offerPrice = variant.offer_price ?? variant.list_price ?? 0;
-        const excelLetter = getExcelColumn(excelColIndex++);
 
         proposalVariants.push({
           id: variant.id,
           colKey: `col_${variant.id}`,
-          excelLetter,
-          colLabel: `Variant ${excelLetter} (${variant.sku ?? "Suggested SKU"})`,
+          colLabel: variant.sku ? `Suggested SKU: ${variant.sku}` : "Catalog Suggested SKU",
           type: "Catalog Suggested SKU",
           offerPrice,
           offerQuantity,
@@ -961,7 +703,7 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
       }
 
       sellerProposalsResult.push({
-        sellerId: quote.seller_party_id,
+        sellerPartyId: quote.seller_party_id,
         sellerName,
         quoteId: quote.id,
         quoteNumber: quote.seller_quote_number,
@@ -978,6 +720,7 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
       sellerProposals.flatMap(seller =>
         seller.variants.map(variant => ({
           ...variant,
+          sellerPartyId: seller.sellerPartyId,
           sellerName: seller.sellerName,
           quoteNumber: seller.quoteNumber,
           quoteStatus: seller.quoteStatus,
@@ -986,14 +729,11 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
     [sellerProposals],
   );
 
-  /*
-   * Allocation Insights for this Item
-   */
   const activeItemInsights = useMemo(() => {
     const totalSellers = sellerProposals.length;
     const totalVariants = allCombinedVariants.length;
 
-    const itemAllocations = Object.values(allocations).filter(a => a.rfq_item_id === item.id && a.is_selected && a.awarded_quantity > 0);
+    const itemAllocations = (allocations.find(a => a.rfq_item_id === item.id)?.allocations || []).filter(a => a.is_selected && a.awarded_quantity > 0);
 
     const allocatedSellersCount = new Set(itemAllocations.map(a => a.seller_party_id)).size;
     const allocatedVariantsCount = itemAllocations.length;
@@ -1019,90 +759,141 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
     };
   }, [item.id, item.req_quantity, sellerProposals, allCombinedVariants, allocations]);
 
-  /*
-   * Matrix Selection Handlers
-   */
+  const sellerAllocations = useMemo(() => {
+    if (!item?.id) return [];
+    const itemGroup = allocations.find(a => a.rfq_item_id === item.id);
+    const activeAllocations = (itemGroup?.allocations || []).filter(a => a.is_selected);
+
+    if (activeAllocations.length === 0) return [];
+
+    const groupsMap = new Map<
+      string,
+      {
+        sellerPartyId: string;
+        sellerName: string;
+        sellerQuoteId: string;
+        quoteNumber: string;
+        awardRound: number;
+        quoteStatus: string;
+        totalQty: number;
+        totalValue: number;
+        items: Array<{
+          allocation: AwardAllocation;
+          variant?: FlattenedVariant;
+          variantLabel: string;
+          manufacturer: string;
+          brand: string;
+          unitPrice: number;
+          awardedQty: number;
+          subtotal: number;
+        }>;
+      }
+    >();
+
+    for (const alloc of activeAllocations) {
+      const variant = allCombinedVariants.find(v => v.id === alloc.variant_id);
+      const sellerParty = parties.find(p => p.id === alloc.seller_party_id);
+      const quote = allQuotes.find(q => q.id === alloc.seller_quote_id);
+
+      const sellerName = sellerParty?.display_name || `Supplier (${alloc.seller_party_id})`;
+      const quoteNumber = quote?.seller_quote_number || "Quote Proposal";
+
+      if (!groupsMap.has(alloc.seller_party_id)) {
+        groupsMap.set(alloc.seller_party_id, {
+          sellerPartyId: alloc.seller_party_id,
+          sellerName,
+          sellerQuoteId: alloc.seller_quote_id,
+          quoteNumber,
+          awardRound: 1,
+          quoteStatus: quote?.status || "SUBMITTED",
+          totalQty: 0,
+          totalValue: 0,
+          items: [],
+        });
+      }
+
+      const group = groupsMap.get(alloc.seller_party_id)!;
+      const unitPrice = alloc.unit_price || variant?.offerPrice || 0;
+      const awardedQty = alloc.awarded_quantity || 0;
+      const subtotal = unitPrice * awardedQty;
+
+      group.totalQty += awardedQty;
+      group.totalValue += subtotal;
+
+      group.items.push({
+        allocation: alloc,
+        variant,
+        variantLabel: variant?.colLabel || `Variant (${alloc.variant_type})`,
+        manufacturer: variant?.manufacturer || "N/A",
+        brand: variant?.brand || "N/A",
+        unitPrice,
+        awardedQty,
+        subtotal,
+      });
+    }
+
+    return Array.from(groupsMap.values());
+  }, [item, allocations, allCombinedVariants, parties, allQuotes]);
+
   const handleToggleVariantSelection = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string, checked: boolean) => {
-    const key = `${item.id}:${variant.id}`;
-
     setAllocations(prev => {
-      const existing = prev[key];
-      const currentQty = existing?.awarded_quantity || 0;
-      const nextQty = checked ? currentQty : 0;
+      return prev.map(group => {
+        if (group.rfq_item_id !== item.id) return group;
+        const existing = group.allocations.find(a => a.variant_id === variant.id);
+        const currentQty = existing?.awarded_quantity || 0;
+        const nextQty = checked ? currentQty : 0;
 
-      return {
-        ...prev,
-        [key]: {
+        const updatedAlloc: AwardAllocation = {
           rfq_item_id: item.id,
           seller_party_id: sellerPartyId,
           seller_quote_id: sellerQuoteId,
           variant_id: variant.id,
           variant_col_key: variant.colKey,
-          excel_letter: variant.excelLetter,
           variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
           unit_price: variant.offerPrice,
           awarded_quantity: nextQty,
           unit_of_measure: variant.unit || "PCS",
           seller_accepted: false,
           is_selected: checked,
-        },
-      };
+        };
+
+        const newAllocations = existing ? group.allocations.map(a => (a.variant_id === variant.id ? updatedAlloc : a)) : [...group.allocations, updatedAlloc];
+
+        return { ...group, allocations: newAllocations };
+      });
     });
   };
 
   const handleQtyChange = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string, newQty: number | null) => {
     const qty = Math.max(0, newQty || 0);
-    const key = `${item.id}:${variant.id}`;
 
     setAllocations(prev => {
-      const currentIsSelected = prev[key]?.is_selected;
-      return {
-        ...prev,
-        [key]: {
+      return prev.map(group => {
+        if (group.rfq_item_id !== item.id) return group;
+        const existing = group.allocations.find(a => a.variant_id === variant.id);
+        const currentIsSelected = existing?.is_selected;
+
+        const updatedAlloc: AwardAllocation = {
           rfq_item_id: item.id,
           seller_party_id: sellerPartyId,
           seller_quote_id: sellerQuoteId,
           variant_id: variant.id,
           variant_col_key: variant.colKey,
-          excel_letter: variant.excelLetter,
           variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
           unit_price: variant.offerPrice,
           awarded_quantity: qty,
           unit_of_measure: variant.unit || "PCS",
           seller_accepted: false,
           is_selected: qty > 0 ? true : (currentIsSelected ?? false),
-        },
-      };
+        };
+
+        const newAllocations = existing ? group.allocations.map(a => (a.variant_id === variant.id ? updatedAlloc : a)) : [...group.allocations, updatedAlloc];
+
+        return { ...group, allocations: newAllocations };
+      });
     });
   };
 
-  const handleQuickFullAllocation = (variant: ProposalVariant, sellerPartyId: string, sellerQuoteId: string) => {
-    const key = `${item.id}:${variant.id}`;
-    const currentVariantQty = allocations[key]?.awarded_quantity || 0;
-    const targetQty = currentVariantQty + activeItemInsights.remainingQty;
-
-    setAllocations(prev => ({
-      ...prev,
-      [key]: {
-        rfq_item_id: item.id,
-        seller_party_id: sellerPartyId,
-        seller_quote_id: sellerQuoteId,
-        variant_id: variant.id,
-        variant_col_key: variant.colKey,
-        excel_letter: variant.excelLetter,
-        variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
-        unit_price: variant.offerPrice,
-        awarded_quantity: targetQty,
-        unit_of_measure: variant.unit || "PCS",
-        seller_accepted: false,
-        is_selected: true,
-      },
-    }));
-  };
-
-  /*
-   * Matrix Row Definitions
-   */
   const rowsDefinition = useMemo(
     () => [
       {
@@ -1142,14 +933,15 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
         key: "select_variant",
         attributeName: "Select for Award",
         getValue: (variant: FlattenedVariant) => {
-          const key = `${item.id}:${variant.id}`;
-          const isSelected = !!allocations[key]?.is_selected;
+          const itemAllocations = allocations.find(a => a.rfq_item_id === item.id)?.allocations || [];
+          const alloc = itemAllocations.find(a => a.variant_id === variant.id);
+          const isSelected = !!alloc?.is_selected;
 
           return (
             <div className="flex items-center gap-1.5">
               <Checkbox
                 checked={isSelected}
-                onChange={e => handleToggleVariantSelection(variant, variant.sellerName, variant.quoteNumber, e.target.checked)}
+                onChange={e => handleToggleVariantSelection(variant, variant.sellerPartyId, variant.quoteNumber, e.target.checked)}
                 className="font-medium text-xs"
               >
                 {isSelected ? (
@@ -1166,99 +958,6 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
     [allocations, item.id],
   );
 
-  const sellerAllocationsGrouped = useMemo(() => {
-    if (!item?.id) return [];
-
-    const activeAllocations = Object.values(allocations).filter(a => a.rfq_item_id === item.id && a.is_selected);
-
-    if (activeAllocations.length === 0) return [];
-
-    const reqQty = item.req_quantity || 1;
-
-    const groupsMap = new Map<
-      string,
-      {
-        sellerPartyId: string;
-        sellerName: string;
-        sellerQuoteId: string;
-        quoteNumber: string;
-        proposalRound: number;
-        awardRound: number;
-        quoteStatus: string;
-        totalQty: number;
-        totalValue: number;
-        items: Array<{
-          allocation: AwardAllocation;
-          variant?: FlattenedVariant;
-          excelLetter: string;
-          variantLabel: string;
-          manufacturer: string;
-          brand: string;
-          unitPrice: number;
-          awardedQty: number;
-          subtotal: number;
-          sharePct: number;
-        }>;
-      }
-    >();
-
-    for (const alloc of activeAllocations) {
-      const variant = allCombinedVariants.find(v => v.id === alloc.variant_id);
-      const sellerParty = parties.find(p => p.id === alloc.seller_party_id);
-      const quote = allQuotes.find(q => q.id === alloc.seller_quote_id);
-
-      const sellerName = sellerParty?.display_name || `Supplier (${alloc.seller_party_id})`;
-      const quoteNumber = quote?.seller_quote_number || "Quote Proposal";
-
-      if (!groupsMap.has(alloc.seller_party_id)) {
-        groupsMap.set(alloc.seller_party_id, {
-          sellerPartyId: alloc.seller_party_id,
-          sellerName,
-          sellerQuoteId: alloc.seller_quote_id,
-          quoteNumber,
-          proposalRound: quote?.round || 1,
-          awardRound: quote?.award_round || 1,
-          quoteStatus: quote?.status || "SUBMITTED",
-          totalQty: 0,
-          totalValue: 0,
-          items: [],
-        });
-      }
-
-      const group = groupsMap.get(alloc.seller_party_id)!;
-      const unitPrice = alloc.unit_price || variant?.offerPrice || 0;
-      const awardedQty = alloc.awarded_quantity || 0;
-      const subtotal = unitPrice * awardedQty;
-      const sharePct = Math.round((awardedQty / reqQty) * 100);
-
-      group.totalQty += awardedQty;
-      group.totalValue += subtotal;
-
-      group.items.push({
-        allocation: alloc,
-        variant,
-        excelLetter: alloc.excel_letter || variant?.excelLetter || "A",
-        variantLabel: variant?.colLabel || `Variant (${alloc.variant_type})`,
-        manufacturer: variant?.manufacturer || "N/A",
-        brand: variant?.brand || "N/A",
-        unitPrice,
-        awardedQty,
-        subtotal,
-        sharePct,
-      });
-    }
-
-    return Array.from(groupsMap.values()).map(g => ({
-      ...g,
-      sellerSharePct: Math.round((g.totalQty / reqQty) * 100),
-    }));
-  }, [item, allocations, allCombinedVariants, parties, allQuotes]);
-
-  const [revisionModalVisible, setRevisionModalVisible] = useState(false);
-  const [selectedSellerForRevision, setSelectedSellerForRevision] = useState<any>(null);
-  const [revisionNote, setRevisionNote] = useState("");
-  const [submittingRevision, setSubmittingRevision] = useState(false);
-
   const handleOpenAwardRevisionModal = (sellerGroup: any) => {
     setSelectedSellerForRevision(sellerGroup);
     setRevisionNote("");
@@ -1269,35 +968,131 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
     if (!selectedSellerForRevision) return;
     setSubmittingRevision(true);
     try {
-      const nextAwardRound = (selectedSellerForRevision.awardRound || 1) + 1;
+      const now = new Date().toISOString();
 
-      await rfqDb.seller_quotes.update(selectedSellerForRevision.sellerQuoteId, {
+      const existingAward = await rfqDb.rfq_quote_awards
+        .where("rfq_item_id")
+        .equals(item.id)
+        .and(a => a.seller_quote_id === selectedSellerForRevision.sellerQuoteId)
+        .first();
+
+      const nextAwardRound = (existingAward?.award_round || 0) + 1;
+      const awardId = existingAward?.id || `qaward-${crypto.randomUUID()}`;
+
+      const existingVariantAwards = await rfqDb.rfq_quote_variant_awards.where("quote_award_id").equals(awardId).toArray();
+      const existingVariantMap = new Map(existingVariantAwards.map(v => [v.variant_id, v]));
+
+      const awardPayload: RfqQuoteAward = {
+        id: awardId,
+        rfq_id: item.rfq_id,
+        rfq_item_id: item.id,
+        seller_quote_id: selectedSellerForRevision.sellerQuoteId,
+        seller_party_id: selectedSellerForRevision.sellerPartyId,
+        buyer_party_id: activePartyId || "",
+        created_by_user_id: currentUserId,
+        award_status: existingAward ? "BUYER_REVISED" : "AWARDED",
         award_round: nextAwardRound,
-        status: "REVISION_REQUIRED",
-        updated_at: new Date().toISOString(),
-      });
+        total_awarded_amount: selectedSellerForRevision.totalValue,
+        total_awarded_quantity: selectedSellerForRevision.totalQty,
+        currency: "USD",
+        notes: revisionNote.trim() || undefined,
+        created_at: existingAward?.created_at || now,
+        updated_at: now,
+      };
 
-      for (const allocItem of selectedSellerForRevision.items) {
-        await rfqDb.award_revision_history.add({
-          id: `arh-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+      const variantAwardsPayload: RfqQuoteVariantAward[] = [];
+      const historyPayload: AwardRevisionHistory[] = [];
+
+      for (const allocItem of selectedSellerForRevision?.items) {
+        const existingQva = existingVariantMap.get(allocItem.allocation.variant_id);
+        const qvaId = existingQva?.id || `qva-${crypto.randomUUID()}`;
+
+        variantAwardsPayload.push({
+          id: qvaId,
+          quote_award_id: awardId,
+          rfq_id: item.rfq_id,
+          rfq_item_id: item.id,
+          seller_quote_id: selectedSellerForRevision.sellerQuoteId,
+          seller_party_id: selectedSellerForRevision.sellerPartyId,
+          variant_id: allocItem.allocation.variant_id,
+          variant_type: allocItem.allocation.variant_type,
+          variant_label: allocItem.variantLabel,
+          award_round: nextAwardRound,
+          buyer_target_quantity: allocItem.awardedQty,
+          seller_offered_quantity: allocItem.awardedQty,
+          awarded_quantity: allocItem.awardedQty,
+          unit_price: allocItem.unitPrice,
+          total_price: allocItem.subtotal,
+          unit_of_measure: allocItem.allocation.unit_of_measure || item.req_unit || "PCS",
+          variant_award_status: existingAward ? "BUYER_REVISED" : "AWARDED",
+          seller_accepted: false,
+          buyer_accepted: true,
+          buyer_accepted_at: now,
+          created_at: existingQva?.created_at || now,
+          updated_at: now,
+        });
+
+        historyPayload.push({
+          id: `arh-${crypto.randomUUID()}`,
+          quote_award_id: awardId,
+          quote_variant_award_id: qvaId,
           rfq_id: item.rfq_id,
           rfq_item_id: item.id,
           seller_party_id: selectedSellerForRevision.sellerPartyId,
           seller_quote_id: selectedSellerForRevision.sellerQuoteId,
           award_round: nextAwardRound,
           actor_type: "BUYER",
-          actor_id: "buyer-user",
+          actor_id: currentUserId || "",
           variant_id: allocItem.allocation.variant_id,
           quantity: allocItem.awardedQty,
           unit_price: allocItem.unitPrice,
-          note: revisionNote || undefined,
-          created_at: new Date().toISOString(),
+          note: revisionNote.trim() || undefined,
+          created_at: now,
         });
       }
 
-      message.success(
-        `Award Revision Request (Award Rev R${nextAwardRound}) successfully sent to ${selectedSellerForRevision.sellerName}!`
+      const notePayload: RfqAwardRevisionNote | null =
+        revisionNote && revisionNote.trim()
+          ? {
+            id: `arn-${crypto.randomUUID()}`,
+            rfq_id: item.rfq_id,
+            rfq_item_id: item.id,
+            seller_quote_id: selectedSellerForRevision.sellerQuoteId,
+            seller_party_id: selectedSellerForRevision.sellerPartyId,
+            buyer_party_id: activePartyId || "",
+            quote_award_id: awardId,
+            award_round: nextAwardRound,
+            actor_type: "BUYER",
+            actor_id: currentUserId || "",
+            note_type: "BUYER_REVISION_REQUEST",
+            note: revisionNote.trim(),
+            created_at: now,
+          }
+          : null;
+
+      const quoteUpdatePayload = {
+        award_round: nextAwardRound,
+        status: "REVISION_REQUIRED" as const,
+        updated_at: now,
+      };
+
+      await rfqDb.transaction(
+        "rw",
+        [rfqDb.rfq_quote_awards, rfqDb.rfq_quote_variant_awards, rfqDb.award_revision_history, rfqDb.rfq_award_revision_notes, rfqDb.seller_quotes],
+        async () => {
+          await rfqDb.rfq_quote_awards.put(awardPayload);
+          await rfqDb.rfq_quote_variant_awards.bulkPut(variantAwardsPayload);
+          if (historyPayload.length > 0) {
+            await rfqDb.award_revision_history.bulkAdd(historyPayload);
+          }
+          if (notePayload) {
+            await rfqDb.rfq_award_revision_notes.add(notePayload);
+          }
+          await rfqDb.seller_quotes.update(selectedSellerForRevision.sellerQuoteId, quoteUpdatePayload);
+        },
       );
+
+      message.success(`Award Revision Request (Award Rev R${nextAwardRound}) successfully sent to ${selectedSellerForRevision.sellerName}!`);
       setRevisionModalVisible(false);
       setSelectedSellerForRevision(null);
     } catch (err) {
@@ -1308,66 +1103,32 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
     }
   };
 
-  const handleClearActiveItemAllocations = () => {
-    if (!item?.id) return;
-    setAllocations(prev => {
-      const next = { ...prev };
-      Object.keys(next).forEach(key => {
-        if (key.startsWith(`${item.id}:`)) {
-          next[key] = {
-            ...next[key],
-            awarded_quantity: 0,
-            is_selected: false,
-          };
-        }
-      });
-      return next;
-    });
-    message.info("Cleared all variant allocations for this line item.");
-  };
-
-  const hasExistingAwardRevision = useMemo(() => {
-    const itemQuotes = allQuotes.filter(q => q.rfq_item_id === item.id);
-    const hasRevisionQuote = itemQuotes.some(
-      q => (q.award_round !== undefined && q.award_round > 1) || q.status === "REVISION_REQUIRED"
-    );
-    const hasAllocations = Object.values(allocations).some(
-      a => a.rfq_item_id === item.id && a.is_selected && a.awarded_quantity > 0
-    );
-    return hasRevisionQuote || hasAllocations;
-  }, [allQuotes, item.id, allocations]);
-
-  const [cardStep, setCardStep] = useState<0 | 1>(hasExistingAwardRevision ? 1 : 0);
-  const hasInitializedStep = React.useRef(false);
-
   useEffect(() => {
-    if (!hasInitializedStep.current && hasExistingAwardRevision) {
+    if (!hasAutoSetInitialStep.current && hasExistingAwardRevision) {
       setCardStep(1);
-      hasInitializedStep.current = true;
+      hasAutoSetInitialStep.current = true;
     }
   }, [hasExistingAwardRevision]);
 
   return (
     <Card size="small" className="shadow-xs border-slate-200 bg-white rounded-xl">
       <div className="space-y-3">
-        {/* Product Line Item Header Banner */}
         <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/70 via-indigo-50/15 to-white -mx-3 -mt-3 p-3 rounded-t-lg">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-semibold text-indigo-600 bg-indigo-50/80 border border-indigo-100/60 px-2 py-0.5 rounded">
-              Line Item #{item.item_index || itemIndex}
-            </span>
+            <div className="flex items-center justify-center h-7 w-7 rounded-full bg-blue-500 text-white font-semibold text-sm m-0">{item.item_index}</div>
             <h3 className="font-semibold text-slate-800 text-sm m-0">{product?.name || `RFQ Line Item #${itemIndex}`}</h3>
             <span className="px-2 py-0.5 rounded text-[11px] font-medium border border-sky-200/60 bg-sky-50/70 text-sky-700 m-0">
               {category?.name || "Category"}
             </span>
           </div>
           <div className="text-xs text-slate-600">
-            Requested Qty: <span className="font-semibold text-slate-800">{item.req_quantity} {item.req_unit || "PCS"}</span>
+            Requested Qty:{" "}
+            <span className="font-semibold text-slate-800">
+              {item.req_quantity} {item.req_unit || "PCS"}
+            </span>
           </div>
         </div>
 
-        {/* Insights Overview Bar */}
-        {/* Combined Insights & Step Navigation Header (Ant Design Descriptions with Compact Size) */}
         <div className="bg-white rounded-lg border border-slate-200/60 overflow-hidden shadow-xs">
           <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 bg-slate-50/70 border-b border-slate-100">
             <div className="flex items-center gap-2">
@@ -1411,10 +1172,10 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
           <Descriptions
             size="small"
             bordered
-            column={{ xs: 1, sm: 2, }}
+            column={{ xs: 1, sm: 2 }}
             classNames={{
               label: "!py-1 !px-2.5 !text-[11px] text-slate-500 bg-slate-50/40 font-medium",
-              content: "!py-1 !px-2.5 !text-xs bg-white"
+              content: "!py-1 !px-2.5 !text-xs bg-white",
             }}
           >
             <Descriptions.Item
@@ -1449,25 +1210,11 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
             </Descriptions.Item>
 
             <Descriptions.Item label="Allocated Value">
-              <strong className="text-emerald-600 font-semibold">
-                {formatCurrency(activeItemInsights.allocatedTotalPrice)}
-              </strong>
+              <strong className="text-emerald-600 font-semibold">{formatCurrency(activeItemInsights.allocatedTotalPrice)}</strong>
             </Descriptions.Item>
-
-            {/* <Descriptions.Item label="Min Price">
-              {activeItemInsights.lowestPrice > 0 ? (
-                <span>
-                  <span className="font-semibold text-slate-800">{formatCurrency(activeItemInsights.lowestPrice)}</span>
-                  <span className="text-slate-400 text-[11px] ml-0.5">/ {item?.req_unit || "unit"}</span>
-                </span>
-              ) : (
-                <span className="text-slate-400 text-xs">N/A</span>
-              )}
-            </Descriptions.Item> */}
           </Descriptions>
         </div>
 
-        {/* Step 1: Award Variant Choose (Comparison Matrix Table) */}
         {cardStep === 0 && (
           <div className="space-y-3">
             {allCombinedVariants.length > 0 ? (
@@ -1483,7 +1230,7 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
                       </th>
                       {sellerProposals.map(seller => (
                         <th
-                          key={seller.sellerId}
+                          key={seller.sellerPartyId}
                           colSpan={seller.variants.length}
                           className="sticky top-0 z-20 text-center font-semibold text-slate-800 bg-white border-r border-b border-slate-100 py-1.5 px-3 text-xs"
                         >
@@ -1500,10 +1247,7 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
                             key={variant.id}
                             className="sticky top-[38px] z-20 text-center font-medium text-slate-700 bg-slate-50/80 border-r border-b border-slate-100 py-1 px-3 text-xs min-w-[180px]"
                           >
-                            <div className="flex items-center justify-center gap-1 py-0.5">
-                              <span className="inline-block px-1.5 py-0.5 rounded bg-indigo-50/80 text-indigo-600 border border-indigo-100/60 font-mono font-medium text-[10px]">
-                                {variant.excelLetter}
-                              </span>
+                            <div className="flex items-center justify-center gap-1.5 py-0.5">
                               <span className="font-medium text-slate-700 text-xs">{variant.colLabel}</span>
                             </div>
                           </th>
@@ -1546,31 +1290,29 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
           </div>
         )}
 
-        {/* Step 2: Award Variants Revision (Selection Insights & Seller-Wise Breakdown) */}
         {cardStep === 1 && (
           <Card size="small" className="shadow-xs border-slate-200/60 bg-white rounded-xl">
-            {/* Section Header */}
             <div className="flex flex-wrap items-center justify-between gap-3 mb-3 pb-2.5 border-b border-slate-100">
               <div className="flex items-center gap-2">
                 <TrophyOutlined className="text-amber-500/80 text-base" />
                 <h3 className="text-xs font-semibold text-slate-700 tracking-wide m-0">Current Line Item Selection Insights (Seller-Wise Breakdown)</h3>
                 <span className="px-2 py-0.5 text-[11px] font-medium rounded border border-sky-200/60 bg-sky-50/70 text-sky-700 m-0">
-                  {sellerAllocationsGrouped.length} Awarded Supplier(s)
+                  {sellerAllocations.length} Awarded Supplier(s)
                 </span>
               </div>
             </div>
 
-            {sellerAllocationsGrouped.length > 0 ? (
+            {sellerAllocations.length > 0 ? (
               <div className="space-y-3">
-
-                {/* Seller-Wise Cards List */}
-                {sellerAllocationsGrouped.map(sellerGroup => (
+                {sellerAllocations.map(sellerGroup => (
                   <div key={sellerGroup.sellerPartyId} className="border border-slate-200/60 rounded-xl overflow-hidden bg-white shadow-xs">
                     <div className="bg-slate-50/70 px-3 py-2 border-b border-slate-100 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
                         <ShopOutlined className="text-indigo-500" />
                         <span className="font-semibold text-slate-800 text-xs">{sellerGroup.sellerName}</span>
-                        <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200/60">{sellerGroup.quoteNumber}</span>
+                        <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200/60">
+                          {sellerGroup.quoteNumber}
+                        </span>
                         <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-slate-200/60 bg-slate-50/70 text-slate-700 m-0">
                           Round-{sellerGroup.awardRound}
                         </span>
@@ -1581,8 +1323,7 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
                           Allocated Qty:{" "}
                           <strong className="text-slate-800 font-semibold">
                             {sellerGroup.totalQty} {item?.req_unit || "PCS"}
-                          </strong>{" "}
-                          <span className="text-slate-400 font-normal">({sellerGroup.sellerSharePct}% Share)</span>
+                          </strong>
                         </span>
                         <span className="text-slate-300">|</span>
                         <span className="text-slate-500">
@@ -1600,7 +1341,6 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
                             <th className="p-2 border-r border-slate-100 text-right">Unit Price</th>
                             <th className="p-2 border-r border-slate-100 text-right">Awarded Qty</th>
                             <th className="p-2 border-r border-slate-100 text-right">Subtotal</th>
-                            {/* <th className="p-2 text-center">Line Share</th> */}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1608,7 +1348,6 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
                             <tr key={item.allocation.variant_id} className="hover:bg-slate-50/30 transition-colors">
                               <td className="p-2 border-r border-slate-100">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="px-1.5 py-0.5 rounded bg-indigo-50/80 text-indigo-600 border border-indigo-100/60 font-mono font-medium text-[10px]">{item.excelLetter}</span>
                                   <span className="font-medium text-slate-700 text-xs">{item.variantLabel}</span>
                                 </div>
                               </td>
@@ -1622,7 +1361,9 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
                                   </span>
                                 </div>
                               </td>
-                              <td className="p-2 border-r border-slate-100 text-right font-mono font-medium text-slate-700">{formatCurrency(item.unitPrice)}</td>
+                              <td className="p-2 border-r border-slate-100 text-right font-mono font-medium text-slate-700">
+                                {formatCurrency(item.unitPrice)}
+                              </td>
                               <td className="p-2 border-r border-slate-100 text-right">
                                 <div className="flex items-center justify-end gap-1">
                                   <InputNumber
@@ -1638,34 +1379,39 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
                                     className="!w-24 text-[11px] !h-7 font-mono font-medium border-slate-200/70"
                                     placeholder="Qty"
                                   />
-                                  <Tooltip title="Quick Fill Remaining Quantity">
-                                    <Button
-                                      size="small"
-                                      type="default"
-                                      icon={<ThunderboltOutlined />}
-                                      onClick={() => {
-                                        if (item.variant) {
-                                          handleQuickFullAllocation(item.variant, item.allocation.seller_party_id, item.allocation.seller_quote_id);
-                                        }
-                                      }}
-                                      className="!h-7 !px-1.5 text-[10px] text-indigo-500 hover:text-indigo-600 font-medium bg-indigo-50/50 border border-indigo-100/60 rounded"
-                                    />
-                                  </Tooltip>
                                 </div>
                               </td>
-                              <td className="p-2 border-r border-slate-100 text-right font-mono font-semibold text-emerald-600">{formatCurrency(item.subtotal)}</td>
-                              {/* <td c 
-                              
-                              
-                              
-                              lassName="p-2 text-center font-mono font-medium text-indigo-600">{item.sharePct}%</td> */}
+                              <td className="p-2 border-r border-slate-100 text-right font-mono font-semibold text-emerald-600">
+                                {formatCurrency(item.subtotal)}
+                              </td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
 
-                    {/* Item-Supplier Award Revision Action Bar */}
+                    {(() => {
+                      const notes = (awardRevisionNotes || [])
+                        .filter(n => n.rfq_item_id === item.id && n.seller_party_id === sellerGroup.sellerPartyId)
+                        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                      const latestNote = notes[0];
+                      if (!latestNote) return null;
+                      const isSellerNote = latestNote.actor_type === "SELLER";
+                      return (
+                        <div
+                          className={`px-3 py-2 border-t border-slate-100 flex items-start gap-2 text-xs ${isSellerNote ? "bg-indigo-50/50" : "bg-amber-50/40"}`}
+                        >
+                          <FileTextOutlined className={isSellerNote ? "text-indigo-600 mt-0.5" : "text-amber-600 mt-0.5"} />
+                          <div>
+                            <span className={`font-semibold ${isSellerNote ? "text-indigo-900" : "text-amber-900"}`}>
+                              {isSellerNote ? "Supplier Response Note" : "Revision Request Note"} (Round {latestNote.award_round}):
+                            </span>
+                            <span className="text-slate-700 italic ml-1">&ldquo;{latestNote.note}&rdquo;</span>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     <div className="bg-slate-50/40 px-3 py-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2 text-xs">
                         {sellerGroup.quoteStatus === "REVISION_REQUIRED" ? (
@@ -1691,7 +1437,6 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
                     </div>
                   </div>
                 ))}
-
               </div>
             ) : (
               <Alert
@@ -1705,7 +1450,6 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
           </Card>
         )}
 
-        {/* Item-Supplier Award Revision Modal */}
         <Modal
           open={revisionModalVisible}
           title={
@@ -1732,8 +1476,9 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
               message="Negotiate Allocation with Seller"
               description={
                 <span>
-                  You are requesting an Award Revision for <strong>{selectedSellerForRevision?.sellerName}</strong> on Line Item #{item.item_index || itemIndex} (
-                  <strong>{product?.name || "Product"}</strong>). This will initiate <strong>Award Revision Round {(selectedSellerForRevision?.awardRound || 1) + 1}</strong> with this seller.
+                  You are requesting an Award Revision for <strong>{selectedSellerForRevision?.sellerName}</strong> on Line Item #{item.item_index || itemIndex}{" "}
+                  (<strong>{product?.name || "Product"}</strong>). This will initiate{" "}
+                  <strong>Award Revision Round {(selectedSellerForRevision?.awardRound || 1) + 1}</strong> with this seller.
                 </span>
               }
               className="border-sky-100 bg-sky-50/40 text-slate-600"
@@ -1741,12 +1486,10 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
 
             <div className="bg-slate-50/60 p-2.5 rounded-lg border border-slate-100 space-y-1.5">
               <div className="flex justify-between font-medium text-slate-600">
-                <span>Proposal Round:</span>
-                <span className="px-1.5 py-0.5 rounded text-[11px] font-medium border border-cyan-200/60 bg-cyan-50/70 text-cyan-700">Proposal R{selectedSellerForRevision?.proposalRound}</span>
-              </div>
-              <div className="flex justify-between font-medium text-slate-600">
                 <span>New Award Revision Round:</span>
-                <span className="px-1.5 py-0.5 rounded text-[11px] font-medium border border-purple-200/60 bg-purple-50/70 text-purple-700">Award Rev R{(selectedSellerForRevision?.awardRound || 1) + 1}</span>
+                <span className="px-1.5 py-0.5 rounded text-[11px] font-medium border border-purple-200/60 bg-purple-50/70 text-purple-700">
+                  {selectedSellerForRevision?.awardRound || 1}
+                </span>
               </div>
               <div className="flex justify-between font-medium text-slate-600">
                 <span>Target Allocated Quantity:</span>
@@ -1756,16 +1499,12 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
               </div>
               <div className="flex justify-between font-medium text-slate-600">
                 <span>Estimated Allocation Value:</span>
-                <span className="font-mono font-semibold text-emerald-600">
-                  {formatCurrency(selectedSellerForRevision?.totalValue || 0)}
-                </span>
+                <span className="font-mono font-semibold text-emerald-600">{formatCurrency(selectedSellerForRevision?.totalValue || 0)}</span>
               </div>
             </div>
 
             <div>
-              <label className="block font-medium text-slate-700 mb-1">
-                Revision Request Note for Seller (Optional):
-              </label>
+              <label className="block font-medium text-slate-700 mb-1">Revision Request Note for Seller (Optional):</label>
               <Input.TextArea
                 rows={3}
                 placeholder="e.g. Please confirm if you can supply 300 PCS at $245 within 14 days lead time."
@@ -1788,7 +1527,7 @@ const SingleItemMatrixComparisonCard: React.FC<SingleItemMatrixComparisonCardPro
  */
 interface ItemWiseAwardOverviewSummaryProps {
   rfqItems: RfqItem[];
-  allocations: Record<string, AwardAllocation>;
+  allocations: RfqItemAllocation[];
   catalogProducts: any[];
   categories: any[];
   parties: any[];
@@ -1817,8 +1556,8 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
     const partiesMap = new Map(parties.map(p => [p.id, p.display_name]));
     const quotesMap = new Map(allQuotes.map(q => [q.id, q]));
 
-    const variantsMap = new Map<string, { colLabel: string; excelLetter: string; manufacturer: string; brand: string }>();
-    let excelIdx = 0;
+    const variantsMap = new Map<string, { colLabel: string; manufacturer: string; brand: string }>();
+    let optCount = 1;
 
     for (const q of allQuotes) {
       const customVars = allProposalVariants.filter(v => v.seller_quote_id === q.id);
@@ -1827,20 +1566,17 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
       const { manufacturer, brand } = extractMfgBrandFromQuoteAttrs(q.id, quoteAttributes, allManufacturers, allBrands);
 
       for (const v of customVars) {
-        const excelLetter = getExcelColumn(excelIdx++);
+        const optNum = optCount++;
         variantsMap.set(v.id, {
-          colLabel: `Variant ${excelLetter} (Custom)`,
-          excelLetter,
+          colLabel: v.sku ? `Option #${optNum} (${v.sku})` : `Option #${optNum} (Custom)`,
           manufacturer,
           brand,
         });
       }
 
       for (const v of suggestedVars) {
-        const excelLetter = getExcelColumn(excelIdx++);
         variantsMap.set(v.id, {
-          colLabel: `Variant ${excelLetter} (${v.sku ?? "Suggested SKU"})`,
-          excelLetter,
+          colLabel: v.sku ? `Suggested SKU: ${v.sku}` : "Catalog Suggested SKU",
           manufacturer,
           brand,
         });
@@ -1851,7 +1587,8 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
       const product = catalogProducts.find(p => p.id === item.catalog_product_id);
       const category = categories.find(c => c.id === item.category_id);
 
-      const itemAllocations = Object.values(allocations).filter(a => a.rfq_item_id === item.id && a.is_selected && a.awarded_quantity > 0);
+      const itemGroup = allocations.find(a => a.rfq_item_id === item.id);
+      const itemAllocations = (itemGroup?.allocations || []).filter(a => a.is_selected && a.awarded_quantity > 0);
 
       const totalAllocatedQty = itemAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
       const totalItemValue = itemAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
@@ -1865,20 +1602,17 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
         const unitPrice = alloc.unit_price || 0;
         const awardedQty = alloc.awarded_quantity || 0;
         const subtotal = unitPrice * awardedQty;
-        const sharePct = Math.round((awardedQty / reqQty) * 100);
 
         return {
           allocation: alloc,
           sellerName: sellerPartyName,
           quoteNumber: quote?.seller_quote_number || "Quote Proposal",
-          excelLetter: alloc.excel_letter || variantInfo?.excelLetter || "A",
           variantLabel: variantInfo?.colLabel || `Variant (${alloc.variant_type})`,
           manufacturer: variantInfo?.manufacturer || "N/A",
           brand: variantInfo?.brand || "N/A",
           unitPrice,
           awardedQty,
           subtotal,
-          sharePct,
         };
       });
 
@@ -1894,7 +1628,19 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
         allocatedRows,
       };
     });
-  }, [rfqItems, allocations, catalogProducts, categories, parties, allQuotes, allProposalVariants, allSuggestedVariants, quoteAttributes, allManufacturers, allBrands]);
+  }, [
+    rfqItems,
+    allocations,
+    catalogProducts,
+    categories,
+    parties,
+    allQuotes,
+    allProposalVariants,
+    allSuggestedVariants,
+    quoteAttributes,
+    allManufacturers,
+    allBrands,
+  ]);
 
   const grandTotalValue = useMemo(() => itemWiseGroups.reduce((sum, g) => sum + g.totalItemValue, 0), [itemWiseGroups]);
   const allocatedItemsCount = useMemo(() => itemWiseGroups.filter(g => g.allocatedRows.length > 0).length, [itemWiseGroups]);
@@ -1921,7 +1667,7 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
           className="mt-2"
           classNames={{
             label: "text-xs p-1 text-slate-500",
-            content: "text-xs p-1"
+            content: "text-xs p-1",
           }}
         >
           <Descriptions.Item label="Total RFQ Line Items">
@@ -1945,14 +1691,15 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
                 Line Item #{group.itemNumber}
               </span>
               <span className="font-semibold text-slate-800 text-xs">{group.productName}</span>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200/60 bg-sky-50/70 text-sky-700 m-0">
-                {group.categoryName}
-              </span>
+              <span className="px-1.5 py-0.5 rounded text-[10px] font-medium border border-sky-200/60 bg-sky-50/70 text-sky-700 m-0">{group.categoryName}</span>
             </div>
 
             <div className="flex items-center gap-3 text-xs">
               <span className="text-slate-500">
-                Requested Qty: <strong className="text-slate-800 font-semibold">{group.reqQty} {group.reqUnit}</strong>
+                Requested Qty:{" "}
+                <strong className="text-slate-800 font-semibold">
+                  {group.reqQty} {group.reqUnit}
+                </strong>
               </span>
 
               <span className="text-slate-300">|</span>
@@ -1971,9 +1718,7 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
               </span>
 
               {group.totalAllocatedQty === group.reqQty && group.reqQty > 0 ? (
-                <span className="font-medium text-[10px] px-1.5 py-0.5 rounded border border-sky-200/60 bg-sky-50/70 text-sky-700 m-0">
-                  ✓ 100% Allocated
-                </span>
+                <span className="font-medium text-[10px] px-1.5 py-0.5 rounded border border-sky-200/60 bg-sky-50/70 text-sky-700 m-0">✓ 100% Allocated</span>
               ) : group.totalAllocatedQty > group.reqQty ? (
                 <span className="font-medium text-[10px] px-1.5 py-0.5 rounded border border-rose-200/60 bg-rose-50/70 text-rose-700 m-0">
                   ⚠ Over Allocated
@@ -1983,9 +1728,7 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
                   Partially Allocated
                 </span>
               ) : (
-                <span className="font-medium text-[10px] px-1.5 py-0.5 rounded border border-slate-200/60 bg-slate-50 text-slate-500 m-0">
-                  Unallocated
-                </span>
+                <span className="font-medium text-[10px] px-1.5 py-0.5 rounded border border-slate-200/60 bg-slate-50 text-slate-500 m-0">Unallocated</span>
               )}
             </div>
           </div>
@@ -2000,8 +1743,7 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
                     <th className="p-2 border-r border-slate-100">Manufacturer / Brand</th>
                     <th className="p-2 border-r border-slate-100 text-right">Unit Price</th>
                     <th className="p-2 border-r border-slate-100 text-right">Awarded Quantity</th>
-                    <th className="p-2 border-r border-slate-100 text-right">Subtotal</th>
-                    <th className="p-2 text-center">Line Share</th>
+                    <th className="p-2 text-right">Subtotal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -2018,9 +1760,6 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
                       </td>
                       <td className="p-2 border-r border-slate-100">
                         <div className="flex items-center gap-1.5">
-                          <span className="px-1.5 py-0.5 rounded bg-indigo-50/80 text-indigo-600 border border-indigo-100/60 font-mono font-medium text-[10px]">
-                            {row.excelLetter}
-                          </span>
                           <span className="font-medium text-slate-700">{row.variantLabel}</span>
                         </div>
                       </td>
@@ -2034,16 +1773,11 @@ const ItemWiseAwardOverviewSummary: React.FC<ItemWiseAwardOverviewSummaryProps> 
                           </span>
                         </div>
                       </td>
-                      <td className="p-2 border-r border-slate-100 text-right font-mono font-medium text-slate-700">
-                        {formatCurrency(row.unitPrice)}
-                      </td>
+                      <td className="p-2 border-r border-slate-100 text-right font-mono font-medium text-slate-700">{formatCurrency(row.unitPrice)}</td>
                       <td className="p-2 border-r border-slate-100 text-right font-medium text-slate-800">
                         {row.awardedQty} {group.reqUnit}
                       </td>
-                      <td className="p-2 border-r border-slate-100 text-right font-mono font-semibold text-emerald-600">
-                        {formatCurrency(row.subtotal)}
-                      </td>
-                      <td className="p-2 text-center font-mono font-medium text-indigo-600">{row.sharePct}%</td>
+                      <td className="p-2 text-right font-mono font-semibold text-emerald-600">{formatCurrency(row.subtotal)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -2074,7 +1808,7 @@ interface SellerWiseAwardOverviewSummaryProps {
   rfq: any;
   currentProcessHeader?: RfqQuoteAward;
   isFinalized: boolean;
-  allocations: Record<string, AwardAllocation>;
+  allocations: RfqItemAllocation[];
   existingAwardItems: RfqQuoteVariantAward[];
   existingPurchaseOrders: PurchaseOrder[];
   existingPoAcknowledgements: PoAcknowledgement[];
@@ -2128,7 +1862,7 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
     const partiesMap = new Map(parties.map(p => [p.id, p.display_name]));
 
     const result: FlattenedVariant[] = [];
-    let excelIndex = 0;
+    let optionCounter = 1;
 
     for (const quote of allQuotes) {
       const sellerName = partiesMap.get(quote.seller_party_id) ?? `Supplier (${quote.seller_party_id})`;
@@ -2139,12 +1873,11 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
 
       for (const variant of customVars) {
         const offerPrice = variant.offer_price ?? 0;
-        const excelLetter = getExcelColumn(excelIndex++);
+        const optNum = optionCounter++;
         result.push({
           id: variant.id,
           colKey: `col_${variant.id}`,
-          excelLetter,
-          colLabel: `Variant ${excelLetter} (Custom)`,
+          colLabel: variant.sku ? `Option #${optNum} (${variant.sku})` : `Option #${optNum} (Custom)`,
           type: "New proposal option",
           offerPrice,
           offerQuantity: quote.offer_quantity ?? 1,
@@ -2153,6 +1886,7 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
           manufacturer,
           brand,
           sellerName,
+          sellerPartyId: quote.seller_party_id,
           quoteNumber: quote.seller_quote_number,
           quoteStatus: quote.status,
         });
@@ -2160,12 +1894,10 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
 
       for (const variant of suggestedVars) {
         const offerPrice = variant.offer_price ?? variant.list_price ?? 0;
-        const excelLetter = getExcelColumn(excelIndex++);
         result.push({
           id: variant.id,
           colKey: `col_${variant.id}`,
-          excelLetter,
-          colLabel: `Variant ${excelLetter} (${variant.sku ?? "Suggested SKU"})`,
+          colLabel: variant.sku ? `Suggested SKU: ${variant.sku}` : "Catalog Suggested SKU",
           type: "Catalog Suggested SKU",
           offerPrice,
           offerQuantity: quote.offer_quantity ?? 1,
@@ -2174,6 +1906,7 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
           manufacturer,
           brand,
           sellerName,
+          sellerPartyId: quote.seller_party_id,
           quoteNumber: quote.seller_quote_number,
           quoteStatus: quote.status,
         });
@@ -2185,7 +1918,7 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
   const rfqAwardSummaryBySeller = useMemo(() => {
     if (!rfqId) return [];
 
-    const activeAllocations = Object.values(allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
+    const activeAllocations = allocations.flatMap(itemGroup => itemGroup.allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
 
     const sellerGroupsMap = new Map<
       string,
@@ -2203,7 +1936,6 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
           productName: string;
           categoryName: string;
           variantId: string;
-          excelLetter: string;
           variantLabel: string;
           manufacturer: string;
           brand: string;
@@ -2249,7 +1981,6 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
           productName: product?.name || `RFQ Line Item #${rfqItem?.item_index || 1}`,
           categoryName: category?.name || "Category",
           variantId: item.variant_id,
-          excelLetter: variant?.excelLetter || "A",
           variantLabel: variant?.colLabel || `Variant (${item.variant_type})`,
           manufacturer: variant?.manufacturer || "N/A",
           brand: variant?.brand || "N/A",
@@ -2289,7 +2020,6 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
           productName: product?.name || `RFQ Line Item #${rfqItem?.item_index || 1}`,
           categoryName: category?.name || "Category",
           variantId: alloc.variant_id,
-          excelLetter: alloc.excel_letter || variant?.excelLetter || "A",
           variantLabel: variant?.colLabel || `Variant (${alloc.variant_type})`,
           manufacturer: variant?.manufacturer || "N/A",
           brand: variant?.brand || "N/A",
@@ -2327,7 +2057,9 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
                 <TrophyOutlined className="text-amber-500/80" />
                 Final Sourcing Contract Award Summary (Supplier-Wise Preview)
               </span>
-              <span className={`px-2 py-0.5 text-xs font-semibold rounded border ${isFinalized ? "border-emerald-200/60 bg-emerald-50/70 text-emerald-700" : "border-sky-200/60 bg-sky-50/70 text-sky-700"}`}>
+              <span
+                className={`px-2 py-0.5 text-xs font-semibold rounded border ${isFinalized ? "border-emerald-200/60 bg-emerald-50/70 text-emerald-700" : "border-sky-200/60 bg-sky-50/70 text-sky-700"}`}
+              >
                 {currentProcessHeader?.award_status || (rfqAwardSummaryBySeller.length > 0 ? "DRAFT ALLOCATION" : "NO AWARDS")}
               </span>
             </div>
@@ -2338,7 +2070,7 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
           className="mt-2 text-xs"
           classNames={{
             label: "text-xs p-1 text-slate-500",
-            content: "text-xs p-1"
+            content: "text-xs p-1",
           }}
         >
           <Descriptions.Item label="RFQ Number">
@@ -2367,7 +2099,9 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
                 <div className="flex items-center gap-2">
                   <ShopOutlined className="text-indigo-500 text-sm" />
                   <span className="font-semibold text-slate-800 text-xs">{sellerGroup.sellerName}</span>
-                  <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200/60">{sellerGroup.quoteNumber}</span>
+                  <span className="font-mono text-[11px] text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200/60">
+                    {sellerGroup.quoteNumber}
+                  </span>
                 </div>
 
                 <div className="flex items-center gap-3 text-xs">
@@ -2433,7 +2167,6 @@ const SellerWiseAwardOverviewSummary: React.FC<SellerWiseAwardOverviewSummaryPro
                         </td>
                         <td className="p-2 border-r border-slate-100">
                           <div className="flex items-center gap-1.5">
-                            <span className="px-1.5 py-0.5 rounded bg-indigo-50/80 text-indigo-600 border border-indigo-100/60 font-mono font-medium text-[10px]">{item.excelLetter}</span>
                             <span className="font-medium text-slate-700">{item.variantLabel}</span>
                           </div>
                         </td>
