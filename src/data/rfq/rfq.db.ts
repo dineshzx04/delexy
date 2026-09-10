@@ -11,8 +11,8 @@ import type {
   SellerQuoteAttributeComment,
   SellerQuoteVariantComment,
   RfqQuoteAward,
-  RfqQuoteVariantAward,
-  AwardRevisionHistory,
+  RfqQuoteItemAward,
+  RfqQuoteItemAwardRevision,
   RfqAwardRevisionNote,
   PurchaseOrder,
   PurchaseOrderItem,
@@ -31,8 +31,8 @@ export class RfqDatabase extends Dexie {
   seller_quote_attribute_comments!: Table<SellerQuoteAttributeComment, string>;
   seller_quote_variant_comments!: Table<SellerQuoteVariantComment, string>;
   rfq_quote_awards!: Table<RfqQuoteAward, string>;
-  rfq_quote_variant_awards!: Table<RfqQuoteVariantAward, string>;
-  award_revision_history!: Table<AwardRevisionHistory, string>;
+  rfq_quote_item_awards!: Table<RfqQuoteItemAward, string>;
+  rfq_quote_item_award_revisions!: Table<RfqQuoteItemAwardRevision, string>;
   rfq_award_revision_notes!: Table<RfqAwardRevisionNote, string>;
   purchase_orders!: Table<PurchaseOrder, string>;
   purchase_order_items!: Table<PurchaseOrderItem, string>;
@@ -71,6 +71,28 @@ export class RfqDatabase extends Dexie {
 
     this.version(16).stores({
       rfq_award_revision_notes: "id, rfq_id, rfq_item_id, seller_quote_id, seller_party_id, quote_award_id, award_round, actor_type, note_type",
+    });
+
+    this.version(17).stores({
+      rfq_quote_item_awards: "id, quote_award_id, rfq_id, rfq_item_id, seller_quote_id, seller_party_id, variant_id, variant_award_status",
+      rfq_quote_item_award_revisions: "id, quote_award_id, quote_variant_award_id, rfq_id, rfq_item_id, seller_party_id, award_round",
+    }).upgrade(async (tx) => {
+      try {
+        const oldAwards = await tx.table("rfq_quote_variant_awards").toArray();
+        if (oldAwards?.length) {
+          await tx.table("rfq_quote_item_awards").bulkPut(oldAwards);
+        }
+      } catch {
+        // Table may not exist
+      }
+      try {
+        const oldRevisions = await tx.table("award_revision_history").toArray();
+        if (oldRevisions?.length) {
+          await tx.table("rfq_quote_item_award_revisions").bulkPut(oldRevisions);
+        }
+      } catch {
+        // Table may not exist
+      }
     });
   }
 }

@@ -9,30 +9,24 @@ import {
   Alert,
   InputNumber,
   Input,
-  Timeline,
-  message,
-  notification,
   Space,
   Divider,
+  Table,
+  App as AntApp,
 } from "antd";
 import {
   CheckCircleOutlined,
   SendOutlined,
-  ArrowLeftOutlined,
-  HistoryOutlined,
   DollarOutlined,
   ShoppingOutlined,
   FileTextOutlined,
   ClockCircleOutlined,
+  ArrowLeftOutlined,
 } from "@ant-design/icons";
 
 import {
   rfqDb,
-  type Rfq,
-  type RfqItem,
-  type SellerQuote,
-  type AwardRevisionHistory,
-  type RfqQuoteVariantAward,
+  type RfqQuoteItemAwardRevision,
   type RfqAwardRevisionNote,
 } from "../../data/rfq";
 import { businessDb } from "../../data/business/business.db";
@@ -47,10 +41,23 @@ const formatCurrency = (amount: number, currency: string = "USD") =>
     minimumFractionDigits: 2,
   }).format(amount);
 
+interface VariantResponseRow {
+  variantAwardId: string;
+  variantId: string;
+  variantType: "CUSTOM" | "SUGGESTED";
+  variantLabel: string;
+  uom: string;
+  buyerTargetQty: number;
+  buyerUnitPrice: number;
+  offeredQty: number;
+  offeredPrice: number;
+}
+
 export const SellerAwardRevisionResponse: React.FC = () => {
   const navigate = useNavigate();
   const { rfqId, itemId } = useParams<{ rfqId: string; itemId: string }>();
   const { activeWorkspace, currentUserId } = useWorkspace();
+  const { message, notification } = AntApp.useApp();
 
   const isBusinessContext = activeWorkspace?.type === "BUSINESS";
   const basePath = isBusinessContext ? "/b/seller/rfqs" : "/user/seller/rfqs";
@@ -68,6 +75,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       parties,
       catalogProducts,
       categories,
+      quoteAwards,
       awardItems,
       historyRecords,
       revisionNotes,
@@ -78,8 +86,9 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       businessDb.parties.toArray(),
       catalogDb.products.toArray(),
       catalogDb.categories.toArray(),
-      rfqDb.rfq_quote_variant_awards.where("rfq_item_id").equals(itemId).toArray(),
-      rfqDb.award_revision_history.where("rfq_item_id").equals(itemId).toArray(),
+      rfqDb.rfq_quote_awards.where("rfq_item_id").equals(itemId).toArray(),
+      rfqDb.rfq_quote_item_awards.where("rfq_item_id").equals(itemId).toArray(),
+      rfqDb.rfq_quote_item_award_revisions.where("rfq_item_id").equals(itemId).toArray(),
       rfqDb.rfq_award_revision_notes.where("rfq_item_id").equals(itemId).toArray(),
     ]);
 
@@ -90,6 +99,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       parties: parties || [],
       catalogProducts: catalogProducts || [],
       categories: categories || [],
+      quoteAwards: quoteAwards || [],
       awardItems: awardItems || [],
       historyRecords: historyRecords || [],
       revisionNotes: revisionNotes || [],
@@ -103,6 +113,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     parties = [],
     catalogProducts = [],
     categories = [],
+    quoteAwards = [],
     awardItems = [],
     historyRecords = [],
     revisionNotes = [],
@@ -127,9 +138,14 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     return allQuotes.find(q => q.seller_party_id === sellerParty.id) || null;
   }, [allQuotes, sellerParty]);
 
-  const myAwardItem = useMemo(() => {
+  const myAward = useMemo(() => {
     if (!sellerParty?.id) return null;
-    return awardItems.find(a => a.seller_party_id === sellerParty.id) || null;
+    return quoteAwards.find(a => a.seller_party_id === sellerParty.id) || null;
+  }, [quoteAwards, sellerParty]);
+
+  const myAwardItems = useMemo(() => {
+    if (!sellerParty?.id) return [];
+    return awardItems.filter(a => a.seller_party_id === sellerParty.id);
   }, [awardItems, sellerParty]);
 
   const product = useMemo(() => {
@@ -154,12 +170,35 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     return sellerHistory.find(h => h.actor_type === "BUYER") || null;
   }, [sellerHistory]);
 
-  const latestBuyerNote = useMemo(() => {
-    if (!sellerParty?.id) return null;
-    return (revisionNotes || [])
-      .filter(n => n.seller_party_id === sellerParty.id && n.actor_type === "BUYER")
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] || null;
-  }, [revisionNotes, sellerParty]);
+  const latestBuyerNoteInfo = useMemo(() => {
+    // 1. Check dedicated rfq_award_revision_notes for this quote / seller
+    const quoteRevisionNotes = (revisionNotes || [])
+      .filter(n => (n.seller_quote_id === myQuote?.id || n.seller_party_id === sellerParty?.id) && n.actor_type === "BUYER")
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const noteRecord = quoteRevisionNotes[0];
+
+    // 2. Check myAward.notes (entered by buyer when awarding in RfqQuoteAwardingPage)
+    const awardNote = myAward?.notes?.trim();
+
+    // 3. Check latest buyer history audit record
+    const historyNote = latestBuyerHistory?.note?.trim();
+    const isCustomHistoryNote = historyNote && !historyNote.startsWith("Buyer awarded allocation for Round");
+
+    const noteText = noteRecord?.note?.trim() || awardNote || (isCustomHistoryNote ? historyNote : undefined);
+
+    if (!noteText) return null;
+
+    const round = noteRecord?.award_round || myAward?.award_round || latestBuyerHistory?.award_round || 1;
+    const timestamp = noteRecord?.created_at || myAward?.updated_at || myAward?.created_at || latestBuyerHistory?.created_at;
+
+    return {
+      note: noteText,
+      round,
+      timestamp,
+      quoteNumber: myQuote?.seller_quote_number,
+    };
+  }, [revisionNotes, myQuote, sellerParty, myAward, latestBuyerHistory]);
 
   /*
    * 4. Breadcrumb Pattern (Rule 4A: Must be called before conditional returns)
@@ -167,31 +206,66 @@ export const SellerAwardRevisionResponse: React.FC = () => {
   const breadcrumbs = useMemo(() => [
     { title: <a onClick={() => navigate(basePath)}>Seller RFQs</a> },
     { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || "RFQ Workspace"}</a> },
-    { title: <span className="text-slate-800">Item #{item?.item_index || 1} Award Revision</span> },
+    { title: <span className="text-slate-800 font-semibold">Item #{item?.item_index || 1} Award Allocation</span> },
   ], [navigate, basePath, rfqId, rfq?.rfq_number, item?.item_index]);
 
   useBreadcrumb(breadcrumbs);
 
   /*
-   * 5. Interactive Form States
+   * 5. Interactive Multi-Variant Form States
    */
-  const [offeredQty, setOfferedQty] = useState<number>(0);
-  const [offeredPrice, setOfferedPrice] = useState<number>(0);
+  const [variantResponses, setVariantResponses] = useState<VariantResponseRow[]>([]);
   const [responseNote, setResponseNote] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // Initialize response form with buyer target request or current quote values
+  // Initialize response form with awarded variants or single fallback
   useEffect(() => {
-    if (latestBuyerHistory) {
-      setOfferedQty(latestBuyerHistory.quantity || item?.req_quantity || 1);
-      setOfferedPrice(latestBuyerHistory.unit_price || 0);
-    } else if (myAwardItem) {
-      setOfferedQty(myAwardItem.buyer_target_quantity || myAwardItem.awarded_quantity || item?.req_quantity || 1);
-      setOfferedPrice(myAwardItem.unit_price || 0);
+    if (myAwardItems.length > 0) {
+      setVariantResponses(
+        myAwardItems.map(itemAward => {
+          const variantHistory = sellerHistory.find(h => h.variant_id === itemAward.variant_id);
+          const initialQty =
+            itemAward.seller_offered_quantity ||
+            itemAward.awarded_quantity ||
+            itemAward.buyer_target_quantity ||
+            variantHistory?.quantity ||
+            1;
+          const initialPrice =
+            itemAward.unit_price ||
+            variantHistory?.unit_price ||
+            0;
+
+          return {
+            variantAwardId: itemAward.id,
+            variantId: itemAward.variant_id,
+            variantType: itemAward.variant_type || "CUSTOM",
+            variantLabel: itemAward.variant_label || itemAward.sku || `Variant (${itemAward.variant_id})`,
+            uom: itemAward.unit_of_measure || item?.req_unit || "PCS",
+            buyerTargetQty: itemAward.buyer_target_quantity || itemAward.awarded_quantity || 1,
+            buyerUnitPrice: itemAward.unit_price || 0,
+            offeredQty: initialQty,
+            offeredPrice: initialPrice,
+          };
+        })
+      );
     } else if (myQuote) {
-      setOfferedQty(myQuote.offer_quantity || item?.req_quantity || 1);
+      const initialQty = latestBuyerHistory?.quantity || myQuote.offer_quantity || item?.req_quantity || 1;
+      const initialPrice = latestBuyerHistory?.unit_price || 0;
+      setVariantResponses([
+        {
+          variantAwardId: "fallback",
+          variantId: "default",
+          variantType: "CUSTOM",
+          variantLabel: "Standard Line Item",
+          uom: item?.req_unit || "PCS",
+          buyerTargetQty: latestBuyerHistory?.quantity || item?.req_quantity || 1,
+          buyerUnitPrice: initialPrice,
+          offeredQty: initialQty,
+          offeredPrice: initialPrice,
+        },
+      ]);
     }
-  }, [latestBuyerHistory, myAwardItem, myQuote, item?.req_quantity]);
+  }, [myAwardItems, sellerHistory, myQuote, item?.req_quantity, item?.req_unit, latestBuyerHistory]);
 
   /*
    * 6. Loading & Guard Checks (Rule 4B: after all hooks)
@@ -205,9 +279,28 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     );
   }
 
-  const currentAwardRound = myQuote?.award_round || 1;
+  const currentAwardRound = myAward?.award_round || 1;
   const currentProposalRound = myQuote?.round || 1;
-  const currentTotal = (offeredQty || 0) * (offeredPrice || 0);
+  const awardStatus = myAward?.award_status || "AWARDED";
+  const isConfirmed = awardStatus === "CONFIRMED";
+  const isRevised = awardStatus === "SELLER_REVISED";
+
+  const totalOfferedUnits = variantResponses.reduce((sum, r) => sum + (r.offeredQty || 0), 0);
+  const totalOfferedAmount = variantResponses.reduce((sum, r) => sum + ((r.offeredQty || 0) * (r.offeredPrice || 0)), 0);
+  const totalBuyerTargetUnits = variantResponses.reduce((sum, r) => sum + (r.buyerTargetQty || 0), 0);
+  const totalBuyerTargetAmount = variantResponses.reduce((sum, r) => sum + ((r.buyerTargetQty || 0) * (r.buyerUnitPrice || 0)), 0);
+
+  const handleRowQtyChange = (variantId: string, val: number | null) => {
+    setVariantResponses(prev =>
+      prev.map(row => (row.variantId === variantId ? { ...row, offeredQty: val || 0 } : row))
+    );
+  };
+
+  const handleRowPriceChange = (variantId: string, val: number | null) => {
+    setVariantResponses(prev =>
+      prev.map(row => (row.variantId === variantId ? { ...row, offeredPrice: val || 0 } : row))
+    );
+  };
 
   /*
    * 7. Handlers
@@ -218,76 +311,95 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     try {
       const now = new Date().toISOString();
 
-      // Update quote status to DEVIATION_ACCEPTED / confirmed
-      await rfqDb.seller_quotes.update(myQuote.id, {
-        status: "DEVIATION_ACCEPTED",
-        offer_quantity: offeredQty,
-        updated_at: now,
-      });
-
-      // Update quote variant award and quote award if present
-      if (myAwardItem) {
-        const updatePayload = {
-          variant_award_status: "CONFIRMED" as const,
-          seller_accepted: true,
-          seller_accepted_at: now,
-          seller_offered_quantity: offeredQty,
-          awarded_quantity: offeredQty,
-          updated_at: now,
-        };
-        await rfqDb.rfq_quote_variant_awards.update(myAwardItem.id, updatePayload);
-        const qa = await rfqDb.rfq_quote_awards.where("seller_quote_id").equals(myQuote.id).first();
-        if (qa) {
-          await rfqDb.rfq_quote_awards.update(qa.id, {
-            award_status: "CONFIRMED",
-            seller_accepted_at: now,
+      await rfqDb.transaction(
+        "rw",
+        [
+          rfqDb.seller_quotes,
+          rfqDb.rfq_quote_awards,
+          rfqDb.rfq_quote_item_awards,
+          rfqDb.rfq_quote_item_award_revisions,
+          rfqDb.rfq_award_revision_notes,
+        ],
+        async () => {
+          // 1. Update quote status to DEVIATION_ACCEPTED
+          await rfqDb.seller_quotes.update(myQuote.id, {
+            status: "DEVIATION_ACCEPTED",
+            offer_quantity: totalBuyerTargetUnits || totalOfferedUnits,
             updated_at: now,
           });
+
+          // 2. Update quote award
+          if (myAward) {
+            await rfqDb.rfq_quote_awards.update(myAward.id, {
+              award_status: "CONFIRMED",
+              seller_accepted_at: now,
+              updated_at: now,
+            });
+          }
+
+          // 3. Update each quote item award
+          for (const row of variantResponses) {
+            if (row.variantAwardId !== "fallback") {
+              await rfqDb.rfq_quote_item_awards.update(row.variantAwardId, {
+                variant_award_status: "CONFIRMED",
+                seller_accepted: true,
+                seller_accepted_at: now,
+                seller_offered_quantity: row.buyerTargetQty,
+                awarded_quantity: row.buyerTargetQty,
+                unit_price: row.buyerUnitPrice,
+                total_price: row.buyerTargetQty * row.buyerUnitPrice,
+                updated_at: now,
+              });
+            }
+          }
+
+          // 4. Record audit revisions
+          const revisions: RfqQuoteItemAwardRevision[] = variantResponses.map(row => ({
+            id: `arh-${crypto.randomUUID()}`,
+            quote_award_id: myAward?.id || "",
+            quote_variant_award_id: row.variantAwardId !== "fallback" ? row.variantAwardId : undefined,
+            rfq_id: rfqId!,
+            rfq_item_id: itemId!,
+            seller_party_id: sellerParty?.id || "pty-seller",
+            seller_quote_id: myQuote.id,
+            award_round: currentAwardRound,
+            actor_type: "SELLER",
+            actor_id: currentUserId || "seller-user",
+            variant_id: row.variantId,
+            quantity: row.buyerTargetQty,
+            unit_price: row.buyerUnitPrice,
+            note: responseNote.trim() ? `Accepted: ${responseNote.trim()}` : "Seller accepted requested allocation.",
+            created_at: now,
+          }));
+
+          if (revisions.length > 0) {
+            await rfqDb.rfq_quote_item_award_revisions.bulkAdd(revisions);
+          }
+
+          // 5. Record note if provided
+          if (responseNote.trim()) {
+            await rfqDb.rfq_award_revision_notes.add({
+              id: `arn-${crypto.randomUUID()}`,
+              rfq_id: rfqId!,
+              rfq_item_id: itemId!,
+              seller_party_id: sellerParty?.id || "pty-seller",
+              seller_quote_id: myQuote.id,
+              buyer_party_id: rfq.requester_party_id || rfq.requester_id || "pty-buyer",
+              quote_award_id: myAward?.id,
+              award_round: currentAwardRound,
+              actor_type: "SELLER",
+              actor_id: currentUserId || "seller-user",
+              note_type: "SELLER_ACCEPTANCE",
+              note: responseNote.trim(),
+              created_at: now,
+            });
+          }
         }
-      }
-
-      // Record in dedicated award revision notes table
-      if (responseNote && responseNote.trim()) {
-        await rfqDb.rfq_award_revision_notes.add({
-          id: `arn-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-          rfq_id: rfqId!,
-          rfq_item_id: itemId!,
-          seller_party_id: sellerParty?.id || "pty-seller",
-          seller_quote_id: myQuote.id,
-          buyer_party_id: rfq.requester_party_id || rfq.requester_id || "pty-buyer",
-          quote_award_id: myAwardItem?.quote_award_id,
-          quote_variant_award_id: myAwardItem?.id,
-          award_round: currentAwardRound,
-          actor_type: "SELLER",
-          actor_id: currentUserId || "seller-user",
-          note_type: "SELLER_ACCEPTANCE",
-          note: responseNote.trim(),
-          created_at: now,
-        });
-      }
-
-      // Record in audit trail
-      await rfqDb.award_revision_history.add({
-        id: `arh-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-        quote_award_id: myAwardItem?.quote_award_id,
-        quote_variant_award_id: myAwardItem?.id,
-        rfq_id: rfqId!,
-        rfq_item_id: itemId!,
-        seller_party_id: sellerParty?.id || "pty-seller",
-        seller_quote_id: myQuote.id,
-        award_round: currentAwardRound,
-        actor_type: "SELLER",
-        actor_id: currentUserId || "seller-user",
-        variant_id: myAwardItem?.variant_id || "default",
-        quantity: offeredQty,
-        unit_price: offeredPrice,
-        note: responseNote ? `Accepted: ${responseNote}` : "Seller accepted requested allocation.",
-        created_at: now,
-      });
+      );
 
       notification.success({
         message: "Award Allocation Confirmed",
-        description: `You have successfully confirmed the allocation of ${offeredQty} ${item.req_unit || "PCS"} at ${formatCurrency(offeredPrice)}.`,
+        description: `You have successfully confirmed the allocation of ${totalBuyerTargetUnits} units totaling ${formatCurrency(totalBuyerTargetAmount)}.`,
       });
 
       navigate(`${basePath}/${rfqId}`);
@@ -301,80 +413,106 @@ export const SellerAwardRevisionResponse: React.FC = () => {
 
   const handleCounterOffer = async () => {
     if (!myQuote) return;
-    if (offeredQty <= 0) {
-      message.warning("Please enter a valid fulfillable quantity greater than 0.");
-      return;
+
+    for (const row of variantResponses) {
+      if (row.offeredQty <= 0) {
+        message.warning(`Please enter a valid fulfillable quantity greater than 0 for ${row.variantLabel}.`);
+        return;
+      }
     }
+
     setIsSubmitting(true);
     try {
       const now = new Date().toISOString();
 
-      // Update quote with new offer quantity
-      await rfqDb.seller_quotes.update(myQuote.id, {
-        status: "SUBMITTED",
-        offer_quantity: offeredQty,
-        updated_at: now,
-      });
-
-      // Update quote variant award and quote award if present
-      if (myAwardItem) {
-        const updatePayload = {
-          variant_award_status: "SELLER_REVISED" as const,
-          seller_accepted: false,
-          seller_offered_quantity: offeredQty,
-          unit_price: offeredPrice,
-          updated_at: now,
-        };
-        await rfqDb.rfq_quote_variant_awards.update(myAwardItem.id, updatePayload);
-        const qa = await rfqDb.rfq_quote_awards.where("seller_quote_id").equals(myQuote.id).first();
-        if (qa) {
-          await rfqDb.rfq_quote_awards.update(qa.id, {
-            award_status: "SELLER_REVISED",
+      await rfqDb.transaction(
+        "rw",
+        [
+          rfqDb.seller_quotes,
+          rfqDb.rfq_quote_awards,
+          rfqDb.rfq_quote_item_awards,
+          rfqDb.rfq_quote_item_award_revisions,
+          rfqDb.rfq_award_revision_notes,
+        ],
+        async () => {
+          // 1. Update quote
+          await rfqDb.seller_quotes.update(myQuote.id, {
+            status: "SUBMITTED",
+            offer_quantity: totalOfferedUnits,
             updated_at: now,
           });
+
+          // 2. Update quote award
+          if (myAward) {
+            await rfqDb.rfq_quote_awards.update(myAward.id, {
+              award_status: "SELLER_REVISED",
+              total_awarded_quantity: totalOfferedUnits,
+              total_awarded_amount: totalOfferedAmount,
+              updated_at: now,
+            });
+          }
+
+          // 3. Update each quote item award
+          for (const row of variantResponses) {
+            if (row.variantAwardId !== "fallback") {
+              await rfqDb.rfq_quote_item_awards.update(row.variantAwardId, {
+                variant_award_status: "SELLER_REVISED",
+                seller_accepted: false,
+                seller_offered_quantity: row.offeredQty,
+                unit_price: row.offeredPrice,
+                total_price: row.offeredQty * row.offeredPrice,
+                updated_at: now,
+              });
+            }
+          }
+
+          // 4. Record counter-offer in audit trail
+          const revisions: RfqQuoteItemAwardRevision[] = variantResponses.map(row => ({
+            id: `arh-${crypto.randomUUID()}`,
+            quote_award_id: myAward?.id || "",
+            quote_variant_award_id: row.variantAwardId !== "fallback" ? row.variantAwardId : undefined,
+            rfq_id: rfqId!,
+            rfq_item_id: itemId!,
+            seller_party_id: sellerParty?.id || "pty-seller",
+            seller_quote_id: myQuote.id,
+            award_round: currentAwardRound,
+            actor_type: "SELLER",
+            actor_id: currentUserId || "seller-user",
+            variant_id: row.variantId,
+            quantity: row.offeredQty,
+            unit_price: row.offeredPrice,
+            note: responseNote.trim() ? `Counter-Offer: ${responseNote.trim()}` : "Seller submitted revised counter-offer.",
+            created_at: now,
+          }));
+
+          if (revisions.length > 0) {
+            await rfqDb.rfq_quote_item_award_revisions.bulkAdd(revisions);
+          }
+
+          // 5. Record note if provided
+          if (responseNote.trim()) {
+            await rfqDb.rfq_award_revision_notes.add({
+              id: `arn-${crypto.randomUUID()}`,
+              rfq_id: rfqId!,
+              rfq_item_id: itemId!,
+              seller_party_id: sellerParty?.id || "pty-seller",
+              seller_quote_id: myQuote.id,
+              buyer_party_id: rfq.requester_party_id || rfq.requester_id || "pty-buyer",
+              quote_award_id: myAward?.id,
+              award_round: currentAwardRound,
+              actor_type: "SELLER",
+              actor_id: currentUserId || "seller-user",
+              note_type: "SELLER_COUNTER_OFFER",
+              note: responseNote.trim(),
+              created_at: now,
+            });
+          }
         }
-      }
-
-      // Record in dedicated award revision notes table
-      if (responseNote && responseNote.trim()) {
-        await rfqDb.rfq_award_revision_notes.add({
-          id: `arn-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-          rfq_id: rfqId!,
-          rfq_item_id: itemId!,
-          seller_party_id: sellerParty?.id || "pty-seller",
-          seller_quote_id: myQuote.id,
-          buyer_party_id: rfq.requester_party_id || rfq.requester_id || "pty-buyer",
-          quote_award_id: myAwardItem?.quote_award_id,
-          quote_variant_award_id: myAwardItem?.id,
-          award_round: currentAwardRound,
-          actor_type: "SELLER",
-          actor_id: currentUserId || "seller-user",
-          note_type: "SELLER_COUNTER_OFFER",
-          note: responseNote.trim(),
-          created_at: now,
-        });
-      }
-
-      // Record counter-offer in audit trail
-      await rfqDb.award_revision_history.add({
-        id: `arh-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
-        rfq_id: rfqId!,
-        rfq_item_id: itemId!,
-        seller_party_id: sellerParty?.id || "pty-seller",
-        seller_quote_id: myQuote.id,
-        award_round: currentAwardRound,
-        actor_type: "SELLER",
-        actor_id: currentUserId || "seller-user",
-        variant_id: myAwardItem?.variant_id || "default",
-        quantity: offeredQty,
-        unit_price: offeredPrice,
-        note: responseNote ? `Counter-Offer: ${responseNote}` : "Seller submitted revised counter-offer.",
-        created_at: now,
-      });
+      );
 
       notification.info({
         message: "Counter-Offer Submitted",
-        description: `Your counter-offer of ${offeredQty} ${item.req_unit || "PCS"} at ${formatCurrency(offeredPrice)} has been sent to the buyer.`,
+        description: `Your counter-offer of ${totalOfferedUnits} units totaling ${formatCurrency(totalOfferedAmount)} has been sent to the buyer.`,
       });
 
       navigate(`${basePath}/${rfqId}`);
@@ -386,6 +524,106 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     }
   };
 
+  const tableColumns = [
+    {
+      title: "Variant / Option",
+      dataIndex: "variantLabel",
+      key: "variantLabel",
+      render: (label: string, record: VariantResponseRow) => (
+        <div>
+          <div className="font-bold text-xs text-slate-800">{label}</div>
+          <div className="flex items-center gap-1.5 mt-0.5">
+            <AntTag color={record.variantType === "CUSTOM" ? "blue" : "purple"} className="text-[10px] m-0">
+              {record.variantType}
+            </AntTag>
+            <span className="text-[10px] text-slate-400 font-mono">ID: {record.variantId}</span>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Buyer Requested Allocation",
+      key: "buyerTarget",
+      align: "right" as const,
+      render: (_: any, record: VariantResponseRow) => (
+        <div className="text-right">
+          <div className="font-bold text-xs text-indigo-700">
+            {record.buyerTargetQty} {record.uom}
+          </div>
+          <div className="text-[11px] text-slate-500 font-medium">
+            @ {formatCurrency(record.buyerUnitPrice)}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Fulfillable Quantity",
+      key: "offeredQty",
+      width: 180,
+      render: (_: any, record: VariantResponseRow) => (
+        <div className="space-y-1">
+          <InputNumber
+            min={1}
+            step={1}
+            disabled={isConfirmed || isSubmitting}
+            value={record.offeredQty}
+            onChange={val => handleRowQtyChange(record.variantId, val)}
+            className="w-full font-mono font-bold"
+            size="middle"
+            addonAfter={record.uom}
+          />
+          {record.offeredQty !== record.buyerTargetQty && (
+            <span className="text-[10px] text-amber-600 block font-medium">
+              Requested: {record.buyerTargetQty} {record.uom} ({record.offeredQty - record.buyerTargetQty > 0 ? `+${record.offeredQty - record.buyerTargetQty}` : record.offeredQty - record.buyerTargetQty})
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: "Confirmed Unit Price",
+      key: "offeredPrice",
+      width: 180,
+      render: (_: any, record: VariantResponseRow) => (
+        <div className="space-y-1">
+          <InputNumber
+            min={0}
+            step={0.01}
+            disabled={isConfirmed || isSubmitting}
+            value={record.offeredPrice}
+            onChange={val => handleRowPriceChange(record.variantId, val)}
+            className="w-full font-mono font-bold"
+            size="middle"
+            prefix={<DollarOutlined className="text-slate-400" />}
+          />
+          {record.offeredPrice !== record.buyerUnitPrice && (
+            <span className="text-[10px] text-amber-600 block font-medium">
+              Target: {formatCurrency(record.buyerUnitPrice)}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      title: "Line Subtotal",
+      key: "subtotal",
+      align: "right" as const,
+      render: (_: any, record: VariantResponseRow) => {
+        const subtotal = (record.offeredQty || 0) * (record.offeredPrice || 0);
+        return (
+          <div className="text-right">
+            <div className="font-mono font-bold text-xs text-emerald-700">
+              {formatCurrency(subtotal)}
+            </div>
+            <div className="text-[10px] text-slate-400">
+              {record.offeredQty} &times; {formatCurrency(record.offeredPrice)}
+            </div>
+          </div>
+        );
+      },
+    },
+  ];
+
   return (
     <div className="max-w-5xl mx-auto space-y-4 pb-12">
       {/* 1. Page Header Card */}
@@ -394,18 +632,36 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">
-                Award Allocation Revision (Award Rev Round {currentAwardRound})
+                Award Allocation Review
               </h1>
               <AntTag color="purple" className="font-bold text-xs">
-                Award Rev R{currentAwardRound}
+                Award Round {currentAwardRound}
               </AntTag>
+              {isConfirmed && (
+                <AntTag color="emerald" className="font-bold text-xs">
+                  CONFIRMED
+                </AntTag>
+              )}
+              {isRevised && (
+                <AntTag color="orange" className="font-bold text-xs">
+                  COUNTER-OFFER SUBMITTED
+                </AntTag>
+              )}
             </div>
             <p className="text-xs text-slate-500 mt-1 m-0">
-              Review the buyer&apos;s allocated target quantity and terms for this line item. You can confirm the allocation or submit a revised counter-offer.
+              The buyer has awarded line item allocation to your quote across variant options. Review the requested quantities and pricing, then confirm or counter-propose revised allocations.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
+            <Button
+              size="small"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate(`${basePath}/${rfqId}`)}
+              className="text-xs"
+            >
+              Back to RFQ
+            </Button>
             <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
               RFQ: {rfq.rfq_number}
             </span>
@@ -413,7 +669,37 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         </div>
       </Card>
 
-      {/* 2. Line Item & Buyer Target Request Overview */}
+      {/* 2. Status Alerts */}
+      {isConfirmed && (
+        <Alert
+          type="success"
+          showIcon
+          icon={<CheckCircleOutlined className="text-emerald-600" />}
+          message={<span className="font-bold text-xs text-emerald-900">Award Allocation Confirmed & Accepted</span>}
+          description={
+            <span className="text-xs text-emerald-800">
+              You have confirmed and accepted this award allocation{myAward?.seller_accepted_at ? ` on ${new Date(myAward.seller_accepted_at).toLocaleString()}` : ""}. The buyer can now proceed with Purchase Order issuance.
+            </span>
+          }
+          className="bg-emerald-50 border-emerald-200 shadow-sm"
+        />
+      )}
+
+      {isRevised && (
+        <Alert
+          type="info"
+          showIcon
+          message={<span className="font-bold text-xs text-blue-900">Counter-Offer Sent to Buyer</span>}
+          description={
+            <span className="text-xs text-blue-800">
+              Your revised counter-offer is currently under review by the buyer. You will be notified once the buyer responds or re-issues the award allocation.
+            </span>
+          }
+          className="bg-blue-50 border-blue-200 shadow-sm"
+        />
+      )}
+
+      {/* 3. Line Item Overview */}
       <Card size="small" className="shadow-sm border-slate-200 bg-white">
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-slate-200 pb-2">
@@ -434,7 +720,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
                 Proposal R{currentProposalRound}
               </AntTag>
               <AntTag color="purple" className="font-semibold text-xs">
-                Award Rev R{currentAwardRound}
+                Award Round {currentAwardRound}
               </AntTag>
             </div>
           </div>
@@ -451,152 +737,122 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             <Descriptions.Item label="Original RFQ Quantity">
               <span>{item.req_quantity} {item.req_unit || "PCS"}</span>
             </Descriptions.Item>
-            <Descriptions.Item label="Buyer Requested Allocation">
+            <Descriptions.Item label="Buyer Total Requested Allocation">
               <span className="font-bold text-indigo-700 text-sm">
-                {latestBuyerHistory?.quantity || myAwardItem?.buyer_target_quantity || item.req_quantity} {item.req_unit || "PCS"}
+                {totalBuyerTargetUnits} {item.req_unit || "PCS"}
               </span>
             </Descriptions.Item>
-            <Descriptions.Item label="Buyer Target Price">
+            <Descriptions.Item label="Buyer Total Target Value">
               <span className="font-bold text-emerald-700 text-sm">
-                {formatCurrency(latestBuyerHistory?.unit_price || myAwardItem?.unit_price || 0)}
+                {formatCurrency(totalBuyerTargetAmount)}
               </span>
             </Descriptions.Item>
           </Descriptions>
 
-          {/* Buyer's Revision Note Callout */}
-          {(latestBuyerNote?.note || latestBuyerHistory?.note) && (
+          {/* Buyer's Latest Note Callout */}
+          {latestBuyerNoteInfo && (
             <Alert
               type="warning"
               showIcon
-              icon={<FileTextOutlined className="text-amber-600" />}
-              message={<span className="font-bold text-xs text-amber-900">Buyer&apos;s Revision Request Note:</span>}
-              description={<span className="text-xs text-amber-800 italic">&ldquo;{latestBuyerNote?.note || latestBuyerHistory?.note}&rdquo;</span>}
-              className="bg-amber-50/70 border-amber-200"
+              icon={<FileTextOutlined className="text-amber-600 text-sm mt-0.5" />}
+              message={
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="font-bold text-xs text-amber-900">
+                    Latest Buyer&apos;s Note for Quote {latestBuyerNoteInfo.quoteNumber ? `(${latestBuyerNoteInfo.quoteNumber})` : ""} (Round {latestBuyerNoteInfo.round}):
+                  </span>
+                  {latestBuyerNoteInfo.timestamp && (
+                    <span className="text-[11px] text-amber-700/80 font-normal font-mono">
+                      {new Date(latestBuyerNoteInfo.timestamp).toLocaleString()}
+                    </span>
+                  )}
+                </div>
+              }
+              description={
+                <div className="mt-1 bg-amber-100/40 p-2 rounded border border-amber-200/60">
+                  <span className="text-xs text-amber-950 italic font-medium leading-relaxed">
+                    &ldquo;{latestBuyerNoteInfo.note}&rdquo;
+                  </span>
+                </div>
+              }
+              className="bg-amber-50/80 border-amber-200 shadow-xs"
             />
           )}
         </div>
       </Card>
 
-      {/* 3. Negotiation History Timeline */}
-      {sellerHistory.length > 0 && (
-        <Card
-          size="small"
-          className="shadow-sm border-slate-200 bg-white"
-          title={
-            <div className="flex items-center gap-2">
-              <HistoryOutlined className="text-indigo-600" />
-              <span className="font-bold text-xs text-slate-800">Negotiation Round History</span>
-            </div>
-          }
-        >
-          <Timeline
-            className="pt-2"
-            items={sellerHistory.map(entry => {
-              const isBuyer = entry.actor_type === "BUYER";
-              return {
-                color: isBuyer ? "blue" : "green",
-                children: (
-                  <div className="text-xs space-y-0.5 pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900">
-                        {isBuyer ? "Buyer (Allocation Request)" : "Seller (Your Response)"}
-                      </span>
-                      <AntTag color={isBuyer ? "purple" : "cyan"} className="text-[10px] font-semibold m-0">
-                        Award Rev R{entry.award_round}
-                      </AntTag>
-                      <span className="text-[11px] text-slate-400">
-                        {new Date(entry.created_at).toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="text-slate-700 font-medium">
-                      Quantity: <strong>{entry.quantity} {item.req_unit || "PCS"}</strong> | Unit Price: <strong>{formatCurrency(entry.unit_price)}</strong> | Total: <strong>{formatCurrency(entry.quantity * entry.unit_price)}</strong>
-                    </div>
-                    {entry.note && (
-                      <div className="text-slate-600 italic bg-slate-50 p-1.5 rounded border border-slate-200 text-[11px]">
-                        &ldquo;{entry.note}&rdquo;
-                      </div>
-                    )}
-                  </div>
-                ),
-              };
-            })}
-          />
-        </Card>
-      )}
-
-      {/* 4. Seller's Response Form */}
+      {/* 4. Multi-Variant Allocation Response Table */}
       <Card
         size="small"
         className="shadow-sm border-slate-200 bg-white"
         title={
-          <div className="flex items-center gap-2">
-            <ShoppingOutlined className="text-emerald-600" />
-            <span className="font-bold text-xs text-slate-800">Your Allocation Response</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ShoppingOutlined className="text-emerald-600" />
+              <span className="font-bold text-xs text-slate-800">Your Allocation Response</span>
+            </div>
+            <span className="text-xs text-slate-500 font-normal">
+              {variantResponses.length} Awarded Variant Option{variantResponses.length !== 1 ? "s" : ""}
+            </span>
           </div>
         }
       >
         <div className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Fulfillable Quantity ({item.req_unit || "PCS"}):
-              </label>
-              <InputNumber
-                min={1}
-                step={1}
-                value={offeredQty}
-                onChange={val => setOfferedQty(val || 0)}
-                className="w-full font-mono font-bold"
-                size="middle"
-                placeholder="Enter fulfillable quantity"
-              />
-              <span className="text-[11px] text-slate-500 mt-0.5 block">
-                Buyer requested: {latestBuyerHistory?.quantity || item.req_quantity} {item.req_unit || "PCS"}
-              </span>
+          <Table
+            dataSource={variantResponses}
+            columns={tableColumns}
+            rowKey="variantId"
+            pagination={false}
+            size="small"
+            bordered
+            className="border border-slate-200 rounded-md overflow-hidden"
+          />
+
+          {/* Allocation Summary Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
+            <div className="flex items-center gap-6">
+              <div>
+                <span className="text-[11px] text-slate-500 block">Total Fulfillable Quantity:</span>
+                <span className="text-sm font-mono font-bold text-slate-800">
+                  {totalOfferedUnits} {item.req_unit || "PCS"}
+                </span>
+                <span className="text-[10px] text-slate-400 block">
+                  Buyer Target: {totalBuyerTargetUnits} {item.req_unit || "PCS"}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[11px] text-slate-500 block">Total Contract Allocation:</span>
+                <span className="text-base font-mono font-bold text-emerald-700">
+                  {formatCurrency(totalOfferedAmount)}
+                </span>
+                <span className="text-[10px] text-slate-400 block">
+                  Buyer Target Total: {formatCurrency(totalBuyerTargetAmount)}
+                </span>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Confirmed Unit Price (USD):
-              </label>
-              <InputNumber
-                min={0}
-                step={0.01}
-                value={offeredPrice}
-                onChange={val => setOfferedPrice(val || 0)}
-                className="w-full font-mono font-bold"
-                size="middle"
-                prefix={<DollarOutlined className="text-slate-400" />}
-                placeholder="Enter unit price"
-              />
-              <span className="text-[11px] text-slate-500 mt-0.5 block">
-                Target: {formatCurrency(latestBuyerHistory?.unit_price || myAwardItem?.unit_price || 0)}
-              </span>
-            </div>
-
-            <div className="flex flex-col justify-center bg-white p-2.5 rounded border border-slate-200">
-              <span className="text-[11px] text-slate-500 font-medium">Total Contract Allocation:</span>
-              <span className="text-base font-mono font-bold text-emerald-700">
-                {formatCurrency(currentTotal)}
-              </span>
-              <span className="text-[10px] text-slate-400">
-                {offeredQty} {item.req_unit || "PCS"} &times; {formatCurrency(offeredPrice)}
-              </span>
-            </div>
+            {totalOfferedUnits !== totalBuyerTargetUnits && (
+              <div className="text-xs text-amber-700 bg-amber-50 px-3 py-1.5 rounded border border-amber-200 font-medium">
+                Note: Total offered quantity differs by {Math.abs(totalOfferedUnits - totalBuyerTargetUnits)} {item.req_unit || "PCS"} from requested allocation.
+              </div>
+            )}
           </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Response / Clarification Note for Buyer:
-            </label>
-            <Input.TextArea
-              rows={3}
-              placeholder="e.g. We confirm we can fulfill 300 PCS at $250.00 with shipping scheduled within 10 business days."
-              value={responseNote}
-              onChange={e => setResponseNote(e.target.value)}
-              className="text-xs"
-            />
-          </div>
+          {!isConfirmed && (
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Response / Clarification Note for Buyer:
+              </label>
+              <Input.TextArea
+                rows={3}
+                placeholder="e.g. We confirm we can fulfill the requested variants at the agreed schedule, with shipping within 10 business days."
+                value={responseNote}
+                onChange={e => setResponseNote(e.target.value)}
+                className="text-xs"
+                disabled={isSubmitting}
+              />
+            </div>
+          )}
 
           <Divider className="my-2" />
 
@@ -608,32 +864,43 @@ export const SellerAwardRevisionResponse: React.FC = () => {
               disabled={isSubmitting}
               className="text-xs font-semibold"
             >
-              Cancel
+              Back to RFQ
             </Button>
 
-            <Space>
-              <Button
-                type="default"
-                size="middle"
-                icon={<SendOutlined />}
-                onClick={handleCounterOffer}
-                loading={isSubmitting}
-                className="text-xs font-semibold text-indigo-700 border-indigo-200 hover:border-indigo-400"
-              >
-                Submit Counter-Offer (Revise Qty / Price)
-              </Button>
+            {!isConfirmed ? (
+              <Space>
+                <Button
+                  type="default"
+                  size="middle"
+                  icon={<SendOutlined />}
+                  onClick={handleCounterOffer}
+                  loading={isSubmitting}
+                  className="text-xs font-semibold text-indigo-700 border-indigo-200 hover:border-indigo-400"
+                >
+                  Send as Revised (Counter-Offer)
+                </Button>
 
+                <Button
+                  type="primary"
+                  size="middle"
+                  icon={<CheckCircleOutlined />}
+                  onClick={handleAcceptAllocation}
+                  loading={isSubmitting}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold border-0"
+                >
+                  Accept & Confirm Award
+                </Button>
+              </Space>
+            ) : (
               <Button
                 type="primary"
                 size="middle"
-                icon={<CheckCircleOutlined />}
-                onClick={handleAcceptAllocation}
-                loading={isSubmitting}
-                className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold"
+                onClick={() => navigate(`${basePath}/${rfqId}`)}
+                className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold border-0"
               >
-                Accept & Confirm Allocation
+                Done (Confirmed)
               </Button>
-            </Space>
+            )}
           </div>
         </div>
       </Card>

@@ -31,6 +31,7 @@ export const SellerRfqWorkspace: React.FC = () => {
       sellerProducts,
       awardHistory,
       awardItems,
+      quoteAwards,
     ] = await Promise.all([
       rfqDb.rfqs.get(rfqId),
       rfqDb.rfq_items.where('rfq_id').equals(rfqId).toArray(),
@@ -39,8 +40,9 @@ export const SellerRfqWorkspace: React.FC = () => {
       catalogDb.products.toArray(),
       catalogDb.categories.toArray(),
       catalogDb.sellerProducts.toArray(),
-      rfqDb.award_revision_history.where('rfq_id').equals(rfqId).toArray(),
-      rfqDb.rfq_quote_variant_awards.where('rfq_id').equals(rfqId).toArray(),
+      rfqDb.rfq_quote_item_award_revisions.where('rfq_id').equals(rfqId).toArray(),
+      rfqDb.rfq_quote_item_awards.where('rfq_id').equals(rfqId).toArray(),
+      rfqDb.rfq_quote_awards.where('rfq_id').equals(rfqId).toArray(),
     ]);
 
     return {
@@ -52,7 +54,8 @@ export const SellerRfqWorkspace: React.FC = () => {
       categories,
       sellerProducts,
       awardHistory: awardHistory || [],
-      awardItems: awardItems,
+      awardItems: awardItems || [],
+      quoteAwards: quoteAwards || [],
     };
   }, [rfqId]);
 
@@ -66,6 +69,7 @@ export const SellerRfqWorkspace: React.FC = () => {
     sellerProducts = [],
     awardHistory = [],
     awardItems = [],
+    quoteAwards = [],
   } = pageData ?? {};
 
   const activeParty = useMemo(() => {
@@ -112,23 +116,21 @@ export const SellerRfqWorkspace: React.FC = () => {
 
         const isVariantSelected = Boolean(item.variant_id);
 
+        const myAward = (quoteAwards || []).find(
+          (a: any) => a.rfq_item_id === item.id && a.seller_party_id === activePartyId
+        );
+        const myAwardStatus = myAward?.award_status;
+        const awardRound = myAward?.award_round || 1;
+
+        const myAwardItems = (awardItems || []).filter(
+          (a) => a.rfq_item_id === item.id && a.seller_party_id === activePartyId
+        );
         const hasAwardHistory = awardHistory.some(
           (h) => h.rfq_item_id === item.id && h.seller_party_id === activePartyId
         );
-        const hasAwardItem = awardItems.some(
-          (a) => a.rfq_item_id === item.id && a.seller_party_id === activePartyId
-        );
 
-        const isDeviationAccepted = quote?.status === 'DEVIATION_ACCEPTED';
-        const isAwardRoundSet = Boolean(quote?.award_round !== undefined && quote.award_round >= 1);
-
-        // Move to award revision if deviation accepted, or award round active, or award history exists
-        const isAwardRevision = Boolean(
-          isDeviationAccepted ||
-          hasAwardHistory ||
-          hasAwardItem ||
-          (quote?.status === 'REVISION_REQUIRED' && (isAwardRoundSet || hasAwardHistory))
-        );
+        // An award exists strictly if an award record, award items, or award history exists
+        const hasAward = Boolean(myAward || myAwardItems.length > 0 || hasAwardHistory);
 
         return {
           key: item.id,
@@ -143,11 +145,12 @@ export const SellerRfqWorkspace: React.FC = () => {
           quote_number: quote?.seller_quote_number,
           quote_status: quote?.status || 'NOT_SUBMITTED',
           proposal_round: quote?.round || 1,
-          award_round: quote?.award_round || 1,
-          is_award_revision: isAwardRevision,
+          award_round: awardRound,
+          award_status: myAwardStatus,
+          has_award: hasAward,
         };
       });
-  }, [rfqItems, quotes, catalogProducts, categories, sellerProducts, activePartyId, awardHistory, awardItems]);
+  }, [rfqItems, quotes, catalogProducts, categories, sellerProducts, activePartyId, awardHistory, awardItems, quoteAwards]);
 
   const requesterPartyName = useMemo(() => {
     if (!rfq?.requester_id) return 'Requester Company';
@@ -229,6 +232,7 @@ export const SellerRfqWorkspace: React.FC = () => {
           rowKey="key"
           size="small"
           pagination={false}
+          classNames={{ header: { cell: "text-[12px]" } }}
           columns={[
             {
               title: 'S.No',
@@ -278,57 +282,77 @@ export const SellerRfqWorkspace: React.FC = () => {
               ),
             },
             {
-              title: 'Proposal & Award Status',
-              key: 'status',
-              width: 210,
+              title: 'Proposal Status',
+              key: 'proposal_status',
+              width: 160,
               render: (_: any, record: any) => (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <RFQQuoteStatusBadge status={record.quote_status} />
-                    {record.proposal_round > 1 && (
-                      <AntTag color="cyan" className="text-[10px] m-0 font-medium">
-                        Proposal R{record.proposal_round}
-                      </AntTag>
-                    )}
-                  </div>
-                  {record.is_award_revision && record.quote_status === 'REVISION_REQUIRED' && (
-                    <div>
-                      <AntTag color="purple" className="text-[10px] m-0 font-bold">
-                        Award Rev R{record.award_round || 2} Requested
-                      </AntTag>
-                    </div>
-                  )}
-                  {record.quote_status === 'DEVIATION_ACCEPTED' && (
-                    <div>
-                      <AntTag color="emerald" className="text-[10px] m-0 font-semibold">
-                        Award Allocation Eligible
-                      </AntTag>
-                    </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <RFQQuoteStatusBadge status={record.quote_status} />
+                  {record.quote_status !== 'NOT_SUBMITTED' && (
+                    <AntTag color="cyan" className="text-[10px] m-0 font-medium">
+                      Round-{record.proposal_round || 1}
+                    </AntTag>
                   )}
                 </div>
               ),
             },
             {
-              title: 'Action',
-              key: 'action',
+              title: 'Award Status',
+              key: 'award_status',
               width: 190,
-              align: 'right',
               render: (_: any, record: any) => {
-                if (record.is_award_revision) {
-                  const isRevisionRequired = record.quote_status === 'REVISION_REQUIRED';
-                  return (
-                    <Button
-                      type="primary"
-                      size="small"
-                      className={`${isRevisionRequired ? 'bg-purple-600 hover:bg-purple-700' : 'bg-indigo-600 hover:bg-indigo-700'} font-semibold text-xs flex items-center gap-1 ml-auto`}
-                      onClick={() => navigate(`${basePath}/${rfqId}/items/${record.rfq_item_id}/award-revision`)}
-                      icon={<ArrowRightOutlined />}
-                    >
-                      {isRevisionRequired ? 'Respond to Award Rev' : 'View Award Allocation'}
-                    </Button>
-                  );
+                if (!record.has_award) {
+                  if (record.quote_status === 'DEVIATION_ACCEPTED') {
+                    return (
+                      <AntTag color="blue" className="text-[10px] m-0 font-medium border-dashed">
+                        Allocation Eligible
+                      </AntTag>
+                    );
+                  }
+                  return <span className="text-slate-300 font-bold text-sm">—</span>;
                 }
 
+                return (
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {record.award_status === 'CONFIRMED' ? (
+                        <AntTag color="emerald" className="text-[10px] m-0 font-bold">
+                          ✓ Confirmed (R{record.award_round})
+                        </AntTag>
+                      ) : record.award_status === 'SELLER_REVISED' ? (
+                        <AntTag color="amber" className="text-[10px] m-0 font-bold">
+                          Revised (R{record.award_round})
+                        </AntTag>
+                      ) : record.award_status === 'AWARDED' ? (
+                        <AntTag color="purple" className="text-[10px] m-0 font-bold">
+                          Awarded (R{record.award_round})
+                        </AntTag>
+                      ) : (
+                        <AntTag color="blue" className="text-[10px] m-0 font-medium">
+                          Round {record.award_round}
+                        </AntTag>
+                      )}
+                    </div>
+                    {record.award_status === 'AWARDED' && (
+                      <span className="text-[10px] text-purple-700 font-semibold block">
+                        Action Required
+                      </span>
+                    )}
+                    {record.award_status === 'SELLER_REVISED' && (
+                      <span className="text-[10px] text-amber-600 italic block">
+                        Awaiting Buyer Review
+                      </span>
+                    )}
+                  </div>
+                );
+              },
+            },
+            {
+              title: 'Actions',
+              key: 'action',
+              width: 230,
+              align: 'right',
+              render: (_: any, record: any) => {
                 let buttonText = 'Make Proposal';
                 if (record.quote_status === 'DRAFT') buttonText = 'Continue Draft';
                 else if (record.quote_status === 'SUBMITTED') buttonText = 'View Proposal';
@@ -337,17 +361,48 @@ export const SellerRfqWorkspace: React.FC = () => {
                   buttonText = 'View Proposal';
                 else if (record.quote_status === 'REJECTED') buttonText = 'View Proposal';
 
+                const isAwardActionRequired = record.award_status === 'AWARDED';
+                const isAwardConfirmed = record.award_status === 'CONFIRMED';
+
                 return (
-                  <Button
-                    type="primary"
-                    ghost
-                    size="small"
-                    className="font-semibold text-xs"
-                    onClick={() => navigate(`${basePath}/${rfqId}/items/${record.rfq_item_id}/respond`)}
-                    icon={<ArrowRightOutlined />}
-                  >
-                    {buttonText}
-                  </Button>
+                  <div className="flex flex-col items-end gap-1.5">
+                    {record.has_award && (
+                      <Button
+                        type={isAwardActionRequired ? 'primary' : 'default'}
+                        size="small"
+                        className={`${isAwardActionRequired
+                          ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                          : isAwardConfirmed
+                            ? 'text-emerald-700 border-emerald-300 bg-emerald-50/50 hover:bg-emerald-100'
+                            : 'text-amber-700 border-amber-300 bg-amber-50/50 hover:bg-amber-100'
+                          } font-semibold text-xs flex items-center gap-1 w-fit`}
+                        onClick={() => navigate(`${basePath}/${rfqId}/items/${record.rfq_item_id}/award-revision`)}
+                        icon={<ArrowRightOutlined />}
+                      >
+                        {isAwardActionRequired
+                          ? `Review & Confirm Award (R${record.award_round})`
+                          : isAwardConfirmed
+                            ? 'View Confirmed Award ✓'
+                            : `View Counter-Offer (R${record.award_round})`}
+                      </Button>
+                    )}
+
+                    <Button
+                      type={!record.has_award && (record.quote_status === 'NOT_SUBMITTED' || record.quote_status === 'DRAFT' || record.quote_status === 'REVISION_REQUIRED') ? 'primary' : 'default'}
+                      ghost={!record.has_award && (record.quote_status === 'NOT_SUBMITTED' || record.quote_status === 'DRAFT')}
+                      size="small"
+                      className={`${!record.has_award && record.quote_status === 'REVISION_REQUIRED'
+                        ? 'bg-amber-500 hover:bg-amber-600 text-white border-0'
+                        : record.has_award
+                          ? 'text-slate-600 hover:text-slate-900 border-slate-200'
+                          : ''
+                        } font-medium text-xs flex items-center gap-1 w-fit`}
+                      onClick={() => navigate(`${basePath}/${rfqId}/items/${record.rfq_item_id}/respond`)}
+                      icon={<ArrowRightOutlined />}
+                    >
+                      {buttonText}
+                    </Button>
+                  </div>
                 );
               },
             },

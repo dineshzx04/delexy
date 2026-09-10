@@ -63,7 +63,6 @@ export interface SellerQuote {
   id: string;
   rfq_item_id: string;
   round: number; // Proposal Revision Round (1, 2, 3...)
-  award_round?: number; // Award Allocation Revision Round (1, 2, 3...)
   seller_party_id: string;
   seller_quote_number: string;
   // offer_unit_price: number;
@@ -145,51 +144,8 @@ export interface SellerQuoteVariantComment {
 
 export type SellerQuoteComment = SellerQuoteAttributeComment;
 
-// export interface ItemAttributeChangeHistory {
-//   id: string;
-//   rfq_item_id: string;
-//   item_revision?: number;
-//   seller_quote_id?: string | null;
-//   round?: number | null;
-//   group_id: string;
-//   attribute_id: string;
-//   attribute_name?: string;
-//   value_type?: string;
-//   actor_type: "BUYER" | "SELLER" | "SYSTEM";
-//   actor_id: string;
-//   old_value?: ItemAttributeValue[] | null;
-//   new_value?: ItemAttributeValue[] | null;
-//   change_reason?: string;
-//   timestamp?: string;
-//   archived_at?: string;
-// }
 
-export type RfqQuoteAwardStatus =
-  | "DRAFT"
-  | "AWARDED"
-  | "SELLER_REVISED"
-  | "BUYER_REVISED"
-  | "CONFIRMED"
-  | "PO_CREATED"
-  | "PO_RECEIVED"
-  | "COMPLETED"
-  | "REJECTED"
-  | "CANCELLED";
 
-export type RfqQuoteVariantAwardStatus =
-  | "DRAFT"
-  | "AWARDED"
-  | "SELLER_REVISED"
-  | "BUYER_REVISED"
-  | "CONFIRMED"
-  | "PO_CREATED"
-  | "REJECTED";
-
-/**
- * Commercial award commitment granted to a specific SellerQuote.
- * Supports split awards per RFQ item, independent round negotiations,
- * and clean 1:1 lineage to Purchase Orders.
- */
 export interface RfqQuoteAward {
   id: string;
   rfq_id: string;
@@ -198,7 +154,17 @@ export interface RfqQuoteAward {
   seller_party_id: string;
   buyer_party_id: string;
   created_by_user_id?: string;
-  award_status: RfqQuoteAwardStatus;
+  award_status:
+  | "DRAFT"
+  | "AWARDED" // Sent by Buyer (Awaiting Seller Confirmation or Revision)
+  | "SELLER_REVISED" // Sent by Seller (Counter-offer proposing revised terms)
+  | "BUYER_REVISED" // Deprecated: Buyer always sends/re-issues as "AWARDED"
+  | "CONFIRMED" // Confirmed & accepted by Seller
+  | "PO_CREATED" // Buyer released Purchase Order
+  | "PO_RECEIVED" // Seller confirmed PO receipt
+  | "COMPLETED" // Order fulfilled
+  | "REJECTED" // Rejected
+  | "CANCELLED"; // Cancelled;
   award_round: number;
   total_awarded_amount: number;
   total_awarded_quantity: number;
@@ -214,11 +180,7 @@ export interface RfqQuoteAward {
   updated_at: string;
 }
 
-/**
- * Awarded commercial variant belonging to a specific RfqQuoteAward.
- * Models awarded quantity, pricing, round status, and catalog mapping status.
- */
-export interface RfqQuoteVariantAward {
+export interface RfqQuoteItemAward {
   id: string;
   quote_award_id: string;
   rfq_id: string;
@@ -230,8 +192,7 @@ export interface RfqQuoteVariantAward {
   variant_label?: string;
   sku?: string;
 
-  // 2-Tier Round Architecture & Negotiation
-  award_round: number;
+  // Negotiation Quantities & Pricing
   buyer_target_quantity?: number;
   seller_offered_quantity?: number;
   awarded_quantity: number;
@@ -240,7 +201,14 @@ export interface RfqQuoteVariantAward {
   unit_of_measure?: string;
 
   // Lifecycle & Status
-  variant_award_status: RfqQuoteVariantAwardStatus;
+  variant_award_status:
+  | "DRAFT"
+  | "AWARDED"
+  | "SELLER_REVISED"
+  | "BUYER_REVISED"
+  | "CONFIRMED"
+  | "PO_CREATED"
+  | "REJECTED";
   seller_accepted: boolean;
   seller_accepted_at?: string;
   buyer_accepted?: boolean;
@@ -252,31 +220,23 @@ export interface RfqQuoteVariantAward {
   updated_at: string;
 }
 
-export interface AwardRevisionHistory {
+export interface RfqQuoteItemAwardRevision {
   id: string;
-  quote_award_id?: string;
+  actor_type: "BUYER" | "SELLER";
+  actor_id: string;
+  award_round: number;
+  quote_award_id: string;
   quote_variant_award_id?: string;
   rfq_id: string;
   rfq_item_id: string;
   seller_party_id: string;
   seller_quote_id: string;
-  award_round: number;
-  actor_type: "BUYER" | "SELLER";
-  actor_id: string;
   variant_id: string;
   quantity: number;
   unit_price: number;
   note?: string;
   created_at: string;
 }
-
-export type RfqAwardRevisionNoteActor = "BUYER" | "SELLER";
-
-export type RfqAwardRevisionNoteType =
-  | "BUYER_REVISION_REQUEST"
-  | "SELLER_COUNTER_OFFER"
-  | "SELLER_ACCEPTANCE"
-  | "GENERAL_NOTE";
 
 export interface RfqAwardRevisionNote {
   id: string;
@@ -288,19 +248,12 @@ export interface RfqAwardRevisionNote {
   quote_award_id?: string;
   quote_variant_award_id?: string;
   award_round: number;
-  actor_type: RfqAwardRevisionNoteActor;
+  actor_type: "BUYER" | "SELLER";
   actor_id: string;
-  note_type: RfqAwardRevisionNoteType;
+  note_type: "BUYER_REVISION_REQUEST" | "SELLER_COUNTER_OFFER" | "SELLER_ACCEPTANCE";
   note: string;
   created_at: string;
 }
-
-export type PoStatus =
-  | "DRAFT"
-  | "RELEASED"
-  | "SELLER_ACKNOWLEDGED"
-  | "COMPLETED"
-  | "CANCELLED";
 
 export interface PurchaseOrder {
   id: string;
@@ -311,7 +264,7 @@ export interface PurchaseOrder {
   seller_party_id: string;
   total_amount: number;
   currency: string;
-  po_status: PoStatus;
+  po_status: "DRAFT" | "RELEASED" | "SELLER_ACKNOWLEDGED" | "COMPLETED" | "CANCELLED";
   shipping_address?: string;
   payment_terms?: string;
   delivery_notes?: string;
@@ -396,19 +349,13 @@ export type SellerQuoteStatus =
   | "FINAL_ACKNOWLEDGE_ACCEPTED"
   | "REJECTED";
 
-
-export type AwardStatus =
-  | "AWARDED"
-  | "CANCELLED"
-  | "PO_CREATED"
-  | "PO_RECEIVED";
+export type AwardStatus = "AWARDED" | "CANCELLED" | "PO_CREATED" | "PO_RECEIVED";
 
 export type RfqItemAttributeConnector = "AND" | "OR";
-
 
 interface VariantCombination {
   group_id: string;
   attribute_id: string;
-  value_id: string
+  value_id: string;
   [key: string]: any;
 }
