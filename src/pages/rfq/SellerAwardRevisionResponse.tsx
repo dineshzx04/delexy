@@ -1,34 +1,9 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import {
-  Card,
-  Descriptions,
-  Button,
-  Tag as AntTag,
-  Alert,
-  InputNumber,
-  Input,
-  Space,
-  Divider,
-  Table,
-  App as AntApp,
-} from "antd";
-import {
-  CheckCircleOutlined,
-  SendOutlined,
-  DollarOutlined,
-  ShoppingOutlined,
-  FileTextOutlined,
-  ClockCircleOutlined,
-  ArrowLeftOutlined,
-} from "@ant-design/icons";
-
-import {
-  rfqDb,
-  type RfqQuoteItemAwardRevision,
-  type RfqAwardRevisionNote,
-} from "../../data/rfq";
+import { Card, Descriptions, Button, Tag as AntTag, Alert, InputNumber, Input, Space, Divider, Table, App as AntApp } from "antd";
+import { CheckCircleOutlined, SendOutlined, DollarOutlined, ShoppingOutlined, FileTextOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import { rfqDb, type RfqQuoteItemAwardRevision, type RfqAwardRevisionNote } from "../../data/rfq";
 import { businessDb } from "../../data/business/business.db";
 import { catalogDb } from "../../data/catalog/catalog.db";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
@@ -59,27 +34,22 @@ export const SellerAwardRevisionResponse: React.FC = () => {
   const { activeWorkspace, currentUserId } = useWorkspace();
   const { message, notification } = AntApp.useApp();
 
-  const isBusinessContext = activeWorkspace?.type === "BUSINESS";
-  const basePath = isBusinessContext ? "/b/seller/rfqs" : "/user/seller/rfqs";
+  const { isBusinessContext, basePath } = useMemo(() => {
+    const isBusiness = activeWorkspace?.type === "BUSINESS";
+    return {
+      isBusinessContext: isBusiness,
+      basePath: isBusiness ? "/b/seller/rfqs" : "/user/seller/rfqs",
+    };
+  }, [activeWorkspace?.type]);
 
-  /*
-   * 1. Data Fetching via useLiveQuery Hooks
-   */
+  const [variantResponses, setVariantResponses] = useState<VariantResponseRow[]>([]);
+  const [responseNote, setResponseNote] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
   const pageData = useLiveQuery(async () => {
     if (!rfqId || !itemId) return null;
 
-    const [
-      rfq,
-      item,
-      allQuotes,
-      parties,
-      catalogProducts,
-      categories,
-      quoteAwards,
-      awardItems,
-      historyRecords,
-      revisionNotes,
-    ] = await Promise.all([
+    const [rfq, item, allQuotes, parties, catalogProducts, categories, quoteAwards, awardItems, historyRecords, revisionNotes] = await Promise.all([
       rfqDb.rfqs.get(rfqId),
       rfqDb.rfq_items.get(itemId),
       rfqDb.seller_quotes.where("rfq_item_id").equals(itemId).toArray(),
@@ -106,134 +76,116 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     };
   }, [rfqId, itemId]);
 
+  const { rfq, item, allQuotes = [], parties = [], catalogProducts = [], categories = [], quoteAwards = [], awardItems = [], historyRecords = [], revisionNotes = [] } = pageData ?? {};
+
   const {
-    rfq,
-    item,
-    allQuotes = [],
-    parties = [],
-    catalogProducts = [],
-    categories = [],
-    quoteAwards = [],
-    awardItems = [],
-    historyRecords = [],
-    revisionNotes = [],
-  } = pageData ?? {};
+    sellerParty,
+    myQuote,
+    myAward,
+    myAwardItems,
+    product,
+    category,
+    sellerHistory,
+    latestBuyerHistory,
+    latestBuyerNoteInfo,
+    currentAwardRound,
+    currentProposalRound,
+    awardStatus,
+    isConfirmed,
+    isRevised,
+  } = useMemo(() => {
+    const party = parties.length
+      ? isBusinessContext
+        ? parties.find(p => p.owner_type === "BUSINESS" && p.owner_id === activeWorkspace?.businessId) || null
+        : parties.find(p => p.owner_type === "USER" && p.owner_id === currentUserId) || parties.find(p => p.id === "pty-6") || null
+      : null;
 
-  /*
-   * 2. Active Seller Party Resolution
-   */
-  const sellerParty = useMemo(() => {
-    if (!parties.length) return null;
-    if (isBusinessContext) {
-      return parties.find(p => p.owner_type === "BUSINESS" && p.owner_id === activeWorkspace?.businessId) || null;
-    }
-    return parties.find(p => p.owner_type === "USER" && p.owner_id === currentUserId) || parties.find(p => p.id === "pty-6") || null;
-  }, [parties, isBusinessContext, activeWorkspace, currentUserId]);
+    const sellerId = party?.id;
+    const quote = sellerId ? allQuotes.find(q => q.seller_party_id === sellerId) || null : null;
+    const award = sellerId ? quoteAwards.find(a => a.seller_party_id === sellerId) || null : null;
+    const items = sellerId ? awardItems.filter(a => a.seller_party_id === sellerId) : [];
 
-  /*
-   * 3. Seller's Target Quote & Award Info for this Line Item
-   */
-  const myQuote = useMemo(() => {
-    if (!sellerParty?.id) return null;
-    return allQuotes.find(q => q.seller_party_id === sellerParty.id) || null;
-  }, [allQuotes, sellerParty]);
+    const prod = item?.catalog_product_id ? catalogProducts.find(p => p.id === item.catalog_product_id) || null : null;
+    const cat = item?.category_id ? categories.find(c => c.id === item.category_id) || null : null;
 
-  const myAward = useMemo(() => {
-    if (!sellerParty?.id) return null;
-    return quoteAwards.find(a => a.seller_party_id === sellerParty.id) || null;
-  }, [quoteAwards, sellerParty]);
+    const history = sellerId ? historyRecords.filter(h => h.seller_party_id === sellerId).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : [];
+    const buyerHistory = history.find(h => h.actor_type === "BUYER") || null;
 
-  const myAwardItems = useMemo(() => {
-    if (!sellerParty?.id) return [];
-    return awardItems.filter(a => a.seller_party_id === sellerParty.id);
-  }, [awardItems, sellerParty]);
-
-  const product = useMemo(() => {
-    if (!item?.catalog_product_id) return null;
-    return catalogProducts.find(p => p.id === item.catalog_product_id) || null;
-  }, [catalogProducts, item?.catalog_product_id]);
-
-  const category = useMemo(() => {
-    if (!item?.category_id) return null;
-    return categories.find(c => c.id === item.category_id) || null;
-  }, [categories, item?.category_id]);
-
-  // Filter history records for this specific seller
-  const sellerHistory = useMemo(() => {
-    if (!sellerParty?.id) return [];
-    return historyRecords
-      .filter(h => h.seller_party_id === sellerParty.id)
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  }, [historyRecords, sellerParty]);
-
-  const latestBuyerHistory = useMemo(() => {
-    return sellerHistory.find(h => h.actor_type === "BUYER") || null;
-  }, [sellerHistory]);
-
-  const latestBuyerNoteInfo = useMemo(() => {
-    // 1. Check dedicated rfq_award_revision_notes for this quote / seller
     const quoteRevisionNotes = (revisionNotes || [])
-      .filter(n => (n.seller_quote_id === myQuote?.id || n.seller_party_id === sellerParty?.id) && n.actor_type === "BUYER")
+      .filter(n => (n.seller_quote_id === quote?.id || n.seller_party_id === sellerId) && n.actor_type === "BUYER")
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
     const noteRecord = quoteRevisionNotes[0];
-
-    // 2. Check myAward.notes (entered by buyer when awarding in RfqQuoteAwardingPage)
-    const awardNote = myAward?.notes?.trim();
-
-    // 3. Check latest buyer history audit record
-    const historyNote = latestBuyerHistory?.note?.trim();
+    const awardNote = award?.notes?.trim();
+    const historyNote = buyerHistory?.note?.trim();
     const isCustomHistoryNote = historyNote && !historyNote.startsWith("Buyer awarded allocation for Round");
-
     const noteText = noteRecord?.note?.trim() || awardNote || (isCustomHistoryNote ? historyNote : undefined);
 
-    if (!noteText) return null;
+    const buyerNoteInfo = noteText
+      ? {
+        note: noteText,
+        round: noteRecord?.award_round || award?.award_round || buyerHistory?.award_round || 1,
+        timestamp: noteRecord?.created_at || award?.updated_at || award?.created_at || buyerHistory?.created_at,
+        quoteNumber: quote?.seller_quote_number,
+      }
+      : null;
 
-    const round = noteRecord?.award_round || myAward?.award_round || latestBuyerHistory?.award_round || 1;
-    const timestamp = noteRecord?.created_at || myAward?.updated_at || myAward?.created_at || latestBuyerHistory?.created_at;
+    const currentAwardRound = award?.award_round || 1;
+    const currentProposalRound = quote?.round || 1;
+    const status = award?.award_status || "AWARDED";
+    const isConfirmed = status === "CONFIRMED";
+    const isRevised = status === "SELLER_REVISED";
 
     return {
-      note: noteText,
-      round,
-      timestamp,
-      quoteNumber: myQuote?.seller_quote_number,
+      sellerParty: party,
+      myQuote: quote,
+      myAward: award,
+      myAwardItems: items,
+      product: prod,
+      category: cat,
+      sellerHistory: history,
+      latestBuyerHistory: buyerHistory,
+      latestBuyerNoteInfo: buyerNoteInfo,
+      currentAwardRound,
+      currentProposalRound,
+      awardStatus: status,
+      isConfirmed,
+      isRevised,
     };
-  }, [revisionNotes, myQuote, sellerParty, myAward, latestBuyerHistory]);
+  }, [
+    parties,
+    isBusinessContext,
+    activeWorkspace?.businessId,
+    currentUserId,
+    allQuotes,
+    quoteAwards,
+    awardItems,
+    item?.catalog_product_id,
+    item?.category_id,
+    catalogProducts,
+    categories,
+    historyRecords,
+    revisionNotes,
+  ]);
 
-  /*
-   * 4. Breadcrumb Pattern (Rule 4A: Must be called before conditional returns)
-   */
-  const breadcrumbs = useMemo(() => [
-    { title: <a onClick={() => navigate(basePath)}>Seller RFQs</a> },
-    { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || "RFQ Workspace"}</a> },
-    { title: <span className="text-slate-800 font-semibold">Item #{item?.item_index || 1} Award Allocation</span> },
-  ], [navigate, basePath, rfqId, rfq?.rfq_number, item?.item_index]);
+  const breadcrumbs = useMemo(
+    () => [
+      { title: <a onClick={() => navigate(basePath)}>Seller RFQs</a> },
+      { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || "RFQ Workspace"}</a> },
+      { title: <span className="text-slate-800 font-semibold">Item #{item?.item_index || 1} Award Allocation</span> },
+    ],
+    [navigate, basePath, rfqId, rfq?.rfq_number, item?.item_index],
+  );
 
   useBreadcrumb(breadcrumbs);
 
-  /*
-   * 5. Interactive Multi-Variant Form States
-   */
-  const [variantResponses, setVariantResponses] = useState<VariantResponseRow[]>([]);
-  const [responseNote, setResponseNote] = useState<string>("");
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  // Initialize response form with awarded variants or single fallback
   useEffect(() => {
     if (myAwardItems.length > 0) {
       setVariantResponses(
         myAwardItems.map(itemAward => {
           const variantHistory = sellerHistory.find(h => h.variant_id === itemAward.variant_id);
-          const initialQty =
-            itemAward.seller_offered_quantity ||
-            itemAward.awarded_quantity ||
-            itemAward.buyer_target_quantity ||
-            variantHistory?.quantity ||
-            1;
-          const initialPrice =
-            itemAward.unit_price ||
-            variantHistory?.unit_price ||
-            0;
+          const initialQty = itemAward.seller_offered_quantity || itemAward.awarded_quantity || itemAward.buyer_target_quantity || variantHistory?.quantity || 1;
+          const initialPrice = itemAward.unit_price || variantHistory?.unit_price || 0;
 
           return {
             variantAwardId: itemAward.id,
@@ -246,7 +198,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             offeredQty: initialQty,
             offeredPrice: initialPrice,
           };
-        })
+        }),
       );
     } else if (myQuote) {
       const initialQty = latestBuyerHistory?.quantity || myQuote.offer_quantity || item?.req_quantity || 1;
@@ -267,9 +219,144 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     }
   }, [myAwardItems, sellerHistory, myQuote, item?.req_quantity, item?.req_unit, latestBuyerHistory]);
 
-  /*
-   * 6. Loading & Guard Checks (Rule 4B: after all hooks)
-   */
+  const { totalOfferedUnits, totalOfferedAmount, totalBuyerTargetUnits, totalBuyerTargetAmount, isQtyChanged, isPriceChanged, canAcceptAllocation } = useMemo(() => {
+    let offeredUnits = 0;
+    let offeredAmount = 0;
+    let buyerUnits = 0;
+    let buyerAmount = 0;
+    let qtyChanged = false;
+    let priceChanged = false;
+
+    for (const r of variantResponses) {
+      const oQty = r.offeredQty || 0;
+      const oPrice = r.offeredPrice || 0;
+      const bQty = r.buyerTargetQty || 0;
+      const bPrice = r.buyerUnitPrice || 0;
+
+      offeredUnits += oQty;
+      offeredAmount += oQty * oPrice;
+      buyerUnits += bQty;
+      buyerAmount += bQty * bPrice;
+
+      if (r.offeredQty !== r.buyerTargetQty) qtyChanged = true;
+      if (r.offeredPrice !== r.buyerUnitPrice) priceChanged = true;
+    }
+
+    return {
+      totalOfferedUnits: offeredUnits,
+      totalOfferedAmount: offeredAmount,
+      totalBuyerTargetUnits: buyerUnits,
+      totalBuyerTargetAmount: buyerAmount,
+      isQtyChanged: qtyChanged,
+      isPriceChanged: priceChanged,
+      canAcceptAllocation: !qtyChanged && !priceChanged,
+    };
+  }, [variantResponses]);
+
+  const handleRowQtyChange = (variantId: string, val: number | null) => {
+    setVariantResponses(prev => prev.map(row => (row.variantId === variantId ? { ...row, offeredQty: val || 0 } : row)));
+  };
+
+  const handleRowPriceChange = (variantId: string, val: number | null) => {
+    setVariantResponses(prev => prev.map(row => (row.variantId === variantId ? { ...row, offeredPrice: val || 0 } : row)));
+  };
+
+  const tableColumns = useMemo(
+    () => [
+      {
+        title: "Variant / Option",
+        dataIndex: "variantLabel",
+        key: "variantLabel",
+        render: (label: string, record: VariantResponseRow) => (
+          <div>
+            <div className="font-semibold text-xs text-slate-800">{label}</div>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <AntTag color={record.variantType === "CUSTOM" ? "blue" : "purple"} className="text-[10px] m-0">
+                {record.variantType}
+              </AntTag>
+              <span className="text-[10px] text-slate-400 font-mono">ID: {record.variantId}</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        title: "Buyer Requested Allocation",
+        key: "buyerTarget",
+        align: "right" as const,
+        render: (_: any, record: VariantResponseRow) => (
+          <div className="text-right">
+            <div className="font-bold text-xs text-indigo-700">
+              {record.buyerTargetQty} {record.uom}
+            </div>
+            <div className="text-[11px] text-slate-500 font-medium">@ {formatCurrency(record.buyerUnitPrice)}</div>
+          </div>
+        ),
+      },
+      {
+        title: "Fulfillable Quantity",
+        key: "offeredQty",
+        width: 180,
+        render: (_: any, record: VariantResponseRow) => (
+          <div className="space-y-1">
+            <InputNumber
+              min={1}
+              step={1}
+              disabled={isConfirmed || isSubmitting}
+              value={record.offeredQty}
+              onChange={val => handleRowQtyChange(record.variantId, val)}
+              className="w-full font-mono font-bold"
+              size="middle"
+              addonAfter={record.uom}
+            />
+            {record.offeredQty !== record.buyerTargetQty && (
+              <span className="text-[10px] text-amber-600 block font-medium">
+                Requested: {record.buyerTargetQty} {record.uom} (
+                {record.offeredQty - record.buyerTargetQty > 0 ? `+${record.offeredQty - record.buyerTargetQty}` : record.offeredQty - record.buyerTargetQty})
+              </span>
+            )}
+          </div>
+        ),
+      },
+      {
+        title: "Confirmed Unit Price",
+        key: "offeredPrice",
+        width: 180,
+        render: (_: any, record: VariantResponseRow) => (
+          <div className="space-y-1">
+            <InputNumber
+              min={0}
+              step={0.01}
+              disabled
+              value={record.offeredPrice}
+              onChange={val => handleRowPriceChange(record.variantId, val)}
+              className="w-full font-mono font-bold"
+              size="middle"
+              prefix={<DollarOutlined className="text-slate-400" />}
+            />
+            {record.offeredPrice !== record.buyerUnitPrice && <span className="text-[10px] text-amber-600 block font-medium">Target: {formatCurrency(record.buyerUnitPrice)}</span>}
+          </div>
+        ),
+      },
+      {
+        title: "Line Subtotal",
+        key: "subtotal",
+        align: "right" as const,
+        render: (_: any, record: VariantResponseRow) => {
+          const subtotal = (record.offeredQty || 0) * (record.offeredPrice || 0);
+          return (
+            <div className="text-right">
+              <div className="font-mono font-bold text-xs text-emerald-700">{formatCurrency(subtotal)}</div>
+              <div className="text-[10px] text-slate-400">
+                {record.offeredQty} &times; {formatCurrency(record.offeredPrice)}
+              </div>
+            </div>
+          );
+        },
+      },
+    ],
+    [isConfirmed, isSubmitting],
+  );
+
   if (!pageData || !rfq || !item) {
     return (
       <div className="max-w-5xl mx-auto p-8 text-center text-slate-500">
@@ -279,56 +366,33 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     );
   }
 
-  const currentAwardRound = myAward?.award_round || 1;
-  const currentProposalRound = myQuote?.round || 1;
-  const awardStatus = myAward?.award_status || "AWARDED";
-  const isConfirmed = awardStatus === "CONFIRMED";
-  const isRevised = awardStatus === "SELLER_REVISED";
-
-  const totalOfferedUnits = variantResponses.reduce((sum, r) => sum + (r.offeredQty || 0), 0);
-  const totalOfferedAmount = variantResponses.reduce((sum, r) => sum + ((r.offeredQty || 0) * (r.offeredPrice || 0)), 0);
-  const totalBuyerTargetUnits = variantResponses.reduce((sum, r) => sum + (r.buyerTargetQty || 0), 0);
-  const totalBuyerTargetAmount = variantResponses.reduce((sum, r) => sum + ((r.buyerTargetQty || 0) * (r.buyerUnitPrice || 0)), 0);
-
-  const handleRowQtyChange = (variantId: string, val: number | null) => {
-    setVariantResponses(prev =>
-      prev.map(row => (row.variantId === variantId ? { ...row, offeredQty: val || 0 } : row))
-    );
-  };
-
-  const handleRowPriceChange = (variantId: string, val: number | null) => {
-    setVariantResponses(prev =>
-      prev.map(row => (row.variantId === variantId ? { ...row, offeredPrice: val || 0 } : row))
-    );
-  };
-
-  /*
-   * 7. Handlers
-   */
   const handleAcceptAllocation = async () => {
     if (!myQuote) return;
+
+    if (isQtyChanged) {
+      message.warning("Fulfillable quantity differs from the requested allocation. Please submit as an award revision.");
+      return;
+    }
+
+    if (isPriceChanged) {
+      message.warning("Unit price differs from the buyer's target price. Please submit as an award revision.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const now = new Date().toISOString();
 
       await rfqDb.transaction(
         "rw",
-        [
-          rfqDb.seller_quotes,
-          rfqDb.rfq_quote_awards,
-          rfqDb.rfq_quote_item_awards,
-          rfqDb.rfq_quote_item_award_revisions,
-          rfqDb.rfq_award_revision_notes,
-        ],
+        [rfqDb.seller_quotes, rfqDb.rfq_quote_awards, rfqDb.rfq_quote_item_awards, rfqDb.rfq_quote_item_award_revisions, rfqDb.rfq_award_revision_notes],
         async () => {
-          // 1. Update quote status to DEVIATION_ACCEPTED
           await rfqDb.seller_quotes.update(myQuote.id, {
             status: "DEVIATION_ACCEPTED",
             offer_quantity: totalBuyerTargetUnits || totalOfferedUnits,
             updated_at: now,
           });
 
-          // 2. Update quote award
           if (myAward) {
             await rfqDb.rfq_quote_awards.update(myAward.id, {
               award_status: "CONFIRMED",
@@ -337,7 +401,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             });
           }
 
-          // 3. Update each quote item award
           for (const row of variantResponses) {
             if (row.variantAwardId !== "fallback") {
               await rfqDb.rfq_quote_item_awards.update(row.variantAwardId, {
@@ -353,7 +416,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             }
           }
 
-          // 4. Record audit revisions
           const revisions: RfqQuoteItemAwardRevision[] = variantResponses.map(row => ({
             id: `arh-${crypto.randomUUID()}`,
             quote_award_id: myAward?.id || "",
@@ -376,7 +438,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             await rfqDb.rfq_quote_item_award_revisions.bulkAdd(revisions);
           }
 
-          // 5. Record note if provided
           if (responseNote.trim()) {
             await rfqDb.rfq_award_revision_notes.add({
               id: `arn-${crypto.randomUUID()}`,
@@ -394,7 +455,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
               created_at: now,
             });
           }
-        }
+        },
       );
 
       notification.success({
@@ -411,7 +472,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     }
   };
 
-  const handleCounterOffer = async () => {
+  const handleSubmitAwardRevision = async () => {
     if (!myQuote) return;
 
     for (const row of variantResponses) {
@@ -427,22 +488,14 @@ export const SellerAwardRevisionResponse: React.FC = () => {
 
       await rfqDb.transaction(
         "rw",
-        [
-          rfqDb.seller_quotes,
-          rfqDb.rfq_quote_awards,
-          rfqDb.rfq_quote_item_awards,
-          rfqDb.rfq_quote_item_award_revisions,
-          rfqDb.rfq_award_revision_notes,
-        ],
+        [rfqDb.seller_quotes, rfqDb.rfq_quote_awards, rfqDb.rfq_quote_item_awards, rfqDb.rfq_quote_item_award_revisions, rfqDb.rfq_award_revision_notes],
         async () => {
-          // 1. Update quote
           await rfqDb.seller_quotes.update(myQuote.id, {
             status: "SUBMITTED",
             offer_quantity: totalOfferedUnits,
             updated_at: now,
           });
 
-          // 2. Update quote award
           if (myAward) {
             await rfqDb.rfq_quote_awards.update(myAward.id, {
               award_status: "SELLER_REVISED",
@@ -452,7 +505,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             });
           }
 
-          // 3. Update each quote item award
           for (const row of variantResponses) {
             if (row.variantAwardId !== "fallback") {
               await rfqDb.rfq_quote_item_awards.update(row.variantAwardId, {
@@ -466,7 +518,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             }
           }
 
-          // 4. Record counter-offer in audit trail
           const revisions: RfqQuoteItemAwardRevision[] = variantResponses.map(row => ({
             id: `arh-${crypto.randomUUID()}`,
             quote_award_id: myAward?.id || "",
@@ -481,7 +532,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             variant_id: row.variantId,
             quantity: row.offeredQty,
             unit_price: row.offeredPrice,
-            note: responseNote.trim() ? `Counter-Offer: ${responseNote.trim()}` : "Seller submitted revised counter-offer.",
+            note: responseNote.trim() ? `Award Revision: ${responseNote.trim()}` : "Seller submitted award revision.",
             created_at: now,
           }));
 
@@ -489,7 +540,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             await rfqDb.rfq_quote_item_award_revisions.bulkAdd(revisions);
           }
 
-          // 5. Record note if provided
           if (responseNote.trim()) {
             await rfqDb.rfq_award_revision_notes.add({
               id: `arn-${crypto.randomUUID()}`,
@@ -502,138 +552,36 @@ export const SellerAwardRevisionResponse: React.FC = () => {
               award_round: currentAwardRound,
               actor_type: "SELLER",
               actor_id: currentUserId || "seller-user",
-              note_type: "SELLER_COUNTER_OFFER",
+              note_type: "SELLER_AWARD_REVISION",
               note: responseNote.trim(),
               created_at: now,
             });
           }
-        }
+        },
       );
 
       notification.info({
-        message: "Counter-Offer Submitted",
-        description: `Your counter-offer of ${totalOfferedUnits} units totaling ${formatCurrency(totalOfferedAmount)} has been sent to the buyer.`,
+        message: "Award Revision Submitted",
+        description: `Your award revision of ${totalOfferedUnits} units totaling ${formatCurrency(totalOfferedAmount)} has been sent to the buyer.`,
       });
 
       navigate(`${basePath}/${rfqId}`);
     } catch (err) {
-      console.error("Failed to submit counter offer", err);
-      message.error("Failed to submit counter offer.");
+      console.error("Failed to submit award revision", err);
+      message.error("Failed to submit award revision.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const tableColumns = [
-    {
-      title: "Variant / Option",
-      dataIndex: "variantLabel",
-      key: "variantLabel",
-      render: (label: string, record: VariantResponseRow) => (
-        <div>
-          <div className="font-bold text-xs text-slate-800">{label}</div>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <AntTag color={record.variantType === "CUSTOM" ? "blue" : "purple"} className="text-[10px] m-0">
-              {record.variantType}
-            </AntTag>
-            <span className="text-[10px] text-slate-400 font-mono">ID: {record.variantId}</span>
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Buyer Requested Allocation",
-      key: "buyerTarget",
-      align: "right" as const,
-      render: (_: any, record: VariantResponseRow) => (
-        <div className="text-right">
-          <div className="font-bold text-xs text-indigo-700">
-            {record.buyerTargetQty} {record.uom}
-          </div>
-          <div className="text-[11px] text-slate-500 font-medium">
-            @ {formatCurrency(record.buyerUnitPrice)}
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: "Fulfillable Quantity",
-      key: "offeredQty",
-      width: 180,
-      render: (_: any, record: VariantResponseRow) => (
-        <div className="space-y-1">
-          <InputNumber
-            min={1}
-            step={1}
-            disabled={isConfirmed || isSubmitting}
-            value={record.offeredQty}
-            onChange={val => handleRowQtyChange(record.variantId, val)}
-            className="w-full font-mono font-bold"
-            size="middle"
-            addonAfter={record.uom}
-          />
-          {record.offeredQty !== record.buyerTargetQty && (
-            <span className="text-[10px] text-amber-600 block font-medium">
-              Requested: {record.buyerTargetQty} {record.uom} ({record.offeredQty - record.buyerTargetQty > 0 ? `+${record.offeredQty - record.buyerTargetQty}` : record.offeredQty - record.buyerTargetQty})
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: "Confirmed Unit Price",
-      key: "offeredPrice",
-      width: 180,
-      render: (_: any, record: VariantResponseRow) => (
-        <div className="space-y-1">
-          <InputNumber
-            min={0}
-            step={0.01}
-            disabled={isConfirmed || isSubmitting}
-            value={record.offeredPrice}
-            onChange={val => handleRowPriceChange(record.variantId, val)}
-            className="w-full font-mono font-bold"
-            size="middle"
-            prefix={<DollarOutlined className="text-slate-400" />}
-          />
-          {record.offeredPrice !== record.buyerUnitPrice && (
-            <span className="text-[10px] text-amber-600 block font-medium">
-              Target: {formatCurrency(record.buyerUnitPrice)}
-            </span>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: "Line Subtotal",
-      key: "subtotal",
-      align: "right" as const,
-      render: (_: any, record: VariantResponseRow) => {
-        const subtotal = (record.offeredQty || 0) * (record.offeredPrice || 0);
-        return (
-          <div className="text-right">
-            <div className="font-mono font-bold text-xs text-emerald-700">
-              {formatCurrency(subtotal)}
-            </div>
-            <div className="text-[10px] text-slate-400">
-              {record.offeredQty} &times; {formatCurrency(record.offeredPrice)}
-            </div>
-          </div>
-        );
-      },
-    },
-  ];
-
   return (
     <div className="max-w-5xl mx-auto space-y-4 pb-12">
-      {/* 1. Page Header Card */}
       <Card size="small" className="shadow-sm border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">
-                Award Allocation Review
-              </h1>
+              <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Award Allocation Review</h1>
+              <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">RFQ: {rfq.rfq_number}</span>
               <AntTag color="purple" className="font-bold text-xs">
                 Award Round {currentAwardRound}
               </AntTag>
@@ -644,32 +592,18 @@ export const SellerAwardRevisionResponse: React.FC = () => {
               )}
               {isRevised && (
                 <AntTag color="orange" className="font-bold text-xs">
-                  COUNTER-OFFER SUBMITTED
+                  AWARD REVISION SUBMITTED
                 </AntTag>
               )}
             </div>
             <p className="text-xs text-slate-500 mt-1 m-0">
-              The buyer has awarded line item allocation to your quote across variant options. Review the requested quantities and pricing, then confirm or counter-propose revised allocations.
+              The buyer has awarded line item allocation to your quote across variant options. Review the requested quantities and pricing, then confirm or counter-propose revised
+              allocations.
             </p>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button
-              size="small"
-              icon={<ArrowLeftOutlined />}
-              onClick={() => navigate(`${basePath}/${rfqId}`)}
-              className="text-xs"
-            >
-              Back to RFQ
-            </Button>
-            <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">
-              RFQ: {rfq.rfq_number}
-            </span>
           </div>
         </div>
       </Card>
 
-      {/* 2. Status Alerts */}
       {isConfirmed && (
         <Alert
           type="success"
@@ -678,7 +612,8 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           message={<span className="font-bold text-xs text-emerald-900">Award Allocation Confirmed & Accepted</span>}
           description={
             <span className="text-xs text-emerald-800">
-              You have confirmed and accepted this award allocation{myAward?.seller_accepted_at ? ` on ${new Date(myAward.seller_accepted_at).toLocaleString()}` : ""}. The buyer can now proceed with Purchase Order issuance.
+              You have confirmed and accepted this award allocation{myAward?.seller_accepted_at ? ` on ${new Date(myAward.seller_accepted_at).toLocaleString()}` : ""}. The buyer can now
+              proceed with Purchase Order issuance.
             </span>
           }
           className="bg-emerald-50 border-emerald-200 shadow-sm"
@@ -689,27 +624,22 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         <Alert
           type="info"
           showIcon
-          message={<span className="font-bold text-xs text-blue-900">Counter-Offer Sent to Buyer</span>}
+          message={<span className="font-bold text-xs text-blue-900">Award Revision Sent to Buyer</span>}
           description={
             <span className="text-xs text-blue-800">
-              Your revised counter-offer is currently under review by the buyer. You will be notified once the buyer responds or re-issues the award allocation.
+              Your award revision is currently under review by the buyer. You will be notified once the buyer responds or re-issues the award allocation.
             </span>
           }
           className="bg-blue-50 border-blue-200 shadow-sm"
         />
       )}
 
-      {/* 3. Line Item Overview */}
       <Card size="small" className="shadow-sm border-slate-200 bg-white">
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-slate-200 pb-2">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded">
-                Line Item #{item.item_index || 1}
-              </span>
-              <h3 className="font-bold text-slate-800 text-sm m-0">
-                {product?.name || category?.name || "RFQ Product Item"}
-              </h3>
+              <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded">Line Item #{item.item_index || 1}</span>
+              <h3 className="font-bold text-slate-800 text-sm m-0">{product?.name || category?.name || "RFQ Product Item"}</h3>
               <AntTag color="blue" className="text-[11px] font-medium m-0">
                 {category?.name || "Category"}
               </AntTag>
@@ -735,7 +665,9 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             }}
           >
             <Descriptions.Item label="Original RFQ Quantity">
-              <span>{item.req_quantity} {item.req_unit || "PCS"}</span>
+              <span>
+                {item.req_quantity} {item.req_unit || "PCS"}
+              </span>
             </Descriptions.Item>
             <Descriptions.Item label="Buyer Total Requested Allocation">
               <span className="font-bold text-indigo-700 text-sm">
@@ -743,13 +675,10 @@ export const SellerAwardRevisionResponse: React.FC = () => {
               </span>
             </Descriptions.Item>
             <Descriptions.Item label="Buyer Total Target Value">
-              <span className="font-bold text-emerald-700 text-sm">
-                {formatCurrency(totalBuyerTargetAmount)}
-              </span>
+              <span className="font-bold text-emerald-700 text-sm">{formatCurrency(totalBuyerTargetAmount)}</span>
             </Descriptions.Item>
           </Descriptions>
 
-          {/* Buyer's Latest Note Callout */}
           {latestBuyerNoteInfo && (
             <Alert
               type="warning"
@@ -760,18 +689,12 @@ export const SellerAwardRevisionResponse: React.FC = () => {
                   <span className="font-bold text-xs text-amber-900">
                     Latest Buyer&apos;s Note for Quote {latestBuyerNoteInfo.quoteNumber ? `(${latestBuyerNoteInfo.quoteNumber})` : ""} (Round {latestBuyerNoteInfo.round}):
                   </span>
-                  {latestBuyerNoteInfo.timestamp && (
-                    <span className="text-[11px] text-amber-700/80 font-normal font-mono">
-                      {new Date(latestBuyerNoteInfo.timestamp).toLocaleString()}
-                    </span>
-                  )}
+                  {latestBuyerNoteInfo.timestamp && <span className="text-[11px] text-amber-700/80 font-normal font-mono">{new Date(latestBuyerNoteInfo.timestamp).toLocaleString()}</span>}
                 </div>
               }
               description={
                 <div className="mt-1 bg-amber-100/40 p-2 rounded border border-amber-200/60">
-                  <span className="text-xs text-amber-950 italic font-medium leading-relaxed">
-                    &ldquo;{latestBuyerNoteInfo.note}&rdquo;
-                  </span>
+                  <span className="text-xs text-amber-950 italic font-medium leading-relaxed">&ldquo;{latestBuyerNoteInfo.note}&rdquo;</span>
                 </div>
               }
               className="bg-amber-50/80 border-amber-200 shadow-xs"
@@ -780,7 +703,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         </div>
       </Card>
 
-      {/* 4. Multi-Variant Allocation Response Table */}
       <Card
         size="small"
         className="shadow-sm border-slate-200 bg-white"
@@ -805,9 +727,9 @@ export const SellerAwardRevisionResponse: React.FC = () => {
             size="small"
             bordered
             className="border border-slate-200 rounded-md overflow-hidden"
+            classNames={{ header: { cell: "text-[12px]" } }}
           />
 
-          {/* Allocation Summary Bar */}
           <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
             <div className="flex items-center gap-6">
               <div>
@@ -822,12 +744,8 @@ export const SellerAwardRevisionResponse: React.FC = () => {
 
               <div>
                 <span className="text-[11px] text-slate-500 block">Total Contract Allocation:</span>
-                <span className="text-base font-mono font-bold text-emerald-700">
-                  {formatCurrency(totalOfferedAmount)}
-                </span>
-                <span className="text-[10px] text-slate-400 block">
-                  Buyer Target Total: {formatCurrency(totalBuyerTargetAmount)}
-                </span>
+                <span className="text-base font-mono font-bold text-emerald-700">{formatCurrency(totalOfferedAmount)}</span>
+                <span className="text-[10px] text-slate-400 block">Buyer Target Total: {formatCurrency(totalBuyerTargetAmount)}</span>
               </div>
             </div>
 
@@ -840,9 +758,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
 
           {!isConfirmed && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Response / Clarification Note for Buyer:
-              </label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Response / Clarification Note for Buyer:</label>
               <Input.TextArea
                 rows={3}
                 placeholder="e.g. We confirm we can fulfill the requested variants at the agreed schedule, with shipping within 10 business days."
@@ -856,14 +772,8 @@ export const SellerAwardRevisionResponse: React.FC = () => {
 
           <Divider className="my-2" />
 
-          {/* Action Buttons */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <Button
-              size="middle"
-              onClick={() => navigate(`${basePath}/${rfqId}`)}
-              disabled={isSubmitting}
-              className="text-xs font-semibold"
-            >
+            <Button size="middle" onClick={() => navigate(`${basePath}/${rfqId}`)} disabled={isSubmitting} className="text-xs font-semibold">
               Back to RFQ
             </Button>
 
@@ -873,31 +783,28 @@ export const SellerAwardRevisionResponse: React.FC = () => {
                   type="default"
                   size="middle"
                   icon={<SendOutlined />}
-                  onClick={handleCounterOffer}
+                  onClick={handleSubmitAwardRevision}
                   loading={isSubmitting}
                   className="text-xs font-semibold text-indigo-700 border-indigo-200 hover:border-indigo-400"
                 >
-                  Send as Revised (Counter-Offer)
+                  Submit Award Revision
                 </Button>
 
-                <Button
-                  type="primary"
-                  size="middle"
-                  icon={<CheckCircleOutlined />}
-                  onClick={handleAcceptAllocation}
-                  loading={isSubmitting}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold border-0"
-                >
-                  Accept & Confirm Award
-                </Button>
+                {canAcceptAllocation && (
+                  <Button
+                    type="primary"
+                    size="middle"
+                    icon={<CheckCircleOutlined />}
+                    onClick={handleAcceptAllocation}
+                    loading={isSubmitting}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold border-0"
+                  >
+                    Accept & Confirm Award
+                  </Button>
+                )}
               </Space>
             ) : (
-              <Button
-                type="primary"
-                size="middle"
-                onClick={() => navigate(`${basePath}/${rfqId}`)}
-                className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold border-0"
-              >
+              <Button type="primary" size="middle" onClick={() => navigate(`${basePath}/${rfqId}`)} className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold border-0">
                 Done (Confirmed)
               </Button>
             )}

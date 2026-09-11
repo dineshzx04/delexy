@@ -383,7 +383,7 @@ export const SellerRfqWorkspace: React.FC = () => {
                           ? `Review & Confirm Award (R${record.award_round})`
                           : isAwardConfirmed
                             ? 'View Confirmed Award ✓'
-                            : `View Counter-Offer (R${record.award_round})`}
+                            : `View Award Revision (R${record.award_round})`}
                       </Button>
                     )}
 

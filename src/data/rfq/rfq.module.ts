@@ -157,7 +157,7 @@ export interface RfqQuoteAward {
   award_status:
   | "DRAFT"
   | "AWARDED" // Sent by Buyer (Awaiting Seller Confirmation or Revision)
-  | "SELLER_REVISED" // Sent by Seller (Counter-offer proposing revised terms)
+  | "SELLER_REVISED" // Sent by Seller (Award revision proposing revised terms)
   | "BUYER_REVISED" // Deprecated: Buyer always sends/re-issues as "AWARDED"
   | "CONFIRMED" // Confirmed & accepted by Seller
   | "PO_CREATED" // Buyer released Purchase Order
@@ -250,7 +250,7 @@ export interface RfqAwardRevisionNote {
   award_round: number;
   actor_type: "BUYER" | "SELLER";
   actor_id: string;
-  note_type: "BUYER_REVISION_REQUEST" | "SELLER_COUNTER_OFFER" | "SELLER_ACCEPTANCE";
+  note_type: "BUYER_REVISION_REQUEST" | "SELLER_AWARD_REVISION" | "SELLER_COUNTER_OFFER" | "SELLER_ACCEPTANCE";
   note: string;
   created_at: string;
 }

@@ -1088,7 +1088,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
                       </Checkbox>
                       <div className="flex items-center gap-1 flex-wrap">
                         <AntTag color="orange" className="text-[10px] m-0 font-bold w-fit">
-                          Counter-Offer
+                          Award Revision
                         </AntTag>
                         {variantAward.seller_offered_quantity !== undefined && (
                           <span className="text-[10px] text-amber-700 font-mono font-medium">
@@ -1453,7 +1453,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
                                 <div className="flex flex-wrap items-center gap-2">
                                   <div className="flex items-center gap-1.5 font-bold text-amber-900">
                                     <ExclamationCircleOutlined className="text-amber-600" />
-                                    <span>Supplier Proposed Revision / Counter-Offer (Round {sellerQuoteAllocation.awardRound})</span>
+                                    <span>Supplier Proposed Award Revision (Round {sellerQuoteAllocation.awardRound})</span>
                                   </div>
                                   <AntTag color="orange" className="font-bold text-[10px] m-0">
                                     Action Required
@@ -1551,7 +1551,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
               <span>
                 You are issuing an Award Allocation to <strong>{revisionModalState.sellerQuoteAllocation?.sellerName}</strong> for Line Item #{revisionModalState.item?.item_index || 1} (
                 <strong>{modalProduct?.name || "Product"}</strong>). This will send the award allocation (<strong>Award Round {(revisionModalState.sellerQuoteAllocation?.awardRound || 1) + 1}</strong>
-                ) to the seller to either <strong>Confirm</strong> or submit a <strong>Revised Counter-Offer</strong>.
+                ) to the seller to either <strong>Confirm</strong> or submit an <strong>Award Revision</strong>.
               </span>
             }
             className="border-sky-100 bg-sky-50/40 text-slate-600"
