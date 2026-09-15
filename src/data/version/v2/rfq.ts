@@ -91,7 +91,7 @@ export interface RfqAward {
   seller_quote_header_id: string;
   seller_party_id: string;
 
-  total_awarded_amount: number;
+  // total_awarded_amount: number;
   currency?: string;
   award_status: AwardStatus;
 

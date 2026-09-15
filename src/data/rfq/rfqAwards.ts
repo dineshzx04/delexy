@@ -8,7 +8,7 @@
 //     rfq_item_id: "item-04",
 //     seller_quote_id: "q-04-1",
 //     seller_party_id: "pty-6",
-//     awarded_quantity: 20,
+//     buyer_target_quantity: 20,
 //     unit_price: 1080,
 //     currency: "USD",
 //     award_status: "PO_CREATED",

@@ -50,7 +50,7 @@ export const BuyerDashboard: React.FC = () => {
 
   const activeRfqs = partyRfqs.filter((r) => r.status === 'ISSUED' || r.status === 'IN_PROGRESS');
   // const totalAwardedAmount = awards.reduce(
-  //   (acc: number, a: any) => acc + ((a.awarded_quantity || 0) * (a.unit_price || 0)),
+  //   (acc: number, a: any) => acc + ((a.buyer_target_quantity || 0) * (a.unit_price || 0)),
   //   0
   // );
   const pendingReviewsCount = responses.filter((r: any) => r.status === 'SUBMITTED').length;

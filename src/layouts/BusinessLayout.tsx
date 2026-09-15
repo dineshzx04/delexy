@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   Menu as AntMenu,
@@ -33,30 +33,6 @@ const BusinessLayout: React.FC = () => {
   const [switchPassModalOpen, setSwitchPassModalOpen] = useState(false);
   const [loadingPass, setLoadingPass] = useState(false);
 
-  const [isFixedBackBtn, setIsFixedBackBtn] = useState(false);
-  const [btnLeftPos, setBtnLeftPos] = useState<number | undefined>(undefined);
-  const breadcrumbCardRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleScrollOrResize = () => {
-      if (!breadcrumbCardRef.current) return;
-      const rect = breadcrumbCardRef.current.getBoundingClientRect();
-      if (rect.top <= 68) {
-        setIsFixedBackBtn(true);
-        setBtnLeftPos(rect.left);
-      } else {
-        setIsFixedBackBtn(false);
-      }
-    };
-
-    handleScrollOrResize();
-    window.addEventListener("scroll", handleScrollOrResize, { passive: true });
-    window.addEventListener("resize", handleScrollOrResize, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", handleScrollOrResize);
-      window.removeEventListener("resize", handleScrollOrResize);
-    };
-  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -419,21 +395,12 @@ const BusinessLayout: React.FC = () => {
 
         {/* Content Body */}
         <main className="flex-1 p-1 sm:p-3 md:p-4 mt-16 min-w-0 w-full">
-          <div ref={breadcrumbCardRef} className="max-w-7xl w-full mx-auto mb-3 flex items-center gap-4">
-            {/* Back Button - Fixed at top-[4.25rem] when container touches header */}
-            <div
-              className={cn(isFixedBackBtn ? "fixed top-[4.25rem] z-40 transition-all duration-150" : "relative")}
-              style={isFixedBackBtn && btnLeftPos !== undefined ? { left: `${btnLeftPos}px` } : undefined}
-            >
-              <AntButton
-                icon={<Lucide.ArrowLeft size={16} />}
-                onClick={handleGoBack}
-                className="rounded-full bg-white border border-slate-300 shadow-md hover:bg-slate-100 text-slate-800 flex items-center justify-center w-8 h-8"
-              />
-            </div>
-
-            {/* Layout spacer when button becomes fixed to prevent breadcrumb jump */}
-            {isFixedBackBtn && <div className="w-8 h-8 flex-shrink-0" />}
+          <div className="max-w-7xl w-full mx-auto mb-3 flex items-center gap-4">
+            <AntButton
+              icon={<Lucide.ArrowLeft size={16} />}
+              onClick={handleGoBack}
+              className="rounded-full bg-white border border-slate-300 shadow-md hover:bg-slate-100 text-slate-800 flex items-center justify-center w-8 h-8 flex-shrink-0"
+            />
 
             {breadcrumbItems.length > 0 && (
               <div className="flex-1 min-w-0">

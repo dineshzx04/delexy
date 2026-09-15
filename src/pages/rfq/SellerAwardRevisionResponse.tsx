@@ -2,8 +2,8 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Card, Descriptions, Button, Tag as AntTag, Alert, InputNumber, Input, Space, Divider, Table, App as AntApp } from "antd";
-import { CheckCircleOutlined, SendOutlined, DollarOutlined, ShoppingOutlined, FileTextOutlined, ClockCircleOutlined } from "@ant-design/icons";
-import { rfqDb, type RfqQuoteItemAwardRevision, type RfqAwardRevisionNote } from "../../data/rfq";
+import { CheckCircleOutlined, SendOutlined, ShoppingOutlined, FileTextOutlined, ClockCircleOutlined } from "@ant-design/icons";
+import { rfqDb, type RfqQuoteItemAwardRevision } from "../../data/rfq";
 import { businessDb } from "../../data/business/business.db";
 import { catalogDb } from "../../data/catalog/catalog.db";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
@@ -93,6 +93,8 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     awardStatus,
     isConfirmed,
     isRevised,
+    isViewMode,
+    latestSellerNoteInfo,
   } = useMemo(() => {
     const party = parties.length
       ? isBusinessContext
@@ -130,11 +132,27 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       }
       : null;
 
+    const sellerRevisionNotes = (revisionNotes || [])
+      .filter(n => (n.seller_quote_id === quote?.id || n.seller_party_id === sellerId) && n.actor_type === "SELLER")
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+    const sellerNoteRecord = sellerRevisionNotes[0];
+    const sellerNoteText = sellerNoteRecord?.note?.trim();
+    const sellerNoteInfo = sellerNoteText
+      ? {
+        note: sellerNoteText,
+        round: sellerNoteRecord?.award_round || award?.award_round || 1,
+        timestamp: sellerNoteRecord?.created_at,
+        noteType: sellerNoteRecord?.note_type,
+      }
+      : null;
+
     const currentAwardRound = award?.award_round || 1;
     const currentProposalRound = quote?.round || 1;
     const status = award?.award_status || "AWARDED";
     const isConfirmed = status === "CONFIRMED";
     const isRevised = status === "SELLER_REVISED";
+    const isViewMode = isConfirmed || isRevised;
 
     return {
       sellerParty: party,
@@ -146,11 +164,13 @@ export const SellerAwardRevisionResponse: React.FC = () => {
       sellerHistory: history,
       latestBuyerHistory: buyerHistory,
       latestBuyerNoteInfo: buyerNoteInfo,
+      latestSellerNoteInfo: sellerNoteInfo,
       currentAwardRound,
       currentProposalRound,
       awardStatus: status,
       isConfirmed,
       isRevised,
+      isViewMode,
     };
   }, [
     parties,
@@ -167,57 +187,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     historyRecords,
     revisionNotes,
   ]);
-
-  const breadcrumbs = useMemo(
-    () => [
-      { title: <a onClick={() => navigate(basePath)}>Seller RFQs</a> },
-      { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || "RFQ Workspace"}</a> },
-      { title: <span className="text-slate-800 font-semibold">Item #{item?.item_index || 1} Award Allocation</span> },
-    ],
-    [navigate, basePath, rfqId, rfq?.rfq_number, item?.item_index],
-  );
-
-  useBreadcrumb(breadcrumbs);
-
-  useEffect(() => {
-    if (myAwardItems.length > 0) {
-      setVariantResponses(
-        myAwardItems.map(itemAward => {
-          const variantHistory = sellerHistory.find(h => h.variant_id === itemAward.variant_id);
-          const initialQty = itemAward.seller_offered_quantity || itemAward.awarded_quantity || itemAward.buyer_target_quantity || variantHistory?.quantity || 1;
-          const initialPrice = itemAward.unit_price || variantHistory?.unit_price || 0;
-
-          return {
-            variantAwardId: itemAward.id,
-            variantId: itemAward.variant_id,
-            variantType: itemAward.variant_type || "CUSTOM",
-            variantLabel: itemAward.variant_label || itemAward.sku || `Variant (${itemAward.variant_id})`,
-            uom: itemAward.unit_of_measure || item?.req_unit || "PCS",
-            buyerTargetQty: itemAward.buyer_target_quantity || itemAward.awarded_quantity || 1,
-            buyerUnitPrice: itemAward.unit_price || 0,
-            offeredQty: initialQty,
-            offeredPrice: initialPrice,
-          };
-        }),
-      );
-    } else if (myQuote) {
-      const initialQty = latestBuyerHistory?.quantity || myQuote.offer_quantity || item?.req_quantity || 1;
-      const initialPrice = latestBuyerHistory?.unit_price || 0;
-      setVariantResponses([
-        {
-          variantAwardId: "fallback",
-          variantId: "default",
-          variantType: "CUSTOM",
-          variantLabel: "Standard Line Item",
-          uom: item?.req_unit || "PCS",
-          buyerTargetQty: latestBuyerHistory?.quantity || item?.req_quantity || 1,
-          buyerUnitPrice: initialPrice,
-          offeredQty: initialQty,
-          offeredPrice: initialPrice,
-        },
-      ]);
-    }
-  }, [myAwardItems, sellerHistory, myQuote, item?.req_quantity, item?.req_unit, latestBuyerHistory]);
 
   const { totalOfferedUnits, totalOfferedAmount, totalBuyerTargetUnits, totalBuyerTargetAmount, isQtyChanged, isPriceChanged, canAcceptAllocation } = useMemo(() => {
     let offeredUnits = 0;
@@ -253,12 +222,42 @@ export const SellerAwardRevisionResponse: React.FC = () => {
     };
   }, [variantResponses]);
 
+  const breadcrumbs = useMemo(
+    () => [
+      { title: <a onClick={() => navigate(basePath)}>Seller RFQs</a> },
+      { title: <a onClick={() => navigate(`${basePath}/${rfqId}`)}>{rfq?.rfq_number || "RFQ Workspace"}</a> },
+      { title: <span className="text-slate-800 font-semibold">Item #{item?.item_index || 1} Award Allocation</span> },
+    ],
+    [navigate, basePath, rfqId, rfq?.rfq_number, item?.item_index],
+  );
+
+  useBreadcrumb(breadcrumbs);
+
+  useEffect(() => {
+    if (myAwardItems.length > 0) {
+      setVariantResponses(
+        myAwardItems.map(itemAward => {
+          const initialQty = itemAward?.seller_offered_quantity || itemAward?.buyer_target_quantity || 1;
+          const initialPrice = itemAward.unit_price || 0;
+
+          return {
+            variantAwardId: itemAward.id,
+            variantId: itemAward.variant_id,
+            variantType: itemAward.variant_type,
+            variantLabel: itemAward.variant_label || itemAward.sku || `Variant (${itemAward.variant_id})`,
+            uom: itemAward.unit_of_measure || item?.req_unit || "PCS",
+            buyerTargetQty: itemAward?.buyer_target_quantity || 1,
+            buyerUnitPrice: itemAward.unit_price || 0,
+            offeredQty: initialQty,
+            offeredPrice: initialPrice,
+          };
+        }),
+      );
+    }
+  }, [myAwardItems, sellerHistory, item?.req_unit]);
+
   const handleRowQtyChange = (variantId: string, val: number | null) => {
     setVariantResponses(prev => prev.map(row => (row.variantId === variantId ? { ...row, offeredQty: val || 0 } : row)));
-  };
-
-  const handleRowPriceChange = (variantId: string, val: number | null) => {
-    setVariantResponses(prev => prev.map(row => (row.variantId === variantId ? { ...row, offeredPrice: val || 0 } : row)));
   };
 
   const tableColumns = useMemo(
@@ -297,44 +296,40 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         key: "offeredQty",
         width: 180,
         render: (_: any, record: VariantResponseRow) => (
-          <div className="space-y-1">
-            <InputNumber
-              min={1}
-              step={1}
-              disabled={isConfirmed || isSubmitting}
-              value={record.offeredQty}
-              onChange={val => handleRowQtyChange(record.variantId, val)}
-              className="w-full font-mono font-bold"
-              size="middle"
-              addonAfter={record.uom}
-            />
-            {record.offeredQty !== record.buyerTargetQty && (
-              <span className="text-[10px] text-amber-600 block font-medium">
-                Requested: {record.buyerTargetQty} {record.uom} (
-                {record.offeredQty - record.buyerTargetQty > 0 ? `+${record.offeredQty - record.buyerTargetQty}` : record.offeredQty - record.buyerTargetQty})
-              </span>
-            )}
-          </div>
-        ),
-      },
-      {
-        title: "Confirmed Unit Price",
-        key: "offeredPrice",
-        width: 180,
-        render: (_: any, record: VariantResponseRow) => (
-          <div className="space-y-1">
-            <InputNumber
-              min={0}
-              step={0.01}
-              disabled
-              value={record.offeredPrice}
-              onChange={val => handleRowPriceChange(record.variantId, val)}
-              className="w-full font-mono font-bold"
-              size="middle"
-              prefix={<DollarOutlined className="text-slate-400" />}
-            />
-            {record.offeredPrice !== record.buyerUnitPrice && <span className="text-[10px] text-amber-600 block font-medium">Target: {formatCurrency(record.buyerUnitPrice)}</span>}
-          </div>
+          isViewMode ? (
+            <div className="space-y-0.5">
+              <div className="font-bold text-xs text-slate-800 font-mono">
+                {record.offeredQty} {record.uom}
+              </div>
+              {record.offeredQty !== record.buyerTargetQty ? (
+                <span className="text-[10px] text-amber-600 block font-medium">
+                  Requested: {record.buyerTargetQty} {record.uom} (
+                  {record.offeredQty - record.buyerTargetQty > 0 ? `+${record.offeredQty - record.buyerTargetQty}` : record.offeredQty - record.buyerTargetQty})
+                </span>
+              ) : (
+                <span className="text-[10px] text-emerald-600 block font-medium">Matches requested ✓</span>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <InputNumber
+                min={1}
+                step={1}
+                disabled={isSubmitting}
+                value={record.offeredQty}
+                onChange={val => handleRowQtyChange(record.variantId, val)}
+                className="w-full font-mono font-bold"
+                size="middle"
+                addonAfter={record.uom}
+              />
+              {record.offeredQty !== record.buyerTargetQty && (
+                <span className="text-[10px] text-amber-600 block font-medium">
+                  Requested: {record.buyerTargetQty} {record.uom} (
+                  {record.offeredQty - record.buyerTargetQty > 0 ? `+${record.offeredQty - record.buyerTargetQty}` : record.offeredQty - record.buyerTargetQty})
+                </span>
+              )}
+            </div>
+          )
         ),
       },
       {
@@ -354,19 +349,31 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         },
       },
     ],
-    [isConfirmed, isSubmitting],
+    [isViewMode, isSubmitting],
   );
 
   if (!pageData || !rfq || !item) {
     return (
-      <div className="max-w-5xl mx-auto p-8 text-center text-slate-500">
+      <div className="mx-auto p-8 text-center text-slate-500">
         <ClockCircleOutlined className="text-2xl animate-spin mb-2" />
         <div>Loading Award Revision details...</div>
       </div>
     );
   }
 
-  const handleAcceptAllocation = async () => {
+  if (!myAward || myAwardItems.length === 0) {
+    return (
+      <div className="max-w-3xl mx-auto p-8 text-center bg-white rounded-lg border border-slate-200 mt-8 space-y-3">
+        <h2 className="text-base font-bold text-slate-800">No Award Allocation Found</h2>
+        <p className="text-xs text-slate-500">There are no awarded items or allocations assigned to your account for this line item.</p>
+        <Button type="primary" size="small" onClick={() => navigate(basePath)}>
+          Back to Seller RFQs
+        </Button>
+      </div>
+    );
+  }
+
+  const handleSubmitAwardAllocation = async () => {
     if (!myQuote) return;
 
     if (isQtyChanged) {
@@ -402,24 +409,22 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           }
 
           for (const row of variantResponses) {
-            if (row.variantAwardId !== "fallback") {
-              await rfqDb.rfq_quote_item_awards.update(row.variantAwardId, {
-                variant_award_status: "CONFIRMED",
-                seller_accepted: true,
-                seller_accepted_at: now,
-                seller_offered_quantity: row.buyerTargetQty,
-                awarded_quantity: row.buyerTargetQty,
-                unit_price: row.buyerUnitPrice,
-                total_price: row.buyerTargetQty * row.buyerUnitPrice,
-                updated_at: now,
-              });
-            }
+            await rfqDb.rfq_quote_item_awards.update(row.variantAwardId, {
+              variant_award_status: "CONFIRMED",
+              seller_accepted: true,
+              seller_accepted_at: now,
+              seller_offered_quantity: row.buyerTargetQty,
+              buyer_target_quantity: row.buyerTargetQty,
+              unit_price: row.buyerUnitPrice,
+              total_price: row.buyerTargetQty * row.buyerUnitPrice,
+              updated_at: now,
+            });
           }
 
           const revisions: RfqQuoteItemAwardRevision[] = variantResponses.map(row => ({
             id: `arh-${crypto.randomUUID()}`,
             quote_award_id: myAward?.id || "",
-            quote_variant_award_id: row.variantAwardId !== "fallback" ? row.variantAwardId : undefined,
+            quote_variant_award_id: row.variantAwardId,
             rfq_id: rfqId!,
             rfq_item_id: itemId!,
             seller_party_id: sellerParty?.id || "pty-seller",
@@ -488,47 +493,39 @@ export const SellerAwardRevisionResponse: React.FC = () => {
 
       await rfqDb.transaction(
         "rw",
-        [rfqDb.seller_quotes, rfqDb.rfq_quote_awards, rfqDb.rfq_quote_item_awards, rfqDb.rfq_quote_item_award_revisions, rfqDb.rfq_award_revision_notes],
+        [rfqDb.rfq_quote_awards, rfqDb.rfq_quote_item_awards, rfqDb.rfq_quote_item_award_revisions, rfqDb.rfq_award_revision_notes],
         async () => {
-          await rfqDb.seller_quotes.update(myQuote.id, {
-            status: "SUBMITTED",
-            offer_quantity: totalOfferedUnits,
-            updated_at: now,
-          });
-
           if (myAward) {
             await rfqDb.rfq_quote_awards.update(myAward.id, {
               award_status: "SELLER_REVISED",
-              total_awarded_quantity: totalOfferedUnits,
-              total_awarded_amount: totalOfferedAmount,
               updated_at: now,
             });
           }
 
           for (const row of variantResponses) {
-            if (row.variantAwardId !== "fallback") {
-              await rfqDb.rfq_quote_item_awards.update(row.variantAwardId, {
-                variant_award_status: "SELLER_REVISED",
-                seller_accepted: false,
-                seller_offered_quantity: row.offeredQty,
-                unit_price: row.offeredPrice,
-                total_price: row.offeredQty * row.offeredPrice,
-                updated_at: now,
-              });
-            }
+            await rfqDb.rfq_quote_item_awards.update(row.variantAwardId, {
+              variant_award_status: "SELLER_REVISED",
+              seller_accepted: false,
+              seller_offered_quantity: row.offeredQty,
+              total_price: row.offeredQty * row.offeredPrice,
+              updated_at: now,
+            });
           }
+
+          const sellerPartyId = sellerParty?.id || myQuote.seller_party_id;
+          const currentActorId = currentUserId || "seller-user";
 
           const revisions: RfqQuoteItemAwardRevision[] = variantResponses.map(row => ({
             id: `arh-${crypto.randomUUID()}`,
             quote_award_id: myAward?.id || "",
-            quote_variant_award_id: row.variantAwardId !== "fallback" ? row.variantAwardId : undefined,
+            quote_variant_award_id: row.variantAwardId,
             rfq_id: rfqId!,
             rfq_item_id: itemId!,
-            seller_party_id: sellerParty?.id || "pty-seller",
+            seller_party_id: sellerPartyId,
             seller_quote_id: myQuote.id,
             award_round: currentAwardRound,
             actor_type: "SELLER",
-            actor_id: currentUserId || "seller-user",
+            actor_id: currentActorId,
             variant_id: row.variantId,
             quantity: row.offeredQty,
             unit_price: row.offeredPrice,
@@ -545,13 +542,13 @@ export const SellerAwardRevisionResponse: React.FC = () => {
               id: `arn-${crypto.randomUUID()}`,
               rfq_id: rfqId!,
               rfq_item_id: itemId!,
-              seller_party_id: sellerParty?.id || "pty-seller",
+              seller_party_id: sellerPartyId,
               seller_quote_id: myQuote.id,
-              buyer_party_id: rfq.requester_party_id || rfq.requester_id || "pty-buyer",
+              buyer_party_id: rfq.requester_party_id || rfq.requester_id,
               quote_award_id: myAward?.id,
               award_round: currentAwardRound,
               actor_type: "SELLER",
-              actor_id: currentUserId || "seller-user",
+              actor_id: currentActorId,
               note_type: "SELLER_AWARD_REVISION",
               note: responseNote.trim(),
               created_at: now,
@@ -575,35 +572,18 @@ export const SellerAwardRevisionResponse: React.FC = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto space-y-4 pb-12">
-      <Card size="small" className="shadow-sm border-slate-200 bg-white">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Award Allocation Review</h1>
-              <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1 rounded border border-slate-200">RFQ: {rfq.rfq_number}</span>
-              <AntTag color="purple" className="font-bold text-xs">
-                Award Round {currentAwardRound}
-              </AntTag>
-              {isConfirmed && (
-                <AntTag color="emerald" className="font-bold text-xs">
-                  CONFIRMED
-                </AntTag>
-              )}
-              {isRevised && (
-                <AntTag color="orange" className="font-bold text-xs">
-                  AWARD REVISION SUBMITTED
-                </AntTag>
-              )}
-            </div>
-            <p className="text-xs text-slate-500 mt-1 m-0">
-              The buyer has awarded line item allocation to your quote across variant options. Review the requested quantities and pricing, then confirm or counter-propose revised
-              allocations.
-            </p>
-          </div>
+    <div className="mx-auto space-y-4 pb-12">
+      {/* Structural Page Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pb-1">
+        <div>
+          <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">
+            Award Allocation Response
+          </h1>
+          <p className="text-xs text-slate-500 mt-0.5 m-0">
+            Review line item award details, manage fulfillable variant allocations, and submit your response or revision.
+          </p>
         </div>
-      </Card>
-
+      </div>
       {isConfirmed && (
         <Alert
           type="success"
@@ -612,11 +592,10 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           message={<span className="font-bold text-xs text-emerald-900">Award Allocation Confirmed & Accepted</span>}
           description={
             <span className="text-xs text-emerald-800">
-              You have confirmed and accepted this award allocation{myAward?.seller_accepted_at ? ` on ${new Date(myAward.seller_accepted_at).toLocaleString()}` : ""}. The buyer can now
-              proceed with Purchase Order issuance.
+              You have confirmed this award allocation{myAward?.seller_accepted_at ? ` on ${new Date(myAward.seller_accepted_at).toLocaleString()}` : ""}. The buyer can now proceed with Purchase Order issuance.
             </span>
           }
-          className="bg-emerald-50 border-emerald-200 shadow-sm"
+          className="bg-emerald-50 border-emerald-200"
         />
       )}
 
@@ -627,79 +606,92 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           message={<span className="font-bold text-xs text-blue-900">Award Revision Sent to Buyer</span>}
           description={
             <span className="text-xs text-blue-800">
-              Your award revision is currently under review by the buyer. You will be notified once the buyer responds or re-issues the award allocation.
+              Your award revision is currently under review by the buyer. You will be notified once the buyer responds or re-issues the allocation.
             </span>
           }
-          className="bg-blue-50 border-blue-200 shadow-sm"
+          className="bg-blue-50 border-blue-200"
         />
       )}
-
-      <Card size="small" className="shadow-sm border-slate-200 bg-white">
+      <Card size="small" className="shadow-sm border-slate-200 bg-white" title={<span className="font-bold text-xs text-slate-800">Line Item Award Overview</span>}>
         <div className="space-y-3">
-          <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded">Line Item #{item.item_index || 1}</span>
-              <h3 className="font-bold text-slate-800 text-sm m-0">{product?.name || category?.name || "RFQ Product Item"}</h3>
-              <AntTag color="blue" className="text-[11px] font-medium m-0">
-                {category?.name || "Category"}
-              </AntTag>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <AntTag color="cyan" className="font-semibold text-xs">
-                Proposal R{currentProposalRound}
-              </AntTag>
-              <AntTag color="purple" className="font-semibold text-xs">
-                Award Round {currentAwardRound}
-              </AntTag>
-            </div>
-          </div>
-
           <Descriptions
             bordered
             size="small"
-            column={{ xs: 1, sm: 2, md: 3 }}
-            classNames={{
-              label: "text-xs font-medium text-slate-600 bg-slate-50 p-2",
-              content: "text-xs font-semibold text-slate-800 p-2",
-            }}
+            column={{ xxl: 3, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }}
+            labelStyle={{ fontSize: "12px", fontWeight: 600, color: "#475569", backgroundColor: "#f8fafc", width: "150px" }}
+            contentStyle={{ fontSize: "12px", color: "#1e293b" }}
           >
+            <Descriptions.Item label="Line Item">
+              <span className="font-mono text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                Item #{item.item_index || 1}
+              </span>
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Product / Category">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="font-semibold text-slate-800 text-xs">
+                  {product?.name || category?.name || "RFQ Product Item"}
+                </span>
+                {category?.name && (
+                  <AntTag color="blue" className="text-[10px] m-0">
+                    {category.name}
+                  </AntTag>
+                )}
+              </div>
+            </Descriptions.Item>
+
+            <Descriptions.Item label="RFQ Number">
+              <span className="font-mono font-bold text-slate-700 text-xs">
+                {rfq.rfq_number}
+              </span>
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Proposal Round">
+              <AntTag color="cyan" className="font-semibold text-xs m-0">
+                Round {currentProposalRound}
+              </AntTag>
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Award Round">
+              <AntTag color="purple" className="font-semibold text-xs m-0">
+                Award Round {currentAwardRound}
+              </AntTag>
+            </Descriptions.Item>
+
+            <Descriptions.Item label="Award Status">
+              {isConfirmed ? (
+                <AntTag color="emerald" className="font-bold text-xs m-0">
+                  CONFIRMED
+                </AntTag>
+              ) : isRevised ? (
+                <AntTag color="orange" className="font-bold text-xs m-0">
+                  AWARD REVISION SUBMITTED
+                </AntTag>
+              ) : (
+                <AntTag color="blue" className="font-bold text-xs m-0">
+                  ACTION REQUIRED
+                </AntTag>
+              )}
+            </Descriptions.Item>
+
             <Descriptions.Item label="Original RFQ Quantity">
-              <span>
+              <span className="font-semibold text-slate-700 font-mono text-xs">
                 {item.req_quantity} {item.req_unit || "PCS"}
               </span>
             </Descriptions.Item>
-            <Descriptions.Item label="Buyer Total Requested Allocation">
-              <span className="font-bold text-indigo-700 text-sm">
+
+            <Descriptions.Item label="Buyer Requested Allocation">
+              <span className="font-bold text-indigo-700 font-mono text-xs">
                 {totalBuyerTargetUnits} {item.req_unit || "PCS"}
               </span>
             </Descriptions.Item>
+
             <Descriptions.Item label="Buyer Total Target Value">
-              <span className="font-bold text-emerald-700 text-sm">{formatCurrency(totalBuyerTargetAmount)}</span>
+              <span className="font-bold text-emerald-700 font-mono text-xs">
+                {formatCurrency(totalBuyerTargetAmount)}
+              </span>
             </Descriptions.Item>
           </Descriptions>
-
-          {latestBuyerNoteInfo && (
-            <Alert
-              type="warning"
-              showIcon
-              icon={<FileTextOutlined className="text-amber-600 text-sm mt-0.5" />}
-              message={
-                <div className="flex flex-wrap items-center justify-between gap-1">
-                  <span className="font-bold text-xs text-amber-900">
-                    Latest Buyer&apos;s Note for Quote {latestBuyerNoteInfo.quoteNumber ? `(${latestBuyerNoteInfo.quoteNumber})` : ""} (Round {latestBuyerNoteInfo.round}):
-                  </span>
-                  {latestBuyerNoteInfo.timestamp && <span className="text-[11px] text-amber-700/80 font-normal font-mono">{new Date(latestBuyerNoteInfo.timestamp).toLocaleString()}</span>}
-                </div>
-              }
-              description={
-                <div className="mt-1 bg-amber-100/40 p-2 rounded border border-amber-200/60">
-                  <span className="text-xs text-amber-950 italic font-medium leading-relaxed">&ldquo;{latestBuyerNoteInfo.note}&rdquo;</span>
-                </div>
-              }
-              className="bg-amber-50/80 border-amber-200 shadow-xs"
-            />
-          )}
         </div>
       </Card>
 
@@ -709,8 +701,8 @@ export const SellerAwardRevisionResponse: React.FC = () => {
         title={
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <ShoppingOutlined className="text-emerald-600" />
-              <span className="font-bold text-xs text-slate-800">Your Allocation Response</span>
+              <ShoppingOutlined className="text-indigo-600" />
+              <span className="font-bold text-xs text-slate-800">Awarded Variant Quantity Allocation</span>
             </div>
             <span className="text-xs text-slate-500 font-normal">
               {variantResponses.length} Awarded Variant Option{variantResponses.length !== 1 ? "s" : ""}
@@ -731,7 +723,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
           />
 
           <div className="flex flex-wrap items-center justify-between gap-4 bg-slate-50 p-3 rounded-lg border border-slate-200">
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-6">
               <div>
                 <span className="text-[11px] text-slate-500 block">Total Fulfillable Quantity:</span>
                 <span className="text-sm font-mono font-bold text-slate-800">
@@ -755,29 +747,113 @@ export const SellerAwardRevisionResponse: React.FC = () => {
               </div>
             )}
           </div>
+        </div>
+      </Card>
 
-          {!isConfirmed && (
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Response / Clarification Note for Buyer:</label>
-              <Input.TextArea
-                rows={3}
-                placeholder="e.g. We confirm we can fulfill the requested variants at the agreed schedule, with shipping within 10 business days."
-                value={responseNote}
-                onChange={e => setResponseNote(e.target.value)}
-                className="text-xs"
-                disabled={isSubmitting}
-              />
+      {/* Communication Thread & Action Card */}
+      <Card
+        size="small"
+        className="shadow-sm border-slate-200 bg-white"
+        title={
+          <div className="flex items-center gap-2">
+            <FileTextOutlined className="text-indigo-600" />
+            <span className="font-bold text-xs text-slate-800">Award Revision Notes & Communication Thread</span>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          {(latestBuyerNoteInfo || (isViewMode ? latestSellerNoteInfo : true)) ? (
+            <div className="space-y-3">
+              {/* Buyer Note Thread Item */}
+              {latestBuyerNoteInfo && (
+                <div className="bg-white p-3 rounded-md border border-amber-200/90 shadow-2xs">
+                  <div className="flex flex-wrap items-center justify-between text-xs mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-amber-900 bg-amber-100/70 px-2 py-0.5 rounded text-[11px] border border-amber-200">
+                        Buyer Note
+                      </span>
+                      <span className="text-slate-600 font-medium text-[11px]">
+                        Quote {latestBuyerNoteInfo.quoteNumber ? `(${latestBuyerNoteInfo.quoteNumber})` : ""} &bull; Round {latestBuyerNoteInfo.round}
+                      </span>
+                    </div>
+                    {latestBuyerNoteInfo.timestamp && (
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {new Date(latestBuyerNoteInfo.timestamp).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-slate-800 bg-amber-50/50 p-2.5 rounded border border-amber-100 leading-relaxed italic">
+                    &ldquo;{latestBuyerNoteInfo.note}&rdquo;
+                  </div>
+                </div>
+              )}
+
+              {/* Seller Note / Response Thread Item */}
+              {isViewMode ? (
+                latestSellerNoteInfo && (
+                  <div className="bg-white p-3 rounded-md border border-indigo-200/90 shadow-2xs">
+                    <div className="flex flex-wrap items-center justify-between text-xs mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-indigo-900 bg-indigo-100/70 px-2 py-0.5 rounded text-[11px] border border-indigo-200">
+                          Your Response
+                        </span>
+                        <span className="text-slate-600 font-medium text-[11px]">
+                          Round {latestSellerNoteInfo.round}
+                        </span>
+                      </div>
+                      {latestSellerNoteInfo.timestamp && (
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          {new Date(latestSellerNoteInfo.timestamp).toLocaleString()}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-800 bg-indigo-50/40 p-2.5 rounded border border-indigo-100 leading-relaxed italic">
+                      &ldquo;{latestSellerNoteInfo.note}&rdquo;
+                    </div>
+                  </div>
+                )
+              ) : (
+                <div className="bg-white p-3 rounded-md border border-indigo-200/90 shadow-2xs space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-indigo-900 bg-indigo-100/70 px-2 py-0.5 rounded text-[11px] border border-indigo-200">
+                        Your Response
+                      </span>
+                      <span className="text-slate-500 font-medium text-[11px]">
+                        Round {currentAwardRound} (Drafting Clarification / Revision Note)
+                      </span>
+                    </div>
+                  </div>
+                  <Input.TextArea
+                    rows={3}
+                    placeholder="e.g. We confirm we can fulfill the requested variants at the agreed schedule, with shipping within 10 business days."
+                    value={responseNote}
+                    onChange={e => setResponseNote(e.target.value)}
+                    className="text-xs"
+                    disabled={isSubmitting}
+                  />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-xs text-slate-400 italic py-2">
+              No notes or communication records for this award allocation.
             </div>
           )}
 
           <Divider className="my-2" />
 
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-            <Button size="middle" onClick={() => navigate(`${basePath}/${rfqId}`)} disabled={isSubmitting} className="text-xs font-semibold">
-              Back to RFQ
-            </Button>
-
-            {!isConfirmed ? (
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-1">
+            {isViewMode ? (
+              <Button
+                type="primary"
+                size="middle"
+                onClick={() => navigate(`${basePath}/${rfqId}`)}
+                className="text-xs font-semibold"
+              >
+                Back to RFQ Workspace
+              </Button>
+            ) : (
               <Space>
                 <Button
                   type="default"
@@ -795,7 +871,7 @@ export const SellerAwardRevisionResponse: React.FC = () => {
                     type="primary"
                     size="middle"
                     icon={<CheckCircleOutlined />}
-                    onClick={handleAcceptAllocation}
+                    onClick={handleSubmitAwardAllocation}
                     loading={isSubmitting}
                     className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold border-0"
                   >
@@ -803,10 +879,6 @@ export const SellerAwardRevisionResponse: React.FC = () => {
                   </Button>
                 )}
               </Space>
-            ) : (
-              <Button type="primary" size="middle" onClick={() => navigate(`${basePath}/${rfqId}`)} className="bg-emerald-600 hover:bg-emerald-700 text-xs font-semibold border-0">
-                Done (Confirmed)
-              </Button>
             )}
           </div>
         </div>

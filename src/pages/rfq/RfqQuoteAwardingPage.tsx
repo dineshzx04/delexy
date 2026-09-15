@@ -80,7 +80,7 @@ type AwardAllocation = {
   variant_col_key: string;
   variant_type: "CUSTOM" | "SUGGESTED";
   unit_price: number;
-  awarded_quantity: number;
+  buyer_target_quantity: number;
   unit_of_measure: string;
   seller_accepted?: boolean;
   is_selected?: boolean;
@@ -238,7 +238,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
                 variant_col_key: `col_${v.variant_id}`,
                 variant_type: v.variant_type,
                 unit_price: v.unit_price,
-                awarded_quantity: v.awarded_quantity,
+                buyer_target_quantity: v.buyer_target_quantity,
                 unit_of_measure: v.unit_of_measure || item.req_unit || "PCS",
                 seller_accepted: v.seller_accepted,
                 is_selected: true,
@@ -282,7 +282,7 @@ export const RfqQuoteAwardingPage: React.FC = () => {
                 variant_col_key: `col_${v.variant_id}`,
                 variant_type: v.variant_type,
                 unit_price: v.unit_price,
-                awarded_quantity: v.awarded_quantity,
+                buyer_target_quantity: v.buyer_target_quantity,
                 unit_of_measure: v.unit_of_measure || item.req_unit || "PCS",
                 seller_accepted: v.seller_accepted,
                 is_selected: true,
@@ -306,14 +306,14 @@ export const RfqQuoteAwardingPage: React.FC = () => {
   //     const itemGroup = allocations.find(a => a.rfq_item_id === item.id);
   //     const itemAllocated = (itemGroup?.allocations || [])
   //       .filter(a => a.is_selected)
-  //       .reduce((sum, a) => sum + (a.awarded_quantity || 0), 0);
+  //       .reduce((sum, a) => sum + (a.buyer_target_quantity || 0), 0);
   //     if (itemAllocated > item.req_quantity) {
   //       message.error(`Line item #${item.item_index || 1} is over-allocated (${itemAllocated}/${item.req_quantity}). Please adjust before finalizing.`);
   //       return;
   //     }
   //   }
   //
-  //   const activeAllocations = allocations.flatMap(itemGroup => itemGroup.allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
+  //   const activeAllocations = allocations.flatMap(itemGroup => itemGroup.allocations).filter(a => a.is_selected && a.buyer_target_quantity > 0);
   //   if (activeAllocations.length === 0) {
   //     message.warning("Please allocate award quantities to at least one variant before finalizing.");
   //     return;
@@ -565,7 +565,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
   const hasItemExistingAwardRevision = (item: RfqItem) => {
     const hasRevisionAward = (existingQuoteAwards || []).some(a => a.rfq_item_id === item.id && (a.award_round > 1 || a.award_status === "SELLER_REVISED"));
     const itemAllocations = allocations.find(a => a.rfq_item_id === item.id)?.allocations || [];
-    const hasAllocations = itemAllocations.some(a => a.is_selected && a.awarded_quantity > 0);
+    const hasAllocations = itemAllocations.some(a => a.is_selected && a.buyer_target_quantity > 0);
     const hasExistingDbAward = (existingQuoteAwards || []).some(a => a.rfq_item_id === item.id);
     return hasRevisionAward || hasAllocations || hasExistingDbAward;
   };
@@ -583,7 +583,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
       return prev.map(group => {
         if (group.rfq_item_id !== itemId) return group;
         const existing = group.allocations.find(a => a.variant_id === variant.id);
-        const currentQty = existing?.awarded_quantity || 0;
+        const currentQty = existing?.buyer_target_quantity || 0;
         const nextQty = checked ? currentQty : 0;
 
         const updatedAlloc: AwardAllocation = {
@@ -594,7 +594,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
           variant_col_key: variant.colKey,
           variant_type: variant.type.includes("Custom") ? "CUSTOM" : "SUGGESTED",
           unit_price: variant.offerPrice,
-          awarded_quantity: nextQty,
+          buyer_target_quantity: nextQty,
           unit_of_measure: variant.unit || "PCS",
           seller_accepted: false,
           is_selected: checked,
@@ -639,7 +639,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
           variant_col_key: colKey,
           variant_type: variantType,
           unit_price: unitPrice,
-          awarded_quantity: qty,
+          buyer_target_quantity: qty,
           unit_of_measure: unit,
           seller_accepted: existing?.seller_accepted ?? false,
           is_selected: qty > 0 ? true : (currentIsSelected ?? false),
@@ -690,8 +690,8 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
         created_by_user_id: currentUserId,
         award_status: "AWARDED",
         award_round: nextAwardRound,
-        total_awarded_amount: selectedSellerForRevision.totalValue,
-        total_awarded_quantity: selectedSellerForRevision.totalQty,
+        // total_awarded_amount: selectedSellerForRevision.totalValue,
+        // total_awarded_quantity: selectedSellerForRevision.totalQty,
         currency: "USD",
         notes: revisionNote.trim() || undefined,
         created_at: existingAward?.created_at || now,
@@ -717,7 +717,6 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
           variant_label: allocItem.variantLabel,
           buyer_target_quantity: allocItem.awardedQty,
           seller_offered_quantity: allocItem.awardedQty,
-          awarded_quantity: allocItem.awardedQty,
           unit_price: allocItem.unitPrice,
           total_price: allocItem.subtotal,
           unit_of_measure: allocItem.allocation.unit_of_measure || item.req_unit || "PCS",
@@ -877,13 +876,13 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
         })),
       );
 
-      const itemAllocations = (allocations.find(a => a.rfq_item_id === item.id)?.allocations || []).filter(a => a.is_selected && a.awarded_quantity > 0);
+      const itemAllocations = (allocations.find(a => a.rfq_item_id === item.id)?.allocations || []).filter(a => a.is_selected && a.buyer_target_quantity > 0);
       const allocatedSellersCount = new Set(itemAllocations.map(a => a.seller_party_id)).size;
       const allocatedVariantsCount = itemAllocations.length;
-      const allocatedQty = itemAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
+      const allocatedQty = itemAllocations.reduce((sum, a) => sum + a.buyer_target_quantity, 0);
       const reqQty = item.req_quantity || 0;
       const remainingQty = Math.max(0, reqQty - allocatedQty);
-      const allocatedTotalPrice = itemAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
+      const allocatedTotalPrice = itemAllocations.reduce((sum, a) => sum + a.unit_price * a.buyer_target_quantity, 0);
       const lowestPrice = allCombinedVariants.length > 0 ? Math.min(...allCombinedVariants.map(v => v.offerPrice)) : 0;
 
       const itemGroup = allocations.find(a => a.rfq_item_id === item.id);
@@ -929,7 +928,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
 
         const group = sellerQuoteAllocationsMap.get(alloc.seller_party_id)!;
         const unitPrice = alloc.unit_price || variant?.offerPrice || 0;
-        const awardedQty = alloc.awarded_quantity || 0;
+        const awardedQty = alloc.buyer_target_quantity || 0;
         const subtotal = unitPrice * awardedQty;
 
         const existingQva = (existingQuoteVariantAwards || []).find(v => v.rfq_item_id === item.id && v.seller_party_id === alloc.seller_party_id && v.variant_id === alloc.variant_id);
@@ -1054,7 +1053,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
               if (sellerAward && variantAward) {
                 if (sellerAward.award_status === "AWARDED" || variantAward.variant_award_status === "AWARDED") {
                   return (
-                    <Tooltip title={`Award allocation of ${variantAward.awarded_quantity} ${variant.unit} has been sent to ${variant.sellerName} (Round ${awardRound}). Pending supplier response.`}>
+                    <Tooltip title={`Award allocation of ${variantAward.buyer_target_quantity} ${variant.unit} has been sent to ${variant.sellerName} (Round ${awardRound}). Pending supplier response.`}>
                       <div className="flex items-center gap-1.5 cursor-not-allowed">
                         <AntTag color="blue" className="text-[11px] m-0 font-medium flex items-center gap-1">
                           <ClockCircleOutlined /> Awarded (R{awardRound})
@@ -1660,10 +1659,10 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
 //       const category = categories.find(c => c.id === item.category_id);
 
 //       const itemGroup = allocations.find(a => a.rfq_item_id === item.id);
-//       const itemAllocations = (itemGroup?.allocations || []).filter(a => a.is_selected && a.awarded_quantity > 0);
+//       const itemAllocations = (itemGroup?.allocations || []).filter(a => a.is_selected && a.buyer_target_quantity > 0);
 
-//       const totalAllocatedQty = itemAllocations.reduce((sum, a) => sum + a.awarded_quantity, 0);
-//       const totalItemValue = itemAllocations.reduce((sum, a) => sum + a.unit_price * a.awarded_quantity, 0);
+//       const totalAllocatedQty = itemAllocations.reduce((sum, a) => sum + a.buyer_target_quantity, 0);
+//       const totalItemValue = itemAllocations.reduce((sum, a) => sum + a.unit_price * a.buyer_target_quantity, 0);
 //       const reqQty = item.req_quantity || 1;
 
 //       const allocatedRows = itemAllocations.map(alloc => {
@@ -1672,7 +1671,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
 //         const variantInfo = variantsMap.get(alloc.variant_id);
 
 //         const unitPrice = alloc.unit_price || 0;
-//         const awardedQty = alloc.awarded_quantity || 0;
+//         const awardedQty = alloc.buyer_target_quantity || 0;
 //         const subtotal = unitPrice * awardedQty;
 
 //         return {
@@ -1992,7 +1991,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
 //   const rfqAwardSummaryBySeller = useMemo(() => {
 //     if (!rfqId) return [];
 
-//     const activeAllocations = allocations.flatMap(itemGroup => itemGroup.allocations).filter(a => a.is_selected && a.awarded_quantity > 0);
+//     const activeAllocations = allocations.flatMap(itemGroup => itemGroup.allocations).filter(a => a.is_selected && a.buyer_target_quantity > 0);
 
 //     const sellerGroupsMap = new Map<
 //       string,
@@ -2047,7 +2046,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
 //         }
 
 //         const group = sellerGroupsMap.get(item.seller_party_id)!;
-//         group.totalAmount += item.total_price || item.unit_price * item.awarded_quantity;
+//         group.totalAmount += item.total_price || item.unit_price * item.buyer_target_quantity;
 
 //         group.items.push({
 //           rfqItemId: item.rfq_item_id,
@@ -2059,8 +2058,8 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
 //           manufacturer: variant?.manufacturer || "N/A",
 //           brand: variant?.brand || "N/A",
 //           unitPrice: item.unit_price,
-//           awardedQuantity: item.awarded_quantity,
-//           totalPrice: item.total_price || item.unit_price * item.awarded_quantity,
+//           awardedQuantity: item.buyer_target_quantity,
+//           totalPrice: item.total_price || item.unit_price * item.buyer_target_quantity,
 //           unitOfMeasure: "PCS",
 //         });
 //       });
@@ -2085,7 +2084,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
 //         }
 
 //         const group = sellerGroupsMap.get(alloc.seller_party_id)!;
-//         const itemTotal = alloc.unit_price * alloc.awarded_quantity;
+//         const itemTotal = alloc.unit_price * alloc.buyer_target_quantity;
 //         group.totalAmount += itemTotal;
 
 //         group.items.push({
@@ -2098,7 +2097,7 @@ const QuoteRevisionSection: React.FC<QuoteRevisionSectionProps> = props => {
 //           manufacturer: variant?.manufacturer || "N/A",
 //           brand: variant?.brand || "N/A",
 //           unitPrice: alloc.unit_price,
-//           awardedQuantity: alloc.awarded_quantity,
+//           awardedQuantity: alloc.buyer_target_quantity,
 //           totalPrice: itemTotal,
 //           unitOfMeasure: alloc.unit_of_measure || "PCS",
 //         });

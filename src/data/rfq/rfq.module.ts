@@ -166,8 +166,8 @@ export interface RfqQuoteAward {
   | "REJECTED" // Rejected
   | "CANCELLED"; // Cancelled;
   award_round: number;
-  total_awarded_amount: number;
-  total_awarded_quantity: number;
+  // total_awarded_amount: number;
+  // total_awarded_quantity: number;
   currency?: string;
   payment_terms?: string;
   shipping_address?: string;
@@ -193,9 +193,8 @@ export interface RfqQuoteItemAward {
   sku?: string;
 
   // Negotiation Quantities & Pricing
-  buyer_target_quantity?: number;
+  buyer_target_quantity: number;
   seller_offered_quantity?: number;
-  awarded_quantity: number;
   unit_price: number;
   total_price: number;
   unit_of_measure?: string;
@@ -282,7 +281,7 @@ export interface PurchaseOrderItem {
   variant_id: string;
   variant_label?: string;
   unit_price: number;
-  awarded_quantity: number;
+  buyer_target_quantity: number;
   unit_of_measure?: string;
   total_price: number;
 }

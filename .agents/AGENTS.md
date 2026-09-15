@@ -1,4 +1,4 @@
-﻿# Strict Data Architecture & Multi-Context Rules
+# Strict Data Architecture & Multi-Context Rules
 
 1. **User Identity & Multi-Context Versatility**:
    - An individual user (`User`) can own businesses (`BusinessMembership.membership_type = 'OWNER'`), be a business member (`BusinessMembership.membership_type = 'MEMBER'`), and hold a platform role (`PlatformMembership`).
@@ -337,6 +337,33 @@ The action column in SupplierRfqInbox.tsx MUST follow this exact state machine:
 - award.product_mapping_status === ACKNOWLEDGED && award.award_status === AWARDED -> Text: "Awaiting PO Release..." (amber italic)
 - award.award_status === PO_CREATED -> Button: "Confirm PO Receipt" (purple)
 - award.award_status === PO_RECEIVED -> Button: "View PO / Order" (emerald outline)
+
+---
+
+### 4H. CANONICAL 4-TIER PAGE ARCHITECTURE PATTERN
+
+Every page across User, Business, and Platform admin workspaces MUST adopt the standard 4-tier layout:
+
+1. **Tier 1: Static Page Header (`<h1>` + `<p>`)**:
+   - Header is always static and semantic ("Page Title" + concise purpose subtitle).
+   - Never embed dynamic state variables or IDs in top-level `<h1>`.
+
+2. **Tier 2: Lifecycle State Banners (`Alert`)**:
+   - Render record lifecycle notices (`CONFIRMED`, `SELLER_REVISED`, `ACTION_REQUIRED`) directly beneath the header.
+
+3. **Tier 3: Entity Overview Card (Ant Design `Descriptions`)**:
+   - Standardize on `<Descriptions bordered size="small" column={{ xxl: 3, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }}>`.
+   - Sequence: Primary Identifiers -> Lifecycle Status/Rounds -> Quantities/Values.
+
+4. **Tier 4: Primary Workspace Card (Table / Form Grid)**:
+   - Dedicated workspace card ending with a compact summary & variance strip (`bg-slate-50 border rounded-lg p-3`).
+
+5. **Tier 5: Communication Thread & Action Card**:
+   - Unified conversation thread cards for notes & history (role badge tag + timestamp + message box).
+   - Right-aligned action footer separated by a `<Divider className="my-2" />` (Dual buttons in Action Mode; single return button in View Mode).
+
+6. **Single State Mode Switch (`isViewMode`)**:
+   - Derive `isViewMode = isConfirmed || isSubmitted || isReadOnly` to toggle inputs into clean typography and actions into navigation return.
 
 ---
 
