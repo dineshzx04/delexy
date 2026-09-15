@@ -40,7 +40,7 @@ import { RfqWorkspace } from './pages/rfq/RfqWorkspace';
 import { ItemDetailWorkspace } from './pages/rfq/ItemDetailWorkspace';
 import { SellerRfqInbox } from './pages/rfq/SellerRfqInbox';
 import { SellerRfqWorkspace } from './pages/rfq/SellerRfqWorkspace';
-import { SupplierItemRespond } from './pages/rfq/SupplierItemRespond';
+import { SellerItemRespond } from './pages/rfq/SupplierItemRespond';
 import { SellerAwardRevisionResponse } from './pages/rfq/SellerAwardRevisionResponse';
 
 import { RequesterQuoteReview } from './pages/rfq/RequesterQuoteReview';
@@ -143,7 +143,7 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
                 <Route path="seller/rfqs" element={<SellerRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId" element={<SellerRfqWorkspace />} />
-                <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SellerItemRespond />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/award-revision" element={<SellerAwardRevisionResponse />} />
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
@@ -174,7 +174,7 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
                 <Route path="seller/rfqs" element={<SellerRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId" element={<SellerRfqWorkspace />} />
-                <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SupplierItemRespond />} />
+                <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SellerItemRespond />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/award-revision" element={<SellerAwardRevisionResponse />} />
 
                 <Route path="*" element={<NotFound scope="business" />} />

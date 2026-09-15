@@ -83,7 +83,7 @@ export const ItemDetailWorkspace: React.FC = () => {
         <div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Sourcing Line Item Workspace</h1>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Manage requested attributes, assigned suppliers, quotation offers, and contract awards for this line item.
+            Manage requested attributes, assigned sellers, quotation offers, and contract awards for this line item.
           </p>
         </div>
       </div>
@@ -140,7 +140,7 @@ export const ItemDetailWorkspace: React.FC = () => {
                   <FileTextOutlined /> Seller Quotes ({quotesCount})
                 </span>
               ),
-              children: <SupplierQuotesTab itemId={itemId} />
+              children: <SellerQuotesTab itemId={itemId} />
             },
             {
               key: 'attributes',
@@ -340,9 +340,9 @@ const RequestedAttributesTab: React.FC<TabProps> = ({ itemId }) => {
 };
 
 // ============================================================================
-// SUB-COMPONENT 2: Supplier Quotes Tab
+// SUB-COMPONENT 2: Seller Quotes Tab
 // ============================================================================
-const SupplierQuotesTab: React.FC<TabProps> = ({ itemId }) => {
+const SellerQuotesTab: React.FC<TabProps> = ({ itemId }) => {
   const parties = useLiveQuery(() => businessDb.parties.toArray(), []) || [];
   const quotes = useLiveQuery(
     () =>
@@ -562,7 +562,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
 
     submittedQuotes.forEach((quote) => {
       const party = parties.find((p) => p.id === quote.seller_party_id);
-      const supplierName = party?.display_name || quote.seller_party_id;
+      const sellerName = party?.display_name || quote.seller_party_id;
 
       // Extract quote attributes (specs) for custom options of this quote
       const quoteSpecs = allQuoteAttributes
@@ -591,7 +591,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
           id: v.id,
           quoteId: quote.id,
           sellerQuoteNumber: quote.seller_quote_number,
-          supplierName,
+          sellerName,
           title: label,
           type: 'CUSTOM',
           offer_price: v.offer_price,
@@ -636,7 +636,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
           id: sv.id,
           quoteId: quote.id,
           sellerQuoteNumber: quote.seller_quote_number,
-          supplierName,
+          sellerName,
           title: label,
           type: 'SUGGESTED',
           offer_price: sv.offer_price,
@@ -833,7 +833,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
     return (
       <div className="p-8 text-center text-slate-500">
         <h3 className="text-sm font-bold text-slate-700 m-0">No Submitted Quotes to Compare</h3>
-        <p className="text-xs text-slate-400 mt-1">When suppliers submit quote proposals for this line item, their offered options will be compared side-by-side here.</p>
+        <p className="text-xs text-slate-400 mt-1">When sellers submit quote proposals for this line item, their offered options will be compared side-by-side here.</p>
       </div>
     );
   }
@@ -843,7 +843,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-sm font-bold text-slate-800 m-0">Submitted Quote Options Matrix ({selectedOfferedItems.length} offered options)</h3>
-          <p className="text-xs text-slate-500 mt-0.5 m-0">Side-by-side comparison matrix of all supplier proposals for this line item.</p>
+          <p className="text-xs text-slate-500 mt-0.5 m-0">Side-by-side comparison matrix of all seller proposals for this line item.</p>
         </div>
       </div>
 
@@ -889,7 +889,7 @@ const SubmittedQuoteComparisonsTab: React.FC<TabProps> = ({ itemId }) => {
             title: (
               <div className="flex flex-col items-center gap-0.5 py-1 min-w-[150px]">
                 <div className="flex flex-col items-center gap-0.5 text-xs">
-                  <span className="font-semibold text-slate-800">{colItem.supplierName}</span>
+                  <span className="font-semibold text-slate-800">{colItem.sellerName}</span>
                   <span className="font-mono text-indigo-700 font-semibold text-[11px]">({colItem.sellerQuoteNumber})</span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">

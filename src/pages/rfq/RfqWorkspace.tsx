@@ -63,7 +63,7 @@ export const RfqWorkspace: React.FC = () => {
         <div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">RFQ Sourcing Workspace</h1>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Manage line items, supplier assignments, quote comparisons, and contract awards for this RFQ.
+            Manage line items, seller assignments, quote comparisons, and contract awards for this RFQ.
           </p>
         </div>
         <div>
@@ -129,13 +129,13 @@ export const RfqWorkspace: React.FC = () => {
               children: <ItemsTab rfqId={rfqId!} />,
             },
             {
-              key: 'suppliers',
+              key: 'sellers',
               label: (
                 <span className="font-semibold flex items-center gap-1.5 text-xs">
-                  <TeamOutlined /> Suppliers
+                  <TeamOutlined /> Sellers
                 </span>
               ),
-              children: <SuppliersTab rfqId={rfqId!} />,
+              children: <SellersTab rfqId={rfqId!} />,
             },
           ]}
         />
@@ -262,7 +262,7 @@ const ItemsTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
 
 
 
-const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
+const SellersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
   const navigate = useNavigate();
   const screens = AntGrid.useBreakpoint();
   const { activeWorkspace } = useWorkspace();
@@ -276,24 +276,24 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
 
   const [selectedSellerId, setSelectedSellerId] = useState<string | null>(null);
 
-  const uniqueSuppliers = React.useMemo(() => {
-    const suppliersMap = new Map<string, { party: any; itemsAssigned: number }>();
+  const uniqueSellers = React.useMemo(() => {
+    const sellersMap = new Map<string, { party: any; itemsAssigned: number }>();
 
     items.forEach(item => {
       if (item.seller_assignments) {
         item.seller_assignments.forEach(assignment => {
           const partyId = assignment.seller_party_id;
-          if (!suppliersMap.has(partyId)) {
+          if (!sellersMap.has(partyId)) {
             const party = parties.find(p => p.id === partyId);
-            suppliersMap.set(partyId, { party, itemsAssigned: 1 });
+            sellersMap.set(partyId, { party, itemsAssigned: 1 });
           } else {
-            suppliersMap.get(partyId)!.itemsAssigned += 1;
+            sellersMap.get(partyId)!.itemsAssigned += 1;
           }
         });
       }
     });
 
-    return Array.from(suppliersMap.values()).map(({ party, itemsAssigned }) => ({
+    return Array.from(sellersMap.values()).map(({ party, itemsAssigned }) => ({
       seller_party_id: party?.id,
       name: party?.display_name || party?.id || 'Unknown Party',
       status: party?.status || 'UNKNOWN',
@@ -301,7 +301,7 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
     }));
   }, [items, parties]);
 
-  const supplierColumns = [
+  const sellerColumns = [
     {
       title: 'S.No.',
       key: 'sno',
@@ -309,7 +309,7 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
       render: (_: any, __: any, index: number) => <span className="font-semibold text-slate-500 text-xs">{index + 1}</span>,
     },
     {
-      title: 'Supplier Name',
+      title: 'Seller Name',
       dataIndex: 'name',
       key: 'name',
       render: (text: string) => <span className="font-semibold text-slate-800 text-xs">{text}</span>,
@@ -412,20 +412,20 @@ const SuppliersTab: React.FC<{ rfqId: string }> = ({ rfqId }) => {
     },
   ];
 
-  const selectedSupplierName = uniqueSuppliers.find(s => s.seller_party_id === selectedSellerId)?.name;
+  const selectedSellerName = uniqueSellers.find(s => s.seller_party_id === selectedSellerId)?.name;
 
   return (
     <div className="space-y-3">
       <Table
-        dataSource={uniqueSuppliers}
-        columns={supplierColumns}
+        dataSource={uniqueSellers}
+        columns={sellerColumns}
         rowKey="seller_party_id"
         pagination={false}
         size="small"
         scroll={{ x: 500 }}
       />
       <Drawer
-        title={`Items Assigned to ${selectedSupplierName}`}
+        title={`Items Assigned to ${selectedSellerName}`}
         placement="right"
         width={screens.md ? 640 : '100%'}
         onClose={() => setSelectedSellerId(null)}

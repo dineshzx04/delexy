@@ -1014,7 +1014,7 @@ export const RequesterQuoteReview: React.FC = () => {
         <div>
           <h1 className="text-lg font-bold text-slate-900 tracking-tight m-0">Review Sourcing Quote Proposal</h1>
           <p className="text-xs text-slate-500 mt-0.5 m-0">
-            Evaluate supplier offered options, compare attribute deviations, and accept proposal or request revisions.
+            Evaluate seller offered options, compare attribute deviations, and accept proposal or request revisions.
           </p>
         </div>
       </div>
@@ -1107,7 +1107,7 @@ export const RequesterQuoteReview: React.FC = () => {
               type="warning"
               showIcon
               message="Revision Requested"
-              description="Revisions have been requested. A new proposal response round is now open for this supplier."
+              description="Revisions have been requested. A new proposal response round is now open for this seller."
               className="rounded-xl"
             />
           )}
@@ -1183,7 +1183,7 @@ export const RequesterQuoteReview: React.FC = () => {
             <div>
               <h3 className="text-base font-bold text-slate-900">Offered Proposal Options & Prices</h3>
               <p className="text-xs text-slate-500">
-                Review the specific proposal options offered by the supplier along with unit offer prices (custom combinations & suggested catalog SKUs). Mark options for acceptance.
+                Review the specific proposal options offered by the seller along with unit offer prices (custom combinations & suggested catalog SKUs). Mark options for acceptance.
               </p>
             </div>
             <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm" style={{ borderLeft: `4px solid #527EA3` }}>

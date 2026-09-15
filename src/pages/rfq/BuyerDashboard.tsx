@@ -133,7 +133,7 @@ export const BuyerDashboard: React.FC = () => {
           </div>
           <h1 className="text-2xl font-black text-white">Strategic Procurement Dashboard</h1>
           <p className="text-sm text-slate-300 mt-1 max-w-xl">
-            Managing party-based RFQs, technical evaluation rounds, product mapping, and multi-supplier split order awards for {activeParty?.display_name || ''}.
+            Managing party-based RFQs, technical evaluation rounds, product mapping, and multi-seller split order awards for {activeParty?.display_name || ''}.
           </p>
         </div>
         <Button

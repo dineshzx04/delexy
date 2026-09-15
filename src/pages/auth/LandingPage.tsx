@@ -33,7 +33,7 @@ const LandingPage: React.FC = () => {
           The Enterprise <span className="text-transparent bg-clip-text bg-gradient-to-r from-sky-600 to-blue-800">Sourcing Engine</span>
         </h1>
         <p className="text-lg lg:text-xl text-slate-600 max-w-2xl mb-10 leading-relaxed">
-          Delexy connects global engineering suppliers with enterprise buyers. Manage RFQs, track procurement, and scale your supply chain in one unified platform.
+          Delexy connects global engineering sellers with enterprise buyers. Manage RFQs, track procurement, and scale your supply chain in one unified platform.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center gap-4">
@@ -44,7 +44,7 @@ const LandingPage: React.FC = () => {
           </Link>
           <Link to="/login">
             <AntButton size="large" className="h-14 px-8 text-lg font-medium">
-              Access Supplier Portal
+              Access Seller Portal
             </AntButton>
           </Link>
         </div>
@@ -55,7 +55,7 @@ const LandingPage: React.FC = () => {
             <div className="w-12 h-12 bg-sky-100 rounded-lg flex items-center justify-center mb-4 text-sky-600">
               <Lucide.ShieldCheck size={24} />
             </div>
-            <h3 className="text-xl font-bold text-slate-900 mb-2">Verified Suppliers</h3>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Verified Sellers</h3>
             <p className="text-slate-600">Access a curated network of ISO-certified manufacturing and engineering partners globally.</p>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">

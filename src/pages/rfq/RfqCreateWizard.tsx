@@ -115,7 +115,7 @@ export const RfqCreateWizard: React.FC = () => {
             <p className="text-xs text-slate-500 m-0">Set up base sourcing parameters, submission deadline, and contact terms.</p>
           )}
           {currentStep === 1 && (
-            <p className="text-xs text-slate-500 m-0">Define required product attributes, specifications, and supplier assignments.</p>
+            <p className="text-xs text-slate-500 m-0">Define required product attributes, specifications, and seller assignments.</p>
           )}
           {currentStep === 2 && (
             <p className="text-xs text-slate-500 m-0">Inspect complete RFQ structure and line items before publishing.</p>
@@ -1933,7 +1933,7 @@ const RfqReviewSubmitStep: React.FC<RfqReviewSubmitStepProps> = ({
                           ))}
                         </div>
                       ) : (
-                        <AntTag color="cyan" className="text-xs m-0" icon={<AntGlobalOutlined />}>Open RFQ (All Marketplace Suppliers)</AntTag>
+                        <AntTag color="cyan" className="text-xs m-0" icon={<AntGlobalOutlined />}>Open RFQ (All Marketplace Sellers)</AntTag>
                       )}
                     </AntDescriptions.Item>
                   </AntDescriptions>

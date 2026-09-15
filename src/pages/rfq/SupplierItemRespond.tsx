@@ -2550,6 +2550,4 @@ const StepQuoteProposal: React.FC<{ rfqId: string; itemId: string; activePartyId
   );
 };
 
-
-
-
+export const SellerItemRespond = SupplierItemRespond;

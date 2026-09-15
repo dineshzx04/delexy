@@ -21,7 +21,7 @@ const AuthLayout: React.FC = () => {
               The B2B Engineering Marketplace & Procurement Platform
             </h1>
             <p className="text-sky-200 text-lg">
-              Streamline your RFQs, manage your suppliers, and scale your global sourcing with enterprise-grade tools.
+              Streamline your RFQs, manage your sellers, and scale your global sourcing with enterprise-grade tools.
             </p>
           </div>
         </div>
