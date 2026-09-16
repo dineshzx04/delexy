@@ -207,6 +207,7 @@ export interface RfqQuoteItemAward {
   | "BUYER_REVISED"
   | "CONFIRMED"
   | "PO_CREATED"
+  | "PO_RECEIVED"
   | "REJECTED";
   seller_accepted: boolean;
   seller_accepted_at?: string;
@@ -261,11 +262,14 @@ export interface PurchaseOrder {
   quote_award_id?: string;
   buyer_party_id: string;
   seller_party_id: string;
+  seller_quote_ids?: string[];
   total_amount: number;
   currency: string;
   po_status: "DRAFT" | "RELEASED" | "SELLER_ACKNOWLEDGED" | "COMPLETED" | "CANCELLED";
   shipping_address?: string;
   payment_terms?: string;
+  incoterms?: string;
+  shipping_method?: string;
   delivery_notes?: string;
   issued_by_user_id?: string;
   po_released_at?: string;
@@ -276,14 +280,29 @@ export interface PurchaseOrder {
 export interface PurchaseOrderItem {
   id: string;
   purchase_order_id: string;
+  quote_item_award_id?: string;
   quote_variant_award_id?: string;
+  seller_quote_id?: string;
+  seller_quote_number?: string;
   rfq_item_id: string;
+  item_index?: number;
+  catalog_product_id?: string;
+  product_name?: string;
+  category_name?: string;
+  sku?: string;
+  specifications?: string;
+  manufacturer?: string;
+  brand?: string;
   variant_id: string;
   variant_label?: string;
   unit_price: number;
   buyer_target_quantity: number;
   unit_of_measure?: string;
   total_price: number;
+  delivery_lead_time?: string;
+  target_delivery_date?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface PoAcknowledgement {

@@ -348,8 +348,9 @@ Every page across User, Business, and Platform admin workspaces MUST adopt the s
    - Header is always static and semantic ("Page Title" + concise purpose subtitle).
    - Never embed dynamic state variables or IDs in top-level `<h1>`.
 
-2. **Tier 2: Lifecycle State Banners (`Alert`)**:
-   - Render record lifecycle notices (`CONFIRMED`, `SELLER_REVISED`, `ACTION_REQUIRED`) directly beneath the header.
+2. **Tier 2: Lifecycle State Banners (`Alert`) - OPTIONAL / CONDITIONAL**:
+   - Render record lifecycle notices (`CONFIRMED`, `SELLER_REVISED`, `ACTION_REQUIRED`) directly beneath the header only when the entity/page has active workflow lifecycle notifications.
+   - Omit completely for pages without active state alerts (e.g. registries, catalog management, neutral views).
 
 3. **Tier 3: Entity Overview Card (Ant Design `Descriptions`)**:
    - Standardize on `<Descriptions bordered size="small" column={{ xxl: 3, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }}>`.

@@ -140,3 +140,54 @@ export const mockAddresses: Address[] = [
     updated_at: "2026-06-01T08:00:00.000Z",
   },
 ];
+
+
+// {
+//   line1: "No. 12, Anna Nagar Main Road",
+//   line2: "Anna Nagar West",
+//   line3: "",
+
+//   locality: "Chennai",
+//   administrative_area: "Tamil Nadu",
+//   postal_code: "600101",
+
+//   country_code: "IN",
+//   country_name: "India",
+
+//   formatted_address:
+//     "No. 12, Anna Nagar Main Road, Anna Nagar West, Chennai, Tamil Nadu 600101, India",
+
+//   latitude: 13.0850,
+//   longitude: 80.2101,
+
+//   provider: "google",
+//   provider_place_id: "ChIJxxxxxxxxxxxx",
+
+//   verification_status: "VERIFIED",
+//   verified_at: "2026-09-16T10:30:00Z"
+// }
+
+// interface Address {
+//   line1: string;
+//   line2?: string;
+//   line3?: string;
+
+//   locality?: string;
+//   administrative_area?: string;
+
+//   postal_code?: string;
+
+//   country_code: string;
+//   country_name: string;
+
+//   formatted_address?: string;
+
+//   latitude?: number;
+//   longitude?: number;
+
+//   provider?: string;
+//   provider_place_id?: string;
+
+//   verification_status?: AddressVerificationStatus;
+//   verified_at?: Date;
+// }

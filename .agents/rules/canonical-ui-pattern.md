@@ -6,13 +6,13 @@ This rule establishes the standard page design architecture to be used across al
 
 ## 1. Universal Visual & Structural Hierarchy
 
-Every entity/workspace page follows this 4-tier layout:
+Every entity/workspace page follows this canonical layout (with Tier 2 being optional/conditional):
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────┐
 │ Tier 1: STATIC PAGE HEADER (<h1> Title + <p> Functional Purpose)           │
 ├────────────────────────────────────────────────────────────────────────────┤
-│ Tier 2: LIFECYCLE STATE BANNERS (Conditional Alerts)                       │
+│ Tier 2: LIFECYCLE STATE BANNERS (OPTIONAL / Conditional Alerts)            │
 ├────────────────────────────────────────────────────────────────────────────┤
 │ Tier 3: CARD 1 - ENTITY OVERVIEW (AntD Descriptions 3-col Grid)            │
 ├────────────────────────────────────────────────────────────────────────────┤
@@ -28,7 +28,9 @@ Every entity/workspace page follows this 4-tier layout:
 
 ### A. Static Page Header vs. Dynamic Context
 - **Title (`<h1>`) & Subtitle (`<p>`)**: Always static. Clearly describes the feature/purpose of the screen. Never embed volatile IDs or conditional switches into the top `<h1>`.
-- **Lifecycle Banners**: Render state-level notices (`Alert`) directly below the header (e.g. `CONFIRMED`, `PENDING_REVIEW`, `ACTION_REQUIRED`).
+- **Tier 2 - Lifecycle Banners (OPTIONAL / CONDITIONAL)**: 
+  - **When to use**: Render state-level notices (`Alert`) directly below the header only when an entity has active lifecycle notifications, revision flags, or pending actions (e.g. `CONFIRMED`, `SELLER_REVISED`, `ACTION_REQUIRED`, `REVISION_REQUESTED`).
+  - **When to omit**: Omit completely if the page/entity does not have active lifecycle states (e.g., standard registry, catalog, settings, or neutral data pages). Do not render empty or redundant banner placeholders.
 
 ### B. Serial Overview via Ant Design `Descriptions` (Card 1)
 - Always use `<Descriptions bordered size="small" column={{ xxl: 3, xl: 3, lg: 3, md: 2, sm: 1, xs: 1 }}>`.

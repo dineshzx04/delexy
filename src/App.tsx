@@ -45,6 +45,7 @@ import { SellerAwardRevisionResponse } from './pages/rfq/SellerAwardRevisionResp
 
 import { RequesterQuoteReview } from './pages/rfq/RequesterQuoteReview';
 import { RfqQuoteAwardingPage } from './pages/rfq/RfqQuoteAwardingPage';
+import { SellerPurchaseOrderReceipt } from './pages/rfq/SellerPurchaseOrderReceipt';
 
 import IndexedDbManager from './pages/dev/IndexedDbManager';
 import PlatformLayout from './layouts/PlatformLayout';
@@ -141,10 +142,12 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/awarding" element={<RfqQuoteAwardingPage />} />
                 <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
+
                 <Route path="seller/rfqs" element={<SellerRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId" element={<SellerRfqWorkspace />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SellerItemRespond />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/award-revision" element={<SellerAwardRevisionResponse />} />
+                <Route path="seller/rfqs/:rfqId/purchase-orders/:poId" element={<SellerPurchaseOrderReceipt />} />
                 <Route path="*" element={<NotFound scope="user" />} />
               </Route>
             </Route>
@@ -172,10 +175,12 @@ const App: React.FC = () => {
                 <Route path="rfqs/:rfqId/awarding" element={<RfqQuoteAwardingPage />} />
                 <Route path="rfqs/:rfqId/items/:itemId" element={<ItemDetailWorkspace />} />
                 <Route path="rfqs/:rfqId/items/:itemId/quotes/:quoteId/review" element={<RequesterQuoteReview />} />
+
                 <Route path="seller/rfqs" element={<SellerRfqInbox />} />
                 <Route path="seller/rfqs/:rfqId" element={<SellerRfqWorkspace />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/respond" element={<SellerItemRespond />} />
                 <Route path="seller/rfqs/:rfqId/items/:itemId/award-revision" element={<SellerAwardRevisionResponse />} />
+                <Route path="seller/rfqs/:rfqId/purchase-orders/:poId" element={<SellerPurchaseOrderReceipt />} />
 
                 <Route path="*" element={<NotFound scope="business" />} />
               </Route>

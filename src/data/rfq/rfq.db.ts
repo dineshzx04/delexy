@@ -94,6 +94,12 @@ export class RfqDatabase extends Dexie {
         // Table may not exist
       }
     });
+
+    this.version(18).stores({
+      purchase_orders: "id, po_number, rfq_id, quote_award_id, buyer_party_id, seller_party_id, po_status, [rfq_id+seller_party_id]",
+      purchase_order_items: "id, purchase_order_id, quote_item_award_id, seller_quote_id, rfq_item_id",
+      po_acknowledgements: "id, purchase_order_id, seller_party_id",
+    });
   }
 }
 
