@@ -638,9 +638,11 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
           const awardRound = existingAward?.award_round || 1;
           const awardStatus = existingAward ? existingAward.award_status : quote?.status || "SUBMITTED";
 
-          const isPendingSeller = awardStatus === "AWARDED";
+          const isPoCreated = awardStatus === "PO_CREATED" || awardStatus === "PO_RECEIVED" || !!existingAward?.purchase_order_id;
           const isConfirmed = awardStatus === "CONFIRMED";
+          const isPendingSeller = awardStatus === "AWARDED";
           const isSellerRevised = awardStatus === "SELLER_REVISED";
+          const isDraft = !existingAward || awardStatus === "DRAFT" || awardStatus === "SUBMITTED" || awardStatus === "DEVIATION_ACCEPTED";
 
           sellerQuoteAllocationsMap.set(alloc.seller_party_id, {
             sellerPartyId: alloc.seller_party_id,
@@ -650,9 +652,11 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
             awardRound,
             quoteStatus: awardStatus,
             awardStatus,
+            isPoCreated,
             isPendingSeller,
             isConfirmed,
             isSellerRevised,
+            isDraft,
             totalQty: 0,
             totalValue: 0,
             items: [],
@@ -669,6 +673,14 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
         );
         const sellerOfferedQty = existingQva?.seller_offered_quantity;
         const sellerOfferedPrice = existingQva?.unit_price;
+
+        if (
+          existingQva?.variant_award_status === "PO_CREATED" ||
+          existingQva?.variant_award_status === "PO_RECEIVED" ||
+          !!existingQva?.purchase_order_id
+        ) {
+          group.isPoCreated = true;
+        }
 
         group.totalQty += awardedQty;
         group.totalValue += subtotal;
@@ -813,9 +825,6 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
             allocatedTotalPrice,
           } = itemData;
 
-          const isFullyAllocated = allocatedQty === reqQty && reqQty > 0;
-          const isOverAllocated = allocatedQty > reqQty;
-
           const rowsDefinition = [
             {
               key: "manufacturer",
@@ -927,7 +936,13 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
                     );
                   }
 
-                  if (sellerAward.award_status === "PO_CREATED" || sellerAward.award_status === "PO_RECEIVED") {
+                  if (
+                    sellerAward.award_status === "PO_CREATED" ||
+                    sellerAward.award_status === "PO_RECEIVED" ||
+                    variantAward.variant_award_status === "PO_CREATED" ||
+                    variantAward.variant_award_status === "PO_RECEIVED" ||
+                    !!variantAward.purchase_order_id
+                  ) {
                     return (
                       <div className="flex items-center justify-center">
                         <AntTag color="purple" className="text-[11px] m-0 font-semibold flex items-center gap-1">
@@ -1096,7 +1111,7 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
                                   {sellerQuoteAlloc.quoteNumber}
                                 </span>
                                 <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-slate-200 bg-white text-slate-700">
-                                  Round-{sellerQuoteAlloc.awardRound}
+                                  R-{sellerQuoteAlloc.awardRound}
                                 </span>
                               </div>
 
@@ -1117,8 +1132,12 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
 
                                 {/* Action Dispatch Button for this Seller Quote */}
                                 <div className="ml-2">
-                                  {sellerQuoteAlloc.isConfirmed ? (
-                                    <AntTag color="green" className="font-semibold text-xs m-0">
+                                  {sellerQuoteAlloc.isPoCreated ? (
+                                    <AntTag color="purple" className="font-semibold text-xs m-0 flex items-center gap-1">
+                                      <CheckCircleOutlined /> PO Released
+                                    </AntTag>
+                                  ) : sellerQuoteAlloc.isConfirmed ? (
+                                    <AntTag color="green" className="font-semibold text-xs m-0 flex items-center gap-1">
                                       <CheckCircleOutlined /> Confirmed ✓
                                     </AntTag>
                                   ) : sellerQuoteAlloc.isPendingSeller ? (
@@ -1135,7 +1154,7 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
                                     >
                                       Send Revised Award (Round {(sellerQuoteAlloc.awardRound || 1) + 1})
                                     </Button>
-                                  ) : (
+                                  ) : sellerQuoteAlloc.isDraft || !sellerQuoteAlloc.awardStatus || sellerQuoteAlloc.awardStatus === "DRAFT" || sellerQuoteAlloc.awardStatus === "DEVIATION_ACCEPTED" ? (
                                     <Button
                                       type="primary"
                                       size="small"
@@ -1146,7 +1165,7 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
                                     >
                                       Send Award Allocation
                                     </Button>
-                                  )}
+                                  ) : null}
                                 </div>
                               </div>
                             </div>
@@ -1179,10 +1198,36 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
                                           <span className="font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-xs">
                                             {allocItem.awardedQty} {item.req_unit || "PCS"}
                                           </span>
-                                        ) : sellerQuoteAlloc.isConfirmed ? (
+                                        ) : sellerQuoteAlloc.isConfirmed || sellerQuoteAlloc.isPoCreated ? (
                                           <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 text-xs">
                                             {allocItem.awardedQty} {item.req_unit || "PCS"}
                                           </span>
+                                        ) : sellerQuoteAlloc.isSellerRevised ? (
+                                          <div className="flex flex-col items-end gap-1">
+                                            <InputNumber
+                                              min={0}
+                                              step={1}
+                                              value={allocItem.awardedQty}
+                                              onChange={val =>
+                                                handleQtyChange(
+                                                  item.id,
+                                                  allocItem.variant || allocItem.allocation.variant_id,
+                                                  allocItem.allocation.seller_party_id,
+                                                  allocItem.allocation.seller_quote_id,
+                                                  val,
+                                                  allCombinedVariants,
+                                                  item.req_unit,
+                                                )
+                                              }
+                                              size="small"
+                                              className="!w-24 text-xs font-mono font-bold border-slate-300"
+                                            />
+                                            {allocItem.sellerOfferedQty !== undefined && (
+                                              <span className="text-[10px] text-slate-600 font-medium">
+                                                Offered: {allocItem.sellerOfferedQty} {item.req_unit || "PCS"}
+                                              </span>
+                                            )}
+                                          </div>
                                         ) : (
                                           <div className="flex flex-col items-end gap-1">
                                             <InputNumber
@@ -1203,11 +1248,6 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
                                               size="small"
                                               className="!w-24 text-xs font-mono font-bold border-slate-300"
                                             />
-                                            {sellerQuoteAlloc.isSellerRevised && allocItem.sellerOfferedQty !== undefined && (
-                                              <span className="text-[10px] text-slate-600 font-medium">
-                                                Offered: {allocItem.sellerOfferedQty} {item.req_unit || "PCS"}
-                                              </span>
-                                            )}
                                           </div>
                                         )}
                                       </td>
@@ -1262,19 +1302,6 @@ export const RfqQuoteAwardingTab: React.FC<RfqQuoteAwardingTabProps> = ({ rfqId 
                         {allocatedQty} / {reqQty} {item.req_unit || "PCS"}
                       </strong>
                       <span className="text-slate-400 text-[11px]">(Rem: {remainingQty})</span>
-                      {isFullyAllocated ? (
-                        <AntTag color="green" className="font-semibold text-xs m-0">
-                          <CheckCircleOutlined /> Target Met
-                        </AntTag>
-                      ) : isOverAllocated ? (
-                        <AntTag color="red" className="font-semibold text-xs m-0">
-                          <ExclamationCircleOutlined /> Over Allocated (+{allocatedQty - reqQty})
-                        </AntTag>
-                      ) : (
-                        <AntTag className="font-medium text-xs m-0 bg-white border-slate-300 text-slate-700">
-                          Under Allocated (-{remainingQty})
-                        </AntTag>
-                      )}
                     </div>
 
                     <div className="flex items-center gap-3">
